@@ -1,0 +1,438 @@
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdfootballAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .winner-btn.selected, .result-btn.selected {
+            background-color: #10B981; /* Emerald 500 */
+            color: white;
+            border-color: #059669; /* Emerald 600 */
+        }
+        .winner-btn:disabled, .result-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        select:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            background-color: #f3f4f6;
+        }
+        .view-toggle-btn.active {
+            background-color: #4f46e5; /* Indigo-600 */
+            color: white;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Login View -->
+    <div id="login-view" class="min-h-screen flex items-center justify-center">
+        <div class="text-center p-8 bg-white rounded-2xl shadow-lg max-w-sm mx-auto">
+            <h1 class="text-4xl font-bold text-gray-900">NerdfootballAI</h1>
+            <p class="mt-2 mb-6 text-gray-600">Your weekly NFL confidence pool.</p>
+            <button id="login-btn" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 flex items-center justify-center w-full">
+                <svg class="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
+                Sign In with Google
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-view" class="container mx-auto p-4 md:p-8 max-w-5xl hidden">
+        <header class="mb-6">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <div id="admin-controls" class="hidden">
+                    <button id="picks-view-btn" class="view-toggle-btn active py-2 px-4 rounded-lg font-semibold border border-gray-300">My Picks</button>
+                    <button id="admin-view-btn" class="view-toggle-btn py-2 px-4 rounded-lg font-semibold border border-gray-300">Admin</button>
+                </div>
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900 order-first md:order-none w-full md:w-auto text-center">NerdfootballAI</h1>
+                <div class="flex items-center space-x-4">
+                    <span id="user-display" class="text-sm font-medium text-gray-700"></span>
+                    <button id="logout-btn" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-600">Logout</button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Picks View -->
+        <div id="picks-container">
+            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <div class="mb-6 flex justify-between items-center">
+                    <div>
+                        <label for="week-selector" class="block text-lg font-medium text-gray-700 mb-2">Select a Week:</label>
+                        <select id="week-selector" class="p-3 rounded-lg border-2 border-gray-300 bg-white"></select>
+                    </div>
+                </div>
+
+                <main id="picks-form">
+                    <div id="lock-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md mb-6" role="alert">
+                        <p class="font-bold">Picks Locked</p>
+                        <p>The games for this week have started. Your picks can no longer be changed.</p>
+                    </div>
+                    <div id="game-list" class="space-y-6">
+                        <!-- Game rows will be dynamically inserted here -->
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Admin View -->
+        <div id="admin-container" class="hidden">
+             <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Admin Dashboard</h2>
+                    <div>
+                        <label for="admin-week-selector" class="block text-lg font-medium text-gray-700 mb-2">Manage Week:</label>
+                        <select id="admin-week-selector" class="p-3 rounded-lg border-2 border-gray-300 bg-white"></select>
+                    </div>
+                </div>
+
+                <!-- Game Results Input -->
+                <div id="results-input-section" class="mb-8">
+                    <h3 class="text-xl font-bold mb-4">Enter Game Winners</h3>
+                    <div id="results-game-list" class="space-y-4"></div>
+                    <button id="save-results-btn" class="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 flex items-center justify-center">
+                        Save Game Results
+                    </button>
+                </div>
+
+                <!-- Leaderboard -->
+                <div id="leaderboard-section">
+                    <h3 class="text-xl font-bold mb-4">Live Leaderboard</h3>
+                    <div id="leaderboard-loader" class="loader hidden"></div>
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body" class="bg-white divide-y divide-gray-200">
+                           <!-- Leaderboard rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const ADMIN_UID = "YOUR_GOOGLE_UID_HERE"; // IMPORTANT: Replace with your actual Google User ID
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const seasonData = [ /* Fictional 2025 schedule */ 
+                // Week 1
+                { week: 1, games: [
+                    { id: 101, away: 'Ravens', home: 'Chiefs', kickoff: '2025-09-04T20:20:00' },
+                    { id: 102, away: 'Packers', home: 'Eagles', kickoff: '2025-09-05T20:15:00' },
+                    { id: 103, away: 'Steelers', home: 'Falcons', kickoff: '2025-09-07T13:00:00' },
+                ]},
+                // Week 2
+                { week: 2, games: [
+                    { id: 201, away: 'Bills', home: 'Dolphins', kickoff: '2025-09-11T20:15:00' },
+                    { id: 202, away: 'Raiders', home: 'Ravens', kickoff: '2025-09-14T13:00:00' },
+                    { id: 203, away: 'Chargers', home: 'Panthers', kickoff: '2025-09-14T13:00:00' },
+                ]},
+            ];
+
+            // --- ALL UI ELEMENTS ---
+            const loginView = document.getElementById('login-view'), appView = document.getElementById('app-view');
+            const loginBtn = document.getElementById('login-btn'), logoutBtn = document.getElementById('logout-btn');
+            const userDisplay = document.getElementById('user-display'), adminControls = document.getElementById('admin-controls');
+            const picksContainer = document.getElementById('picks-container'), adminContainer = document.getElementById('admin-container');
+            const picksViewBtn = document.getElementById('picks-view-btn'), adminViewBtn = document.getElementById('admin-view-btn');
+            const weekSelector = document.getElementById('week-selector'), adminWeekSelector = document.getElementById('admin-week-selector');
+            const gameList = document.getElementById('game-list'), resultsGameList = document.getElementById('results-game-list');
+            const saveResultsBtn = document.getElementById('save-results-btn');
+            const leaderboardLoader = document.getElementById('leaderboard-loader'), leaderboardBody = document.getElementById('leaderboard-body');
+
+            // --- APP STATE ---
+            let currentWeek = 1;
+            let currentUser = null;
+            let db, auth;
+            let unsubscribeFromPicks = null;
+            
+            // --- INITIALIZATION ---
+            async function initializeAppAndAuth() {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "...", authDomain: "...", projectId: "..." };
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                onAuthStateChanged(auth, handleAuthStateChange);
+            }
+
+            async function handleAuthStateChange(user) {
+                if (user) {
+                    currentUser = user;
+                    loginView.classList.add('hidden');
+                    appView.classList.remove('hidden');
+                    userDisplay.textContent = `Welcome, ${user.displayName.split(' ')[0]}`;
+
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const userDocRef = doc(db, `artifacts/${appId}/public/data/nerdfootball_users/${user.uid}`);
+                    await setDoc(userDocRef, { displayName: user.displayName, email: user.email }, { merge: true });
+
+                    if (user.uid === ADMIN_UID) {
+                        adminControls.classList.remove('hidden');
+                    }
+
+                    populateWeekSelectors();
+                    loadAndRenderWeek(currentWeek);
+                    renderAdminView(currentWeek); // Pre-load admin view
+                } else {
+                    currentUser = null;
+                    loginView.classList.remove('hidden');
+                    appView.classList.add('hidden');
+                }
+            }
+
+            // --- DATA PATH HELPERS ---
+            const appId = () => typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const picksPath = (week, uid) => `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
+            const resultsPath = (week) => `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
+            const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
+            
+            // --- PICKS VIEW LOGIC ---
+            function getWeekLockStatus(weekNumber) {
+                const weekData = seasonData.find(w => w.week == weekNumber);
+                if (!weekData || !weekData.games.length) return false;
+                // Add 'Z' to treat the kickoff time as UTC for consistent comparison
+                const firstKickoff = new Date(weekData.games[0].kickoff + 'Z'); 
+                return new Date() > firstKickoff;
+            }
+
+            async function loadAndRenderWeek(weekNumber) {
+                currentWeek = parseInt(weekNumber, 10);
+                if (!currentUser) return;
+                
+                if (unsubscribeFromPicks) unsubscribeFromPicks();
+                
+                const docRef = doc(db, picksPath(currentWeek, currentUser.uid));
+
+                unsubscribeFromPicks = onSnapshot(docRef, (docSnap) => {
+                    const weekIsLocked = getWeekLockStatus(currentWeek);
+                    let userPicks = {};
+                    const weekData = seasonData.find(w => w.week == currentWeek);
+                    
+                    if (docSnap.exists()) {
+                        userPicks = docSnap.data();
+                    } else {
+                        // Initialize picks for the week if they don't exist in Firestore
+                        weekData.games.forEach((game, index) => {
+                            userPicks[game.id] = { winner: null, confidence: index + 1 };
+                        });
+                    }
+                    renderWeekUI(weekData, userPicks, weekIsLocked);
+                });
+            }
+
+            function renderWeekUI(weekData, userPicks, weekIsLocked) {
+                document.getElementById('lock-banner').classList.toggle('hidden', !weekIsLocked);
+                gameList.innerHTML = '';
+                const totalGames = weekData.games.length;
+                const confidenceOptions = Array.from({ length: totalGames }, (_, i) => i + 1);
+
+                weekData.games.forEach(game => {
+                    const pick = userPicks[game.id] || { winner: null, confidence: 0 };
+                    const gameRow = document.createElement('div');
+                    gameRow.className = 'p-4 border border-gray-200 rounded-lg';
+                    gameRow.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                            <div class="md:col-span-8">
+                                <div class="flex flex-col sm:flex-row justify-around items-center gap-2">
+                                    <button data-game-id="${game.id}" data-team="${game.away}" ${weekIsLocked ? 'disabled' : ''} class="winner-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 border-gray-300 font-semibold ${pick.winner === game.away ? 'selected' : 'bg-gray-50 hover:bg-gray-200'}">${game.away}</button>
+                                    <span class="text-gray-500 font-bold">@</span>
+                                    <button data-game-id="${game.id}" data-team="${game.home}" ${weekIsLocked ? 'disabled' : ''} class="winner-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 border-gray-300 font-semibold ${pick.winner === game.home ? 'selected' : 'bg-gray-50 hover:bg-gray-200'}">${game.home}</button>
+                                </div>
+                            </div>
+                            <div class="md:col-span-4">
+                                <select data-game-id="${game.id}" ${weekIsLocked ? 'disabled' : ''} class="confidence-select w-full p-3 rounded-lg border-2 border-gray-300 bg-white">
+                                    ${confidenceOptions.map(opt => `<option value="${opt}" ${pick.confidence === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>`;
+                    gameList.appendChild(gameRow);
+                });
+
+                // Add event listeners after rendering
+                gameList.querySelectorAll('.winner-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const gameId = e.target.dataset.gameId;
+                        const team = e.target.dataset.team;
+                        userPicks[gameId].winner = team;
+                        gameList.querySelectorAll(`.winner-btn[data-game-id="${gameId}"]`).forEach(b => b.classList.remove('selected'));
+                        e.target.classList.add('selected');
+                        savePicksToFirestore(currentWeek, userPicks);
+                    });
+                });
+
+                gameList.querySelectorAll('.confidence-select').forEach(select => {
+                    select.addEventListener('change', (e) => {
+                        const gameId = e.target.dataset.gameId;
+                        const newConfidence = parseInt(e.target.value, 10);
+                        const oldConfidence = userPicks[gameId].confidence;
+                        if (newConfidence === oldConfidence) return;
+                        
+                        const otherGameId = Object.keys(userPicks).find(id => id !== gameId && userPicks[id].confidence === newConfidence);
+                        if (otherGameId) {
+                            userPicks[otherGameId].confidence = oldConfidence;
+                            const otherSelect = gameList.querySelector(`.confidence-select[data-game-id="${otherGameId}"]`);
+                            if (otherSelect) otherSelect.value = oldConfidence;
+                        }
+                        userPicks[gameId].confidence = newConfidence;
+                        savePicksToFirestore(currentWeek, userPicks);
+                    });
+                });
+            }
+
+            async function savePicksToFirestore(weekNum, picks) {
+                if (!currentUser || getWeekLockStatus(weekNum)) return;
+                const docRef = doc(db, picksPath(weekNum, currentUser.uid));
+                try {
+                    await setDoc(docRef, picks);
+                } catch (error) {
+                    console.error("Error saving picks:", error);
+                }
+            }
+
+
+            // --- ADMIN VIEW LOGIC ---
+            function toggleViews(showAdmin) {
+                adminContainer.classList.toggle('hidden', !showAdmin);
+                picksContainer.classList.toggle('hidden', showAdmin);
+                adminViewBtn.classList.toggle('active', showAdmin);
+                picksViewBtn.classList.toggle('active', !showAdmin);
+            }
+            
+            async function renderAdminView(weekNumber) {
+                const weekData = seasonData.find(w => w.week == weekNumber);
+                if (!weekData) return;
+
+                const resultsDocRef = doc(db, resultsPath(weekNumber));
+                const resultsSnap = await getDoc(resultsDocRef);
+                const currentResults = resultsSnap.exists() ? resultsSnap.data() : {};
+                
+                resultsGameList.innerHTML = '';
+                weekData.games.forEach(game => {
+                    const winner = currentResults[game.id] || null;
+                    const gameEl = document.createElement('div');
+                    gameEl.className = 'grid grid-cols-12 gap-2 items-center';
+                    gameEl.innerHTML = `
+                        <div class="col-span-10 flex justify-around items-center">
+                             <button data-game-id="${game.id}" data-team="${game.away}" class="result-btn w-2/5 text-center p-2 rounded-lg border-2 ${winner === game.away ? 'selected' : ''}">${game.away}</button>
+                             <span class="font-bold">@</span>
+                             <button data-game-id="${game.id}" data-team="${game.home}" class="result-btn w-2/5 text-center p-2 rounded-lg border-2 ${winner === game.home ? 'selected' : ''}">${game.home}</button>
+                        </div>
+                    `;
+                    resultsGameList.appendChild(gameEl);
+                });
+                
+                resultsGameList.querySelectorAll('.result-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                    const { gameId } = e.target.dataset;
+                    const gameButtons = resultsGameList.querySelectorAll(`.result-btn[data-game-id="${gameId}"]`);
+                    gameButtons.forEach(b => b.classList.remove('selected'));
+                    e.target.classList.add('selected');
+                }));
+                
+                calculateAndDisplayLeaderboard(weekNumber);
+            }
+            
+            saveResultsBtn.addEventListener('click', async () => {
+                const weekNumber = adminWeekSelector.value;
+                const newResults = {};
+                resultsGameList.querySelectorAll('.result-btn.selected').forEach(btn => {
+                    newResults[btn.dataset.gameId] = btn.dataset.team;
+                });
+                
+                await setDoc(doc(db, resultsPath(weekNumber)), newResults);
+                alert('Results saved successfully!');
+                calculateAndDisplayLeaderboard(weekNumber);
+            });
+
+            async function calculateAndDisplayLeaderboard(weekNumber) {
+                leaderboardLoader.classList.remove('hidden');
+                leaderboardBody.innerHTML = '';
+
+                const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
+                const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+
+                const usersSnap = await getDocs(collection(db, usersPath()));
+                const users = {};
+                usersSnap.forEach(doc => users[doc.id] = doc.data());
+                
+                const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+
+                const scores = [];
+                picksSnap.forEach(pickDoc => {
+                    const userId = pickDoc.id;
+                    if (!users[userId]) return; // Skip if user data not found
+
+                    const userPicks = pickDoc.data();
+                    let userScore = 0;
+                    Object.keys(userPicks).forEach(gameId => {
+                        const pick = userPicks[gameId];
+                        if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
+                            userScore += pick.confidence;
+                        }
+                    });
+                    scores.push({ userId, displayName: users[userId].displayName, score: userScore });
+                });
+                
+                scores.sort((a, b) => b.score - a.score);
+                
+                leaderboardBody.innerHTML = scores.map((s, index) => `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap font-medium">${index + 1}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${s.displayName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap font-bold">${s.score}</td>
+                    </tr>
+                `).join('') || `<tr><td colspan="3" class="text-center py-4">No picks submitted for this week yet.</td></tr>`;
+                leaderboardLoader.classList.add('hidden');
+            }
+
+            // --- EVENT LISTENERS ---
+            loginBtn.addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()));
+            logoutBtn.addEventListener('click', () => signOut(auth));
+            adminViewBtn.addEventListener('click', () => toggleViews(true));
+            picksViewBtn.addEventListener('click', () => toggleViews(false));
+            weekSelector.addEventListener('change', (e) => loadAndRenderWeek(e.target.value));
+            adminWeekSelector.addEventListener('change', (e) => renderAdminView(e.target.value));
+            
+            // --- UTILITY FUNCTIONS ---
+            function populateWeekSelectors() {
+                const options = seasonData.map(w => `<option value="${w.week}">Week ${w.week}</option>`).join('');
+                weekSelector.innerHTML = options;
+                adminWeekSelector.innerHTML = options;
+            }
+
+            initializeAppAndAuth();
+        });
+    </script>
+</body>
+</html>
