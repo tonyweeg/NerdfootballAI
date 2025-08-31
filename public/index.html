@@ -1,774 +1,851 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NerdfootballAI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .winner-btn.selected, .result-btn.selected {
-            background-color: #334155; /* slate-700 */
-            color: white;
-            border-color: #1e293b; /* slate-800 */
-        }
-        .winner-btn:disabled, .result-btn:disabled, #reset-picks-btn:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            background-color: #D1D5DB;
-        }
-        select:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            background-color: #f3f4f6;
-        }
-        .view-toggle-btn.active {
-            background-color: #475569; /* slate-600 */
-            color: white;
-        }
-        .admin-tab {
-            border-color: transparent;
-            border-bottom-width: 2px;
-            padding: 1rem;
-            font-weight: 500;
-            color: #6B7280;
-        }
-        .admin-tab.active {
-            border-color: #475569; /* slate-600 */
-            color: #334155; /* slate-700 */
-        }
-        .form-input {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            border: 1px solid #9ca3af; /* gray-400 */
-            background-color: #f8fafc; /* slate-50 */
-        }
-        .form-btn {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            color: white;
-            background-image: linear-gradient(to bottom, #64748b, #334155);
-            border: 1px solid #1e293b;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        }
-        .form-btn:hover {
-            background-image: linear-gradient(to bottom, #475569, #1e293b);
-        }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #64748b; /* slate-500 */
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        #save-status-icon svg {
-            animation: spin 1s linear infinite;
-        }
-    </style>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>NerdfootballAI</title>
+ <script src="https://cdn.tailwindcss.com"></script>
+ <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+ <style>
+ body {
+ font-family: 'Inter', sans-serif;
+ }
+ .winner-btn.selected, .result-btn.selected {
+ background-color: #334155; /* slate-700 */
+ color: white;
+ border-color: #1e293b; /* slate-800 */
+ }
+ .winner-btn:disabled, .result-btn:disabled, #reset-picks-btn:disabled {
+ opacity: 0.7;
+ cursor: not-allowed;
+ background-color: #D1D5DB;
+ }
+ select:disabled {
+ opacity: 0.7;
+ cursor: not-allowed;
+ background-color: #f3f4f6;
+ }
+ .view-toggle-btn.active {
+ background-color: #475569; /* slate-600 */
+ color: white;
+ }
+ .admin-tab {
+ border-color: transparent;
+ border-bottom-width: 2px;
+ padding: 1rem;
+ font-weight: 500;
+ color: #6B7280;
+ }
+ .admin-tab.active {
+ border-color: #475569; /* slate-600 */
+ color: #334155; /* slate-700 */
+ }
+ .form-input {
+ width: 100%;
+ padding: 0.75rem;
+ border-radius: 0.5rem;
+ border: 1px solid #9ca3af; /* gray-400 */
+ background-color: #f8fafc; /* slate-50 */
+ }
+ .form-btn {
+ width: 100%;
+ padding: 0.75rem;
+ border-radius: 0.5rem;
+ font-weight: 600;
+ color: white;
+ background-image: linear-gradient(to bottom, #64748b, #334155);
+ border: 1px solid #1e293b;
+ box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+ }
+ .form-btn:hover {
+ background-image: linear-gradient(to bottom, #475569, #1e293b);
+ }
+ .loader {
+ border: 4px solid #f3f3f3;
+ border-top: 4px solid #64748b; /* slate-500 */
+ border-radius: 50%;
+ width: 40px;
+ height: 40px;
+ animation: spin 1s linear infinite;
+ margin: 20px auto;
+ }
+ @keyframes spin {
+ 0% { transform: rotate(0deg); }
+ 100% { transform: rotate(360deg); }
+ }
+ #save-status-icon svg {
+ animation: spin 1s linear infinite;
+ }
+  #settings-modal {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+ </style>
 </head>
 <body class="bg-slate-200 text-slate-800">
 
-    <!-- Login & Register View -->
-    <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
-        <div class="p-8 bg-slate-100 rounded-lg shadow-xl max-w-sm w-full mx-auto border border-slate-300">
-            
-            <!-- Login Form -->
-            <form id="login-form">
-                <h1 class="text-3xl font-bold text-center mb-1 text-slate-800">NerdfootballAI</h1>
-                <p class="text-center text-slate-600 mb-6">Welcome back, Nerds</p>
-                <div id="login-error" class="text-red-600 text-center text-sm mb-4 hidden p-3 bg-red-100 rounded-md border border-red-200"></div>
-                <div class="space-y-4">
-                    <input id="login-email" type="email" placeholder="Email Address" required class="form-input">
-                    <input id="login-password" type="password" placeholder="Password" required class="form-input">
-                </div>
-                <button id="login-btn" type="submit" class="form-btn mt-6">Sign In</button>
-                <p class="text-center mt-4 text-sm">
-                    Don't have an account? <a href="#" id="show-register-link" class="font-medium text-slate-600 hover:text-slate-800">Register</a>
-                </p>
-            </form>
+ <!-- Login & Register View -->
+ <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+ <div class="p-8 bg-slate-100 rounded-lg shadow-xl max-w-sm w-full mx-auto border border-slate-300">
+ 
+ <!-- Login Form -->
+ <form id="login-form">
+ <h1 class="text-3xl font-bold text-center mb-1 text-slate-800">NerdfootballAI</h1>
+ <p class="text-center text-slate-600 mb-6">Welcome back, Nerds</p>
+ <div id="login-error" class="text-red-600 text-center text-sm mb-4 hidden p-3 bg-red-100 rounded-md border border-red-200"></div>
+ <div class="space-y-4">
+ <input id="login-email" type="email" placeholder="Email Address" required class="form-input">
+ <input id="login-password" type="password" placeholder="Password" required class="form-input">
+ </div>
+ <button id="login-btn" type="submit" class="form-btn mt-6">Sign In</button>
+ <p class="text-center mt-4 text-sm">
+ Don't have an account? <a href="#" id="show-register-link" class="font-medium text-slate-600 hover:text-slate-800">Register</a>
+ </p>
+ </form>
 
-            <!-- Registration Form -->
-            <form id="register-form" class="hidden">
-                 <h1 class="text-3xl font-bold text-center mb-1">Create Account</h1>
-                <p class="text-center text-slate-600 mb-6">Get started with NerdfootballAI.</p>
-                <div id="register-error" class="text-red-600 text-center text-sm mb-4 hidden p-3 bg-red-100 rounded-md border border-red-200"></div>
-                <div class="space-y-4">
-                     <input id="register-firstname" type="text" placeholder="First Name" required class="form-input">
-                     <input id="register-lastname" type="text" placeholder="Last Name" required class="form-input">
-                     <input id="register-email" type="email" placeholder="Email Address" required class="form-input">
-                     <input id="register-password" type="password" placeholder="Password" required class="form-input">
-                     <input id="register-confirm-password" type="password" placeholder="Confirm Password" required class="form-input">
+ <!-- Registration Form -->
+ <form id="register-form" class="hidden">
+ <h1 class="text-3xl font-bold text-center mb-1">Create Account</h1>
+ <p class="text-center text-slate-600 mb-6">Get started with NerdfootballAI.</p>
+ <div id="register-error" class="text-red-600 text-center text-sm mb-4 hidden p-3 bg-red-100 rounded-md border border-red-200"></div>
+ <div class="space-y-4">
+ <input id="register-firstname" type="text" placeholder="First Name" required class="form-input">
+ <input id="register-lastname" type="text" placeholder="Last Name" required class="form-input">
+ <input id="register-email" type="email" placeholder="Email Address" required class="form-input">
+ <input id="register-password" type="password" placeholder="Password" required class="form-input">
+ <input id="register-confirm-password" type="password" placeholder="Confirm Password" required class="form-input">
+ </div>
+ <button id="register-btn" type="submit" class="form-btn mt-6">Create Account</button>
+ <p class="text-center mt-4 text-sm">
+ Already have an account? <a href="#" id="show-login-link" class="font-medium text-slate-600 hover:text-slate-800">Sign In</a>
+ </p>
+ </form>
+ </div>
+ </div>
+
+ <!-- Main App Container -->
+ <div id="app-view" class="container mx-auto p-4 md:p-8 max-w-5xl hidden">
+ <header class="mb-6">
+ <div class="flex justify-between items-center flex-wrap gap-4">
+ <div id="admin-controls" class="hidden">
+ <button id="picks-view-btn" class="view-toggle-btn active py-2 px-4 rounded-lg font-semibold border border-slate-400">My Picks</button>
+ <button id="admin-view-btn" class="view-toggle-btn py-2 px-4 rounded-lg font-semibold border border-slate-400">Admin</button>
+ </div>
+ <div class="flex items-center space-x-2 order-first md:order-none w-full md:w-auto text-center">
+ <h1 class="text-3xl md:text-4xl font-bold text-slate-800">NerdfootballAI</h1>
+ <span class="text-sm font-medium text-slate-600">v1.1.0</span>
+ </div>
+ <div class="flex items-center space-x-2">
+    <span id="user-display" class="text-sm font-medium text-slate-700"></span>
+    <button id="settings-btn" class="text-slate-500 hover:text-slate-800">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+    </button>
+    <button id="logout-btn" class="bg-rose-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-rose-800">Logout</button>
+</div>
+ </div>
+ </header>
+ 
+ <!-- Picks View -->
+ <div id="picks-container">
+ <div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
+ <div class="mb-6 flex flex-wrap gap-4 justify-between items-center">
+ <div>
+ <label for="week-selector" class="block text-lg font-medium text-slate-700 mb-2">Select a Week:</label>
+ <select id="week-selector" class="p-3 rounded-lg border-2 border-slate-300 bg-white"></select>
+ </div>
+ <div class="flex items-center space-x-4">
+ <div id="save-status" class="flex items-center space-x-2 h-10">
+ <div id="save-status-icon" class="w-6 h-6"></div>
+ <span id="save-status-text" class="text-sm font-medium"></span>
+ </div>
+ <button id="reset-picks-btn" class="bg-emerald-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-emerald-800">Reset Picks</button>
+ </div>
+ </div>
+ <main id="picks-form">
+ <div id="lock-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6" role="alert">
+ <p class="font-bold">Picks Locked</p>
+ <p>The games for this week have started. Your picks can no longer be changed.</p>
+ </div>
+ <div id="game-list" class="space-y-6"></div>
+ </main>
+ </div>
+ </div>
+
+ <!-- Admin View -->
+ <div id="admin-container" class="hidden">
+ <div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
+ <div class="flex justify-between items-center mb-6">
+ <h2 class="text-2xl font-bold text-slate-800">Admin Dashboard</h2>
+ <select id="admin-week-selector" class="p-3 rounded-lg border-2 border-slate-300 bg-white"></select>
+ </div>
+ <div class="border-b border-gray-300 mb-6">
+ <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+ <button id="tab-game-results" class="admin-tab active">Game Results</button>
+ <button id="tab-user-mgmt" class="admin-tab">User Management</button>
+ <button id="tab-picks-mgmt" class="admin-tab">Picks Management</button>
+ </nav>
+ </div>
+ <div id="admin-content-game-results" class="admin-content-section">
+ <h3 class="text-xl font-bold mb-4">Enter Game Winners</h3>
+ <div id="results-game-list" class="space-y-4"></div>
+ <button id="save-results-btn" class="mt-6 w-full bg-green-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-800">Save Game Results</button>
+ <div id="leaderboard-section" class="mt-8">
+ <h3 class="text-xl font-bold mb-4">Live Leaderboard</h3>
+ <div id="leaderboard-loader" class="loader hidden"></div>
+ <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-100"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th></tr></thead><tbody id="leaderboard-body" class="bg-white divide-y divide-gray-200"></tbody></table>
+ </div>
+ </div>
+ <div id="admin-content-user-mgmt" class="admin-content-section hidden">
+ <h3 class="text-xl font-bold mb-4">User Management</h3>
+ <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-100"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th></tr></thead><tbody id="user-mgmt-body" class="bg-white divide-y divide-gray-200"></tbody></table>
+ </div>
+ <div id="admin-content-picks-mgmt" class="admin-content-section hidden">
+ <h3 class="text-xl font-bold mb-4">Edit User Picks</h3>
+ <div class="mb-4">
+ <label for="user-picks-selector" class="block text-sm font-medium text-gray-700">Select User:</label>
+ <select id="user-picks-selector" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-slate-500 focus:border-slate-500 sm:text-sm rounded-md"></select>
+ </div>
+ <div id="user-picks-game-list" class="space-y-6"></div>
+ <button id="save-user-picks-btn" class="mt-6 w-full bg-blue-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-800 hidden">Save User's Picks</button>
+ </div>
+ </div>
+ </div>
+ </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex">
+        <div class="p-8 bg-slate-100 rounded-lg shadow-xl max-w-md w-full mx-auto border border-slate-300 relative">
+            <button id="close-settings-btn" class="absolute top-4 right-4 text-slate-500 hover:text-slate-800">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">User Settings</h2>
+            <div id="settings-error" class="text-red-600 text-center text-sm mb-4 hidden p-3 bg-red-100 rounded-md border border-red-200"></div>
+            <div id="settings-success" class="text-green-600 text-center text-sm mb-4 hidden p-3 bg-green-100 rounded-md border border-green-200"></div>
+            <form id="settings-form" class="space-y-4">
+                <div>
+                    <label for="settings-display-name" class="block text-sm font-medium text-slate-700">Display Name</label>
+                    <input type="text" id="settings-display-name" required class="mt-1 form-input">
                 </div>
-                <button id="register-btn" type="submit" class="form-btn mt-6">Create Account</button>
-                <p class="text-center mt-4 text-sm">
-                    Already have an account? <a href="#" id="show-login-link" class="font-medium text-slate-600 hover:text-slate-800">Sign In</a>
-                </p>
+                <div>
+                    <label for="settings-email" class="block text-sm font-medium text-slate-700">Email Address</label>
+                    <input type="email" id="settings-email" required class="mt-1 form-input">
+                </div>
+                <div class="pt-4">
+                    <button type="submit" class="form-btn">Save Changes</button>
+                </div>
             </form>
         </div>
     </div>
 
-    <!-- Main App Container -->
-    <div id="app-view" class="container mx-auto p-4 md:p-8 max-w-5xl hidden">
-        <header class="mb-6">
-            <div class="flex justify-between items-center flex-wrap gap-4">
-                <div id="admin-controls" class="hidden">
-                    <button id="picks-view-btn" class="view-toggle-btn active py-2 px-4 rounded-lg font-semibold border border-slate-400">My Picks</button>
-                    <button id="admin-view-btn" class="view-toggle-btn py-2 px-4 rounded-lg font-semibold border border-slate-400">Admin</button>
-                </div>
-                <div class="flex items-center space-x-2 order-first md:order-none w-full md:w-auto text-center">
-                    <h1 class="text-3xl md:text-4xl font-bold text-slate-800">NerdfootballAI</h1>
-                    <span class="text-sm font-medium text-slate-600">v1.1.0</span>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <span id="user-display" class="text-sm font-medium text-slate-700"></span>
-                    <button id="logout-btn" class="bg-rose-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-rose-800">Logout</button>
-                </div>
-            </div>
-        </header>
-        
-        <!-- Picks View -->
-        <div id="picks-container">
-            <div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
-                <div class="mb-6 flex flex-wrap gap-4 justify-between items-center">
-                    <div>
-                        <label for="week-selector" class="block text-lg font-medium text-slate-700 mb-2">Select a Week:</label>
-                        <select id="week-selector" class="p-3 rounded-lg border-2 border-slate-300 bg-white"></select>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <div id="save-status" class="flex items-center space-x-2 h-10">
-                            <div id="save-status-icon" class="w-6 h-6"></div>
-                            <span id="save-status-text" class="text-sm font-medium"></span>
-                        </div>
-                        <button id="reset-picks-btn" class="bg-emerald-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-emerald-800">Reset Picks</button>
-                    </div>
-                </div>
-                <main id="picks-form">
-                    <div id="lock-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6" role="alert">
-                        <p class="font-bold">Picks Locked</p>
-                        <p>The games for this week have started. Your picks can no longer be changed.</p>
-                    </div>
-                    <div id="game-list" class="space-y-6"></div>
-                </main>
-            </div>
-        </div>
+ <script type="module">
+ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+ import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updateEmail, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+ import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        <!-- Admin View -->
-        <div id="admin-container" class="hidden">
-             <div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-slate-800">Admin Dashboard</h2>
-                    <select id="admin-week-selector" class="p-3 rounded-lg border-2 border-slate-300 bg-white"></select>
-                </div>
+ const ADMIN_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
 
-                <!-- Admin Nav Tabs -->
-                <div class="border-b border-gray-300 mb-6">
-                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                        <button id="tab-game-results" class="admin-tab active">Game Results</button>
-                        <button id="tab-user-mgmt" class="admin-tab">User Management</button>
-                        <button id="tab-picks-mgmt" class="admin-tab">Picks Management</button>
-                    </nav>
-                </div>
+ document.addEventListener('DOMContentLoaded', () => {
+ 
+ // --- DATA & TIME LOGIC ---
+ async function getGamesForWeek(weekNumber) {
+ try {
+ const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+ if (!response.ok) {
+ throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
+ }
+ const weekData = await response.json();
+ return Array.isArray(weekData.games) ? weekData.games.map(game => ({
+ id: game.id,
+ away: game.a,
+ home: game.h,
+ kickoff: game.dt.slice(0, -1), // FIX: Remove trailing 'Z' to treat as local time
+ stadium: game.stadium
+ })) : [];
+ } catch (error) {
+ console.error(`Error fetching games for week ${weekNumber}:`, error);
+ return [];
+ }
+ }
 
-                <!-- Game Results Content -->
-                <div id="admin-content-game-results" class="admin-content-section">
-                    <h3 class="text-xl font-bold mb-4">Enter Game Winners</h3>
-                    <div id="results-game-list" class="space-y-4"></div>
-                    <button id="save-results-btn" class="mt-6 w-full bg-green-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-800">Save Game Results</button>
-                     <div id="leaderboard-section" class="mt-8">
-                        <h3 class="text-xl font-bold mb-4">Live Leaderboard</h3>
-                        <div id="leaderboard-loader" class="loader hidden"></div>
-                        <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-100"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th></tr></thead><tbody id="leaderboard-body" class="bg-white divide-y divide-gray-200"></tbody></table>
-                    </div>
-                </div>
-                
-                <!-- User Management Content -->
-                <div id="admin-content-user-mgmt" class="admin-content-section hidden">
-                    <h3 class="text-xl font-bold mb-4">User Management</h3>
-                    <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-100"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th></tr></thead><tbody id="user-mgmt-body" class="bg-white divide-y divide-gray-200"></tbody></table>
-                </div>
+ function getCurrentNflWeek() {
+ const seasonStartDate = new Date('2025-09-04T00:00:00Z');
+ const now = new Date();
+ 
+ if (now < seasonStartDate) {
+ return 1;
+ }
 
-                <!-- Picks Management Content -->
-                <div id="admin-content-picks-mgmt" class="admin-content-section hidden">
-                     <h3 class="text-xl font-bold mb-4">Edit User Picks</h3>
-                     <div class="mb-4">
-                        <label for="user-picks-selector" class="block text-sm font-medium text-gray-700">Select User:</label>
-                        <select id="user-picks-selector" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-slate-500 focus:border-slate-500 sm:text-sm rounded-md"></select>
-                     </div>
-                     <div id="user-picks-game-list" class="space-y-6"></div>
-                     <button id="save-user-picks-btn" class="mt-6 w-full bg-blue-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-800 hidden">Save User's Picks</button>
-                </div>
-            </div>
-        </div>
-    </div>
+ const diffTime = Math.abs(now - seasonStartDate);
+ const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+ const week = Math.ceil(diffDays / 7);
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+ return week > 18 ? 18 : week;
+ }
 
-        const ADMIN_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
+ // --- UI ELEMENTS ---
+ const allUI = {
+ loginView: document.getElementById('login-view'), appView: document.getElementById('app-view'),
+ loginForm: document.getElementById('login-form'), registerForm: document.getElementById('register-form'),
+ showRegisterLink: document.getElementById('show-register-link'), showLoginLink: document.getElementById('show-login-link'),
+ loginError: document.getElementById('login-error'), registerError: document.getElementById('register-error'),
+ logoutBtn: document.getElementById('logout-btn'), userDisplay: document.getElementById('user-display'), adminControls: document.getElementById('admin-controls'),
+ picksContainer: document.getElementById('picks-container'), adminContainer: document.getElementById('admin-container'),
+ picksViewBtn: document.getElementById('picks-view-btn'), adminViewBtn: document.getElementById('admin-view-btn'),
+ weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
+ gameList: document.getElementById('game-list'), resultsGameList: document.getElementById('results-game-list'),
+ saveResultsBtn: document.getElementById('save-results-btn'),
+ leaderboardLoader: document.getElementById('leaderboard-loader'), leaderboardBody: document.getElementById('leaderboard-body'),
+ saveStatusIcon: document.getElementById('save-status-icon'), saveStatusText: document.getElementById('save-status-text'),
+ resetPicksBtn: document.getElementById('reset-picks-btn'),
+ adminTabs: document.querySelectorAll('.admin-tab'), adminContentSections: document.querySelectorAll('.admin-content-section'),
+ userMgmtBody: document.getElementById('user-mgmt-body'),
+ userPicksSelector: document.getElementById('user-picks-selector'),
+ userPicksGameList: document.getElementById('user-picks-game-list'),
+ saveUserPicksBtn: document.getElementById('save-user-picks-btn'),
+ settingsBtn: document.getElementById('settings-btn'),
+ settingsModal: document.getElementById('settings-modal'),
+ closeSettingsBtn: document.getElementById('close-settings-btn'),
+ settingsForm: document.getElementById('settings-form'),
+ settingsDisplayName: document.getElementById('settings-display-name'),
+ settingsEmail: document.getElementById('settings-email'),
+ settingsError: document.getElementById('settings-error'),
+ settingsSuccess: document.getElementById('settings-success'),
+ };
 
-        document.addEventListener('DOMContentLoaded', () => {
-            
-            // --- DATA & TIME LOGIC ---
-            async function getGamesForWeek(weekNumber) {
-                try {
-                    const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
-                    }
-                    const weekData = await response.json();
-                    return Array.isArray(weekData.games) ? weekData.games.map(game => ({
-                        id: game.id,
-                        away: game.a,
-                        home: game.h,
-                        kickoff: game.dt,
-                        stadium: game.stadium
-                    })) : [];
-                } catch (error) {
-                    console.error(`Error fetching games for week ${weekNumber}:`, error);
-                    return [];
-                }
-            }
+ // --- APP STATE ---
+ let currentWeek = 1, currentUser = null, db, auth, unsubscribeFromPicks = null, saveTimeout = null;
+ let currentAdminPicks = {}, allUsers = [];
 
-            function getCurrentNflWeek() {
-                const seasonStartDate = new Date('2025-09-04T00:00:00Z');
-                const now = new Date();
-                
-                if (now < seasonStartDate) {
-                    return 1;
-                }
+ // --- ADMIN LOGIC ---
+ async function fetchAllUsers() {
+ const usersCollectionRef = collection(db, usersPath());
+ const usersSnap = await getDocs(usersCollectionRef);
+ allUsers = [];
+ usersSnap.forEach(doc => {
+ allUsers.push({ id: doc.id, ...doc.data() });
+ });
+ allUsers.sort((a,b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+ }
 
-                const diffTime = Math.abs(now - seasonStartDate);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                const week = Math.ceil(diffDays / 7);
+ async function renderGameResultsAdmin(weekNumber) {
+ const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
+ if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
+ allUI.resultsGameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week.</p>';
+ allUI.leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center py-4">No data for this week.</td></tr>`;
+ return;
+ }
+ const resultsDocRef = doc(db, resultsPath(weekNumber));
+ const resultsSnap = await getDoc(resultsDocRef);
+ const currentResults = resultsSnap.exists() ? resultsSnap.data() : {};
+ allUI.resultsGameList.innerHTML = '';
+ weekData.games.forEach(game => {
+ const winner = currentResults[game.id] || null;
+ const gameEl = document.createElement('div');
+ gameEl.className = 'grid grid-cols-12 gap-2 items-center';
+ gameEl.innerHTML = `<div class="col-span-10 flex justify-around items-center"><button data-game-id="${game.id}" data-team="${game.away}" class="result-btn w-2/5 text-center p-2 rounded-lg border-2 ${winner === game.away ? 'selected' : ''}">${game.away}</button><span class="font-bold">@</span><button data-game-id="${game.id}" data-team="${game.home}" class="result-btn w-2/5 text-center p-2 rounded-lg border-2 ${winner === game.home ? 'selected' : ''}">${game.home}</button></div>`;
+ allUI.resultsGameList.appendChild(gameEl);
+ });
+ allUI.resultsGameList.querySelectorAll('.result-btn').forEach(btn => btn.addEventListener('click', (e) => {
+ const { gameId } = e.target.dataset;
+ const gameButtons = allUI.resultsGameList.querySelectorAll(`.result-btn[data-game-id="${gameId}"]`);
+ gameButtons.forEach(b => b.classList.remove('selected'));
+ e.target.classList.add('selected');
+ }));
+ calculateAndDisplayLeaderboard(weekNumber);
+ }
 
-                return week > 18 ? 18 : week;
-            }
+ function renderUserManagement() {
+ allUI.userMgmtBody.innerHTML = allUsers.map(user => `
+ <tr>
+ <td class="px-6 py-4 whitespace-nowrap">${user.displayName || 'N/A'}</td>
+ <td class="px-6 py-4 whitespace-nowrap">${user.email}</td>
+ <td class="px-6 py-4 whitespace-nowrap">
+ <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.disabled ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+ ${user.disabled ? 'Disabled' : 'Active'}
+ </span>
+ </td>
+ <td class="px-6 py-4 whitespace-nowrap">
+ <button data-user-id="${user.id}" data-disabled="${!!user.disabled}" class="user-status-btn text-sm font-medium ${user.disabled ? 'text-green-600 hover:text-green-900' : 'text-red-600 hover:text-red-900'}">
+ ${user.disabled ? 'Enable' : 'Disable'}
+ </button>
+ </td>
+ </tr>
+ `).join('');
+ 
+ allUI.userMgmtBody.querySelectorAll('.user-status-btn').forEach(btn => {
+ btn.addEventListener('click', async (e) => {
+ const userId = e.target.dataset.userId;
+ if (userId === ADMIN_UID) {
+ alert("You cannot disable the main admin account.");
+ return;
+ }
+ const isDisabled = e.target.dataset.disabled === 'true';
+ const userDocRef = doc(db, usersPath(), userId);
+ await updateDoc(userDocRef, { disabled: !isDisabled });
+ await fetchAllUsers();
+ renderUserManagement();
+ });
+ });
+ }
 
-            // --- UI ELEMENTS ---
-            const allUI = {
-                loginView: document.getElementById('login-view'), appView: document.getElementById('app-view'),
-                loginForm: document.getElementById('login-form'), registerForm: document.getElementById('register-form'),
-                showRegisterLink: document.getElementById('show-register-link'), showLoginLink: document.getElementById('show-login-link'),
-                loginError: document.getElementById('login-error'), registerError: document.getElementById('register-error'),
-                logoutBtn: document.getElementById('logout-btn'), userDisplay: document.getElementById('user-display'), adminControls: document.getElementById('admin-controls'),
-                picksContainer: document.getElementById('picks-container'), adminContainer: document.getElementById('admin-container'),
-                picksViewBtn: document.getElementById('picks-view-btn'), adminViewBtn: document.getElementById('admin-view-btn'),
-                weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
-                gameList: document.getElementById('game-list'), resultsGameList: document.getElementById('results-game-list'),
-                saveResultsBtn: document.getElementById('save-results-btn'),
-                leaderboardLoader: document.getElementById('leaderboard-loader'), leaderboardBody: document.getElementById('leaderboard-body'),
-                saveStatusIcon: document.getElementById('save-status-icon'), saveStatusText: document.getElementById('save-status-text'),
-                resetPicksBtn: document.getElementById('reset-picks-btn'),
-                adminTabs: document.querySelectorAll('.admin-tab'), adminContentSections: document.querySelectorAll('.admin-content-section'),
-                userMgmtBody: document.getElementById('user-mgmt-body'),
-                userPicksSelector: document.getElementById('user-picks-selector'),
-                userPicksGameList: document.getElementById('user-picks-game-list'),
-                saveUserPicksBtn: document.getElementById('save-user-picks-btn'),
-            };
+ async function renderPicksManagement(weekNumber) {
+ allUI.userPicksSelector.innerHTML = '<option value="">Select a user...</option>' + allUsers.map(u => `<option value="${u.id}">${u.displayName || u.email}</option>`).join('');
+ allUI.userPicksGameList.innerHTML = '';
+ allUI.saveUserPicksBtn.classList.add('hidden');
+ }
 
-            // --- APP STATE ---
-            let currentWeek = 1, currentUser = null, db, auth, unsubscribeFromPicks = null, saveTimeout = null;
-            let currentAdminPicks = {}, allUsers = [];
+ async function renderAdminView(weekNumber) {
+ const activeTab = document.querySelector('.admin-tab.active').id;
+ switch (activeTab) {
+ case 'tab-game-results': await renderGameResultsAdmin(weekNumber); break;
+ case 'tab-user-mgmt': renderUserManagement(); break;
+ case 'tab-picks-mgmt': renderPicksManagement(weekNumber); break;
+ }
+ }
 
-            // --- ADMIN LOGIC ---
-            async function fetchAllUsers() {
-                const usersCollectionRef = collection(db, usersPath());
-                const usersSnap = await getDocs(usersCollectionRef);
-                allUsers = [];
-                usersSnap.forEach(doc => {
-                    allUsers.push({ id: doc.id, ...doc.data() });
-                });
-                allUsers.sort((a,b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
-            }
+ // --- INITIALIZATION & AUTH ---
+ async function initializeAppAndAuth() {
+ const firebaseConfig = {
+ apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+ authDomain: "nerdfootball.firebaseapp.com",
+ projectId: "nerdfootball",
+ storageBucket: "nerdfootball.appspot.com",
+ messagingSenderId: "969304790725",
+ appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+ measurementId: "G-8RVRHE3HRC"
+ };
+ const app = initializeApp(firebaseConfig);
+ db = getFirestore(app);
+ auth = getAuth(app);
+ onAuthStateChanged(auth, handleAuthStateChange);
+ }
 
-            async function renderGameResultsAdmin(weekNumber) {
-                const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
-                if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
-                    allUI.resultsGameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week.</p>';
-                    allUI.leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center py-4">No data for this week.</td></tr>`;
-                    return;
-                }
-                const resultsDocRef = doc(db, resultsPath(weekNumber));
-                const resultsSnap = await getDoc(resultsDocRef);
-                const currentResults = resultsSnap.exists() ? resultsSnap.data() : {};
-                allUI.resultsGameList.innerHTML = '';
-                weekData.games.forEach(game => {
-                    const winner = currentResults[game.id] || null;
-                    const gameEl = document.createElement('div');
-                    gameEl.className = 'grid grid-cols-12 gap-2 items-center';
-                    gameEl.innerHTML = `<div class="col-span-10 flex justify-around items-center"><button data-game-id="${game.id}" data-team="${game.away}" class="result-btn w-2/5 text-center p-2 rounded-lg border-2 ${winner === game.away ? 'selected' : ''}">${game.away}</button><span class="font-bold">@</span><button data-game-id="${game.id}" data-team="${game.home}" class="result-btn w-2/5 text-center p-2 rounded-lg border-2 ${winner === game.home ? 'selected' : ''}">${game.home}</button></div>`;
-                    allUI.resultsGameList.appendChild(gameEl);
-                });
-                allUI.resultsGameList.querySelectorAll('.result-btn').forEach(btn => btn.addEventListener('click', (e) => {
-                    const { gameId } = e.target.dataset;
-                    const gameButtons = allUI.resultsGameList.querySelectorAll(`.result-btn[data-game-id="${gameId}"]`);
-                    gameButtons.forEach(b => b.classList.remove('selected'));
-                    e.target.classList.add('selected');
-                }));
-                calculateAndDisplayLeaderboard(weekNumber);
-            }
+ async function handleAuthStateChange(user) {
+ currentWeek = getCurrentNflWeek();
+ 
+ if (user) {
+ const userDocRef = doc(db, usersPath(), user.uid);
+ const userDoc = await getDoc(userDocRef);
 
-            function renderUserManagement() {
-                allUI.userMgmtBody.innerHTML = allUsers.map(user => `
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">${user.displayName || 'N/A'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">${user.email}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.disabled ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
-                                ${user.disabled ? 'Disabled' : 'Active'}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <button data-user-id="${user.id}" data-disabled="${!!user.disabled}" class="user-status-btn text-sm font-medium ${user.disabled ? 'text-green-600 hover:text-green-900' : 'text-red-600 hover:text-red-900'}">
-                                ${user.disabled ? 'Enable' : 'Disable'}
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
-                
-                allUI.userMgmtBody.querySelectorAll('.user-status-btn').forEach(btn => {
-                    btn.addEventListener('click', async (e) => {
-                        const userId = e.target.dataset.userId;
-                        if (userId === ADMIN_UID) {
-                            alert("You cannot disable the main admin account.");
-                            return;
-                        }
-                        const isDisabled = e.target.dataset.disabled === 'true';
-                        const userDocRef = doc(db, usersPath(), userId);
-                        await updateDoc(userDocRef, { disabled: !isDisabled });
-                        await fetchAllUsers();
-                        renderUserManagement();
-                    });
-                });
-            }
+ if (userDoc.exists() && userDoc.data().disabled) {
+ allUI.loginError.textContent = 'Your account has been disabled.';
+ allUI.loginError.classList.remove('hidden');
+ await signOut(auth);
+ return;
+ }
+ 
+ currentUser = user;
+ allUI.loginView.classList.add('hidden');
+ allUI.appView.classList.remove('hidden');
+ allUI.userDisplay.textContent = `Welcome, ${user.displayName ? user.displayName.split(' ')[0] : 'User'}`;
 
-            function renderPicksManagement(weekNumber) {
-                allUI.userPicksSelector.innerHTML = '<option value="">Select a user...</option>' + allUsers.map(u => `<option value="${u.id}">${u.displayName || u.email}</option>`).join('');
-                allUI.userPicksGameList.innerHTML = '';
-                allUI.saveUserPicksBtn.classList.add('hidden');
-            }
+ await setDoc(userDocRef, { displayName: user.displayName, email: user.email }, { merge: true });
 
-            async function renderAdminView(weekNumber) {
-                const activeTab = document.querySelector('.admin-tab.active').id;
-                switch (activeTab) {
-                    case 'tab-game-results': renderGameResultsAdmin(weekNumber); break;
-                    case 'tab-user-mgmt': renderUserManagement(); break;
-                    case 'tab-picks-mgmt': renderPicksManagement(weekNumber); break;
-                }
-            }
+ if (user.uid === ADMIN_UID) {
+ allUI.adminControls.classList.remove('hidden');
+ await fetchAllUsers();
+ }
+ 
+ populateWeekSelectors();
+ allUI.weekSelector.value = currentWeek;
+ allUI.adminWeekSelector.value = currentWeek;
 
-            // --- INITIALIZATION & AUTH ---
-            async function initializeAppAndAuth() {
-                const firebaseConfig = {
-                  apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
-                  authDomain: "nerdfootball.firebaseapp.com",
-                  projectId: "nerdfootball",
-                  storageBucket: "nerdfootball.appspot.com",
-                  messagingSenderId: "969304790725",
-                  appId: "1:969304790725:web:892df38db0b0e62bde02ac",
-                  measurementId: "G-8RVRHE3HRC"
-                };
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                onAuthStateChanged(auth, handleAuthStateChange);
-            }
+ await loadAndRenderWeek(currentWeek);
+ if (user.uid === ADMIN_UID) {
+ await renderAdminView(currentWeek);
+ }
+ } else {
+ currentUser = null;
+ allUI.loginView.classList.remove('hidden');
+ allUI.appView.classList.add('hidden');
+ }
+ }
+ 
+ // --- FORM TOGGLING ---
+ allUI.showRegisterLink.addEventListener('click', (e) => { e.preventDefault(); allUI.loginForm.classList.add('hidden'); allUI.registerForm.classList.remove('hidden'); });
+ allUI.showLoginLink.addEventListener('click', (e) => { e.preventDefault(); allUI.registerForm.classList.add('hidden'); allUI.loginForm.classList.remove('hidden'); });
 
-            async function handleAuthStateChange(user) {
-                currentWeek = getCurrentNflWeek();
-                
-                if (user) {
-                    const userDocRef = doc(db, usersPath(), user.uid);
-                    const userDoc = await getDoc(userDocRef);
+ // --- AUTH EVENT LISTENERS ---
+ allUI.loginForm.addEventListener('submit', async (e) => {
+ e.preventDefault();
+ const email = document.getElementById('login-email').value;
+ const password = document.getElementById('login-password').value;
+ try {
+ await signInWithEmailAndPassword(auth, email, password);
+ allUI.loginError.classList.add('hidden');
+ } catch (error) {
+ allUI.loginError.innerHTML = getAuthErrorMessage(error.code);
+ allUI.loginError.classList.remove('hidden');
+ }
+ });
 
-                    if (userDoc.exists() && userDoc.data().disabled) {
-                        allUI.loginError.textContent = 'Your account has been disabled.';
-                        allUI.loginError.classList.remove('hidden');
-                        signOut(auth);
-                        return;
-                    }
-                    
-                    currentUser = user;
-                    allUI.loginView.classList.add('hidden');
-                    allUI.appView.classList.remove('hidden');
-                    allUI.userDisplay.textContent = `Welcome, ${user.displayName ? user.displayName.split(' ')[0] : 'User'}`;
+ allUI.registerForm.addEventListener('submit', async (e) => {
+ e.preventDefault();
+ const firstName = document.getElementById('register-firstname').value;
+ const lastName = document.getElementById('register-lastname').value;
+ const email = document.getElementById('register-email').value;
+ const password = document.getElementById('register-password').value;
+ const confirmPassword = document.getElementById('register-confirm-password').value;
 
-                    await setDoc(userDocRef, { displayName: user.displayName, email: user.email }, { merge: true });
+ if (password !== confirmPassword) {
+ allUI.registerError.textContent = "Passwords do not match.";
+ allUI.registerError.classList.remove('hidden');
+ return;
+ }
+ 
+ try {
+ const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+ await updateProfile(userCredential.user, { displayName: `${firstName} ${lastName}` });
+ allUI.registerError.classList.add('hidden');
+ } catch (error) {
+ allUI.registerError.innerHTML = getAuthErrorMessage(error.code);
+ allUI.registerError.classList.remove('hidden');
+ }
+ });
 
-                    if (user.uid === ADMIN_UID) {
-                        allUI.adminControls.classList.remove('hidden');
-                        await fetchAllUsers();
-                    }
-                    
-                    populateWeekSelectors();
-                    allUI.weekSelector.value = currentWeek;
-                    allUI.adminWeekSelector.value = currentWeek;
+ allUI.logoutBtn.addEventListener('click', () => signOut(auth));
+ 
+ function getAuthErrorMessage(errorCode) {
+ switch (errorCode) {
+ case 'auth/operation-not-allowed':
+ return '<strong>Action Required:</strong><br>Email/Password sign-in is not enabled. Please enable it in your Firebase Console under Authentication -> Sign-in method.';
+ case 'auth/invalid-email': 
+ return 'Please enter a valid email address.';
+ case 'auth/user-not-found':
+ case 'auth/wrong-password': 
+ return 'Invalid email or password.';
+ case 'auth/email-already-in-use': 
+ return 'An account with this email already exists.';
+ case 'auth/weak-password': 
+ return 'Password should be at least 6 characters.';
+ default: 
+ return 'An unexpected error occurred. Please try again.';
+ }
+ }
+ 
+ // --- DATA PATH HELPERS ---
+ const appId = () => 'nerdfootball'; 
+ const picksPath = (week, uid) => `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
+ const resultsPath = (week) => `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
+ const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
+ 
+ // --- SAVE STATUS ---
+ function updateSaveStatus(status, message) {
+ if(saveTimeout) clearTimeout(saveTimeout);
+ allUI.saveStatusIcon.style.animation = 'none';
+ 
+ switch(status) {
+ case 'saving':
+ allUI.saveStatusIcon.innerHTML = `<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+ allUI.saveStatusIcon.style.animation = 'spin 1s linear infinite';
+ allUI.saveStatusText.textContent = message;
+ allUI.saveStatusText.className = 'text-sm font-medium text-gray-500';
+ break;
+ case 'saved':
+ allUI.saveStatusIcon.innerHTML = `<svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+ allUI.saveStatusText.textContent = message;
+ allUI.saveStatusText.className = 'text-sm font-medium text-green-600';
+ saveTimeout = setTimeout(() => updateSaveStatus('idle', ''), 2500);
+ break;
+ case 'idle':
+ default:
+ allUI.saveStatusIcon.innerHTML = '';
+ allUI.saveStatusText.textContent = '';
+ break;
+ }
+ }
 
-                    loadAndRenderWeek(currentWeek);
-                    if (user.uid === ADMIN_UID) {
-                       renderAdminView(currentWeek);
-                    }
-                } else {
-                    currentUser = null;
-                    allUI.loginView.classList.remove('hidden');
-                    allUI.appView.classList.add('hidden');
-                }
-            }
-            
-            // --- FORM TOGGLING ---
-            allUI.showRegisterLink.addEventListener('click', (e) => { e.preventDefault(); allUI.loginForm.classList.add('hidden'); allUI.registerForm.classList.remove('hidden'); });
-            allUI.showLoginLink.addEventListener('click', (e) => { e.preventDefault(); allUI.registerForm.classList.add('hidden'); allUI.loginForm.classList.remove('hidden'); });
+ async function getWeekLockStatus(weekNumber) { 
+ const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) }; 
+ if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) return false; 
+ const firstKickoff = new Date(weekData.games[0].kickoff); 
+ return new Date() > firstKickoff; 
+ }
+ 
+ async function loadAndRenderWeek(weekNumber) { 
+ currentWeek = parseInt(weekNumber, 10);
+ if (!currentUser) return; 
+ if (unsubscribeFromPicks) unsubscribeFromPicks(); 
+ updateSaveStatus('idle');
 
-            // --- AUTH EVENT LISTENERS ---
-            allUI.loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const email = document.getElementById('login-email').value;
-                const password = document.getElementById('login-password').value;
-                try {
-                    await signInWithEmailAndPassword(auth, email, password);
-                    allUI.loginError.classList.add('hidden');
-                } catch (error) {
-                    allUI.loginError.innerHTML = getAuthErrorMessage(error.code);
-                    allUI.loginError.classList.remove('hidden');
-                }
-            });
+ allUI.gameList.innerHTML = `<div class="loader"></div>`;
+ const weekIsLocked = await getWeekLockStatus(currentWeek);
+ allUI.resetPicksBtn.disabled = weekIsLocked;
+ 
+ const docRef = doc(db, picksPath(currentWeek, currentUser.uid)); 
+ 
+ const games = await getGamesForWeek(currentWeek);
+ if (!Array.isArray(games) || games.length === 0) {
+     allUI.gameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week. Please try again later.</p>';
+     return;
+ }
 
-            allUI.registerForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const firstName = document.getElementById('register-firstname').value;
-                const lastName = document.getElementById('register-lastname').value;
-                const email = document.getElementById('register-email').value;
-                const password = document.getElementById('register-password').value;
-                const confirmPassword = document.getElementById('register-confirm-password').value;
+ unsubscribeFromPicks = onSnapshot(docRef, (docSnap) => { 
+ let userPicks = {}; 
+ const weekData = { week: currentWeek, games: games };
 
-                if (password !== confirmPassword) {
-                    allUI.registerError.textContent = "Passwords do not match.";
-                    allUI.registerError.classList.remove('hidden');
-                    return;
-                }
-                
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    await updateProfile(userCredential.user, { displayName: `${firstName} ${lastName}` });
-                    allUI.registerError.classList.add('hidden');
-                } catch (error) {
-                    allUI.registerError.innerHTML = getAuthErrorMessage(error.code);
-                    allUI.registerError.classList.remove('hidden');
-                }
-            });
+ if (docSnap.exists()) { 
+ userPicks = docSnap.data(); 
+ } else { 
+ weekData.games.forEach((game, index) => { 
+ userPicks[game.id] = { winner: null, confidence: index + 1 }; 
+ }); 
+ } 
+ renderWeekUI(weekData, userPicks, weekIsLocked, allUI.gameList); 
+ }); 
+ }
 
-            allUI.logoutBtn.addEventListener('click', () => signOut(auth));
-            
-            function getAuthErrorMessage(errorCode) {
-                switch (errorCode) {
-                    case 'auth/operation-not-allowed':
-                        return '<strong>Action Required:</strong><br>Email/Password sign-in is not enabled. Please enable it in your Firebase Console under Authentication -> Sign-in method.';
-                    case 'auth/invalid-email': 
-                        return 'Please enter a valid email address.';
-                    case 'auth/user-not-found':
-                    case 'auth/wrong-password': 
-                        return 'Invalid email or password.';
-                    case 'auth/email-already-in-use': 
-                        return 'An account with this email already exists.';
-                    case 'auth/weak-password': 
-                        return 'Password should be at least 6 characters.';
-                    default: 
-                        return 'An unexpected error occurred. Please try again.';
-                }
-            }
-            
-            // --- DATA PATH HELPERS ---
-            const appId = () => 'nerdfootball'; 
-            const picksPath = (week, uid) => `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
-            const resultsPath = (week) => `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
-            const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
-            
-            // --- SAVE STATUS ---
-            function updateSaveStatus(status, message) {
-                if(saveTimeout) clearTimeout(saveTimeout);
-                allUI.saveStatusIcon.style.animation = 'none';
-                
-                switch(status) {
-                    case 'saving':
-                        allUI.saveStatusIcon.innerHTML = `<svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
-                        allUI.saveStatusIcon.style.animation = 'spin 1s linear infinite';
-                        allUI.saveStatusText.textContent = message;
-                        allUI.saveStatusText.className = 'text-sm font-medium text-gray-500';
-                        break;
-                    case 'saved':
-                        allUI.saveStatusIcon.innerHTML = `<svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
-                        allUI.saveStatusText.textContent = message;
-                        allUI.saveStatusText.className = 'text-sm font-medium text-green-600';
-                        saveTimeout = setTimeout(() => updateSaveStatus('idle', ''), 2500);
-                        break;
-                    case 'idle':
-                    default:
-                        allUI.saveStatusIcon.innerHTML = '';
-                        allUI.saveStatusText.textContent = '';
-                        break;
-                }
-            }
+ async function savePicksToFirestore(weekNum, picks) { 
+ if (!currentUser || await getWeekLockStatus(weekNum)) return; 
+ updateSaveStatus('saving', 'Saving...');
+ const docRef = doc(db, picksPath(weekNum, currentUser.uid)); 
+ try { 
+ await setDoc(docRef, picks); 
+ updateSaveStatus('saved', 'Picks Saved!');
+ } catch (error) { 
+ console.error("Error saving picks:", error); 
+ updateSaveStatus('error', 'Save Failed');
+ } 
+ }
 
-            async function getWeekLockStatus(weekNumber) { 
-                const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) }; 
-                if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) return false; 
-                const firstKickoff = new Date(weekData.games[0].kickoff + 'Z'); 
-                return new Date() > firstKickoff; 
-            }
-            
-            async function loadAndRenderWeek(weekNumber) { 
-                currentWeek = parseInt(weekNumber, 10);
-                if (!currentUser) return; 
-                if (unsubscribeFromPicks) unsubscribeFromPicks(); 
-                updateSaveStatus('idle');
+ async function calculateAndDisplayLeaderboard(weekNumber) {
+ allUI.leaderboardLoader.classList.remove('hidden');
+ allUI.leaderboardBody.innerHTML = '';
+ const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
+ const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+ const usersSnap = await getDocs(collection(db, usersPath()));
+ const users = {};
+ usersSnap.forEach(doc => users[doc.id] = doc.data());
+ const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+ const scores = [];
+ picksSnap.forEach(pickDoc => {
+ const userId = pickDoc.id;
+ if (!users[userId]) return;
+ const userPicks = pickDoc.data();
+ let userScore = 0;
+ Object.keys(userPicks).forEach(gameId => {
+ const pick = userPicks[gameId];
+ if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
+ userScore += pick.confidence;
+ }
+ });
+ scores.push({ userId, displayName: users[userId].displayName, score: userScore });
+ });
+ scores.sort((a, b) => b.score - a.score);
+ allUI.leaderboardBody.innerHTML = scores.map((s, index) => `<tr><td class="px-6 py-4 whitespace-nowrap font-medium">${index + 1}</td><td class="px-6 py-4 whitespace-nowrap">${s.displayName}</td><td class="px-6 py-4 whitespace-nowrap font-bold">${s.score}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center py-4">No picks submitted for this week yet.</td></tr>`;
+ allUI.leaderboardLoader.classList.add('hidden');
+ }
 
-                const weekIsLocked = await getWeekLockStatus(currentWeek);
-                allUI.resetPicksBtn.disabled = weekIsLocked;
-                
-                const docRef = doc(db, picksPath(currentWeek, currentUser.uid)); 
-                unsubscribeFromPicks = onSnapshot(docRef, (docSnap) => { 
-                    let userPicks = {}; 
-                    const weekData = { week: currentWeek, games: [] };
-                    getGamesForWeek(currentWeek).then(games => {
-                        weekData.games = games;
-                        if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
-                            allUI.gameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week. Please try again later.</p>';
-                            return;
-                        }
+ function populateWeekSelectors() {
+ const options = Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}">Week ${i + 1}</option>`).join('');
+ allUI.weekSelector.innerHTML = options;
+ allUI.adminWeekSelector.innerHTML = options;
+ }
 
-                        if (docSnap.exists()) { 
-                            userPicks = docSnap.data(); 
-                        } else { 
-                            weekData.games.forEach((game, index) => { 
-                                userPicks[game.id] = { winner: null, confidence: index + 1 }; 
-                            }); 
-                        } 
-                        renderWeekUI(weekData, userPicks, weekIsLocked, allUI.gameList); 
-                    }).catch(error => {
-                        console.error("Error in loadAndRenderWeek:", error);
-                        allUI.gameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week. Please try again later.</p>';
-                    });
-                }); 
-            }
+ function renderWeekUI(weekData, userPicks, weekIsLocked, targetContainer = allUI.gameList) {
+ targetContainer.innerHTML = '';
+ if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) {
+ targetContainer.innerHTML = '<p class="text-center text-gray-500">No games are scheduled for this week.</p>';
+ return;
+ }
+ const totalGames = weekData.games.length;
+ const confidenceOptions = Array.from({ length: totalGames }, (_, i) => i + 1);
+ 
+ weekData.games.forEach(game => {
+ const pick = userPicks[game.id] || { winner: null, confidence: 0 };
+ const gameRow = document.createElement('div');
+ gameRow.className = 'p-4 border border-slate-300 rounded-lg bg-slate-100';
+ const gameTime = new Date(game.kickoff);
+ const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
-            async function savePicksToFirestore(weekNum, picks) { 
-                if (!currentUser || await getWeekLockStatus(weekNum)) return; 
-                updateSaveStatus('saving', 'Saving...');
-                const docRef = doc(db, picksPath(weekNum, currentUser.uid)); 
-                try { 
-                    await setDoc(docRef, picks); 
-                    updateSaveStatus('saved', 'Picks Saved!');
-                } catch (error) { 
-                    console.error("Error saving picks:", error); 
-                    updateSaveStatus('error', 'Save Failed');
-                } 
-            }
+ gameRow.innerHTML = `
+ <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+ <div class="md:col-span-8">
+ <div class="flex flex-col sm:flex-row justify-around items-center gap-2">
+ <button data-game-id="${game.id}" data-team="${game.away}" ${weekIsLocked ? 'disabled' : ''} class="winner-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 border-slate-400 font-semibold ${pick.winner === game.away ? 'selected' : 'bg-slate-50 hover:bg-slate-200'}">${game.away}</button>
+ <span class="text-slate-500 font-bold">@</span>
+ <button data-game-id="${game.id}" data-team="${game.home}" ${weekIsLocked ? 'disabled' : ''} class="winner-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 border-slate-400 font-semibold ${pick.winner === game.home ? 'selected' : 'bg-slate-50 hover:bg-slate-200'}">${game.home}</button>
+ </div>
+ </div>
+ <div class="md:col-span-4">
+ <select id="confidence-${game.id}" name="confidence-${game.id}" data-game-id="${game.id}" ${weekIsLocked ? 'disabled' : ''} class="confidence-select w-full p-3 rounded-lg border-2 border-slate-300 bg-white">${confidenceOptions.map(opt => `<option value="${opt}" ${pick.confidence === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>
+ </div>
+ </div>
+ <div class="mt-3 pt-3 border-t border-slate-300 text-xs text-slate-600 grid grid-cols-2 md:grid-cols-4 gap-2">
+ <div><p class="font-bold">Date & Time</p><p>${formattedTime}</p></div>
+ <div><p class="font-bold">Stadium</p><p>${game.stadium}</p></div>
+ <div><p class="font-bold">Weather</p><p>${game.weather || 'TBD'}</p></div>
+ <div><p class="font-bold">Starting QBs</p><p>${(game.startingQBs && game.startingQBs.away) ? `${game.startingQBs.away} vs ${game.startingQBs.home}` : 'TBD'}</p></div>
+ </div>`;
+ targetContainer.appendChild(gameRow);
+ });
 
-            async function calculateAndDisplayLeaderboard(weekNumber) {
-                allUI.leaderboardLoader.classList.remove('hidden');
-                allUI.leaderboardBody.innerHTML = '';
-                const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
-                const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
-                const usersSnap = await getDocs(collection(db, usersPath()));
-                const users = {};
-                usersSnap.forEach(doc => users[doc.id] = doc.data());
-                const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
-                const scores = [];
-                picksSnap.forEach(pickDoc => {
-                    const userId = pickDoc.id;
-                    if (!users[userId]) return;
-                    const userPicks = pickDoc.data();
-                    let userScore = 0;
-                    Object.keys(userPicks).forEach(gameId => {
-                        const pick = userPicks[gameId];
-                        if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
-                            userScore += pick.confidence;
-                        }
-                    });
-                    scores.push({ userId, displayName: users[userId].displayName, score: userScore });
-                });
-                scores.sort((a, b) => b.score - a.score);
-                allUI.leaderboardBody.innerHTML = scores.map((s, index) => `<tr><td class="px-6 py-4 whitespace-nowrap font-medium">${index + 1}</td><td class="px-6 py-4 whitespace-nowrap">${s.displayName}</td><td class="px-6 py-4 whitespace-nowrap font-bold">${s.score}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center py-4">No picks submitted for this week yet.</td></tr>`;
-                allUI.leaderboardLoader.classList.add('hidden');
-            }
+ let activePicks = JSON.parse(JSON.stringify(userPicks));
+ 
+ const saveFunction = targetContainer === allUI.gameList ? savePicksToFirestore : (wk, pks) => { currentAdminPicks = pks; };
 
-            function populateWeekSelectors() {
-                const options = Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}">Week ${i + 1}</option>`).join('');
-                allUI.weekSelector.innerHTML = options;
-                allUI.adminWeekSelector.innerHTML = options;
-            }
+ targetContainer.querySelectorAll('.winner-btn').forEach(btn => {
+ btn.addEventListener('click', (e) => {
+ const gameId = e.target.dataset.gameId;
+ const team = e.target.dataset.team;
+ activePicks[gameId].winner = team;
+ targetContainer.querySelectorAll(`.winner-btn[data-game-id="${gameId}"]`).forEach(b => b.classList.remove('selected'));
+ e.target.classList.add('selected');
+ saveFunction(currentWeek, activePicks);
+ });
+ });
 
-            function renderWeekUI(weekData, userPicks, weekIsLocked, targetContainer = allUI.gameList) {
-                targetContainer.innerHTML = '';
-                if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) {
-                    targetContainer.innerHTML = '<p class="text-center text-gray-500">No games are scheduled for this week.</p>';
-                    return;
-                }
-                const totalGames = weekData.games.length;
-                const confidenceOptions = Array.from({ length: totalGames }, (_, i) => i + 1);
-                
-                weekData.games.forEach(game => {
-                    const pick = userPicks[game.id] || { winner: null, confidence: 0 };
-                    const gameRow = document.createElement('div');
-                    gameRow.className = 'p-4 border border-slate-300 rounded-lg bg-slate-100';
-                    const gameTime = new Date(game.kickoff + 'Z');
-                    const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+ targetContainer.querySelectorAll('.confidence-select').forEach(select => {
+ select.addEventListener('change', (e) => {
+ const gameId = e.target.dataset.gameId;
+ const newConfidence = parseInt(e.target.value, 10);
+ const oldConfidence = activePicks[gameId].confidence;
+ if (newConfidence === oldConfidence) return;
+ const otherGameId = Object.keys(activePicks).find(id => id !== gameId && activePicks[id].confidence === newConfidence);
+ if (otherGameId) {
+ activePicks[otherGameId].confidence = oldConfidence;
+ const otherSelect = targetContainer.querySelector(`.confidence-select[data-game-id="${otherGameId}"]`);
+ if (otherSelect) otherSelect.value = oldConfidence;
+ }
+ activePicks[gameId].confidence = newConfidence;
+ saveFunction(currentWeek, activePicks);
+ });
+ });
+ }
 
-                    gameRow.innerHTML = `
-                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                            <div class="md:col-span-8">
-                                <div class="flex flex-col sm:flex-row justify-around items-center gap-2">
-                                    <button data-game-id="${game.id}" data-team="${game.away}" ${weekIsLocked ? 'disabled' : ''} class="winner-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 border-slate-400 font-semibold ${pick.winner === game.away ? 'selected' : 'bg-slate-50 hover:bg-slate-200'}">${game.away}</button>
-                                    <span class="text-slate-500 font-bold">@</span>
-                                    <button data-game-id="${game.id}" data-team="${game.home}" ${weekIsLocked ? 'disabled' : ''} class="winner-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 border-slate-400 font-semibold ${pick.winner === game.home ? 'selected' : 'bg-slate-50 hover:bg-slate-200'}">${game.home}</button>
-                                </div>
-                            </div>
-                            <div class="md:col-span-4">
-                                <select id="confidence-${game.id}" name="confidence-${game.id}" data-game-id="${game.id}" ${weekIsLocked ? 'disabled' : ''} class="confidence-select w-full p-3 rounded-lg border-2 border-slate-300 bg-white">${confidenceOptions.map(opt => `<option value="${opt}" ${pick.confidence === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>
-                            </div>
-                        </div>
-                        <div class="mt-3 pt-3 border-t border-slate-300 text-xs text-slate-600 grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <div><p class="font-bold">Date & Time</p><p>${formattedTime}</p></div>
-                            <div><p class="font-bold">Stadium</p><p>${game.stadium}</p></div>
-                            <div><p class="font-bold">Weather</p><p>Not available</p></div>
-                            <div><p class="font-bold">Starting QBs</p><p>Not available</p></div>
-                        </div>`;
-                    targetContainer.appendChild(gameRow);
-                });
+ function toggleViews(showAdmin) {
+ allUI.adminContainer.classList.toggle('hidden', !showAdmin);
+ allUI.picksContainer.classList.toggle('hidden', showAdmin);
+ allUI.adminViewBtn.classList.toggle('active', showAdmin);
+ allUI.picksViewBtn.classList.toggle('active', !showAdmin);
+ }
 
-                let activePicks = JSON.parse(JSON.stringify(userPicks));
-                
-                const saveFunction = targetContainer === allUI.gameList ? savePicksToFirestore : (wk, pks) => { currentAdminPicks = pks; };
+ // --- EVENT LISTENERS ---
+ allUI.picksViewBtn.addEventListener('click', () => toggleViews(false));
+ allUI.adminViewBtn.addEventListener('click', () => toggleViews(true));
+ allUI.weekSelector.addEventListener('change', (e) => loadAndRenderWeek(e.target.value));
+ allUI.adminWeekSelector.addEventListener('change', (e) => renderAdminView(e.target.value));
+ allUI.saveResultsBtn.addEventListener('click', async () => {
+ const weekNumber = allUI.adminWeekSelector.value;
+ const newResults = {};
+ allUI.resultsGameList.querySelectorAll('.result-btn.selected').forEach(btn => {
+ newResults[btn.dataset.gameId] = btn.dataset.team;
+ });
+ await setDoc(doc(db, resultsPath(weekNumber)), newResults);
+ alert('Results saved successfully!');
+ calculateAndDisplayLeaderboard(weekNumber);
+ });
+ allUI.resetPicksBtn.addEventListener('click', async () => {
+ const weekIsLocked = await getWeekLockStatus(currentWeek);
+ if (weekIsLocked) return;
 
-                targetContainer.querySelectorAll('.winner-btn').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        const gameId = e.target.dataset.gameId;
-                        const team = e.target.dataset.team;
-                        activePicks[gameId].winner = team;
-                        targetContainer.querySelectorAll(`.winner-btn[data-game-id="${gameId}"]`).forEach(b => b.classList.remove('selected'));
-                        e.target.classList.add('selected');
-                        saveFunction(currentWeek, activePicks);
-                    });
-                });
+ const weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
+ if (!Array.isArray(weekData.games) || weekData.games.length === 0) return;
 
-                targetContainer.querySelectorAll('.confidence-select').forEach(select => {
-                    select.addEventListener('change', (e) => {
-                        const gameId = e.target.dataset.gameId;
-                        const newConfidence = parseInt(e.target.value, 10);
-                        const oldConfidence = activePicks[gameId].confidence;
-                        if (newConfidence === oldConfidence) return;
-                        const otherGameId = Object.keys(activePicks).find(id => id !== gameId && activePicks[id].confidence === newConfidence);
-                        if (otherGameId) {
-                            activePicks[otherGameId].confidence = oldConfidence;
-                            const otherSelect = targetContainer.querySelector(`.confidence-select[data-game-id="${otherGameId}"]`);
-                            if (otherSelect) otherSelect.value = oldConfidence;
-                        }
-                        activePicks[gameId].confidence = newConfidence;
-                        saveFunction(currentWeek, activePicks);
-                    });
-                });
-            }
+ const resetPicks = {};
+ weekData.games.forEach((game, index) => {
+ resetPicks[game.id] = { winner: null, confidence: index + 1 };
+ });
+ await savePicksToFirestore(currentWeek, resetPicks);
+ });
+ allUI.userPicksSelector.addEventListener('change', async (e) => {
+ const selectedUserId = e.target.value;
+ if (!selectedUserId) {
+ allUI.userPicksGameList.innerHTML = '';
+ allUI.saveUserPicksBtn.classList.add('hidden');
+ return;
+ }
+ const weekNumber = parseInt(allUI.adminWeekSelector.value, 10);
+ const docRef = doc(db, picksPath(weekNumber, selectedUserId));
+ const docSnap = await getDoc(docRef);
 
-            function toggleViews(showAdmin) {
-                allUI.adminContainer.classList.toggle('hidden', !showAdmin);
-                allUI.picksContainer.classList.toggle('hidden', showAdmin);
-                allUI.adminViewBtn.classList.toggle('active', showAdmin);
-                allUI.picksViewBtn.classList.toggle('active', !showAdmin);
-            }
+ const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
+ if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
+ allUI.userPicksGameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week.</p>';
+ allUI.saveUserPicksBtn.classList.add('hidden');
+ return;
+ }
+ let userPicks = {};
+ if (docSnap.exists()) {
+ userPicks = docSnap.data();
+ } else {
+ weekData.games.forEach((game, index) => {
+ userPicks[game.id] = { winner: null, confidence: index + 1 };
+ });
+ }
+ currentAdminPicks = userPicks;
+ renderWeekUI(weekData, userPicks, false, allUI.userPicksGameList);
+ allUI.saveUserPicksBtn.classList.remove('hidden');
+ });
+ allUI.saveUserPicksBtn.addEventListener('click', async () => {
+ const selectedUserId = allUI.userPicksSelector.value;
+ const weekNumber = allUI.adminWeekSelector.value;
+ if (!selectedUserId) return;
 
-            // --- EVENT LISTENERS ---
-            allUI.picksViewBtn.addEventListener('click', () => toggleViews(false));
-            allUI.adminViewBtn.addEventListener('click', () => toggleViews(true));
-            allUI.weekSelector.addEventListener('change', (e) => loadAndRenderWeek(e.target.value));
-            allUI.adminWeekSelector.addEventListener('change', (e) => renderAdminView(e.target.value));
-            allUI.saveResultsBtn.addEventListener('click', async () => {
-                const weekNumber = allUI.adminWeekSelector.value;
-                const newResults = {};
-                allUI.resultsGameList.querySelectorAll('.result-btn.selected').forEach(btn => {
-                    newResults[btn.dataset.gameId] = btn.dataset.team;
-                });
-                await setDoc(doc(db, resultsPath(weekNumber)), newResults);
-                alert('Results saved successfully!');
-                calculateAndDisplayLeaderboard(weekNumber);
-            });
-            allUI.resetPicksBtn.addEventListener('click', async () => {
-                const weekIsLocked = await getWeekLockStatus(currentWeek);
-                if (weekIsLocked) return;
+ const docRef = doc(db, picksPath(weekNumber, selectedUserId));
+ await setDoc(docRef, currentAdminPicks);
+ alert(`${allUI.userPicksSelector.options[allUI.userPicksSelector.selectedIndex].text}'s picks have been saved.`);
+ });
+ allUI.adminTabs.forEach(tab => {
+ tab.addEventListener('click', (e) => {
+ allUI.adminTabs.forEach(t => t.classList.remove('active'));
+ e.target.classList.add('active');
+ allUI.adminContentSections.forEach(s => s.classList.add('hidden'));
+ const contentId = `admin-content-${e.target.id.substring(4)}`;
+ document.getElementById(contentId).classList.remove('hidden');
+ renderAdminView(allUI.adminWeekSelector.value);
+ });
+ });
+ 
+ allUI.settingsBtn.addEventListener('click', () => {
+    if (!currentUser) return;
+    allUI.settingsDisplayName.value = currentUser.displayName || '';
+    allUI.settingsEmail.value = currentUser.email || '';
+    allUI.settingsError.classList.add('hidden');
+    allUI.settingsSuccess.classList.add('hidden');
+    allUI.settingsModal.classList.remove('hidden');
+    allUI.settingsModal.classList.add('flex');
+ });
 
-                const weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
-                if (!Array.isArray(weekData.games) || weekData.games.length === 0) return;
+ allUI.closeSettingsBtn.addEventListener('click', () => {
+    allUI.settingsModal.classList.add('hidden');
+    allUI.settingsModal.classList.remove('flex');
+ });
 
-                const resetPicks = {};
-                weekData.games.forEach((game, index) => {
-                    resetPicks[game.id] = { winner: null, confidence: index + 1 };
-                });
-                await savePicksToFirestore(currentWeek, resetPicks);
-            });
-            allUI.userPicksSelector.addEventListener('change', async (e) => {
-                const selectedUserId = e.target.value;
-                if (!selectedUserId) {
-                    allUI.userPicksGameList.innerHTML = '';
-                    allUI.saveUserPicksBtn.classList.add('hidden');
-                    return;
-                }
-                const weekNumber = parseInt(allUI.adminWeekSelector.value, 10);
-                const docRef = doc(db, picksPath(weekNumber, selectedUserId));
-                const docSnap = await getDoc(docRef);
-
-                const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
-                if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
-                    allUI.userPicksGameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week.</p>';
-                    allUI.saveUserPicksBtn.classList.add('hidden');
-                    return;
-                }
-                let userPicks = {};
-                if (docSnap.exists()) {
-                    userPicks = docSnap.data();
-                } else {
-                    weekData.games.forEach((game, index) => {
-                        userPicks[game.id] = { winner: null, confidence: index + 1 };
-                    });
-                }
-                currentAdminPicks = userPicks;
-                renderWeekUI(weekData, userPicks, false, allUI.userPicksGameList);
-                allUI.saveUserPicksBtn.classList.remove('hidden');
-            });
-            allUI.saveUserPicksBtn.addEventListener('click', async () => {
-                const selectedUserId = allUI.userPicksSelector.value;
-                const weekNumber = allUI.adminWeekSelector.value;
-                if (!selectedUserId) return;
-
-                const docRef = doc(db, picksPath(weekNumber, selectedUserId));
-                await setDoc(docRef, currentAdminPicks);
-                alert(`${allUI.userPicksSelector.options[allUI.userPicksSelector.selectedIndex].text}'s picks have been saved.`);
-            });
-            allUI.adminTabs.forEach(tab => {
-                tab.addEventListener('click', (e) => {
-                    allUI.adminTabs.forEach(t => t.classList.remove('active'));
-                    e.target.classList.add('active');
-                    allUI.adminContentSections.forEach(s => s.classList.add('hidden'));
-                    const contentId = `admin-content-${e.target.id.substring(4)}`;
-                    document.getElementById(contentId).classList.remove('hidden');
-                    renderAdminView(allUI.adminWeekSelector.value);
-                });
-            });
-            
-            initializeAppAndAuth();
+ allUI.settingsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newDisplayName = allUI.settingsDisplayName.value;
+    const newEmail = allUI.settingsEmail.value;
+    allUI.settingsError.classList.add('hidden');
+    allUI.settingsSuccess.classList.add('hidden');
+    try {
+        if (newDisplayName !== currentUser.displayName) {
+            await updateProfile(currentUser, { displayName: newDisplayName });
+        }
+        if (newEmail !== currentUser.email) {
+            await updateEmail(auth.currentUser, newEmail);
+        }
+        const userDocRef = doc(db, usersPath(), currentUser.uid);
+        await updateDoc(userDocRef, {
+            displayName: newDisplayName,
+            email: newEmail
         });
-    </script>
+        allUI.settingsSuccess.textContent = 'Settings updated successfully!';
+        allUI.settingsSuccess.classList.remove('hidden');
+        allUI.userDisplay.textContent = `Welcome, ${newDisplayName ? newDisplayName.split(' ')[0] : 'User'}`;
+        setTimeout(() => {
+            allUI.settingsModal.classList.add('hidden');
+            allUI.settingsModal.classList.remove('flex');
+        }, 2000);
+    } catch (error) {
+        console.error("Error updating settings:", error);
+        allUI.settingsError.textContent = `Error: ${error.message}. You may need to log out and log back in to change your email.`;
+        allUI.settingsError.classList.remove('hidden');
+    }
+ });
+
+ initializeAppAndAuth();
+ });
+ </script>
 </body>
 </html>
+
