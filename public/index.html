@@ -135,6 +135,7 @@
  <span class="text-sm font-medium text-slate-600">v1.1.0</span>
  </div>
  <div class="flex items-center space-x-2">
+    <a href="./nerdSurvivor.html" class="bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-700">Nerd Survivor</a>
     <span id="user-display" class="text-sm font-medium text-slate-700"></span>
     <button id="settings-btn" class="text-slate-500 hover:text-slate-800">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -182,12 +183,16 @@
  <button id="tab-game-results" class="admin-tab active">Game Results</button>
  <button id="tab-user-mgmt" class="admin-tab">User Management</button>
  <button id="tab-picks-mgmt" class="admin-tab">Picks Management</button>
+ <button id="tab-survivor-status" class="admin-tab">Survivor Status</button>
  </nav>
  </div>
  <div id="admin-content-game-results" class="admin-content-section">
- <h3 class="text-xl font-bold mb-4">Enter Game Winners</h3>
+ <h3 id="admin-week-title" class="text-xl font-bold mb-4"></h3>
  <div id="results-game-list" class="space-y-4"></div>
- <button id="save-results-btn" class="mt-6 w-full bg-green-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-800">Save Game Results</button>
+ <div class="flex space-x-4 mt-6">
+    <button id="save-results-btn" class="w-full bg-green-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-800">Save Game Results</button>
+    <button id="reset-winners-btn" class="w-full bg-amber-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-amber-600">Reset All Winners</button>
+</div>
  <div id="leaderboard-section" class="mt-8">
  <h3 class="text-xl font-bold mb-4">Live Leaderboard</h3>
  <div id="leaderboard-loader" class="loader hidden"></div>
@@ -207,6 +212,10 @@
  <div id="user-picks-game-list" class="space-y-6"></div>
  <button id="save-user-picks-btn" class="mt-6 w-full bg-blue-700 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-800 hidden">Save User's Picks</button>
  </div>
+ <div id="admin-content-survivor-status" class="admin-content-section hidden">
+    <h3 class="text-xl font-bold mb-4">Survivor Pool Status</h3>
+    <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-100"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">This Week's Pick</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th></tr></thead><tbody id="survivor-status-body" class="bg-white divide-y divide-gray-200"></tbody></table>
+</div>
  </div>
  </div>
  </div>
@@ -239,7 +248,7 @@
  <script type="module">
  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
  import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updateEmail, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
- import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+ import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
  const ADMIN_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
 
@@ -257,8 +266,10 @@
  id: game.id,
  away: game.a,
  home: game.h,
- kickoff: game.dt.slice(0, -1), // FIX: Remove trailing 'Z' to treat as local time
- stadium: game.stadium
+ kickoff: game.dt,
+ stadium: game.stadium,
+ weather: 'TBD',
+ startingQBs: {away: 'TBD', home: 'TBD'}
  })) : [];
  } catch (error) {
  console.error(`Error fetching games for week ${weekNumber}:`, error);
@@ -309,6 +320,9 @@
  settingsEmail: document.getElementById('settings-email'),
  settingsError: document.getElementById('settings-error'),
  settingsSuccess: document.getElementById('settings-success'),
+ adminWeekTitle: document.getElementById('admin-week-title'),
+ resetWinnersBtn: document.getElementById('reset-winners-btn'),
+ survivorStatusBody: document.getElementById('survivor-status-body'),
  };
 
  // --- APP STATE ---
@@ -327,31 +341,81 @@
  }
 
  async function renderGameResultsAdmin(weekNumber) {
- const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
- if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
- allUI.resultsGameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week.</p>';
- allUI.leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center py-4">No data for this week.</td></tr>`;
- return;
+    allUI.adminWeekTitle.textContent = `Editing Results for Week ${weekNumber}`;
+    const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
+    if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
+        allUI.resultsGameList.innerHTML = '<p class="text-center text-red-600">Error loading games for this week.</p>';
+        allUI.leaderboardBody.innerHTML = `<tr><td colspan="3" class="text-center py-4">No data for this week.</td></tr>`;
+        return;
+    }
+    
+    const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`);
+    const picksSnap = await getDocs(picksCollectionRef);
+    const pickCounts = {};
+    picksSnap.forEach(pickDoc => {
+        const userPicks = pickDoc.data();
+        Object.keys(userPicks).forEach(gameId => {
+            if (!pickCounts[gameId]) {
+                pickCounts[gameId] = { away: 0, home: 0 };
+            }
+            if (userPicks[gameId].winner) {
+                const weekGame = weekData.games.find(g => g.id == gameId);
+                if (weekGame && userPicks[gameId].winner === weekGame.away) {
+                    pickCounts[gameId].away++;
+                } else if (weekGame && userPicks[gameId].winner === weekGame.home) {
+                    pickCounts[gameId].home++;
+                }
+            }
+        });
+    });
+
+    const resultsDocRef = doc(db, resultsPath(weekNumber));
+    const resultsSnap = await getDoc(resultsDocRef);
+    const currentResults = resultsSnap.exists() ? resultsSnap.data() : {};
+    allUI.resultsGameList.innerHTML = '';
+
+    weekData.games.forEach(game => {
+        const winner = currentResults[game.id] || null;
+        const counts = pickCounts[game.id] || { away: 0, home: 0 };
+        const totalGamePicks = counts.away + counts.home;
+        const awayPerc = totalGamePicks > 0 ? Math.round((counts.away / totalGamePicks) * 100) : 0;
+        const homePerc = totalGamePicks > 0 ? Math.round((counts.home / totalGamePicks) * 100) : 0;
+        const gameTime = new Date(game.kickoff);
+        const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+        const gameEl = document.createElement('div');
+        gameEl.className = 'p-4 border border-slate-300 rounded-lg bg-slate-100';
+        gameEl.innerHTML = `
+            <div class="grid grid-cols-12 gap-4 items-center">
+                <div class="col-span-12 md:col-span-10">
+                    <div class="flex justify-around items-center">
+                        <div class="w-2/5 text-center">
+                            <button data-game-id="${game.id}" data-team="${game.away}" class="result-btn w-full p-2 rounded-lg border-2 ${winner === game.away ? 'selected' : ''}">${game.away}</button>
+                            <p class="text-xs text-slate-500 mt-1">${awayPerc}% of users</p>
+                        </div>
+                        <div class="text-center">
+                            <span class="font-bold">@</span>
+                            <p class="text-xs text-slate-500 mt-1">${formattedTime}</p>
+                        </div>
+                        <div class="w-2/5 text-center">
+                            <button data-game-id="${game.id}" data-team="${game.home}" class="result-btn w-full p-2 rounded-lg border-2 ${winner === game.home ? 'selected' : ''}">${game.home}</button>
+                            <p class="text-xs text-slate-500 mt-1">${homePerc}% of users</p>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        allUI.resultsGameList.appendChild(gameEl);
+    });
+    
+    allUI.resultsGameList.querySelectorAll('.result-btn').forEach(btn => btn.addEventListener('click', (e) => {
+        const { gameId } = e.target.dataset;
+        const gameButtons = allUI.resultsGameList.querySelectorAll(`.result-btn[data-game-id="${gameId}"]`);
+        gameButtons.forEach(b => b.classList.remove('selected'));
+        e.target.classList.add('selected');
+    }));
+    calculateAndDisplayLeaderboard(weekNumber);
  }
- const resultsDocRef = doc(db, resultsPath(weekNumber));
- const resultsSnap = await getDoc(resultsDocRef);
- const currentResults = resultsSnap.exists() ? resultsSnap.data() : {};
- allUI.resultsGameList.innerHTML = '';
- weekData.games.forEach(game => {
- const winner = currentResults[game.id] || null;
- const gameEl = document.createElement('div');
- gameEl.className = 'grid grid-cols-12 gap-2 items-center';
- gameEl.innerHTML = `<div class="col-span-10 flex justify-around items-center"><button data-game-id="${game.id}" data-team="${game.away}" class="result-btn w-2/5 text-center p-2 rounded-lg border-2 ${winner === game.away ? 'selected' : ''}">${game.away}</button><span class="font-bold">@</span><button data-game-id="${game.id}" data-team="${game.home}" class="result-btn w-2/5 text-center p-2 rounded-lg border-2 ${winner === game.home ? 'selected' : ''}">${game.home}</button></div>`;
- allUI.resultsGameList.appendChild(gameEl);
- });
- allUI.resultsGameList.querySelectorAll('.result-btn').forEach(btn => btn.addEventListener('click', (e) => {
- const { gameId } = e.target.dataset;
- const gameButtons = allUI.resultsGameList.querySelectorAll(`.result-btn[data-game-id="${gameId}"]`);
- gameButtons.forEach(b => b.classList.remove('selected'));
- e.target.classList.add('selected');
- }));
- calculateAndDisplayLeaderboard(weekNumber);
- }
+
 
  function renderUserManagement() {
  allUI.userMgmtBody.innerHTML = allUsers.map(user => `
@@ -392,13 +456,75 @@
  allUI.userPicksGameList.innerHTML = '';
  allUI.saveUserPicksBtn.classList.add('hidden');
  }
+ 
+ async function renderSurvivorStatus(weekNumber) {
+    allUI.survivorStatusBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><div class="loader"></div></td></tr>`;
+    
+    const statusDocRef = doc(db, survivorStatusPath());
+    const statusSnap = await getDoc(statusDocRef);
+    const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
+    
+    const picksCollectionRef = collection(db, survivorPicksPath('').slice(0,-1));
+    const picksSnap = await getDocs(picksCollectionRef);
+    const allPicks = {};
+    picksSnap.forEach(doc => {
+        allPicks[doc.id] = doc.data();
+    });
+
+    const tableRows = allUsers.map(user => {
+        const userStatus = allStatuses[user.id] || { eliminated: false };
+        const userPicks = allPicks[user.id];
+        const thisWeekPick = userPicks && userPicks.picks[weekNumber] ? userPicks.picks[weekNumber].team : 'No Pick';
+        
+        return `
+            <tr>
+                <td class="px-6 py-4 whitespace-nowrap">${user.displayName || user.email}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${thisWeekPick}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${userStatus.eliminated ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                        ${userStatus.eliminated ? `Eliminated (Week ${userStatus.eliminatedWeek})` : 'Active'}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <button data-user-id="${user.id}" data-eliminated="${!!userStatus.eliminated}" class="survivor-status-btn text-sm font-medium ${userStatus.eliminated ? 'text-green-600 hover:text-green-900' : 'text-red-600 hover:text-red-900'}">
+                        ${userStatus.eliminated ? 'Reinstate' : 'Eliminate'}
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    allUI.survivorStatusBody.innerHTML = tableRows || `<tr><td colspan="4" class="text-center py-4">No users in survivor pool.</td></tr>`;
+
+    allUI.survivorStatusBody.querySelectorAll('.survivor-status-btn').forEach(btn => {
+        btn.addEventListener('click', async e => {
+            const userId = e.target.dataset.userId;
+            const isEliminated = e.target.dataset.eliminated === 'true';
+            
+            const statusUpdate = {};
+            if (!isEliminated) {
+                // Eliminate the user
+                statusUpdate[`${userId}.eliminated`] = true;
+                statusUpdate[`${userId}.eliminatedWeek`] = weekNumber;
+            } else {
+                // Reinstate the user
+                statusUpdate[`${userId}`] = deleteField();
+            }
+
+            await updateDoc(statusDocRef, statusUpdate);
+            await renderSurvivorStatus(weekNumber);
+        });
+    });
+}
+
 
  async function renderAdminView(weekNumber) {
  const activeTab = document.querySelector('.admin-tab.active').id;
  switch (activeTab) {
  case 'tab-game-results': await renderGameResultsAdmin(weekNumber); break;
  case 'tab-user-mgmt': renderUserManagement(); break;
- case 'tab-picks-mgmt': renderPicksManagement(weekNumber); break;
+ case 'tab-picks-mgmt': await renderPicksManagement(weekNumber); break;
+ case 'tab-survivor-status': await renderSurvivorStatus(weekNumber); break;
  }
  }
 
@@ -840,6 +966,21 @@
         console.error("Error updating settings:", error);
         allUI.settingsError.textContent = `Error: ${error.message}. You may need to log out and log back in to change your email.`;
         allUI.settingsError.classList.remove('hidden');
+    }
+ });
+
+ allUI.resetWinnersBtn.addEventListener('click', async () => {
+    const weekNumber = allUI.adminWeekSelector.value;
+    if (confirm(`Are you sure you want to reset all winners for Week ${weekNumber}? This cannot be undone.`)) {
+        const resultsDocRef = doc(db, resultsPath(weekNumber));
+        try {
+            await deleteDoc(resultsDocRef);
+            alert(`Winners for Week ${weekNumber} have been reset.`);
+            await renderGameResultsAdmin(weekNumber);
+        } catch (error) {
+            console.error("Error resetting winners:", error);
+            alert("An error occurred while resetting the winners.");
+        }
     }
  });
 

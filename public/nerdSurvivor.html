@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nerd Survivor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .team-btn.selected {
+            background-color: #334155; /* slate-700 */
+            color: white;
+            border-color: #1e293b; /* slate-800 */
+        }
+        .team-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #9ca3af;
+            color: #e5e7eb;
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #9ca3af; /* gray-400 */
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .form-btn {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            color: white;
+            background-image: linear-gradient(to bottom, #64748b, #334155);
+            border: 1px solid #1e293b;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .form-btn:hover {
+            background-image: linear-gradient(to bottom, #475569, #1e293b);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #64748b; /* slate-500 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-200 text-slate-800">
+
+    <div id="app-container" class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-6 text-center">
+            <h1 class="text-4xl font-bold text-slate-800">Nerd Survivor</h1>
+            <p class="text-slate-600">Pick one winner each week. Lose once and you're out.</p>
+            <a href="./index.html" class="text-slate-600 hover:text-slate-800 font-medium">&larr; Back to Confidence Pool</a>
+        </header>
+
+        <div id="main-content" class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
+            <!-- Content will be dynamically rendered here -->
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            
+            let currentUser = null;
+            let currentWeek = 1;
+            let db, auth;
+            
+            async function getGamesForWeek(weekNumber) {
+                try {
+                    const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
+                    }
+                    const weekData = await response.json();
+                    return Array.isArray(weekData.games) ? weekData.games.map(game => ({
+                        id: game.id,
+                        away: game.a,
+                        home: game.h,
+                        kickoff: game.dt,
+                        stadium: game.stadium
+                    })) : [];
+                } catch (error) {
+                    console.error(`Error fetching games for week ${weekNumber}:`, error);
+                    return [];
+                }
+            }
+
+            function getCurrentNflWeek() {
+                const seasonStartDate = new Date('2025-09-04T00:00:00Z');
+                const now = new Date();
+                if (now < seasonStartDate) return 1;
+                const diffTime = Math.abs(now - seasonStartDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const week = Math.ceil(diffDays / 7);
+                return week > 18 ? 18 : week;
+            }
+
+            const appId = () => 'nerdfootball'; 
+            const survivorPicksPath = (uid) => `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
+            const survivorStatusPath = () => `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
+
+            async function initializeSurvivorApp() {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+                    authDomain: "nerdfootball.firebaseapp.com",
+                    projectId: "nerdfootball",
+                    storageBucket: "nerdfootball.appspot.com",
+                    messagingSenderId: "969304790725",
+                    appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+                    measurementId: "G-8RVRHE3HRC"
+                };
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                onAuthStateChanged(auth, user => {
+                    currentUser = user;
+                    renderApp();
+                });
+            }
+
+            async function renderApp() {
+                const mainContent = document.getElementById('main-content');
+                if (!currentUser) {
+                    mainContent.innerHTML = `<p class="text-center">Please <a href="./index.html" class="font-bold text-slate-600 hover:text-slate-800">log in</a> to participate.</p>`;
+                    return;
+                }
+
+                currentWeek = getCurrentNflWeek();
+                mainContent.innerHTML = `<div class="loader"></div>`;
+                
+                const statusDocRef = doc(db, survivorStatusPath());
+                const picksDocRef = doc(db, survivorPicksPath(currentUser.uid));
+
+                const [statusSnap, picksSnap] = await Promise.all([getDoc(statusDocRef), getDoc(picksDocRef)]);
+                const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
+                const userPicks = picksSnap.exists() ? picksSnap.data() : { picks: {} };
+
+                const myStatus = allStatuses[currentUser.uid];
+
+                if (myStatus && myStatus.eliminated) {
+                    mainContent.innerHTML = `<h2 class="text-2xl font-bold text-center text-red-600">You have been eliminated.</h2><p class="text-center mt-2">You were eliminated in Week ${myStatus.eliminatedWeek}. Better luck next year!</p>`;
+                    return;
+                }
+                
+                const weeklyGames = await getGamesForWeek(currentWeek);
+
+                if (!weeklyGames || weeklyGames.length === 0) {
+                     mainContent.innerHTML = `<p class="text-center text-red-600">Could not load games for Week ${currentWeek}. Please check back later.</p>`;
+                     return;
+                }
+                
+                const firstKickoff = new Date(weeklyGames[0].kickoff);
+                const weekLocked = new Date() > firstKickoff;
+                
+                let html = `<h2 class="text-2xl font-bold text-center mb-4">Week ${currentWeek} Pick</h2>`;
+                if(weekLocked) {
+                     html += `<div class="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6" role="alert"><p class="font-bold">Picks are locked for Week ${currentWeek}.</p></div>`;
+                }
+
+                const myPickThisWeek = userPicks.picks[currentWeek];
+                
+                html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
+                weeklyGames.forEach(game => {
+                    const previouslyPickedTeams = Object.values(userPicks.picks).map(p => p.team);
+                    const awayTeamPicked = previouslyPickedTeams.includes(game.away);
+                    const homeTeamPicked = previouslyPickedTeams.includes(game.home);
+
+                    const awaySelected = myPickThisWeek && myPickThisWeek.team === game.away;
+                    const homeSelected = myPickThisWeek && myPickThisWeek.team === game.home;
+
+                    html += `
+                        <div class="border rounded-lg p-4 ${ (awayTeamPicked && !awaySelected) || (homeTeamPicked && !homeSelected) ? 'bg-slate-200' : 'bg-white'}">
+                            <div class="flex justify-between items-center">
+                                <button data-team="${game.away}" data-game-id="${game.id}" class="team-btn w-2/5 text-center p-2 rounded-lg border-2 ${awaySelected ? 'selected' : ''}" ${weekLocked || (awayTeamPicked && !awaySelected) ? 'disabled' : ''}>${game.away}</button>
+                                <span class="font-bold text-slate-500">@</span>
+                                <button data-team="${game.home}" data-game-id="${game.id}" class="team-btn w-2/5 text-center p-2 rounded-lg border-2 ${homeSelected ? 'selected' : ''}" ${weekLocked || (homeTeamPicked && !homeSelected) ? 'disabled' : ''}>${game.home}</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+                mainContent.innerHTML = html;
+
+                mainContent.querySelectorAll('.team-btn').forEach(btn => {
+                    btn.addEventListener('click', async e => {
+                        const { team, gameId } = e.target.dataset;
+                        const newPick = {
+                            team: team,
+                            gameId: gameId,
+                        };
+                        userPicks.picks[currentWeek] = newPick;
+                        await setDoc(picksDocRef, userPicks);
+                        renderApp(); // Re-render to show selection
+                    });
+                });
+            }
+
+            initializeSurvivorApp();
+        });
+    </script>
+</body>
+</html>
