@@ -21,26 +21,6 @@
             background-color: #9ca3af;
             color: #e5e7eb;
         }
-        .form-input {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            border: 1px solid #9ca3af; /* gray-400 */
-            background-color: #f8fafc; /* slate-50 */
-        }
-        .form-btn {
-            width: 100%;
-            padding: 0.75rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            color: white;
-            background-image: linear-gradient(to bottom, #64748b, #334155);
-            border: 1px solid #1e293b;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        }
-        .form-btn:hover {
-            background-image: linear-gradient(to bottom, #475569, #1e293b);
-        }
         .loader {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #64748b; /* slate-500 */
@@ -62,24 +42,35 @@
         <header class="mb-6 text-center">
             <h1 class="text-4xl font-bold text-slate-800">Nerd Survivor</h1>
             <p class="text-slate-600">Pick one winner each week. Lose once and you're out.</p>
-            <a href="./index.html" class="text-slate-600 hover:text-slate-800 font-medium">&larr; Back to Confidence Pool</a>
+            <div class="mt-2 flex justify-center items-center space-x-4">
+                <a href="./index.html" class="text-slate-600 hover:text-slate-800 font-medium">&larr; Back to Confidence Pool</a>
+                <button id="admin-btn" class="hidden bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-700">Admin</button>
+            </div>
         </header>
 
         <div id="main-content" class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
-            <!-- Content will be dynamically rendered here -->
+            <!-- User picks view will be rendered here -->
+        </div>
+        
+        <div id="admin-panel" class="hidden bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200 mt-6">
+             <h2 class="text-2xl font-bold text-slate-800 mb-4">Survivor Admin - Week <span id="admin-week-display"></span></h2>
+             <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-100"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pick</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th></tr></thead><tbody id="survivor-admin-body" class="bg-white divide-y divide-gray-200"></tbody></table>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteField, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const ADMIN_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
 
         document.addEventListener('DOMContentLoaded', async () => {
             
             let currentUser = null;
             let currentWeek = 1;
             let db, auth;
+            let allUsers = [];
             
             async function getGamesForWeek(weekNumber) {
                 try {
@@ -93,7 +84,9 @@
                         away: game.a,
                         home: game.h,
                         kickoff: game.dt,
-                        stadium: game.stadium
+                        stadium: game.stadium,
+                        weather: 'TBD',
+                        startingQBs: {away: 'TBD', home: 'TBD'}
                     })) : [];
                 } catch (error) {
                     console.error(`Error fetching games for week ${weekNumber}:`, error);
@@ -114,6 +107,8 @@
             const appId = () => 'nerdfootball'; 
             const survivorPicksPath = (uid) => `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
             const survivorStatusPath = () => `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
+            const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
+
 
             async function initializeSurvivorApp() {
                 const firebaseConfig = {
@@ -136,9 +131,14 @@
 
             async function renderApp() {
                 const mainContent = document.getElementById('main-content');
+                const adminBtn = document.getElementById('admin-btn');
                 if (!currentUser) {
                     mainContent.innerHTML = `<p class="text-center">Please <a href="./index.html" class="font-bold text-slate-600 hover:text-slate-800">log in</a> to participate.</p>`;
                     return;
+                }
+                
+                if (currentUser.uid === ADMIN_UID) {
+                    adminBtn.classList.remove('hidden');
                 }
 
                 currentWeek = getCurrentNflWeek();
@@ -175,7 +175,7 @@
 
                 const myPickThisWeek = userPicks.picks[currentWeek];
                 
-                html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
+                html += `<div class="space-y-6">`;
                 weeklyGames.forEach(game => {
                     const previouslyPickedTeams = Object.values(userPicks.picks).map(p => p.team);
                     const awayTeamPicked = previouslyPickedTeams.includes(game.away);
@@ -183,13 +183,24 @@
 
                     const awaySelected = myPickThisWeek && myPickThisWeek.team === game.away;
                     const homeSelected = myPickThisWeek && myPickThisWeek.team === game.home;
+                    
+                    const gameTime = new Date(game.kickoff);
+                    const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
                     html += `
-                        <div class="border rounded-lg p-4 ${ (awayTeamPicked && !awaySelected) || (homeTeamPicked && !homeSelected) ? 'bg-slate-200' : 'bg-white'}">
-                            <div class="flex justify-between items-center">
-                                <button data-team="${game.away}" data-game-id="${game.id}" class="team-btn w-2/5 text-center p-2 rounded-lg border-2 ${awaySelected ? 'selected' : ''}" ${weekLocked || (awayTeamPicked && !awaySelected) ? 'disabled' : ''}>${game.away}</button>
-                                <span class="font-bold text-slate-500">@</span>
-                                <button data-team="${game.home}" data-game-id="${game.id}" class="team-btn w-2/5 text-center p-2 rounded-lg border-2 ${homeSelected ? 'selected' : ''}" ${weekLocked || (homeTeamPicked && !homeSelected) ? 'disabled' : ''}>${game.home}</button>
+                        <div class="p-4 border border-slate-300 rounded-lg ${ (awayTeamPicked && !awaySelected) || (homeTeamPicked && !homeSelected) ? 'bg-slate-200' : 'bg-white'}">
+                             <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                                <div class="md:col-span-8">
+                                    <div class="flex flex-col sm:flex-row justify-around items-center gap-2">
+                                        <button data-team="${game.away}" data-game-id="${game.id}" class="team-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 ${awaySelected ? 'selected' : ''}" ${weekLocked || (awayTeamPicked && !awaySelected) ? 'disabled' : ''}>${game.away}</button>
+                                        <span class="font-bold text-slate-500">@</span>
+                                        <button data-team="${game.home}" data-game-id="${game.id}" class="team-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 ${homeSelected ? 'selected' : ''}" ${weekLocked || (homeTeamPicked && !homeSelected) ? 'disabled' : ''}>${game.home}</button>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-4 text-xs text-slate-600 text-center md:text-left">
+                                     <div><p class="font-bold">Date & Time</p><p>${formattedTime}</p></div>
+                                     <div><p class="font-bold">Stadium</p><p>${game.stadium}</p></div>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -210,6 +221,102 @@
                     });
                 });
             }
+
+            async function renderAdminPanel() {
+                document.getElementById('main-content').classList.add('hidden');
+                const adminPanel = document.getElementById('admin-panel');
+                adminPanel.classList.remove('hidden');
+                document.getElementById('admin-week-display').textContent = currentWeek;
+                const adminBody = document.getElementById('survivor-admin-body');
+                adminBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><div class="loader"></div></td></tr>`;
+
+                const statusDocRef = doc(db, survivorStatusPath());
+                const statusSnap = await getDoc(statusDocRef);
+                const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
+
+                const picksCollectionRef = collection(db, survivorPicksPath('').slice(0, -1));
+                const picksSnap = await getDocs(picksCollectionRef);
+                const allPicks = {};
+                picksSnap.forEach(doc => {
+                    allPicks[doc.id] = doc.data();
+                });
+
+                const usersSnap = await getDocs(collection(db, usersPath()));
+                allUsers = [];
+                usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
+                allUsers.sort((a,b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+
+                const tableRows = allUsers.map(user => {
+                    const userStatus = allStatuses[user.id] || { eliminated: false };
+                    const userPicks = allPicks[user.id];
+                    const thisWeekPick = userPicks && userPicks.picks[currentWeek] ? userPicks.picks[currentWeek].team : 'No Pick';
+
+                    return `
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">${user.displayName || user.email}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${thisWeekPick}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${userStatus.eliminated ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                                    ${userStatus.eliminated ? `Eliminated (Week ${userStatus.eliminatedWeek})` : 'Active'}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                <button data-user-id="${user.id}" class="reset-survivor-pick-btn text-blue-600 hover:text-blue-900">Reset Pick</button>
+                                <button data-user-id="${user.id}" data-eliminated="${!!userStatus.eliminated}" class="survivor-status-btn ${userStatus.eliminated ? 'text-green-600 hover:text-green-900' : 'text-red-600 hover:text-red-900'}">
+                                    ${userStatus.eliminated ? 'Reinstate' : 'Eliminate'}
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                adminBody.innerHTML = tableRows || `<tr><td colspan="4" class="text-center py-4">No users found.</td></tr>`;
+
+                adminBody.querySelectorAll('.reset-survivor-pick-btn').forEach(btn => {
+                    btn.addEventListener('click', async e => {
+                        const userId = e.target.dataset.userId;
+                        if(confirm(`Are you sure you want to reset this week's pick for this user?`)){
+                            const userPicksDocRef = doc(db, survivorPicksPath(userId));
+                            const updateData = { [`picks.${currentWeek}`]: deleteField() };
+                            await updateDoc(userPicksDocRef, updateData);
+                            renderAdminPanel();
+                        }
+                    });
+                });
+                
+                adminBody.querySelectorAll('.survivor-status-btn').forEach(btn => {
+                    btn.addEventListener('click', async e => {
+                        const userId = e.target.dataset.userId;
+                        const isEliminated = e.target.dataset.eliminated === 'true';
+                        
+                        const statusUpdate = {};
+                        if (!isEliminated) {
+                            if(confirm('Are you sure you want to eliminate this player?')){
+                                statusUpdate[`${userId}.eliminated`] = true;
+                                statusUpdate[`${userId}.eliminatedWeek`] = currentWeek;
+                            }
+                        } else {
+                            if(confirm('Are you sure you want to reinstate this player?')){
+                                statusUpdate[`${userId}`] = deleteField();
+                            }
+                        }
+
+                        if(Object.keys(statusUpdate).length > 0) {
+                            await updateDoc(statusDocRef, statusUpdate);
+                            renderAdminPanel();
+                        }
+                    });
+                });
+            }
+            
+            document.getElementById('admin-btn').addEventListener('click', () => {
+                const adminPanel = document.getElementById('admin-panel');
+                if (adminPanel.classList.contains('hidden')) {
+                    renderAdminPanel();
+                } else {
+                    document.getElementById('main-content').classList.remove('hidden');
+                    adminPanel.classList.add('hidden');
+                }
+            });
 
             initializeSurvivorApp();
         });
