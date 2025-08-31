@@ -248,7 +248,7 @@
  <script type="module">
  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
  import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updateEmail, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
- import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+ import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
  const ADMIN_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
 
@@ -266,7 +266,7 @@
  id: game.id,
  away: game.a,
  home: game.h,
- kickoff: game.dt,
+ kickoff: game.dt.slice(0, -1),
  stadium: game.stadium
  })) : [];
  } catch (error) {
@@ -472,7 +472,7 @@
     const tableRows = allUsers.map(user => {
         const userStatus = allStatuses[user.id] || { eliminated: false };
         const userPicks = allPicks[user.id];
-        const thisWeekPick = userPicks && userPicks.picks[weekNumber] ? userPicks.picks[weekNumber].team : 'No Pick';
+        const thisWeekPick = userPicks && userPicks.picks && userPicks.picks[weekNumber] ? userPicks.picks[weekNumber].team : 'No Pick';
         
         return `
             <tr>
@@ -501,16 +501,20 @@
             
             const statusUpdate = {};
             if (!isEliminated) {
-                // Eliminate the user
-                statusUpdate[`${userId}.eliminated`] = true;
-                statusUpdate[`${userId}.eliminatedWeek`] = weekNumber;
+                if(confirm('Are you sure you want to eliminate this player?')){
+                    statusUpdate[`${userId}.eliminated`] = true;
+                    statusUpdate[`${userId}.eliminatedWeek`] = weekNumber;
+                }
             } else {
-                // Reinstate the user
-                statusUpdate[`${userId}`] = deleteField();
+                if(confirm('Are you sure you want to reinstate this player?')){
+                    statusUpdate[`${userId}`] = deleteField();
+                }
             }
 
-            await updateDoc(statusDocRef, statusUpdate);
-            await renderSurvivorStatus(weekNumber);
+            if(Object.keys(statusUpdate).length > 0) {
+                await updateDoc(statusDocRef, statusUpdate);
+                await renderSurvivorStatus(weekNumber);
+            }
         });
     });
 }
@@ -651,6 +655,8 @@
  const picksPath = (week, uid) => `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
  const resultsPath = (week) => `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
  const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
+ const survivorPicksPath = (uid) => `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
+ const survivorStatusPath = () => `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
  
  // --- SAVE STATUS ---
  function updateSaveStatus(status, message) {
@@ -969,7 +975,6 @@
 
  allUI.resetWinnersBtn.addEventListener('click', async () => {
     const weekNumber = allUI.adminWeekSelector.value;
-    // A simple browser confirm is used here. For a better UX, a custom modal could be built.
     if (confirm(`Are you sure you want to reset all winners for Week ${weekNumber}? This cannot be undone.`)) {
         const resultsDocRef = doc(db, resultsPath(weekNumber));
         try {

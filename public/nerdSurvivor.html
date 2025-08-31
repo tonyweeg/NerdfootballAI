@@ -83,7 +83,7 @@
                         id: game.id,
                         away: game.a,
                         home: game.h,
-                        kickoff: game.dt,
+                        kickoff: game.dt.slice(0, -1),
                         stadium: game.stadium,
                         weather: 'TBD',
                         startingQBs: {away: 'TBD', home: 'TBD'}
@@ -185,7 +185,7 @@
                     const homeSelected = myPickThisWeek && myPickThisWeek.team === game.home;
                     
                     const gameTime = new Date(game.kickoff);
-                    const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+                    const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
                     html += `
                         <div class="p-4 border border-slate-300 rounded-lg ${ (awayTeamPicked && !awaySelected) || (homeTeamPicked && !homeSelected) ? 'bg-slate-200' : 'bg-white'}">
@@ -216,7 +216,7 @@
                             gameId: gameId,
                         };
                         userPicks.picks[currentWeek] = newPick;
-                        await setDoc(picksDocRef, userPicks);
+                        await setDoc(picksDocRef, userPicks, { merge: true });
                         renderApp(); // Re-render to show selection
                     });
                 });
@@ -249,8 +249,8 @@
                 const tableRows = allUsers.map(user => {
                     const userStatus = allStatuses[user.id] || { eliminated: false };
                     const userPicks = allPicks[user.id];
-                    const thisWeekPick = userPicks && userPicks.picks[currentWeek] ? userPicks.picks[currentWeek].team : 'No Pick';
-
+                    const thisWeekPick = userPicks && userPicks.picks && userPicks.picks[currentWeek] ? userPicks.picks[currentWeek].team : 'No Pick';
+                    
                     return `
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">${user.displayName || user.email}</td>
@@ -301,7 +301,7 @@
                         }
 
                         if(Object.keys(statusUpdate).length > 0) {
-                            await updateDoc(statusDocRef, statusUpdate);
+                            await setDoc(statusDocRef, statusUpdate, { merge: true });
                             renderAdminPanel();
                         }
                     });
