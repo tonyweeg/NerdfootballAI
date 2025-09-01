@@ -144,6 +144,7 @@
                  <button id="menu-admin-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Admin</button>
                  <div class="border-t border-gray-200 my-1"></div>
             </div>
+            <button id="leaderboard-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Leaderboard</button>
             <a href="./nerdSurvivor.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Nerd Survivor</a>
             <button id="settings-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Settings</button>
             <button id="logout-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Logout</button>
@@ -178,6 +179,33 @@
  </main>
  </div>
  </div>
+
+ <!-- Leaderboard View -->
+  <div id="leaderboard-container" class="hidden">
+    <div class="bg-white p-6 rounded-2xl shadow-lg">
+        <h2 class="text-2xl font-bold mb-4 text-center">Confidence Pool Leaderboard</h2>
+        <div class="flex justify-center items-center mb-4 space-x-2">
+            <button id="lb-weekly-btn" class="view-toggle-btn active py-2 px-4 rounded-lg font-semibold border border-gray-300">Weekly</button>
+            <button id="lb-season-btn" class="view-toggle-btn py-2 px-4 rounded-lg font-semibold border border-gray-300">Season</button>
+        </div>
+        <div id="lb-week-selector-container" class="mb-4 text-center">
+            <label for="lb-week-selector" class="text-lg font-medium text-gray-700 mr-2">Week:</label>
+            <select id="lb-week-selector" class="p-2 rounded-lg border-2 border-gray-300 bg-white"></select>
+        </div>
+        <div id="public-leaderboard-loader" class="loader hidden"></div>
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                </tr>
+            </thead>
+            <tbody id="public-leaderboard-body" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+    </div>
+</div>
+
 
  <!-- Admin View -->
  <div id="admin-container" class="hidden">
@@ -274,7 +302,7 @@
  id: game.id,
  away: game.a,
  home: game.h,
- kickoff: game.dt.slice(0, -1), // CORRECT: Treat as local time
+ kickoff: game.dt.slice(0, -1),
  stadium: game.stadium
  })) : [];
  } catch (error) {
@@ -309,6 +337,7 @@
  picksContainer: document.getElementById('picks-container'), adminContainer: document.getElementById('admin-container'),
  picksViewBtn: document.getElementById('menu-picks-view-btn'),
  adminViewBtn: document.getElementById('menu-admin-view-btn'),
+ leaderboardViewBtn: document.getElementById('leaderboard-view-btn'),
  weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
  gameList: document.getElementById('game-list'), resultsGameList: document.getElementById('results-game-list'),
  saveResultsBtn: document.getElementById('save-results-btn'),
@@ -333,6 +362,13 @@
  survivorStatusBody: document.getElementById('survivor-status-body'),
  menuBtn: document.getElementById('menu-btn'),
  menuPanel: document.getElementById('menu-panel'),
+ leaderboardContainer: document.getElementById('leaderboard-container'),
+ lbWeeklyBtn: document.getElementById('lb-weekly-btn'),
+ lbSeasonBtn: document.getElementById('lb-season-btn'),
+ lbWeekSelectorContainer: document.getElementById('lb-week-selector-container'),
+ lbWeekSelector: document.getElementById('lb-week-selector'),
+ publicLeaderboardLoader: document.getElementById('public-leaderboard-loader'),
+ publicLeaderboardBody: document.getElementById('public-leaderboard-body'),
  };
 
  // --- APP STATE ---
@@ -588,6 +624,7 @@
  populateWeekSelectors();
  allUI.weekSelector.value = currentWeek;
  allUI.adminWeekSelector.value = currentWeek;
+ allUI.lbWeekSelector.value = currentWeek;
 
  await loadAndRenderWeek(currentWeek);
  if (user.uid === ADMIN_UID) {
@@ -750,38 +787,72 @@
  } 
  }
 
- async function calculateAndDisplayLeaderboard(weekNumber) {
- allUI.leaderboardLoader.classList.remove('hidden');
- allUI.leaderboardBody.innerHTML = '';
- const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
- const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
- const usersSnap = await getDocs(collection(db, usersPath()));
- const users = {};
- usersSnap.forEach(doc => users[doc.id] = doc.data());
- const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
- const scores = [];
- picksSnap.forEach(pickDoc => {
- const userId = pickDoc.id;
- if (!users[userId]) return;
- const userPicks = pickDoc.data();
- let userScore = 0;
- Object.keys(userPicks).forEach(gameId => {
- const pick = userPicks[gameId];
- if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
- userScore += pick.confidence;
- }
- });
- scores.push({ userId, displayName: users[userId].displayName, score: userScore });
- });
- scores.sort((a, b) => b.score - a.score);
- allUI.leaderboardBody.innerHTML = scores.map((s, index) => `<tr><td class="px-6 py-4 whitespace-nowrap font-medium">${index + 1}</td><td class="px-6 py-4 whitespace-nowrap">${s.displayName}</td><td class="px-6 py-4 whitespace-nowrap font-bold">${s.score}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center py-4">No picks submitted for this week yet.</td></tr>`;
- allUI.leaderboardLoader.classList.add('hidden');
- }
+ async function calculateAndDisplayLeaderboard(weekNumber, targetBody = allUI.leaderboardBody, loader = allUI.leaderboardLoader) {
+    loader.classList.remove('hidden');
+    targetBody.innerHTML = '';
+
+    const usersSnap = await getDocs(collection(db, usersPath()));
+    const users = {};
+    usersSnap.forEach(doc => users[doc.id] = doc.data());
+    
+    let scores = {};
+    for (const id in users) {
+        scores[id] = { userId: id, displayName: users[id].displayName, score: 0 };
+    }
+
+    if (weekNumber) { // Weekly calculation
+        const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
+        const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+        const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+        
+        picksSnap.forEach(pickDoc => {
+            const userId = pickDoc.id;
+            if (scores[userId]) {
+                const userPicks = pickDoc.data();
+                let userScore = 0;
+                Object.keys(userPicks).forEach(gameId => {
+                    const pick = userPicks[gameId];
+                    if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
+                        userScore += pick.confidence;
+                    }
+                });
+                scores[userId].score = userScore;
+            }
+        });
+    } else { // Season calculation
+        for (let i = 1; i <= currentWeek; i++) {
+            const resultsSnap = await getDoc(doc(db, resultsPath(i)));
+            const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+            const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${i}/submissions`));
+
+            picksSnap.forEach(pickDoc => {
+                const userId = pickDoc.id;
+                if (scores[userId]) {
+                    const userPicks = pickDoc.data();
+                    let userScore = 0;
+                    Object.keys(userPicks).forEach(gameId => {
+                        const pick = userPicks[gameId];
+                        if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
+                            userScore += pick.confidence;
+                        }
+                    });
+                    scores[userId].score += userScore;
+                }
+            });
+        }
+    }
+    
+    const sortedScores = Object.values(scores).sort((a, b) => b.score - a.score);
+    targetBody.innerHTML = sortedScores.map((s, index) => `<tr><td class="px-6 py-4 whitespace-nowrap font-medium">${index + 1}</td><td class="px-6 py-4 whitespace-nowrap">${s.displayName}</td><td class="px-6 py-4 whitespace-nowrap font-bold">${s.score}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center py-4">No picks submitted yet.</td></tr>`;
+    loader.classList.add('hidden');
+}
+
 
  function populateWeekSelectors() {
  const options = Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}">Week ${i + 1}</option>`).join('');
  allUI.weekSelector.innerHTML = options;
  allUI.adminWeekSelector.innerHTML = options;
+ allUI.lbWeekSelector.innerHTML = options;
  }
 
  function renderWeekUI(weekData, userPicks, weekIsLocked, targetContainer = allUI.gameList) {
@@ -856,15 +927,70 @@
  }
 
  function toggleViews(showAdmin) {
- allUI.adminContainer.classList.toggle('hidden', !showAdmin);
- allUI.picksContainer.classList.toggle('hidden', showAdmin);
- allUI.adminViewBtn.classList.toggle('active', showAdmin);
- allUI.picksViewBtn.classList.toggle('active', !showAdmin);
+    allUI.adminContainer.classList.toggle('hidden', showAdmin);
+    allUI.picksContainer.classList.toggle('hidden', !showAdmin);
+    allUI.leaderboardContainer.classList.add('hidden'); // Always hide leaderboard when toggling admin/picks
+
+    allUI.adminViewBtn.classList.toggle('active', showAdmin);
+    allUI.picksViewBtn.classList.toggle('active', !showAdmin);
+    allUI.leaderboardViewBtn.classList.remove('active');
  }
 
  // --- EVENT LISTENERS ---
- allUI.picksViewBtn.addEventListener('click', () => toggleViews(false));
- allUI.adminViewBtn.addEventListener('click', () => toggleViews(true));
+ allUI.picksViewBtn.addEventListener('click', () => {
+    allUI.picksContainer.classList.remove('hidden');
+    allUI.adminContainer.classList.add('hidden');
+    allUI.leaderboardContainer.classList.add('hidden');
+    document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+    allUI.picksViewBtn.classList.add('active');
+ });
+
+ allUI.adminViewBtn.addEventListener('click', () => {
+    allUI.picksContainer.classList.add('hidden');
+    allUI.adminContainer.classList.remove('hidden');
+    allUI.leaderboardContainer.classList.add('hidden');
+    document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+    allUI.adminViewBtn.classList.add('active');
+ });
+ 
+ allUI.leaderboardViewBtn.addEventListener('click', () => {
+    allUI.picksContainer.classList.add('hidden');
+    allUI.adminContainer.classList.add('hidden');
+    allUI.leaderboardContainer.classList.remove('hidden');
+    document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+    allUI.leaderboardViewBtn.classList.add('active');
+    renderPublicLeaderboard();
+ });
+
+ async function renderPublicLeaderboard() {
+    allUI.publicLeaderboardLoader.classList.remove('hidden');
+    allUI.publicLeaderboardBody.innerHTML = '';
+    
+    let isSeasonView = allUI.lbSeasonBtn.classList.contains('active');
+    
+    if (isSeasonView) {
+        await calculateAndDisplayLeaderboard(null, allUI.publicLeaderboardBody, allUI.publicLeaderboardLoader);
+    } else {
+        const week = allUI.lbWeekSelector.value;
+        await calculateAndDisplayLeaderboard(week, allUI.publicLeaderboardBody, allUI.publicLeaderboardLoader);
+    }
+}
+
+ allUI.lbWeeklyBtn.addEventListener('click', () => {
+    allUI.lbWeeklyBtn.classList.add('active');
+    allUI.lbSeasonBtn.classList.remove('active');
+    allUI.lbWeekSelectorContainer.classList.remove('hidden');
+    renderPublicLeaderboard();
+ });
+ allUI.lbSeasonBtn.addEventListener('click', () => {
+    allUI.lbSeasonBtn.classList.add('active');
+    allUI.lbWeeklyBtn.classList.remove('active');
+    allUI.lbWeekSelectorContainer.classList.add('hidden');
+    renderPublicLeaderboard();
+ });
+ allUI.lbWeekSelector.addEventListener('change', renderPublicLeaderboard);
+
+
  allUI.weekSelector.addEventListener('change', (e) => loadAndRenderWeek(e.target.value));
  allUI.adminWeekSelector.addEventListener('change', (e) => renderAdminView(e.target.value));
  allUI.saveResultsBtn.addEventListener('click', async () => {
