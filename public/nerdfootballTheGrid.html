@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Grid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #64748b; /* slate-500 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        th, td {
+            white-space: nowrap;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            background-color: #f9fafb; /* gray-50 */
+        }
+        .player-name {
+            position: sticky;
+            left: 0;
+            background-color: #f9fafb; /* gray-50 */
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-slate-200 text-slate-800">
+
+    <div id="app-container" class="container mx-auto p-4 md:p-8">
+        <header class="mb-6 text-center">
+            <h1 class="text-4xl font-bold text-slate-800">The Grid</h1>
+            <p class="text-slate-600">Weekly picks at a glance.</p>
+            <div class="mt-4 flex justify-center items-center space-x-4">
+                <a href="./index.html" class="text-slate-600 hover:text-slate-800 font-medium">&larr; Back to Confidence Pool</a>
+                <a href="./index.html" id="yearly-leaderboard-link" class="text-slate-600 hover:text-slate-800 font-medium">View Yearly Leaderboard &rarr;</a>
+            </div>
+        </header>
+
+        <div id="main-content" class="bg-white p-6 rounded-2xl shadow-lg">
+            <div id="week-selector-container" class="mb-4 text-center">
+                <label for="grid-week-selector" class="text-lg font-medium text-gray-700 mr-2">Week:</label>
+                <select id="grid-week-selector" class="p-2 rounded-lg border-2 border-gray-300 bg-white"></select>
+            </div>
+            <div id="grid-container" class="overflow-x-auto">
+                <!-- The Grid will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            
+            let currentUser = null;
+            let currentWeek = 1;
+            let db, auth;
+
+            const TEAM_ABBREVIATIONS = {
+                "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF", "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE", "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB", "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX", "Kansas City Chiefs": "KC", "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LAR", "Miami Dolphins": "MIA", "Minnesota Vikings": "MIN", "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG", "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT", "San Francisco 49ers": "SF", "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB", "Tennessee Titans": "TEN", "Washington Commanders": "WAS"
+            };
+            
+            async function getGamesForWeek(weekNumber) {
+                try {
+                    const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
+                    }
+                    const weekData = await response.json();
+                    return Array.isArray(weekData.games) ? weekData.games.map(game => ({
+                        id: game.id,
+                        away: game.a,
+                        home: game.h,
+                        kickoff: game.dt,
+                        stadium: game.stadium,
+                    })) : [];
+                } catch (error) {
+                    console.error(`Error fetching games for week ${weekNumber}:`, error);
+                    return [];
+                }
+            }
+
+            function getCurrentNflWeek() {
+                const seasonStartDate = new Date('2025-09-04T00:00:00Z');
+                const now = new Date();
+                if (now < seasonStartDate) return 1;
+                const diffTime = Math.abs(now - seasonStartDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const week = Math.ceil(diffDays / 7);
+                return week > 18 ? 18 : week;
+            }
+
+            const appId = () => 'nerdfootball'; 
+            const picksPath = (week, uid) => `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
+            const resultsPath = (week) => `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
+            const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
+
+            async function initializeGridApp() {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+                    authDomain: "nerdfootball.firebaseapp.com",
+                    projectId: "nerdfootball",
+                    storageBucket: "nerdfootball.appspot.com",
+                    messagingSenderId: "969304790725",
+                    appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+                    measurementId: "G-8RVRHE3HRC"
+                };
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                onAuthStateChanged(auth, user => {
+                    currentUser = user;
+                    renderGrid();
+                });
+            }
+            
+            async function renderGrid() {
+                const gridContainer = document.getElementById('grid-container');
+                const weekSelector = document.getElementById('grid-week-selector');
+                const mainContent = document.getElementById('main-content');
+                
+                if (!currentUser) {
+                    mainContent.innerHTML = `<p class="text-center">Please <a href="./index.html" class="font-bold text-slate-600 hover:text-slate-800">log in</a> to view The Grid.</p>`;
+                    return;
+                }
+                
+                gridContainer.innerHTML = `<div class="loader"></div>`;
+                const selectedWeek = weekSelector.value;
+                const games = await getGamesForWeek(selectedWeek);
+
+                const firstKickoff = new Date(games[0].kickoff); 
+                if (new Date() < firstKickoff && selectedWeek >= currentWeek) {
+                    gridContainer.innerHTML = `<p class="text-center text-slate-600 font-semibold">The Grid for Week ${selectedWeek} will be available after the first game has started.</p>`;
+                    return;
+                }
+
+                const usersSnap = await getDocs(collection(db, usersPath()));
+                const allUsers = [];
+                usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
+
+                const resultsDocRef = doc(db, resultsPath(selectedWeek));
+                const resultsSnap = await getDoc(resultsDocRef);
+                const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+
+                const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
+                const picksSnap = await getDocs(picksCollectionRef);
+                const allPicks = {};
+                picksSnap.forEach(doc => {
+                    allPicks[doc.id] = doc.data();
+                });
+                
+                const userScores = allUsers.map(user => {
+                    let totalPoints = 0;
+                    let pointsLeft = 0;
+                    const userPicks = allPicks[user.id] || {};
+                    
+                    games.forEach(game => {
+                        const pick = userPicks[game.id];
+                        if (pick) {
+                            if (gameResults[game.id]) {
+                                if (pick.winner === gameResults[game.id]) {
+                                    totalPoints += pick.confidence;
+                                }
+                            } else { 
+                                pointsLeft += pick.confidence;
+                            }
+                        }
+                    });
+
+                    return {
+                        ...user,
+                        totalPoints,
+                        pointsLeft,
+                        possibleTotal: totalPoints + pointsLeft,
+                        picks: userPicks
+                    };
+                }).sort((a, b) => b.totalPoints - a.totalPoints);
+                
+                let tableHTML = `<table class="min-w-full divide-y divide-gray-200">`;
+                tableHTML += `<thead class="bg-gray-50"><tr>`;
+                tableHTML += `<th class="player-name px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>`;
+                games.forEach(game => {
+                    tableHTML += `<th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">${TEAM_ABBREVIATIONS[game.away]} @ ${TEAM_ABBREVIATIONS[game.home]}</th>`;
+                });
+                tableHTML += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>`;
+                tableHTML += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Left</th>`;
+                tableHTML += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Possible</th>`;
+                tableHTML += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+
+                userScores.forEach(user => {
+                    tableHTML += `<tr>`;
+                    tableHTML += `<td class="player-name px-6 py-4 font-medium text-gray-900">${user.displayName}</td>`;
+                    games.forEach(game => {
+                        const pick = user.picks[game.id];
+                        let cellContent = '-';
+                        let cellClass = '';
+                        if (pick && pick.winner) {
+                            const pickAbbr = TEAM_ABBREVIATIONS[pick.winner] || 'N/A';
+                            cellContent = `<div class="text-center"><div>${pickAbbr}</div><div class="text-xs text-gray-500">${pick.confidence}</div></div>`;
+                            if(gameResults[game.id]){
+                                cellClass = pick.winner === gameResults[game.id] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                            }
+                        }
+                        tableHTML += `<td class="px-6 py-4 ${cellClass}">${cellContent}</td>`;
+                    });
+                    tableHTML += `<td class="px-6 py-4 font-bold">${user.totalPoints}</td>`;
+                    tableHTML += `<td class="px-6 py-4">${user.pointsLeft}</td>`;
+                    tableHTML += `<td class="px-6 py-4">${user.possibleTotal}</td>`;
+                    tableHTML += `</tr>`;
+                });
+
+                tableHTML += `</tbody></table>`;
+                gridContainer.innerHTML = tableHTML;
+            }
+
+            function populateWeekSelectors() {
+                const weekSelector = document.getElementById('grid-week-selector');
+                const options = Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}">Week ${i + 1}</option>`).join('');
+                weekSelector.innerHTML = options;
+                weekSelector.value = currentWeek;
+            }
+            
+            document.getElementById('grid-week-selector').addEventListener('change', renderGrid);
+            document.getElementById('yearly-leaderboard-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                sessionStorage.setItem('nerdView', 'leaderboard');
+                sessionStorage.setItem('nerdLeaderboardView', 'season');
+                window.location.href = './index.html';
+            });
+            
+            currentWeek = getCurrentNflWeek();
+            populateWeekSelectors();
+            initializeGridApp();
+        });
+    </script>
+</body>
+</html>
