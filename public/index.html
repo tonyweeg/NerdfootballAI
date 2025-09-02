@@ -3,7 +3,7 @@
 <head>
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>NerdfootballAI</title>
+ <title>NerdfootballAI v2.0</title>
  <script src="https://cdn.tailwindcss.com"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
  <style>
@@ -79,12 +79,29 @@
   #settings-modal {
     background-color: rgba(0, 0, 0, 0.5);
   }
+  .public-leaderboard-table tr:nth-child(even) {
+    background-color: #f8fafc; /* slate-50 */
+  }
+  .public-leaderboard-table tr:hover {
+    background-color: #e2e8f0 !important; /* slate-200 */
+  }
+  .public-leaderboard-table tr:hover td {
+    background-color: #e2e8f0 !important; /* slate-200 */
+  }
  </style>
 </head>
 <body class="bg-slate-200 text-slate-800">
 
+ <!-- Loading View -->
+ <div id="loading-view" class="min-h-screen flex items-center justify-center p-4">
+  <div class="text-center">
+   <div class="loader mb-4"></div>
+   <p class="text-slate-600">Loading NerdfootballAI...</p>
+  </div>
+ </div>
+
  <!-- Login & Register View -->
- <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+ <div id="login-view" class="min-h-screen flex items-center justify-center p-4 hidden">
  <div class="p-8 bg-slate-100 rounded-lg shadow-xl max-w-sm w-full mx-auto border border-slate-300">
  
  <!-- Login Form -->
@@ -126,12 +143,14 @@
  <div id="app-view" class="container mx-auto p-4 md:p-8 max-w-5xl hidden">
  <header class="mb-6">
  <div class="flex justify-between items-center flex-wrap gap-4">
- <!-- This div is intentionally left empty for alignment -->
- <div></div>
- <div class="flex items-center space-x-2 order-first md:order-none w-full md:w-auto text-center">
+ <!-- Logo and title - left aligned -->
+ <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
+ <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 md:h-10 w-auto">
  <h1 class="text-3xl md:text-4xl font-bold text-slate-800">NerdfootballAI</h1>
- <span class="text-sm font-medium text-slate-600">v1.1.0</span>
- </div>
+ </a>
+ <!-- Right side elements -->
+ <div class="flex items-center space-x-4">
+ <span class="text-sm font-medium text-slate-600">v2.0</span>
  <div class="flex items-center space-x-2 relative">
     <span id="user-display" class="text-sm font-medium text-slate-700"></span>
     <button id="menu-btn" class="p-2 rounded-md hover:bg-slate-200">
@@ -142,6 +161,7 @@
             <div id="menu-admin-controls" class="hidden">
                  <button id="menu-picks-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn active" role="menuitem">My Picks</button>
                  <button id="menu-admin-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Admin</button>
+                 <button id="survivor-admin-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Survivor Admin</button>
                  <div class="border-t border-gray-200 my-1"></div>
             </div>
             <button id="leaderboard-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Leaderboard</button>
@@ -151,12 +171,13 @@
             <button id="logout-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Logout</button>
         </div>
     </div>
-</div>
+ </div>
+ </div>
  </div>
  </header>
  
  <!-- Picks View -->
- <div id="picks-container">
+ <div id="picks-container" class="hidden">
  <div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
  <div class="mb-6 flex flex-wrap gap-4 justify-between items-center">
  <div>
@@ -194,7 +215,7 @@
             <select id="lb-week-selector" class="p-2 rounded-lg border-2 border-gray-300 bg-white"></select>
         </div>
         <div id="public-leaderboard-loader" class="loader hidden"></div>
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="min-w-full divide-y divide-gray-200 public-leaderboard-table">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
@@ -287,7 +308,8 @@
  import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updateEmail, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
- const ADMIN_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
+ const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
+let saveTimeout;
 
  document.addEventListener('DOMContentLoaded', () => {
  
@@ -329,7 +351,7 @@
 
  // --- UI ELEMENTS ---
  const allUI = {
- loginView: document.getElementById('login-view'), appView: document.getElementById('app-view'),
+ loadingView: document.getElementById('loading-view'), loginView: document.getElementById('login-view'), appView: document.getElementById('app-view'),
  loginForm: document.getElementById('login-form'), registerForm: document.getElementById('register-form'),
  showRegisterLink: document.getElementById('show-register-link'), showLoginLink: document.getElementById('show-login-link'),
  loginError: document.getElementById('login-error'), registerError: document.getElementById('register-error'),
@@ -338,6 +360,7 @@
  picksContainer: document.getElementById('picks-container'), adminContainer: document.getElementById('admin-container'),
  picksViewBtn: document.getElementById('menu-picks-view-btn'),
  adminViewBtn: document.getElementById('menu-admin-view-btn'),
+ survivorAdminBtn: document.getElementById('survivor-admin-btn'),
  leaderboardViewBtn: document.getElementById('leaderboard-view-btn'),
  weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
  gameList: document.getElementById('game-list'), resultsGameList: document.getElementById('results-game-list'),
@@ -375,6 +398,59 @@
  // --- APP STATE ---
  let currentWeek = 1, currentUser = null, db, auth, unsubscribeFromPicks = null, saveTimeout = null;
  let currentAdminPicks = {}, allUsers = [];
+
+ // --- STATE MANAGEMENT ---
+ function saveAppState() {
+  const state = {
+   currentView: getCurrentView(),
+   currentWeek: currentWeek,
+   leaderboardView: allUI.lbSeasonBtn.classList.contains('active') ? 'season' : 'weekly'
+  };
+  localStorage.setItem('nerdfootballState', JSON.stringify(state));
+  updateUrl();
+ }
+
+ function loadAppState() {
+  // Prioritize URL params over localStorage
+  const urlParams = getUrlParams();
+  const saved = localStorage.getItem('nerdfootballState');
+  const savedState = saved ? JSON.parse(saved) : {};
+  
+  return {
+   currentView: urlParams.view,
+   currentWeek: urlParams.week,
+   leaderboardView: urlParams.lb
+  };
+ }
+
+ function getCurrentView() {
+  if (!allUI.adminContainer.classList.contains('hidden')) return 'admin';
+  if (!allUI.leaderboardContainer.classList.contains('hidden')) return 'leaderboard';
+  return 'picks';
+ }
+
+ // --- URL ROUTING ---
+ function getUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+   view: params.get('view') || 'picks',
+   week: parseInt(params.get('week')) || getCurrentNflWeek(),
+   lb: params.get('lb') || 'weekly'
+  };
+ }
+
+ function updateUrl() {
+  const currentView = getCurrentView();
+  const isSeasonView = allUI.lbSeasonBtn.classList.contains('active');
+  const params = new URLSearchParams();
+  
+  if (currentView !== 'picks') params.set('view', currentView);
+  if (currentWeek !== getCurrentNflWeek()) params.set('week', currentWeek);
+  if (currentView === 'leaderboard' && isSeasonView) params.set('lb', 'season');
+  
+  const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+  window.history.replaceState({}, '', newUrl);
+ }
 
  // --- ADMIN LOGIC ---
  async function fetchAllUsers() {
@@ -423,10 +499,6 @@
 
     weekData.games.forEach(game => {
         const winner = currentResults[game.id] || null;
-        const counts = pickCounts[game.id] || { away: 0, home: 0 };
-        const totalGamePicks = counts.away + counts.home;
-        const awayPerc = totalGamePicks > 0 ? Math.round((counts.away / totalGamePicks) * 100) : 0;
-        const homePerc = totalGamePicks > 0 ? Math.round((counts.home / totalGamePicks) * 100) : 0;
         const gameTime = new Date(game.kickoff);
         const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
@@ -438,7 +510,6 @@
                     <div class="flex justify-around items-center">
                         <div class="w-2/5 text-center">
                             <button data-game-id="${game.id}" data-team="${game.away}" class="result-btn w-full p-2 rounded-lg border-2 ${winner === game.away ? 'selected' : ''}">${game.away}</button>
-                            <p class="text-xs text-slate-500 mt-1">${awayPerc}% of users</p>
                         </div>
                         <div class="text-center">
                             <span class="font-bold">@</span>
@@ -446,7 +517,6 @@
                         </div>
                         <div class="w-2/5 text-center">
                             <button data-game-id="${game.id}" data-team="${game.home}" class="result-btn w-full p-2 rounded-lg border-2 ${winner === game.home ? 'selected' : ''}">${game.home}</button>
-                            <p class="text-xs text-slate-500 mt-1">${homePerc}% of users</p>
                         </div>
                     </div>
                 </div>
@@ -485,8 +555,8 @@
  allUI.userMgmtBody.querySelectorAll('.user-status-btn').forEach(btn => {
  btn.addEventListener('click', async (e) => {
  const userId = e.target.dataset.userId;
- if (userId === ADMIN_UID) {
- alert("You cannot disable the main admin account.");
+ if (ADMIN_UIDS.includes(userId)) {
+ alert("You cannot disable admin accounts.");
  return;
  }
  const isDisabled = e.target.dataset.disabled === 'true';
@@ -597,13 +667,15 @@
  }
 
  async function handleAuthStateChange(user) {
- currentWeek = getCurrentNflWeek();
+ const savedState = loadAppState();
  
  if (user) {
  const userDocRef = doc(db, usersPath(), user.uid);
  const userDoc = await getDoc(userDocRef);
 
  if (userDoc.exists() && userDoc.data().disabled) {
+ allUI.loadingView.classList.add('hidden');
+ allUI.loginView.classList.remove('hidden');
  allUI.loginError.textContent = 'Your account has been disabled.';
  allUI.loginError.classList.remove('hidden');
  await signOut(auth);
@@ -611,13 +683,16 @@
  }
  
  currentUser = user;
+ currentWeek = savedState.currentWeek;
+ 
+ allUI.loadingView.classList.add('hidden');
  allUI.loginView.classList.add('hidden');
  allUI.appView.classList.remove('hidden');
  allUI.userDisplay.textContent = `Welcome, ${user.displayName ? user.displayName.split(' ')[0] : 'User'}`;
 
  await setDoc(userDocRef, { displayName: user.displayName, email: user.email }, { merge: true });
 
- if (user.uid === ADMIN_UID) {
+ if (ADMIN_UIDS.includes(user.uid)) {
  allUI.menuAdminControls.classList.remove('hidden');
  await fetchAllUsers();
  }
@@ -628,23 +703,34 @@
  allUI.lbWeekSelector.value = currentWeek;
 
  await loadAndRenderWeek(currentWeek);
- if (user.uid === ADMIN_UID) {
+ if (ADMIN_UIDS.includes(user.uid)) {
  await renderAdminView(currentWeek);
  }
 
-  const view = sessionStorage.getItem('nerdView');
-    if (view === 'leaderboard') {
-        allUI.leaderboardViewBtn.click();
-        const lbView = sessionStorage.getItem('nerdLeaderboardView');
-        if (lbView === 'season') {
-            allUI.lbSeasonBtn.click();
-        }
-        sessionStorage.removeItem('nerdView');
-        sessionStorage.removeItem('nerdLeaderboardView');
-    }
+ // Restore saved view state
+ if (savedState.leaderboardView === 'season') {
+  allUI.lbSeasonBtn.click();
+ }
+ 
+ switch (savedState.currentView) {
+  case 'admin':
+   if (ADMIN_UIDS.includes(user.uid)) {
+    allUI.adminViewBtn.click();
+   } else {
+    allUI.picksViewBtn.click();
+   }
+   break;
+  case 'leaderboard':
+   allUI.leaderboardViewBtn.click();
+   break;
+  case 'picks':
+  default:
+   allUI.picksViewBtn.click();
+ }
 
  } else {
  currentUser = null;
+ allUI.loadingView.classList.add('hidden');
  allUI.loginView.classList.remove('hidden');
  allUI.appView.classList.add('hidden');
  }
@@ -692,7 +778,10 @@
  }
  });
 
- allUI.logoutBtn.addEventListener('click', () => signOut(auth));
+ allUI.logoutBtn.addEventListener('click', () => {
+    signOut(auth);
+    allUI.menuPanel.classList.add('hidden');
+ });
  
  function getAuthErrorMessage(errorCode) {
  switch (errorCode) {
@@ -720,6 +809,7 @@
  const survivorPicksPath = (uid) => `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
  const survivorStatusPath = () => `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
 
+
  
  // --- SAVE STATUS ---
  function updateSaveStatus(status, message) {
@@ -738,6 +828,12 @@
  allUI.saveStatusText.textContent = message;
  allUI.saveStatusText.className = 'text-sm font-medium text-green-600';
  saveTimeout = setTimeout(() => updateSaveStatus('idle', ''), 2500);
+ break;
+ case 'error':
+ allUI.saveStatusIcon.innerHTML = `<svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>`;
+ allUI.saveStatusText.textContent = message;
+ allUI.saveStatusText.className = 'text-sm font-medium text-red-600';
+ saveTimeout = setTimeout(() => updateSaveStatus('idle', ''), 3000);
  break;
  case 'idle':
  default:
@@ -956,6 +1052,8 @@
     allUI.leaderboardContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.picksViewBtn.classList.add('active');
+    allUI.menuPanel.classList.add('hidden');
+    saveAppState();
  });
 
  allUI.adminViewBtn.addEventListener('click', () => {
@@ -964,6 +1062,18 @@
     allUI.leaderboardContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.adminViewBtn.classList.add('active');
+    allUI.menuPanel.classList.add('hidden');
+    saveAppState();
+ });
+ 
+ allUI.survivorAdminBtn.addEventListener('click', () => {
+    allUI.menuPanel.classList.add('hidden');
+    // Set flag to show admin panel when landing on survivor page
+    sessionStorage.setItem('survivorAdminView', 'true');
+    // Force immediate navigation
+    setTimeout(() => {
+        window.location.href = './nerdSurvivor.html';
+    }, 50);
  });
  
  allUI.leaderboardViewBtn.addEventListener('click', () => {
@@ -973,6 +1083,8 @@
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.leaderboardViewBtn.classList.add('active');
     renderPublicLeaderboard();
+    allUI.menuPanel.classList.add('hidden');
+    saveAppState();
  });
 
  async function renderPublicLeaderboard() {
@@ -994,17 +1106,22 @@
     allUI.lbSeasonBtn.classList.remove('active');
     allUI.lbWeekSelectorContainer.classList.remove('hidden');
     renderPublicLeaderboard();
+    saveAppState();
  });
  allUI.lbSeasonBtn.addEventListener('click', () => {
     allUI.lbSeasonBtn.classList.add('active');
     allUI.lbWeeklyBtn.classList.remove('active');
     allUI.lbWeekSelectorContainer.classList.add('hidden');
     renderPublicLeaderboard();
+    saveAppState();
  });
  allUI.lbWeekSelector.addEventListener('change', renderPublicLeaderboard);
 
 
- allUI.weekSelector.addEventListener('change', (e) => loadAndRenderWeek(e.target.value));
+ allUI.weekSelector.addEventListener('change', (e) => {
+  loadAndRenderWeek(e.target.value);
+  saveAppState();
+ });
  allUI.adminWeekSelector.addEventListener('change', (e) => renderAdminView(e.target.value));
  allUI.saveResultsBtn.addEventListener('click', async () => {
  const weekNumber = allUI.adminWeekSelector.value;
@@ -1096,6 +1213,7 @@
     allUI.settingsSuccess.classList.add('hidden');
     allUI.settingsModal.classList.remove('hidden');
     allUI.settingsModal.classList.add('flex');
+    allUI.menuPanel.classList.add('hidden');
  });
 
  allUI.closeSettingsBtn.addEventListener('click', () => {
