@@ -3,7 +3,7 @@
 <head>
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>NerdfootballAI v2.80</title>
+ <title>NerdfootballAI v3.0 - Pool Management</title>
  
  <!-- iOS Web App Meta Tags -->
  <meta name="apple-mobile-web-app-capable" content="yes">
@@ -27,7 +27,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <meta name="version" content="2.80">
+ <meta name="version" content="3.0">
  
  <script src="https://cdn.tailwindcss.com"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -300,9 +300,51 @@
  </a>
  <!-- Right side elements -->
  <div class="flex items-center space-x-4">
- <span class="text-sm font-medium text-slate-600">v2.80</span>
+ <span class="text-sm font-medium text-slate-600">v3.0</span>
  <div class="flex items-center space-x-2 relative">
     <span id="user-display" class="text-sm font-medium text-slate-700"></span>
+    
+    <!-- Pool Switcher -->
+    <div class="relative" id="pool-switcher-container">
+        <button id="pool-switcher-btn" class="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors" aria-label="Switch Pool">
+            <span id="current-pool-name">NerdFootball 2025</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        
+        <div id="pool-switcher-dropdown" class="hidden absolute top-full right-0 mt-1 w-64 bg-white rounded-md shadow-lg z-30 ring-1 ring-black ring-opacity-5">
+            <div class="py-2">
+                <div class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                    My Pools
+                </div>
+                <div id="user-pools-list" class="max-h-64 overflow-y-auto">
+                    <!-- Pool list will be populated dynamically -->
+                </div>
+                <div class="border-t border-slate-200 mt-2 pt-2">
+                    <button id="create-pool-btn" class="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center space-x-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        <span>Create New Pool</span>
+                    </button>
+                    <button id="join-pool-btn" class="w-full text-left px-3 py-2 text-sm text-green-600 hover:bg-green-50 flex items-center space-x-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-5-6l6 6-6 6"></path>
+                        </svg>
+                        <span>Join Pool</span>
+                    </button>
+                    <button id="discover-pools-btn" class="w-full text-left px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 flex items-center space-x-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <span>Discover Pools</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <button id="menu-btn" class="p-2 rounded-md hover:bg-slate-200">
         <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
     </button>
@@ -431,6 +473,7 @@
  <button id="tab-picks-mgmt" class="admin-tab">Picks</button>
  <button id="tab-survivor-status" class="admin-tab">Survivors</button>
  <button id="tab-system-messenger" class="admin-tab">Messaging</button>
+<button id="tab-pool-settings" class="admin-tab">Pool Settings</button>
  </nav>
  </div>
  <div id="admin-content-game-results" class="admin-content-section">
@@ -493,7 +536,7 @@ User
 <span class="sort-indicator ml-1">↕</span>
 </th>
 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 survivor-sort-header" data-sort="thisWeekPick">
-This Week's Pick
+Pick Status
 <span class="sort-indicator ml-1">↕</span>
 </th>
 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 survivor-sort-header" data-sort="status">
@@ -565,6 +608,187 @@ Role
        <!-- Status Messages -->
        <div id="message-status" class="hidden">
            <div id="message-status-content" class="p-4 rounded-md"></div>
+       </div>
+   </div>
+</div>
+
+<div id="admin-content-pool-settings" class="admin-content-section hidden">
+   <div class="flex items-center justify-between mb-6">
+       <h3 class="text-xl font-bold text-slate-800">Pool Management</h3>
+       <div class="flex space-x-2">
+           <button id="edit-pool-settings-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+               Edit Settings
+           </button>
+           <button id="generate-invite-btn" class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors">
+               Create Invite
+           </button>
+       </div>
+   </div>
+   
+   <div class="space-y-6">
+       <!-- Pool Overview Cards -->
+       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+           <div class="bg-white border border-slate-200 rounded-lg p-4">
+               <div class="flex items-center">
+                   <div class="p-2 bg-blue-100 rounded-lg">
+                       <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                       </svg>
+                   </div>
+                   <div class="ml-3">
+                       <p class="text-sm font-medium text-slate-600">Members</p>
+                       <p id="member-count" class="text-2xl font-bold text-slate-900">--</p>
+                   </div>
+               </div>
+           </div>
+           
+           <div class="bg-white border border-slate-200 rounded-lg p-4">
+               <div class="flex items-center">
+                   <div class="p-2 bg-green-100 rounded-lg">
+                       <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                       </svg>
+                   </div>
+                   <div class="ml-3">
+                       <p class="text-sm font-medium text-slate-600">Active Picks</p>
+                       <p id="active-picks-count" class="text-2xl font-bold text-slate-900">--</p>
+                   </div>
+               </div>
+           </div>
+           
+           <div class="bg-white border border-slate-200 rounded-lg p-4">
+               <div class="flex items-center">
+                   <div class="p-2 bg-purple-100 rounded-lg">
+                       <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                       </svg>
+                   </div>
+                   <div class="ml-3">
+                       <p class="text-sm font-medium text-slate-600">Pool Status</p>
+                       <p id="pool-status" class="text-lg font-bold text-slate-900">Active</p>
+                   </div>
+               </div>
+           </div>
+       </div>
+
+       <!-- Current Pool Configuration -->
+       <div class="bg-white border border-slate-200 rounded-lg">
+           <div class="px-6 py-4 border-b border-slate-200">
+               <h4 class="text-lg font-semibold text-slate-800">Pool Configuration</h4>
+           </div>
+           <div class="p-6">
+               <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                   <div>
+                       <dt class="text-sm font-medium text-slate-600">Pool Name</dt>
+                       <dd id="current-pool-name" class="mt-1 text-sm text-slate-900 font-medium">--</dd>
+                   </div>
+                   <div>
+                       <dt class="text-sm font-medium text-slate-600">Pool Type</dt>
+                       <dd id="current-pool-type" class="mt-1 text-sm text-slate-900">--</dd>
+                   </div>
+                   <div>
+                       <dt class="text-sm font-medium text-slate-600">Join Method</dt>
+                       <dd id="current-join-method" class="mt-1 text-sm text-slate-900">--</dd>
+                   </div>
+                   <div>
+                       <dt class="text-sm font-medium text-slate-600">Max Members</dt>
+                       <dd id="current-max-members" class="mt-1 text-sm text-slate-900">--</dd>
+                   </div>
+                   <div>
+                       <dt class="text-sm font-medium text-slate-600">Created</dt>
+                       <dd id="pool-created-date" class="mt-1 text-sm text-slate-900">--</dd>
+                   </div>
+                   <div>
+                       <dt class="text-sm font-medium text-slate-600">Creator</dt>
+                       <dd id="pool-creator" class="mt-1 text-sm text-slate-900">--</dd>
+                   </div>
+               </dl>
+               
+               <div class="mt-6">
+                   <dt class="text-sm font-medium text-slate-600 mb-2">Description</dt>
+                   <dd id="current-pool-description" class="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg">--</dd>
+               </div>
+           </div>
+       </div>
+
+       <!-- Pool Members Management -->
+       <div class="bg-white border border-slate-200 rounded-lg">
+           <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+               <h4 class="text-lg font-semibold text-slate-800">Pool Members</h4>
+               <button id="invite-member-btn" class="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                   Invite Member
+               </button>
+           </div>
+           <div class="overflow-hidden">
+               <div class="overflow-x-auto">
+                   <table class="min-w-full divide-y divide-slate-200">
+                       <thead class="bg-slate-50">
+                           <tr>
+                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Member</th>
+                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
+                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Joined</th>
+                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                           </tr>
+                       </thead>
+                       <tbody id="pool-members-tbody" class="bg-white divide-y divide-slate-200">
+                           <!-- Members will be populated dynamically -->
+                           <tr>
+                               <td colspan="5" class="px-6 py-4 text-center text-sm text-slate-500">
+                                   Loading members...
+                               </td>
+                           </tr>
+                       </tbody>
+                   </table>
+               </div>
+           </div>
+       </div>
+
+       <!-- Invite Links Management -->
+       <div class="bg-white border border-slate-200 rounded-lg">
+           <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+               <h4 class="text-lg font-semibold text-slate-800">Invite Links</h4>
+               <button id="create-invite-link-btn" class="px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors">
+                   Create New Link
+               </button>
+           </div>
+           <div class="p-6">
+               <div id="invite-links-container" class="space-y-3">
+                   <div class="text-sm text-slate-500 text-center py-4">
+                       No active invite links. Create one to invite new members.
+                   </div>
+               </div>
+           </div>
+       </div>
+
+       <!-- Pool Actions -->
+       <div class="bg-white border border-slate-200 rounded-lg">
+           <div class="px-6 py-4 border-b border-slate-200">
+               <h4 class="text-lg font-semibold text-slate-800">Pool Actions</h4>
+           </div>
+           <div class="p-6">
+               <div class="space-y-4">
+                   <div class="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                       <div>
+                           <h5 class="text-sm font-medium text-yellow-800">Archive Pool</h5>
+                           <p class="text-sm text-yellow-700">End the current season and preserve all data</p>
+                       </div>
+                       <button id="archive-pool-btn" class="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors">
+                           Archive
+                       </button>
+                   </div>
+                   
+                   <div class="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+                       <div>
+                           <h5 class="text-sm font-medium text-red-800">Delete Pool</h5>
+                           <p class="text-sm text-red-700">Permanently delete this pool and all associated data</p>
+                       </div>
+                       <button id="delete-pool-btn" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">
+                           Delete
+                       </button>
+                   </div>
+               </div>
+           </div>
        </div>
    </div>
 </div>
@@ -667,6 +891,397 @@ Role
                     <button type="submit" class="form-btn">Save Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Pool Creation Modal -->
+    <div id="pool-creation-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex" role="dialog" aria-labelledby="pool-creation-title" aria-modal="true">
+        <div class="fixed inset-0 bg-black bg-opacity-50" aria-hidden="true"></div>
+        <div class="relative p-6 bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <button id="close-pool-creation-btn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md p-1" aria-label="Close pool creation dialog">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+            
+            <h2 id="pool-creation-title" class="text-2xl font-bold text-slate-800 mb-6">Create New Pool</h2>
+            
+            <!-- Progress Indicator -->
+            <div class="flex items-center justify-center mb-8" aria-label="Pool creation progress">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium" aria-current="step">1</div>
+                        <span class="ml-2 text-sm font-medium text-blue-600">Basic Info</span>
+                    </div>
+                    <div class="h-0.5 w-8 bg-slate-200" aria-hidden="true"></div>
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-slate-200 text-slate-400 rounded-full flex items-center justify-center text-sm font-medium">2</div>
+                        <span class="ml-2 text-sm text-slate-400">Settings</span>
+                    </div>
+                    <div class="h-0.5 w-8 bg-slate-200" aria-hidden="true"></div>
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-slate-200 text-slate-400 rounded-full flex items-center justify-center text-sm font-medium">3</div>
+                        <span class="ml-2 text-sm text-slate-400">Review</span>
+                    </div>
+                </div>
+            </div>
+
+            <form id="pool-creation-form" class="space-y-6" novalidate>
+                <!-- Step 1: Basic Information -->
+                <div id="step-1" class="step-content">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="pool-name" class="block text-sm font-semibold text-slate-700 mb-2">
+                                Pool Name <span class="text-red-500" aria-label="required">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="pool-name" 
+                                name="poolName"
+                                class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                placeholder="Enter pool name (e.g., Friends & Family 2025)"
+                                maxlength="50"
+                                required
+                                aria-describedby="pool-name-help pool-name-error"
+                            >
+                            <p id="pool-name-help" class="mt-1 text-sm text-slate-500">Choose a memorable name for your pool (2-50 characters)</p>
+                            <p id="pool-name-error" class="mt-1 text-sm text-red-600 hidden" role="alert"></p>
+                        </div>
+
+                        <div>
+                            <label for="pool-description" class="block text-sm font-semibold text-slate-700 mb-2">
+                                Description
+                            </label>
+                            <textarea 
+                                id="pool-description" 
+                                name="poolDescription"
+                                rows="3"
+                                class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-vertical"
+                                placeholder="Optional description of your pool"
+                                maxlength="200"
+                                aria-describedby="pool-description-help"
+                            ></textarea>
+                            <p id="pool-description-help" class="mt-1 text-sm text-slate-500">Optional: Describe your pool's purpose or rules (max 200 characters)</p>
+                        </div>
+
+                        <div>
+                            <fieldset>
+                                <legend class="block text-sm font-semibold text-slate-700 mb-3">
+                                    Pool Type <span class="text-red-500" aria-label="required">*</span>
+                                </legend>
+                                <div class="space-y-3">
+                                    <div class="flex items-start">
+                                        <input 
+                                            type="radio" 
+                                            id="type-confidence" 
+                                            name="poolType" 
+                                            value="confidence" 
+                                            class="mt-1 focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300"
+                                            required
+                                            aria-describedby="type-confidence-desc"
+                                        >
+                                        <label for="type-confidence" class="ml-3 cursor-pointer">
+                                            <span class="block text-sm font-medium text-slate-700">Confidence Points Only</span>
+                                            <span id="type-confidence-desc" class="block text-sm text-slate-500">Rank weekly games by confidence (1-16 points)</span>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <input 
+                                            type="radio" 
+                                            id="type-survivor" 
+                                            name="poolType" 
+                                            value="survivor" 
+                                            class="mt-1 focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300"
+                                            aria-describedby="type-survivor-desc"
+                                        >
+                                        <label for="type-survivor" class="ml-3 cursor-pointer">
+                                            <span class="block text-sm font-medium text-slate-700">Survivor Pool Only</span>
+                                            <span id="type-survivor-desc" class="block text-sm text-slate-500">Pick one winning team per week, can't reuse teams</span>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <input 
+                                            type="radio" 
+                                            id="type-both" 
+                                            name="poolType" 
+                                            value="both" 
+                                            class="mt-1 focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300"
+                                            checked
+                                            aria-describedby="type-both-desc"
+                                        >
+                                        <label for="type-both" class="ml-3 cursor-pointer">
+                                            <span class="block text-sm font-medium text-slate-700">Both (Recommended)</span>
+                                            <span id="type-both-desc" class="block text-sm text-slate-500">Confidence points + survivor pool combined</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </fieldset>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Pool Settings (Hidden initially) -->
+                <div id="step-2" class="step-content hidden">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="max-members" class="block text-sm font-semibold text-slate-700 mb-2">
+                                Maximum Members
+                            </label>
+                            <select 
+                                id="max-members" 
+                                name="maxMembers"
+                                class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                aria-describedby="max-members-help"
+                            >
+                                <option value="10">10 Members</option>
+                                <option value="25">25 Members</option>
+                                <option value="50" selected>50 Members</option>
+                                <option value="100">100 Members</option>
+                            </select>
+                            <p id="max-members-help" class="mt-1 text-sm text-slate-500">You can always increase this later</p>
+                        </div>
+
+                        <div>
+                            <fieldset>
+                                <legend class="block text-sm font-semibold text-slate-700 mb-3">Join Method</legend>
+                                <div class="space-y-3">
+                                    <div class="flex items-start">
+                                        <input 
+                                            type="radio" 
+                                            id="join-invite" 
+                                            name="joinMethod" 
+                                            value="invite" 
+                                            class="mt-1 focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300"
+                                            checked
+                                            aria-describedby="join-invite-desc"
+                                        >
+                                        <label for="join-invite" class="ml-3 cursor-pointer">
+                                            <span class="block text-sm font-medium text-slate-700">Invite Only (Recommended)</span>
+                                            <span id="join-invite-desc" class="block text-sm text-slate-500">Members join using invite links you share</span>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-start">
+                                        <input 
+                                            type="radio" 
+                                            id="join-public" 
+                                            name="joinMethod" 
+                                            value="public" 
+                                            class="mt-1 focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300"
+                                            aria-describedby="join-public-desc"
+                                        >
+                                        <label for="join-public" class="ml-3 cursor-pointer">
+                                            <span class="block text-sm font-medium text-slate-700">Public</span>
+                                            <span id="join-public-desc" class="block text-sm text-slate-500">Anyone can find and join your pool</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </fieldset>
+                        </div>
+
+                        <div>
+                            <label class="flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    id="weekly-reminders" 
+                                    name="weeklyReminders"
+                                    class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-slate-300 rounded"
+                                    checked
+                                >
+                                <span class="ml-3 text-sm font-medium text-slate-700">Send weekly reminder emails</span>
+                            </label>
+                            <p class="mt-1 ml-7 text-sm text-slate-500">Remind members to make their picks before games start</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Review (Hidden initially) -->
+                <div id="step-3" class="step-content hidden">
+                    <div class="space-y-4">
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                            <h3 class="text-lg font-semibold text-slate-800 mb-4">Review Your Pool</h3>
+                            
+                            <dl class="space-y-3">
+                                <div class="flex justify-between">
+                                    <dt class="text-sm font-medium text-slate-600">Pool Name:</dt>
+                                    <dd id="review-name" class="text-sm text-slate-800 font-medium"></dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-sm font-medium text-slate-600">Type:</dt>
+                                    <dd id="review-type" class="text-sm text-slate-800"></dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-sm font-medium text-slate-600">Max Members:</dt>
+                                    <dd id="review-max-members" class="text-sm text-slate-800"></dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-sm font-medium text-slate-600">Join Method:</dt>
+                                    <dd id="review-join-method" class="text-sm text-slate-800"></dd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <dt class="text-sm font-medium text-slate-600">Reminders:</dt>
+                                    <dd id="review-reminders" class="text-sm text-slate-800"></dd>
+                                </div>
+                            </dl>
+                        </div>
+                        
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="text-sm font-semibold text-blue-800 mb-2">What happens next?</h4>
+                            <ul class="text-sm text-blue-700 space-y-1">
+                                <li>• Your pool will be created and you'll be the admin</li>
+                                <li>• You'll get an invite link to share with friends</li>
+                                <li>• Pool picks will start with the current NFL week</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Buttons -->
+                <div class="flex justify-between pt-6 border-t border-slate-200">
+                    <button 
+                        type="button" 
+                        id="prev-step-btn" 
+                        class="px-6 py-3 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 hidden"
+                    >
+                        Previous
+                    </button>
+                    <div class="flex space-x-4 ml-auto">
+                        <button 
+                            type="button" 
+                            id="cancel-pool-btn" 
+                            class="px-6 py-3 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            type="button" 
+                            id="next-step-btn" 
+                            class="px-6 py-3 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            Next
+                        </button>
+                        <button 
+                            type="submit" 
+                            id="create-pool-submit-btn" 
+                            class="px-6 py-3 bg-green-600 text-white hover:bg-green-700 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 hidden"
+                        >
+                            <span id="create-pool-btn-text">Create Pool</span>
+                            <svg id="create-pool-spinner" class="hidden animate-spin -mr-1 ml-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Error Display -->
+                <div id="pool-creation-error" class="hidden p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-red-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                        </svg>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800">Error creating pool</h3>
+                            <p id="pool-creation-error-message" class="mt-1 text-sm text-red-700"></p>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Pool Discovery Modal -->
+    <div id="pool-discovery-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex" role="dialog" aria-labelledby="pool-discovery-title" aria-modal="true">
+        <div class="fixed inset-0 bg-black bg-opacity-50" aria-hidden="true"></div>
+        <div class="relative p-6 bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="pool-discovery-title" class="text-2xl font-bold text-slate-800">Discover Public Pools</h2>
+                <button id="close-pool-discovery-btn" class="text-slate-400 hover:text-slate-600 transition-colors" aria-label="Close pool discovery">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Search and Filter Controls -->
+            <div class="mb-6 space-y-4">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-1">
+                        <label for="pool-search" class="block text-sm font-medium text-slate-700 mb-2">Search pools</label>
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                id="pool-search" 
+                                placeholder="Search by name or description..." 
+                                class="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                aria-describedby="pool-search-help"
+                            >
+                            <svg class="absolute left-3 top-3.5 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <p id="pool-search-help" class="mt-1 text-sm text-slate-500">Find pools by name, description, or creator</p>
+                    </div>
+                    <div class="sm:w-48">
+                        <label for="pool-type-filter" class="block text-sm font-medium text-slate-700 mb-2">Pool type</label>
+                        <select id="pool-type-filter" class="w-full py-3 px-4 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">All types</option>
+                            <option value="confidence">Confidence only</option>
+                            <option value="survivor">Survivor only</option>
+                            <option value="both">Both games</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Active filters display -->
+                <div id="active-filters" class="hidden">
+                    <div class="flex flex-wrap gap-2">
+                        <span class="text-sm text-slate-600">Filters:</span>
+                        <div id="filter-tags" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading state -->
+            <div id="pools-loading" class="hidden text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="mt-4 text-slate-600">Searching for public pools...</p>
+            </div>
+
+            <!-- Empty state -->
+            <div id="pools-empty" class="hidden text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <h3 class="mt-4 text-lg font-medium text-slate-900">No pools found</h3>
+                <p class="mt-2 text-slate-600">Try adjusting your search terms or filters</p>
+            </div>
+
+            <!-- Pool results -->
+            <div id="pools-results" class="space-y-4">
+                <!-- Pool cards will be populated here -->
+            </div>
+
+            <!-- Pagination -->
+            <div id="pools-pagination" class="hidden mt-8 flex justify-center">
+                <nav class="flex space-x-2" aria-label="Pagination">
+                    <button id="prev-page" class="px-3 py-2 text-sm text-slate-600 border border-slate-300 rounded hover:bg-slate-50" disabled>Previous</button>
+                    <span id="page-info" class="px-3 py-2 text-sm text-slate-700">Page 1 of 1</span>
+                    <button id="next-page" class="px-3 py-2 text-sm text-slate-600 border border-slate-300 rounded hover:bg-slate-50" disabled>Next</button>
+                </nav>
+            </div>
+
+            <!-- Error state -->
+            <div id="pools-error" class="hidden bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+                <div class="flex">
+                    <svg class="w-5 h-5 text-red-400 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                    </svg>
+                    <div>
+                        <h3 class="text-sm font-medium text-red-800">Error loading pools</h3>
+                        <p id="pools-error-message" class="mt-1 text-sm text-red-700"></p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -805,6 +1420,61 @@ messageStatusContent: document.getElementById('message-status-content'),
  yearlyLeaderboardSection: document.getElementById('yearly-leaderboard-section'),
  yearlyLeaderboardLoader: document.getElementById('yearly-leaderboard-loader'),
  yearlyLeaderboardContent: document.getElementById('yearly-leaderboard-content'),
+// Pool Switcher Elements
+poolSwitcherBtn: document.getElementById('pool-switcher-btn'),
+poolSwitcherDropdown: document.getElementById('pool-switcher-dropdown'),
+currentPoolName: document.getElementById('current-pool-name'),
+userPoolsList: document.getElementById('user-pools-list'),
+createPoolBtn: document.getElementById('create-pool-btn'),
+joinPoolBtn: document.getElementById('join-pool-btn'),
+// Pool Creation Modal Elements
+poolCreationModal: document.getElementById('pool-creation-modal'),
+closePoolCreationBtn: document.getElementById('close-pool-creation-btn'),
+poolCreationForm: document.getElementById('pool-creation-form'),
+prevStepBtn: document.getElementById('prev-step-btn'),
+nextStepBtn: document.getElementById('next-step-btn'),
+cancelPoolBtn: document.getElementById('cancel-pool-btn'),
+createPoolSubmitBtn: document.getElementById('create-pool-submit-btn'),
+createPoolBtnText: document.getElementById('create-pool-btn-text'),
+createPoolSpinner: document.getElementById('create-pool-spinner'),
+poolCreationError: document.getElementById('pool-creation-error'),
+poolCreationErrorMessage: document.getElementById('pool-creation-error-message'),
+// Pool Management Elements
+editPoolSettingsBtn: document.getElementById('edit-pool-settings-btn'),
+generateInviteBtn: document.getElementById('generate-invite-btn'),
+memberCount: document.getElementById('member-count'),
+activePicksCount: document.getElementById('active-picks-count'),
+poolStatus: document.getElementById('pool-status'),
+currentPoolNameDisplay: document.getElementById('current-pool-name'),
+currentPoolType: document.getElementById('current-pool-type'),
+currentJoinMethod: document.getElementById('current-join-method'),
+currentMaxMembers: document.getElementById('current-max-members'),
+poolCreatedDate: document.getElementById('pool-created-date'),
+poolCreator: document.getElementById('pool-creator'),
+currentPoolDescription: document.getElementById('current-pool-description'),
+poolMembersTbody: document.getElementById('pool-members-tbody'),
+inviteMemberBtn: document.getElementById('invite-member-btn'),
+createInviteLinkBtn: document.getElementById('create-invite-link-btn'),
+inviteLinksContainer: document.getElementById('invite-links-container'),
+archivePoolBtn: document.getElementById('archive-pool-btn'),
+deletePoolBtn: document.getElementById('delete-pool-btn'),
+// Pool Discovery Elements
+discoverPoolsBtn: document.getElementById('discover-pools-btn'),
+poolDiscoveryModal: document.getElementById('pool-discovery-modal'),
+closePoolDiscoveryBtn: document.getElementById('close-pool-discovery-btn'),
+poolSearch: document.getElementById('pool-search'),
+poolTypeFilter: document.getElementById('pool-type-filter'),
+activeFilters: document.getElementById('active-filters'),
+filterTags: document.getElementById('filter-tags'),
+poolsLoading: document.getElementById('pools-loading'),
+poolsEmpty: document.getElementById('pools-empty'),
+poolsResults: document.getElementById('pools-results'),
+poolsPagination: document.getElementById('pools-pagination'),
+prevPage: document.getElementById('prev-page'),
+nextPage: document.getElementById('next-page'),
+pageInfo: document.getElementById('page-info'),
+poolsError: document.getElementById('pools-error'),
+poolsErrorMessage: document.getElementById('pools-error-message')
  };
 
  // --- APP STATE ---
@@ -1461,14 +2131,15 @@ async function renderSurvivorStatus(weekNumber) {
     const enhancedUsers = allUsers.map(user => {
         const userStatus = allStatuses[user.id] || { eliminated: false };
         const userPicks = allPicks[user.id];
-        const thisWeekPick = userPicks && userPicks.picks && userPicks.picks[weekNumber] ? userPicks.picks[weekNumber].team : 'No Pick';
+        const hasPick = userPicks && userPicks.picks && userPicks.picks[weekNumber] && userPicks.picks[weekNumber].team;
+        const thisWeekPickStatus = hasPick ? 'Pick Made' : 'No Pick';
         
         return {
             ...user,
-            role: user.isAdmin ? 'admin' : 'user',
+            role: ADMIN_UIDS.includes(user.id) ? 'admin' : 'user',
             eliminated: userStatus.eliminated,
             eliminatedWeek: userStatus.eliminatedWeek,
-            thisWeekPick: thisWeekPick,
+            thisWeekPick: thisWeekPickStatus,
             status: userStatus.eliminated ? `Eliminated (Week ${userStatus.eliminatedWeek})` : 'Active'
         };
     });
@@ -1510,10 +2181,19 @@ async function renderSurvivorStatus(weekNumber) {
                     ${user.displayName || user.email}
                     ${user.role === 'admin' ? '<span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Admin</span>' : ''}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">${user.thisWeekPick}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.thisWeekPick === 'Pick Made' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                        ${user.thisWeekPick}
+                    </span>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.eliminated ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
                         ${user.status}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
+                        ${user.role === 'admin' ? 'Admin' : 'User'}
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -1932,6 +2612,9 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
  auth = getAuth(app);
  functions = getFunctions(app, 'us-central1'); // Initialize global functions variable with region
  onAuthStateChanged(auth, handleAuthStateChange);
+
+// Check for invite code on page load
+checkForInviteCode();
  
  // Register service worker for caching
  if ('serviceWorker' in navigator) {
@@ -2003,6 +2686,10 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
  
  currentUser = user;
  currentWeek = savedState.currentWeek;
+
+ // Load user pool memberships
+ await loadUserPoolMemberships();
+ await initializePoolSwitcher();
  
  allUI.loadingView.classList.add('hidden');
  allUI.loginView.classList.add('hidden');
@@ -2022,6 +2709,14 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
  allUI.lbWeekSelector.value = currentWeek;
 
  await loadAndRenderWeek(currentWeek);
+ 
+ // Check for pending invite code after login
+ const pendingInviteCode = localStorage.getItem('pendingInviteCode');
+ if (pendingInviteCode) {
+   localStorage.removeItem('pendingInviteCode');
+   setTimeout(() => processInviteCode(pendingInviteCode), 1000); // Give UI time to load
+ }
+ 
  if (ADMIN_UIDS.includes(user.uid)) {
  await renderAdminView(currentWeek);
  }
@@ -2538,12 +3233,1899 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
  
  // --- DATA PATH HELPERS ---
  const appId = () => 'nerdfootball'; 
- const picksPath = (week, uid) => `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
- const resultsPath = (week) => `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
- const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
- const survivorPicksPath = (uid) => `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
- const survivorStatusPath = () => `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
 
+// --- POOL CONTEXT ---
+let userPoolMemberships = {}; // Cache for user's pool memberships
+let activePoolId = 'nerdfootball-2025'; // Current active pool
+
+const getCurrentPool = () => {
+  // Phase 2: Support user context and pool switching
+  // Check URL parameter first
+  const urlParams = new URLSearchParams(window.location.search);
+  const poolParam = urlParams.get('pool');
+  if (poolParam && userPoolMemberships[poolParam]) {
+    return poolParam;
+  }
+  
+  // Check localStorage for user preference
+  if (currentUser) {
+    const savedPool = localStorage.getItem(`activePool_${currentUser.uid}`);
+    if (savedPool && userPoolMemberships[savedPool]) {
+      return savedPool;
+    }
+  }
+  
+  // Fall back to default pool for backward compatibility
+  return activePoolId;
+};
+
+const setActivePool = (poolId) => {
+  activePoolId = poolId;
+  if (currentUser) {
+    localStorage.setItem(`activePool_${currentUser.uid}`, poolId);
+  }
+  // Update URL without page refresh
+  const url = new URL(window.location);
+  url.searchParams.set('pool', poolId);
+  window.history.replaceState({}, '', url);
+};
+
+// User pool membership functions
+const getUserPoolsPath = (uid) => `artifacts/${appId()}/users/${uid}/pools`;
+const getPoolMetadataPath = (poolId) => `artifacts/${appId()}/pools/${poolId}/metadata/config`;
+const getPoolMembersPath = (poolId) => `artifacts/${appId()}/pools/${poolId}/metadata/members`;
+
+const getPoolBasePath = () => `artifacts/${appId()}/pools/${getCurrentPool()}`; 
+ const picksPath = (week, uid) => `${getPoolBasePath()}/data/nerdfootball_picks/${week}/submissions/${uid}`;
+ const resultsPath = (week) => `${getPoolBasePath()}/data/nerdfootball_results/${week}`;
+ const usersPath = () => `${getPoolBasePath()}/data/nerdfootball_users`;
+ const survivorPicksPath = (uid) => `${getPoolBasePath()}/data/nerdSurvivor_picks/${uid}`;
+ const survivorStatusPath = () => `${getPoolBasePath()}/data/nerdSurvivor_status/status`;
+
+// --- USER POOL MEMBERSHIP MANAGEMENT ---
+async function loadUserPoolMemberships() {
+  if (!currentUser) return;
+  
+  try {
+    const userPoolsRef = doc(db, getUserPoolsPath(currentUser.uid));
+    const userPoolsSnap = await getDoc(userPoolsRef);
+    
+    if (userPoolsSnap.exists()) {
+      userPoolMemberships = userPoolsSnap.data();
+    } else {
+      // Migrate existing user to default pool and create pool config if needed
+      await ensureDefaultPoolExists();
+      userPoolMemberships = {
+        'nerdfootball-2025': {
+          role: ADMIN_UIDS.includes(currentUser.uid) ? 'admin' : 'member',
+          joinedAt: new Date().toISOString(),
+          status: 'active'
+        }
+      };
+      await setDoc(userPoolsRef, userPoolMemberships);
+    }
+  } catch (error) {
+    console.error('Error loading user pool memberships:', error);
+    // Default fallback
+    userPoolMemberships = {
+      'nerdfootball-2025': {
+        role: ADMIN_UIDS.includes(currentUser.uid) ? 'admin' : 'member',
+        joinedAt: new Date().toISOString(),
+        status: 'active'
+      }
+    };
+  }
+}
+
+async function ensureDefaultPoolExists() {
+  try {
+    const defaultPoolId = 'nerdfootball-2025';
+    const poolConfigRef = doc(db, getPoolMetadataPath(defaultPoolId));
+    const poolConfigSnap = await getDoc(poolConfigRef);
+    
+    if (!poolConfigSnap.exists()) {
+      // Create default pool configuration
+      const defaultPoolConfig = {
+        poolId: defaultPoolId,
+        name: 'NerdFootball 2025 Championship',
+        description: 'Official 2025 season pool - migrated from legacy system',
+        type: 'both',
+        creator: 'system',
+        created: new Date().toISOString(),
+        settings: {
+          maxMembers: 100,
+          joinType: 'invite',
+          confidenceEnabled: true,
+          survivorEnabled: true,
+          weeklyReminders: true
+        },
+        status: 'active',
+        season: '2025',
+        migrated: true
+      };
+      
+      await setDoc(poolConfigRef, defaultPoolConfig);
+      console.log('Default pool configuration created');
+    }
+  } catch (error) {
+    console.error('Error ensuring default pool exists:', error);
+  }
+}
+
+async function joinPool(poolId, inviteCode = null) {
+  if (!currentUser) throw new Error('User must be authenticated');
+  
+  try {
+    // Verify pool exists and user can join
+    const poolConfigRef = doc(db, getPoolMetadataPath(poolId));
+    const poolConfigSnap = await getDoc(poolConfigRef);
+    
+    if (!poolConfigSnap.exists()) {
+      throw new Error('Pool not found');
+    }
+    
+    const poolConfig = poolConfigSnap.data();
+    
+    // Add user to pool members
+    const poolMembersRef = doc(db, getPoolMembersPath(poolId));
+    const memberData = {
+      [`${currentUser.uid}`]: {
+        displayName: currentUser.displayName || currentUser.email,
+        email: currentUser.email,
+        role: 'member',
+        joinedAt: new Date().toISOString(),
+        inviteCode: inviteCode || null,
+        status: 'active'
+      }
+    };
+    await setDoc(poolMembersRef, memberData, { merge: true });
+    
+    // Add pool to user's memberships
+    const userPoolsRef = doc(db, getUserPoolsPath(currentUser.uid));
+    const newMembership = {
+      [`${poolId}`]: {
+        role: 'member',
+        joinedAt: new Date().toISOString(),
+        status: 'active'
+      }
+    };
+    await setDoc(userPoolsRef, newMembership, { merge: true });
+    
+    // Update local cache
+    userPoolMemberships[poolId] = newMembership[poolId];
+    
+    return { success: true, poolId, poolName: poolConfig.name };
+  } catch (error) {
+    console.error('Error joining pool:', error);
+    throw error;
+  }
+}
+
+async function getUserPools() {
+  const pools = [];
+  for (const poolId in userPoolMemberships) {
+    try {
+      const poolConfigRef = doc(db, getPoolMetadataPath(poolId));
+      const poolConfigSnap = await getDoc(poolConfigRef);
+      
+      if (poolConfigSnap.exists()) {
+        const poolConfig = poolConfigSnap.data();
+        pools.push({
+          id: poolId,
+          name: poolConfig.name,
+          type: poolConfig.type,
+          role: userPoolMemberships[poolId].role,
+          status: userPoolMemberships[poolId].status,
+          isActive: poolId === getCurrentPool()
+        });
+      }
+    } catch (error) {
+      console.error(`Error loading pool ${poolId}:`, error);
+    }
+  }
+  return pools;
+}
+
+// --- POOL SWITCHER UI ---
+async function initializePoolSwitcher() {
+  await renderPoolSwitcher();
+  setupPoolSwitcherEventHandlers();
+  setupPoolCreationEventHandlers();
+  setupPoolManagementEventHandlers();
+}
+
+async function renderPoolSwitcher() {
+  try {
+    const pools = await getUserPools();
+    const currentPool = getCurrentPool();
+    
+    // Update current pool display
+    const currentPoolData = pools.find(p => p.id === currentPool);
+    if (currentPoolData) {
+      allUI.currentPoolName.textContent = currentPoolData.name;
+    }
+    
+    // Render pools list
+    allUI.userPoolsList.innerHTML = '';
+    pools.forEach(pool => {
+      const poolItem = document.createElement('button');
+      poolItem.className = `w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center justify-between ${
+        pool.isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+      }`;
+      poolItem.setAttribute('data-pool-id', pool.id);
+      
+      poolItem.innerHTML = `
+        <div class="flex flex-col">
+          <span class="font-medium">${pool.name}</span>
+          <span class="text-xs text-slate-500">${pool.type === 'both' ? 'Confidence + Survivor' : pool.type}</span>
+        </div>
+        ${pool.isActive ? '<svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>' : ''}
+      `;
+      
+      if (!pool.isActive) {
+        poolItem.addEventListener('click', () => switchToPool(pool.id));
+      }
+      
+      allUI.userPoolsList.appendChild(poolItem);
+    });
+  } catch (error) {
+    console.error('Error rendering pool switcher:', error);
+  }
+}
+
+async function switchToPool(poolId) {
+  try {
+    setActivePool(poolId);
+    await renderPoolSwitcher();
+    
+    // Hide dropdown
+    allUI.poolSwitcherDropdown.classList.add('hidden');
+    
+    // Reload current view with new pool context
+    await loadAndRenderWeek(currentWeek);
+    
+    // Show success feedback
+    showPoolSwitchFeedback(`Switched to ${allUI.currentPoolName.textContent}`);
+  } catch (error) {
+    console.error('Error switching pools:', error);
+    showPoolSwitchFeedback('Error switching pools', 'error');
+  }
+}
+
+function setupPoolSwitcherEventHandlers() {
+  // Toggle dropdown
+  allUI.poolSwitcherBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    allUI.poolSwitcherDropdown.classList.toggle('hidden');
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!allUI.poolSwitcherBtn.contains(e.target) && !allUI.poolSwitcherDropdown.contains(e.target)) {
+      allUI.poolSwitcherDropdown.classList.add('hidden');
+    }
+  });
+  
+  // Create pool handler - open pool creation modal
+  allUI.createPoolBtn.addEventListener('click', () => {
+    allUI.poolSwitcherDropdown.classList.add('hidden');
+    openPoolCreationModal();
+  });
+  
+  // Join pool handler - prompt for invite code
+  allUI.joinPoolBtn.addEventListener('click', () => {
+    allUI.poolSwitcherDropdown.classList.add('hidden');
+    promptForInviteCode();
+  });
+
+  // Discover pools handler - open pool discovery modal
+  allUI.discoverPoolsBtn.addEventListener('click', () => {
+    allUI.poolSwitcherDropdown.classList.add('hidden');
+    openPoolDiscoveryModal();
+  });
+}
+
+function showPoolSwitchFeedback(message, type = 'success') {
+  // Create temporary feedback element
+  const feedback = document.createElement('div');
+  feedback.className = `fixed top-4 right-4 px-4 py-2 rounded-md text-white text-sm font-medium z-50 transition-all duration-300 ${
+    type === 'error' ? 'bg-red-500' : type === 'info' ? 'bg-blue-500' : 'bg-green-500'
+  }`;
+  feedback.textContent = message;
+  
+  document.body.appendChild(feedback);
+  
+  // Animate in
+  setTimeout(() => feedback.classList.add('opacity-100'), 10);
+  
+  // Remove after 3 seconds
+  setTimeout(() => {
+    feedback.classList.add('opacity-0');
+    setTimeout(() => document.body.removeChild(feedback), 300);
+  }, 3000);
+}
+
+// --- POOL CREATION WIZARD ---
+let currentWizardStep = 1;
+const totalWizardSteps = 3;
+
+function openPoolCreationModal() {
+  // Reset wizard to step 1
+  currentWizardStep = 1;
+  updateWizardDisplay();
+  
+  // Clear form
+  allUI.poolCreationForm.reset();
+  
+  // Hide error message
+  allUI.poolCreationError.classList.add('hidden');
+  
+  // Show modal
+  allUI.poolCreationModal.classList.remove('hidden');
+  allUI.poolCreationModal.classList.add('flex');
+  
+  // Focus on first input for accessibility
+  document.getElementById('pool-name').focus();
+}
+
+function closePoolCreationModal() {
+  allUI.poolCreationModal.classList.add('hidden');
+  allUI.poolCreationModal.classList.remove('flex');
+}
+
+function updateWizardDisplay() {
+  // Update progress indicators
+  for (let i = 1; i <= totalWizardSteps; i++) {
+    const stepElement = document.querySelector(`[aria-current="step"]`)?.parentElement.parentElement;
+    if (stepElement) {
+      const steps = stepElement.querySelectorAll('.w-8.h-8');
+      const stepLabels = stepElement.querySelectorAll('span:not([aria-hidden])');
+      
+      steps.forEach((step, index) => {
+        const stepNumber = index + 1;
+        if (stepNumber === currentWizardStep) {
+          step.className = 'w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium';
+          step.setAttribute('aria-current', 'step');
+          stepLabels[index * 2].className = 'ml-2 text-sm font-medium text-blue-600';
+        } else if (stepNumber < currentWizardStep) {
+          step.className = 'w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-medium';
+          step.removeAttribute('aria-current');
+          stepLabels[index * 2].className = 'ml-2 text-sm font-medium text-green-600';
+        } else {
+          step.className = 'w-8 h-8 bg-slate-200 text-slate-400 rounded-full flex items-center justify-center text-sm font-medium';
+          step.removeAttribute('aria-current');
+          stepLabels[index * 2].className = 'ml-2 text-sm text-slate-400';
+        }
+      });
+    }
+  }
+  
+  // Show/hide step content
+  for (let i = 1; i <= totalWizardSteps; i++) {
+    const stepContent = document.getElementById(`step-${i}`);
+    if (i === currentWizardStep) {
+      stepContent.classList.remove('hidden');
+    } else {
+      stepContent.classList.add('hidden');
+    }
+  }
+  
+  // Update navigation buttons
+  if (currentWizardStep === 1) {
+    allUI.prevStepBtn.classList.add('hidden');
+  } else {
+    allUI.prevStepBtn.classList.remove('hidden');
+  }
+  
+  if (currentWizardStep === totalWizardSteps) {
+    allUI.nextStepBtn.classList.add('hidden');
+    allUI.createPoolSubmitBtn.classList.remove('hidden');
+  } else {
+    allUI.nextStepBtn.classList.remove('hidden');
+    allUI.createPoolSubmitBtn.classList.add('hidden');
+  }
+  
+  // Update review step if we're on step 3
+  if (currentWizardStep === 3) {
+    updateReviewStep();
+  }
+}
+
+function updateReviewStep() {
+  const formData = new FormData(allUI.poolCreationForm);
+  
+  // Update review display
+  document.getElementById('review-name').textContent = formData.get('poolName') || 'Not specified';
+  
+  const poolType = formData.get('poolType');
+  const typeText = poolType === 'confidence' ? 'Confidence Points Only' : 
+                   poolType === 'survivor' ? 'Survivor Pool Only' : 
+                   'Confidence + Survivor';
+  document.getElementById('review-type').textContent = typeText;
+  
+  document.getElementById('review-max-members').textContent = formData.get('maxMembers') + ' Members';
+  
+  const joinMethod = formData.get('joinMethod');
+  document.getElementById('review-join-method').textContent = joinMethod === 'invite' ? 'Invite Only' : 'Public';
+  
+  document.getElementById('review-reminders').textContent = formData.has('weeklyReminders') ? 'Enabled' : 'Disabled';
+}
+
+function validateCurrentStep() {
+  allUI.poolCreationError.classList.add('hidden');
+  
+  if (currentWizardStep === 1) {
+    return validateStep1();
+  } else if (currentWizardStep === 2) {
+    return validateStep2();
+  }
+  return true;
+}
+
+function validateStep1() {
+  const poolName = document.getElementById('pool-name').value.trim();
+  const poolNameError = document.getElementById('pool-name-error');
+  
+  // Reset error state
+  poolNameError.classList.add('hidden');
+  document.getElementById('pool-name').classList.remove('border-red-500');
+  
+  // Validate pool name
+  if (!poolName) {
+    showFieldError('pool-name', 'Pool name is required');
+    return false;
+  }
+  
+  if (poolName.length < 2) {
+    showFieldError('pool-name', 'Pool name must be at least 2 characters');
+    return false;
+  }
+  
+  if (poolName.length > 50) {
+    showFieldError('pool-name', 'Pool name must be 50 characters or less');
+    return false;
+  }
+  
+  // Validate pool type selection
+  const poolType = document.querySelector('input[name="poolType"]:checked');
+  if (!poolType) {
+    showWizardError('Please select a pool type');
+    return false;
+  }
+  
+  return true;
+}
+
+function validateStep2() {
+  // Step 2 has all optional fields with defaults, so always valid
+  return true;
+}
+
+function showFieldError(fieldId, message) {
+  const field = document.getElementById(fieldId);
+  const errorElement = document.getElementById(`${fieldId}-error`);
+  
+  field.classList.add('border-red-500');
+  errorElement.textContent = message;
+  errorElement.classList.remove('hidden');
+  
+  // Focus on the field for accessibility
+  field.focus();
+}
+
+function showWizardError(message) {
+  allUI.poolCreationErrorMessage.textContent = message;
+  allUI.poolCreationError.classList.remove('hidden');
+}
+
+function nextStep() {
+  if (validateCurrentStep()) {
+    currentWizardStep++;
+    updateWizardDisplay();
+  }
+}
+
+function prevStep() {
+  if (currentWizardStep > 1) {
+    currentWizardStep--;
+    updateWizardDisplay();
+  }
+}
+
+async function createPool() {
+  if (!validateCurrentStep()) return;
+  
+  // Show loading state
+  allUI.createPoolBtnText.textContent = 'Creating...';
+  allUI.createPoolSpinner.classList.remove('hidden');
+  allUI.createPoolSubmitBtn.disabled = true;
+  
+  try {
+    const formData = new FormData(allUI.poolCreationForm);
+    
+    // Generate unique pool ID
+    const poolId = `pool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create pool configuration
+    const poolConfig = {
+      poolId: poolId,
+      name: formData.get('poolName'),
+      description: formData.get('poolDescription') || '',
+      type: formData.get('poolType'),
+      creator: currentUser.uid,
+      created: new Date().toISOString(),
+      settings: {
+        maxMembers: parseInt(formData.get('maxMembers')),
+        joinType: formData.get('joinMethod'),
+        confidenceEnabled: ['confidence', 'both'].includes(formData.get('poolType')),
+        survivorEnabled: ['survivor', 'both'].includes(formData.get('poolType')),
+        weeklyReminders: formData.has('weeklyReminders')
+      },
+      status: 'active',
+      season: new Date().getFullYear().toString()
+    };
+    
+    // Create pool in database
+    const poolConfigRef = doc(db, getPoolMetadataPath(poolId));
+    await setDoc(poolConfigRef, poolConfig);
+    
+    // Add creator as admin member
+    const poolMembersRef = doc(db, getPoolMembersPath(poolId));
+    const memberData = {
+      [currentUser.uid]: {
+        displayName: currentUser.displayName || currentUser.email,
+        email: currentUser.email,
+        role: 'admin',
+        joinedAt: new Date().toISOString(),
+        inviteCode: null,
+        status: 'active'
+      }
+    };
+    await setDoc(poolMembersRef, memberData);
+    
+    // Add pool to user's memberships
+    await joinPool(poolId);
+    
+    // Switch to new pool
+    setActivePool(poolId);
+    await renderPoolSwitcher();
+    
+    // Close modal and show success
+    closePoolCreationModal();
+    showPoolSwitchFeedback(`Pool "${poolConfig.name}" created successfully!`, 'success');
+    
+    // Reload current view with new pool context
+    await loadAndRenderWeek(currentWeek);
+    
+  } catch (error) {
+    console.error('Error creating pool:', error);
+    showWizardError('Failed to create pool. Please try again.');
+  } finally {
+    // Reset loading state
+    allUI.createPoolBtnText.textContent = 'Create Pool';
+    allUI.createPoolSpinner.classList.add('hidden');
+    allUI.createPoolSubmitBtn.disabled = false;
+  }
+}
+
+function setupPoolCreationEventHandlers() {
+  // Modal controls
+  allUI.closePoolCreationBtn.addEventListener('click', closePoolCreationModal);
+  allUI.cancelPoolBtn.addEventListener('click', closePoolCreationModal);
+  
+  // Wizard navigation
+  allUI.nextStepBtn.addEventListener('click', nextStep);
+  allUI.prevStepBtn.addEventListener('click', prevStep);
+  
+  // Form submission
+  allUI.poolCreationForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    createPool();
+  });
+  
+  // Close modal on escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !allUI.poolCreationModal.classList.contains('hidden')) {
+      closePoolCreationModal();
+    }
+  });
+  
+  // Close modal when clicking backdrop
+  allUI.poolCreationModal.addEventListener('click', (e) => {
+    if (e.target === allUI.poolCreationModal) {
+      closePoolCreationModal();
+    }
+  });
+  
+  // Real-time validation feedback
+  document.getElementById('pool-name').addEventListener('blur', validateStep1);
+  document.getElementById('pool-name').addEventListener('input', (e) => {
+    // Clear error state on input
+    if (e.target.value.trim()) {
+      e.target.classList.remove('border-red-500');
+      document.getElementById('pool-name-error').classList.add('hidden');
+    }
+  });
+}
+
+// --- POOL MANAGEMENT ---
+async function loadPoolManagementData() {
+  try {
+    const currentPoolId = getCurrentPool();
+    
+    // Load pool configuration
+    const poolConfigRef = doc(db, getPoolMetadataPath(currentPoolId));
+    const poolConfigSnap = await getDoc(poolConfigRef);
+    
+    if (poolConfigSnap.exists()) {
+      const poolConfig = poolConfigSnap.data();
+      updatePoolConfigurationDisplay(poolConfig);
+    }
+    
+    // Load pool members
+    await loadPoolMembers();
+    
+    // Load invite links
+    await loadInviteLinks();
+    
+    // Update statistics
+    await updatePoolStatistics();
+    
+  } catch (error) {
+    console.error('Error loading pool management data:', error);
+  }
+}
+
+function updatePoolConfigurationDisplay(poolConfig) {
+  // Update pool info display
+  allUI.currentPoolNameDisplay.textContent = poolConfig.name || 'Unknown Pool';
+  
+  const typeText = poolConfig.type === 'confidence' ? 'Confidence Points Only' : 
+                   poolConfig.type === 'survivor' ? 'Survivor Pool Only' : 
+                   'Confidence + Survivor';
+  allUI.currentPoolType.textContent = typeText;
+  
+  allUI.currentJoinMethod.textContent = poolConfig.settings?.joinType === 'invite' ? 'Invite Only' : 'Public';
+  allUI.currentMaxMembers.textContent = `${poolConfig.settings?.maxMembers || 50} members`;
+  
+  // Format created date
+  if (poolConfig.created) {
+    const createdDate = new Date(poolConfig.created);
+    allUI.poolCreatedDate.textContent = createdDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+  
+  allUI.poolCreator.textContent = poolConfig.creator === 'system' ? 'System (Migrated)' : 'Pool Admin';
+  allUI.currentPoolDescription.textContent = poolConfig.description || 'No description provided.';
+}
+
+async function loadPoolMembers() {
+  try {
+    const currentPoolId = getCurrentPool();
+    const poolMembersRef = doc(db, getPoolMembersPath(currentPoolId));
+    const poolMembersSnap = await getDoc(poolMembersRef);
+    
+    allUI.poolMembersTbody.innerHTML = '';
+    
+    if (poolMembersSnap.exists()) {
+      const members = poolMembersSnap.data();
+      const memberEntries = Object.entries(members);
+      
+      if (memberEntries.length === 0) {
+        allUI.poolMembersTbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-4 text-center text-sm text-slate-500">
+              No members found in this pool.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+      
+      // Update member count
+      allUI.memberCount.textContent = memberEntries.length;
+      
+      memberEntries.forEach(([uid, member]) => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-50';
+        
+        // Format joined date
+        const joinedDate = member.joinedAt ? 
+          new Date(member.joinedAt).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric' 
+          }) : 'Unknown';
+        
+        // Role badge
+        const roleBadge = member.role === 'admin' ? 
+          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Admin</span>' :
+          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-slate-100 text-slate-800 rounded-full">Member</span>';
+        
+        // Status badge
+        const statusBadge = member.status === 'active' ?
+          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>' :
+          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Inactive</span>';
+        
+        // Actions (only show for non-admin members and if current user is admin)
+        const isCurrentUserAdmin = userPoolMemberships[getCurrentPool()]?.role === 'admin';
+        const isTargetAdmin = member.role === 'admin';
+        const isCurrentUser = uid === currentUser?.uid;
+        
+        let actions = '';
+        if (isCurrentUserAdmin && !isCurrentUser) {
+          if (!isTargetAdmin) {
+            actions = `
+              <button class="text-blue-600 hover:text-blue-900 text-sm font-medium mr-3" onclick="promoteMember('${uid}')">
+                Make Admin
+              </button>
+            `;
+          } else {
+            actions = `
+              <button class="text-orange-600 hover:text-orange-900 text-sm font-medium mr-3" onclick="demoteMember('${uid}')">
+                Remove Admin
+              </button>
+            `;
+          }
+          actions += `
+            <button class="text-red-600 hover:text-red-900 text-sm font-medium" onclick="removeMember('${uid}')">
+              Remove
+            </button>
+          `;
+        }
+        
+        row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+              <div class="flex-shrink-0 h-8 w-8">
+                <div class="h-8 w-8 bg-slate-200 rounded-full flex items-center justify-center">
+                  <span class="text-sm font-medium text-slate-700">
+                    ${(member.displayName || member.email).charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              </div>
+              <div class="ml-3">
+                <div class="text-sm font-medium text-slate-900">${member.displayName || 'Unknown'}</div>
+                <div class="text-sm text-slate-500">${member.email}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">${roleBadge}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${joinedDate}</td>
+          <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm">${actions}</td>
+        `;
+        
+        allUI.poolMembersTbody.appendChild(row);
+      });
+      
+    } else {
+      allUI.memberCount.textContent = '0';
+      allUI.poolMembersTbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="px-6 py-4 text-center text-sm text-slate-500">
+            No member data found for this pool.
+          </td>
+        </tr>
+      `;
+    }
+    
+  } catch (error) {
+    console.error('Error loading pool members:', error);
+    allUI.poolMembersTbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="px-6 py-4 text-center text-sm text-red-500">
+          Error loading members. Please refresh the page.
+        </td>
+      </tr>
+    `;
+  }
+}
+
+async function loadInviteLinks() {
+  try {
+    // For now, show placeholder until we implement invite system
+    allUI.inviteLinksContainer.innerHTML = `
+      <div class="text-sm text-slate-500 text-center py-4">
+        Invite link system will be implemented in the next phase.
+      </div>
+    `;
+  } catch (error) {
+    console.error('Error loading invite links:', error);
+  }
+}
+
+async function updatePoolStatistics() {
+  try {
+    const currentPoolId = getCurrentPool();
+    
+    // Count active picks for current week
+    const picksCollectionRef = collection(db, `artifacts/${appId()}/pools/${currentPoolId}/data/nerdfootball_picks/${currentWeek}/submissions`);
+    const picksSnap = await getDocs(picksCollectionRef);
+    
+    allUI.activePicksCount.textContent = picksSnap.size.toString();
+    
+  } catch (error) {
+    console.error('Error updating pool statistics:', error);
+    allUI.activePicksCount.textContent = '0';
+  }
+}
+
+// Member management functions (global for HTML onclick handlers)
+window.promoteMember = async function(uid) {
+  if (!confirm('Are you sure you want to make this user a pool admin?')) return;
+  
+  try {
+    const currentPoolId = getCurrentPool();
+    const poolMembersRef = doc(db, getPoolMembersPath(currentPoolId));
+    
+    await updateDoc(poolMembersRef, {
+      [`${uid}.role`]: 'admin'
+    });
+    
+    // Update user's pool membership
+    const userPoolsRef = doc(db, getUserPoolsPath(uid));
+    await updateDoc(userPoolsRef, {
+      [`${currentPoolId}.role`]: 'admin'
+    });
+    
+    showPoolSwitchFeedback('Member promoted to admin successfully', 'success');
+    await loadPoolMembers();
+    
+  } catch (error) {
+    console.error('Error promoting member:', error);
+    showPoolSwitchFeedback('Failed to promote member', 'error');
+  }
+}
+
+window.demoteMember = async function(uid) {
+  if (!confirm('Are you sure you want to remove admin privileges from this user?')) return;
+  
+  try {
+    const currentPoolId = getCurrentPool();
+    const poolMembersRef = doc(db, getPoolMembersPath(currentPoolId));
+    
+    await updateDoc(poolMembersRef, {
+      [`${uid}.role`]: 'member'
+    });
+    
+    // Update user's pool membership
+    const userPoolsRef = doc(db, getUserPoolsPath(uid));
+    await updateDoc(userPoolsRef, {
+      [`${currentPoolId}.role`]: 'member'
+    });
+    
+    showPoolSwitchFeedback('Admin privileges removed successfully', 'success');
+    await loadPoolMembers();
+    
+  } catch (error) {
+    console.error('Error demoting member:', error);
+    showPoolSwitchFeedback('Failed to remove admin privileges', 'error');
+  }
+}
+
+window.removeMember = async function(uid) {
+  if (!confirm('Are you sure you want to remove this member from the pool? This action cannot be undone.')) return;
+  
+  try {
+    const currentPoolId = getCurrentPool();
+    
+    // Remove from pool members
+    const poolMembersRef = doc(db, getPoolMembersPath(currentPoolId));
+    await updateDoc(poolMembersRef, {
+      [uid]: deleteField()
+    });
+    
+    // Remove pool from user's memberships
+    const userPoolsRef = doc(db, getUserPoolsPath(uid));
+    await updateDoc(userPoolsRef, {
+      [currentPoolId]: deleteField()
+    });
+    
+    showPoolSwitchFeedback('Member removed from pool successfully', 'success');
+    await loadPoolMembers();
+    
+  } catch (error) {
+    console.error('Error removing member:', error);
+    showPoolSwitchFeedback('Failed to remove member', 'error');
+  }
+}
+
+function setupPoolManagementEventHandlers() {
+  // Edit pool settings button (placeholder)
+  allUI.editPoolSettingsBtn.addEventListener('click', () => {
+    showPoolSwitchFeedback('Pool editing will be available in a future update', 'info');
+  });
+  
+  // Generate invite button  
+  allUI.generateInviteBtn.addEventListener('click', createQuickInviteLink);
+  
+  // Invite member button (placeholder)
+  allUI.inviteMemberBtn.addEventListener('click', () => {
+    showPoolSwitchFeedback('Member invitations coming in next phase', 'info');
+  });
+  
+  // Create invite link button
+  allUI.createInviteLinkBtn.addEventListener('click', createQuickInviteLink);
+  
+  // Archive pool button
+  allUI.archivePoolBtn.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to archive this pool? This will end the current season but preserve all data.')) return;
+    
+    try {
+      const currentPoolId = getCurrentPool();
+      const poolConfigRef = doc(db, getPoolMetadataPath(currentPoolId));
+      
+      await updateDoc(poolConfigRef, {
+        status: 'archived',
+        archivedAt: new Date().toISOString()
+      });
+      
+      allUI.poolStatus.textContent = 'Archived';
+      showPoolSwitchFeedback('Pool archived successfully', 'success');
+      
+    } catch (error) {
+      console.error('Error archiving pool:', error);
+      showPoolSwitchFeedback('Failed to archive pool', 'error');
+    }
+  });
+  
+  // Delete pool button
+  allUI.deletePoolBtn.addEventListener('click', () => {
+    showPoolSwitchFeedback('Pool deletion will be available in a future update', 'info');
+  });
+}
+
+// Add to admin tab switching logic
+function renderAdminPoolSettings() {
+  if (userPoolMemberships[getCurrentPool()]?.role === 'admin') {
+    loadPoolManagementData();
+  }
+}
+
+// --- INVITE SYSTEM ---
+function generateSecureInviteCode() {
+  // Generate cryptographically secure invite code
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  const array = new Uint8Array(12);
+  crypto.getRandomValues(array);
+  
+  for (let i = 0; i < array.length; i++) {
+    result += chars.charAt(array[i] % chars.length);
+  }
+  
+  return result;
+}
+
+async function createInviteLink(expiresInDays = 7, maxUses = null) {
+  try {
+    const currentPoolId = getCurrentPool();
+    const inviteCode = generateSecureInviteCode();
+    
+    // Calculate expiration date
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+    
+    const inviteData = {
+      code: inviteCode,
+      poolId: currentPoolId,
+      createdBy: currentUser.uid,
+      createdAt: new Date().toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      maxUses: maxUses,
+      currentUses: 0,
+      status: 'active'
+    };
+    
+    // Store invite in database
+    const inviteRef = doc(db, `artifacts/${appId()}/invites/${inviteCode}`);
+    await setDoc(inviteRef, inviteData);
+    
+    // Add to pool's invite list
+    const poolInvitesRef = doc(db, `artifacts/${appId()}/pools/${currentPoolId}/metadata/invites`);
+    await setDoc(poolInvitesRef, {
+      [inviteCode]: {
+        createdBy: currentUser.uid,
+        createdAt: inviteData.createdAt,
+        expiresAt: inviteData.expiresAt,
+        maxUses: maxUses,
+        status: 'active'
+      }
+    }, { merge: true });
+    
+    return {
+      code: inviteCode,
+      url: `${window.location.origin}${window.location.pathname}?invite=${inviteCode}`,
+      expiresAt: expiresAt
+    };
+    
+  } catch (error) {
+    console.error('Error creating invite link:', error);
+    throw new Error('Failed to create invite link');
+  }
+}
+
+async function validateInviteCode(inviteCode) {
+  try {
+    const inviteRef = doc(db, `artifacts/${appId()}/invites/${inviteCode}`);
+    const inviteSnap = await getDoc(inviteRef);
+    
+    if (!inviteSnap.exists()) {
+      return { valid: false, reason: 'Invite code not found' };
+    }
+    
+    const invite = inviteSnap.data();
+    
+    // Check if invite is active
+    if (invite.status !== 'active') {
+      return { valid: false, reason: 'Invite code is no longer active' };
+    }
+    
+    // Check expiration
+    const now = new Date();
+    const expiresAt = new Date(invite.expiresAt);
+    if (now > expiresAt) {
+      return { valid: false, reason: 'Invite code has expired' };
+    }
+    
+    // Check usage limits
+    if (invite.maxUses && invite.currentUses >= invite.maxUses) {
+      return { valid: false, reason: 'Invite code has reached its usage limit' };
+    }
+    
+    // Check if user is already a member
+    if (currentUser && userPoolMemberships[invite.poolId]) {
+      return { valid: false, reason: 'You are already a member of this pool' };
+    }
+    
+    // Get pool info for validation
+    const poolConfigRef = doc(db, getPoolMetadataPath(invite.poolId));
+    const poolConfigSnap = await getDoc(poolConfigRef);
+    
+    if (!poolConfigSnap.exists()) {
+      return { valid: false, reason: 'Pool no longer exists' };
+    }
+    
+    const poolConfig = poolConfigSnap.data();
+    
+    // Check pool status
+    if (poolConfig.status !== 'active') {
+      return { valid: false, reason: 'Pool is no longer active' };
+    }
+    
+    // Check member limits
+    const poolMembersRef = doc(db, getPoolMembersPath(invite.poolId));
+    const poolMembersSnap = await getDoc(poolMembersRef);
+    
+    if (poolMembersSnap.exists()) {
+      const members = poolMembersSnap.data();
+      const memberCount = Object.keys(members).length;
+      
+      if (memberCount >= (poolConfig.settings?.maxMembers || 50)) {
+        return { valid: false, reason: 'Pool has reached its member limit' };
+      }
+    }
+    
+    return { 
+      valid: true, 
+      invite: invite,
+      poolConfig: poolConfig
+    };
+    
+  } catch (error) {
+    console.error('Error validating invite code:', error);
+    return { valid: false, reason: 'Error validating invite code' };
+  }
+}
+
+async function useInviteCode(inviteCode) {
+  try {
+    const validation = await validateInviteCode(inviteCode);
+    if (!validation.valid) {
+      throw new Error(validation.reason);
+    }
+    
+    const { invite, poolConfig } = validation;
+    
+    // Join the pool
+    const result = await joinPool(invite.poolId, inviteCode);
+    
+    // Increment usage count
+    const inviteRef = doc(db, `artifacts/${appId()}/invites/${inviteCode}`);
+    await updateDoc(inviteRef, {
+      currentUses: (invite.currentUses || 0) + 1,
+      lastUsed: new Date().toISOString(),
+      [`usedBy.${currentUser.uid}`]: new Date().toISOString()
+    });
+    
+    return {
+      success: true,
+      poolName: poolConfig.name,
+      poolId: invite.poolId
+    };
+    
+  } catch (error) {
+    console.error('Error using invite code:', error);
+    throw error;
+  }
+}
+
+async function loadInviteLinks() {
+  try {
+    const currentPoolId = getCurrentPool();
+    const poolInvitesRef = doc(db, `artifacts/${appId()}/pools/${currentPoolId}/metadata/invites`);
+    const poolInvitesSnap = await getDoc(poolInvitesRef);
+    
+    allUI.inviteLinksContainer.innerHTML = '';
+    
+    if (poolInvitesSnap.exists()) {
+      const invites = poolInvitesSnap.data();
+      const inviteEntries = Object.entries(invites);
+      
+      if (inviteEntries.length === 0) {
+        allUI.inviteLinksContainer.innerHTML = `
+          <div class="text-sm text-slate-500 text-center py-4">
+            No active invite links. Create one to invite new members.
+          </div>
+        `;
+        return;
+      }
+      
+      // Sort by creation date (newest first)
+      inviteEntries.sort(([, a], [, b]) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      inviteEntries.forEach(([code, invite]) => {
+        const inviteCard = createInviteCard(code, invite);
+        allUI.inviteLinksContainer.appendChild(inviteCard);
+      });
+      
+    } else {
+      allUI.inviteLinksContainer.innerHTML = `
+        <div class="text-sm text-slate-500 text-center py-4">
+          No active invite links. Create one to invite new members.
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error('Error loading invite links:', error);
+    allUI.inviteLinksContainer.innerHTML = `
+      <div class="text-sm text-red-500 text-center py-4">
+        Error loading invite links. Please refresh the page.
+      </div>
+    `;
+  }
+}
+
+function createInviteCard(code, invite) {
+  const card = document.createElement('div');
+  card.className = 'bg-slate-50 border border-slate-200 rounded-lg p-4';
+  
+  const expiresAt = new Date(invite.expiresAt);
+  const now = new Date();
+  const isExpired = now > expiresAt;
+  const daysUntilExpiry = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));
+  
+  const inviteUrl = `${window.location.origin}${window.location.pathname}?invite=${code}`;
+  
+  const statusBadge = isExpired ? 
+    '<span class="inline-flex px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Expired</span>' :
+    '<span class="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>';
+  
+  const expiryText = isExpired ? 
+    'Expired' : 
+    daysUntilExpiry === 1 ? 'Expires tomorrow' : 
+    daysUntilExpiry <= 0 ? 'Expires today' :
+    `Expires in ${daysUntilExpiry} days`;
+  
+  card.innerHTML = `
+    <div class="flex items-start justify-between">
+      <div class="flex-1">
+        <div class="flex items-center space-x-3 mb-2">
+          <code class="text-sm font-mono bg-white px-2 py-1 rounded border">${code}</code>
+          ${statusBadge}
+        </div>
+        <div class="text-sm text-slate-600 space-y-1">
+          <div>Created: ${new Date(invite.createdAt).toLocaleDateString()}</div>
+          <div>${expiryText}</div>
+          ${invite.maxUses ? `<div>Uses: 0/${invite.maxUses}</div>` : '<div>Unlimited uses</div>'}
+        </div>
+      </div>
+      <div class="flex flex-col space-y-2 ml-4">
+        <button 
+          onclick="copyInviteLink('${inviteUrl}')" 
+          class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          ${isExpired ? 'disabled' : ''}
+        >
+          Copy Link
+        </button>
+        <button 
+          onclick="shareInviteLink('${inviteUrl}', '${code}')" 
+          class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+          ${isExpired ? 'disabled' : ''}
+        >
+          Share
+        </button>
+        <button 
+          onclick="revokeInviteLink('${code}')" 
+          class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+        >
+          Revoke
+        </button>
+      </div>
+    </div>
+  `;
+  
+  return card;
+}
+
+// Global functions for invite link management (called from HTML)
+window.copyInviteLink = async function(url) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(url);
+      showPoolSwitchFeedback('Invite link copied to clipboard!', 'success');
+    } else {
+      // Fallback for non-secure contexts
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showPoolSwitchFeedback('Invite link copied!', 'success');
+    }
+  } catch (error) {
+    console.error('Error copying invite link:', error);
+    showPoolSwitchFeedback('Failed to copy link', 'error');
+  }
+};
+
+window.shareInviteLink = async function(url, code) {
+  const poolName = allUI.currentPoolNameDisplay.textContent || 'NerdFootball Pool';
+  
+  if (navigator.share && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+    // Use native sharing on mobile devices
+    try {
+      await navigator.share({
+        title: `Join ${poolName}`,
+        text: `You're invited to join ${poolName}! Use invite code: ${code}`,
+        url: url
+      });
+      showPoolSwitchFeedback('Invite shared successfully!', 'success');
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error('Error sharing invite:', error);
+        fallbackShare(url, code, poolName);
+      }
+    }
+  } else {
+    // Fallback for desktop or unsupported browsers
+    fallbackShare(url, code, poolName);
+  }
+};
+
+function fallbackShare(url, code, poolName) {
+  // Create email sharing option
+  const subject = encodeURIComponent(`Join ${poolName}`);
+  const body = encodeURIComponent(`You're invited to join ${poolName}!
+
+Click this link to join: ${url}
+
+Or use invite code: ${code}
+
+See you in the pool!`);
+  
+  const emailUrl = `mailto:?subject=${subject}&body=${body}`;
+  window.open(emailUrl, '_blank');
+  showPoolSwitchFeedback('Email app opened for sharing', 'success');
+}
+
+window.revokeInviteLink = async function(code) {
+  if (!confirm('Are you sure you want to revoke this invite link? It will no longer work for new members.')) return;
+  
+  try {
+    // Update invite status to revoked
+    const inviteRef = doc(db, `artifacts/${appId()}/invites/${code}`);
+    await updateDoc(inviteRef, {
+      status: 'revoked',
+      revokedAt: new Date().toISOString(),
+      revokedBy: currentUser.uid
+    });
+    
+    // Update pool invites list
+    const currentPoolId = getCurrentPool();
+    const poolInvitesRef = doc(db, `artifacts/${appId()}/pools/${currentPoolId}/metadata/invites`);
+    await updateDoc(poolInvitesRef, {
+      [`${code}.status`]: 'revoked'
+    });
+    
+    showPoolSwitchFeedback('Invite link revoked successfully', 'success');
+    await loadInviteLinks(); // Reload the invite list
+    
+  } catch (error) {
+    console.error('Error revoking invite link:', error);
+    showPoolSwitchFeedback('Failed to revoke invite link', 'error');
+  }
+};
+
+async function createQuickInviteLink() {
+  try {
+    // Show loading state
+    allUI.createInviteLinkBtn.disabled = true;
+    allUI.createInviteLinkBtn.textContent = 'Creating...';
+    
+    const inviteLink = await createInviteLink(7, null); // 7 days, unlimited uses
+    
+    showPoolSwitchFeedback(`Invite link created! Code: ${inviteLink.code}`, 'success');
+    await loadInviteLinks(); // Reload the invite list
+    
+  } catch (error) {
+    console.error('Error creating quick invite link:', error);
+    showPoolSwitchFeedback('Failed to create invite link', 'error');
+  } finally {
+    // Reset button state
+    allUI.createInviteLinkBtn.disabled = false;
+    allUI.createInviteLinkBtn.textContent = 'Create New Link';
+  }
+}
+
+// Check for invite code in URL on page load
+async function checkForInviteCode() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteCode = urlParams.get('invite');
+  
+  if (inviteCode) {
+    // Remove invite parameter from URL
+    const url = new URL(window.location);
+    url.searchParams.delete('invite');
+    window.history.replaceState({}, '', url);
+    
+    if (currentUser) {
+      // User is logged in, process invite
+      await processInviteCode(inviteCode);
+    } else {
+      // User is not logged in, store invite for after login
+      localStorage.setItem('pendingInviteCode', inviteCode);
+      showPoolSwitchFeedback('Please log in to join the pool', 'info');
+    }
+  }
+}
+
+async function processInviteCode(inviteCode) {
+  try {
+    const result = await useInviteCode(inviteCode);
+    
+    // Switch to the new pool
+    setActivePool(result.poolId);
+    await renderPoolSwitcher();
+    
+    showPoolSwitchFeedback(`Welcome to ${result.poolName}!`, 'success');
+    
+    // Reload current view with new pool context
+    await loadAndRenderWeek(currentWeek);
+    
+  } catch (error) {
+    console.error('Error processing invite code:', error);
+    showInviteError(error.message);
+  }
+}
+
+function showInviteError(message) {
+  // Create invite error modal
+  const errorModal = document.createElement('div');
+  errorModal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+  errorModal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+      <div class="flex items-center space-x-3 mb-4">
+        <div class="flex-shrink-0">
+          <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L5.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-slate-900">Unable to Join Pool</h3>
+        </div>
+      </div>
+      <p class="text-slate-600 mb-6">${message}</p>
+      <div class="flex justify-end">
+        <button onclick="this.parentElement.parentElement.parentElement.remove()" class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(errorModal);
+  
+  // Auto-remove after 10 seconds
+  setTimeout(() => {
+    if (document.body.contains(errorModal)) {
+      document.body.removeChild(errorModal);
+    }
+  }, 10000);
+}
+
+function promptForInviteCode() {
+  // Create invite code prompt modal
+  const promptModal = document.createElement('div');
+  promptModal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+  promptModal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+      <h3 class="text-lg font-semibold text-slate-900 mb-4">Join Pool</h3>
+      <p class="text-slate-600 mb-4">Enter the invite code or paste the invite link:</p>
+      
+      <input 
+        type="text" 
+        id="invite-code-input" 
+        class="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors mb-4" 
+        placeholder="Enter invite code or paste link"
+        autocomplete="off"
+      >
+      
+      <div class="flex justify-end space-x-3">
+        <button 
+          onclick="this.parentElement.parentElement.parentElement.remove()" 
+          class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-colors"
+        >
+          Cancel
+        </button>
+        <button 
+          onclick="joinPoolWithCode()" 
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          id="join-pool-submit-btn"
+        >
+          Join Pool
+        </button>
+      </div>
+      
+      <div id="join-pool-error" class="hidden mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+        <p class="text-red-700 text-sm"></p>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(promptModal);
+  
+  // Focus on input
+  document.getElementById('invite-code-input').focus();
+  
+  // Handle Enter key
+  document.getElementById('invite-code-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      joinPoolWithCode();
+    }
+  });
+}
+
+window.joinPoolWithCode = async function() {
+  const input = document.getElementById('invite-code-input');
+  const submitBtn = document.getElementById('join-pool-submit-btn');
+  const errorDiv = document.getElementById('join-pool-error');
+  
+  let inviteCode = input.value.trim();
+  
+  if (!inviteCode) {
+    showJoinPoolError('Please enter an invite code');
+    return;
+  }
+  
+  // Extract invite code from URL if full URL is pasted
+  if (inviteCode.includes('?invite=')) {
+    const match = inviteCode.match(/[?&]invite=([^&]+)/);
+    if (match) {
+      inviteCode = match[1];
+    }
+  }
+  
+  // Show loading state
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Joining...';
+  errorDiv.classList.add('hidden');
+  
+  try {
+    const result = await useInviteCode(inviteCode);
+    
+    // Close modal
+    const modal = submitBtn.closest('.fixed');
+    modal.remove();
+    
+    // Switch to the new pool
+    setActivePool(result.poolId);
+    await renderPoolSwitcher();
+    
+    showPoolSwitchFeedback(`Successfully joined ${result.poolName}!`, 'success');
+    
+    // Reload current view with new pool context
+    await loadAndRenderWeek(currentWeek);
+    
+  } catch (error) {
+    console.error('Error joining pool with code:', error);
+    showJoinPoolError(error.message);
+    
+    // Reset button state
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Join Pool';
+  }
+};
+
+function showJoinPoolError(message) {
+  const errorDiv = document.getElementById('join-pool-error');
+  const errorText = errorDiv.querySelector('p');
+  
+  if (errorDiv && errorText) {
+    errorText.textContent = message;
+    errorDiv.classList.remove('hidden');
+  }
+}
+
+// --- POOL DISCOVERY ---
+let currentPoolSearchState = {
+  searchTerm: '',
+  typeFilter: '',
+  currentPage: 1,
+  poolsPerPage: 10,
+  totalPools: 0,
+  isLoading: false
+};
+
+function openPoolDiscoveryModal() {
+  allUI.poolDiscoveryModal.classList.remove('hidden');
+  allUI.poolDiscoveryModal.classList.add('flex');
+  
+  // Reset search state
+  currentPoolSearchState = {
+    searchTerm: '',
+    typeFilter: '',
+    currentPage: 1,
+    poolsPerPage: 10,
+    totalPools: 0,
+    isLoading: false
+  };
+  
+  // Clear and reset form
+  allUI.poolSearch.value = '';
+  allUI.poolTypeFilter.value = '';
+  allUI.activeFilters.classList.add('hidden');
+  
+  // Load initial pools
+  searchPublicPools();
+  
+  // Set up event listeners if not already done
+  setupPoolDiscoveryListeners();
+}
+
+function setupPoolDiscoveryListeners() {
+  // Prevent multiple listeners
+  if (allUI.poolSearch.hasDiscoveryListener) return;
+  allUI.poolSearch.hasDiscoveryListener = true;
+  
+  // Close modal
+  allUI.closePoolDiscoveryBtn.addEventListener('click', closePoolDiscoveryModal);
+  
+  // Search input with debounce
+  let searchTimeout;
+  allUI.poolSearch.addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      currentPoolSearchState.searchTerm = e.target.value.trim();
+      currentPoolSearchState.currentPage = 1;
+      searchPublicPools();
+    }, 500);
+  });
+  
+  // Type filter
+  allUI.poolTypeFilter.addEventListener('change', (e) => {
+    currentPoolSearchState.typeFilter = e.target.value;
+    currentPoolSearchState.currentPage = 1;
+    searchPublicPools();
+  });
+  
+  // Pagination
+  allUI.prevPage.addEventListener('click', () => {
+    if (currentPoolSearchState.currentPage > 1) {
+      currentPoolSearchState.currentPage--;
+      searchPublicPools();
+    }
+  });
+  
+  allUI.nextPage.addEventListener('click', () => {
+    const maxPages = Math.ceil(currentPoolSearchState.totalPools / currentPoolSearchState.poolsPerPage);
+    if (currentPoolSearchState.currentPage < maxPages) {
+      currentPoolSearchState.currentPage++;
+      searchPublicPools();
+    }
+  });
+  
+  // Close on backdrop click
+  allUI.poolDiscoveryModal.addEventListener('click', (e) => {
+    if (e.target === allUI.poolDiscoveryModal) {
+      closePoolDiscoveryModal();
+    }
+  });
+  
+  // Close on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !allUI.poolDiscoveryModal.classList.contains('hidden')) {
+      closePoolDiscoveryModal();
+    }
+  });
+}
+
+function closePoolDiscoveryModal() {
+  allUI.poolDiscoveryModal.classList.add('hidden');
+  allUI.poolDiscoveryModal.classList.remove('flex');
+}
+
+async function searchPublicPools() {
+  if (currentPoolSearchState.isLoading) return;
+  
+  currentPoolSearchState.isLoading = true;
+  showPoolsLoading();
+  
+  try {
+    // Query Firestore for public pools
+    const poolsCollection = collection(db, 'pools');
+    let pools = [];
+    
+    // Get all pools first (in a real app, this would be optimized with proper queries)
+    const querySnapshot = await getDocs(poolsCollection);
+    
+    querySnapshot.forEach((doc) => {
+      const poolData = doc.data();
+      
+      // Only include public pools
+      if (poolData.settings?.joinType === 'open') {
+        pools.push({
+          id: doc.id,
+          ...poolData
+        });
+      }
+    });
+    
+    // Apply client-side filtering (in production, this would be server-side)
+    let filteredPools = pools;
+    
+    // Search term filter
+    if (currentPoolSearchState.searchTerm) {
+      const searchLower = currentPoolSearchState.searchTerm.toLowerCase();
+      filteredPools = filteredPools.filter(pool => 
+        pool.name?.toLowerCase().includes(searchLower) ||
+        pool.description?.toLowerCase().includes(searchLower) ||
+        pool.creator?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Type filter
+    if (currentPoolSearchState.typeFilter) {
+      filteredPools = filteredPools.filter(pool => 
+        pool.type === currentPoolSearchState.typeFilter
+      );
+    }
+    
+    // Update total count
+    currentPoolSearchState.totalPools = filteredPools.length;
+    
+    // Apply pagination
+    const startIndex = (currentPoolSearchState.currentPage - 1) * currentPoolSearchState.poolsPerPage;
+    const paginatedPools = filteredPools.slice(startIndex, startIndex + currentPoolSearchState.poolsPerPage);
+    
+    // Display results
+    displayPoolResults(paginatedPools);
+    updatePoolsPagination();
+    updateActiveFilters();
+    
+  } catch (error) {
+    console.error('Error searching pools:', error);
+    showPoolsError('Failed to search pools. Please try again.');
+  } finally {
+    currentPoolSearchState.isLoading = false;
+  }
+}
+
+function showPoolsLoading() {
+  allUI.poolsLoading.classList.remove('hidden');
+  allUI.poolsEmpty.classList.add('hidden');
+  allUI.poolsResults.classList.add('hidden');
+  allUI.poolsPagination.classList.add('hidden');
+  allUI.poolsError.classList.add('hidden');
+}
+
+function showPoolsError(message) {
+  allUI.poolsError.classList.remove('hidden');
+  allUI.poolsErrorMessage.textContent = message;
+  allUI.poolsLoading.classList.add('hidden');
+  allUI.poolsEmpty.classList.add('hidden');
+  allUI.poolsResults.classList.add('hidden');
+  allUI.poolsPagination.classList.add('hidden');
+}
+
+function displayPoolResults(pools) {
+  allUI.poolsLoading.classList.add('hidden');
+  allUI.poolsError.classList.add('hidden');
+  
+  if (pools.length === 0) {
+    allUI.poolsEmpty.classList.remove('hidden');
+    allUI.poolsResults.classList.add('hidden');
+    allUI.poolsPagination.classList.add('hidden');
+    return;
+  }
+  
+  allUI.poolsEmpty.classList.add('hidden');
+  allUI.poolsResults.classList.remove('hidden');
+  
+  // Generate pool cards HTML
+  const poolCardsHTML = pools.map(pool => createPoolCard(pool)).join('');
+  allUI.poolsResults.innerHTML = poolCardsHTML;
+  
+  // Add join button event listeners
+  allUI.poolsResults.querySelectorAll('.join-pool-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const poolId = btn.dataset.poolId;
+      const poolName = btn.dataset.poolName;
+      
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Joining...';
+        
+        await joinPool(poolId);
+        closePoolDiscoveryModal();
+        showPoolSwitchFeedback(`Successfully joined ${poolName}!`, 'success');
+        
+      } catch (error) {
+        console.error('Error joining pool:', error);
+        btn.disabled = false;
+        btn.textContent = 'Join Pool';
+        showPoolSwitchFeedback(`Failed to join ${poolName}: ${error.message}`, 'error');
+      }
+    });
+  });
+}
+
+function createPoolCard(pool) {
+  const memberCount = pool.memberCount || 0;
+  const maxMembers = pool.settings?.maxMembers || 'Unlimited';
+  const gameTypes = pool.type === 'both' ? 'Confidence + Survivor' : 
+                   pool.type === 'confidence' ? 'Confidence Only' : 'Survivor Only';
+  
+  const createdDate = pool.created ? new Date(pool.created).toLocaleDateString() : 'Unknown';
+  
+  return `
+    <div class="bg-white border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+      <div class="flex justify-between items-start mb-4">
+        <div class="flex-1">
+          <h3 class="text-lg font-semibold text-slate-900">${escapeHtml(pool.name || 'Unnamed Pool')}</h3>
+          <p class="text-sm text-slate-600 mt-1">${escapeHtml(pool.description || 'No description available')}</p>
+        </div>
+        <div class="ml-4 flex-shrink-0">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            pool.type === 'both' ? 'bg-purple-100 text-purple-800' :
+            pool.type === 'confidence' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+          }">
+            ${gameTypes}
+          </span>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4 text-sm text-slate-600 mb-4">
+        <div>
+          <span class="font-medium">Members:</span>
+          ${memberCount}${maxMembers !== 'Unlimited' ? ` / ${maxMembers}` : ''}
+        </div>
+        <div>
+          <span class="font-medium">Created:</span>
+          ${createdDate}
+        </div>
+        <div>
+          <span class="font-medium">Status:</span>
+          <span class="capitalize ${pool.status === 'active' ? 'text-green-600' : 'text-slate-600'}">
+            ${pool.status || 'Active'}
+          </span>
+        </div>
+        <div>
+          <span class="font-medium">Season:</span>
+          ${pool.season || '2025'}
+        </div>
+      </div>
+      
+      <div class="flex justify-between items-center">
+        <div class="text-xs text-slate-500">
+          Created by ${escapeHtml(pool.creatorName || 'Unknown')}
+        </div>
+        <button 
+          class="join-pool-btn px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          data-pool-id="${pool.id}"
+          data-pool-name="${escapeHtml(pool.name || 'Pool')}"
+          ${memberCount >= maxMembers && maxMembers !== 'Unlimited' ? 'disabled' : ''}
+        >
+          ${memberCount >= maxMembers && maxMembers !== 'Unlimited' ? 'Pool Full' : 'Join Pool'}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function updatePoolsPagination() {
+  const totalPages = Math.ceil(currentPoolSearchState.totalPools / currentPoolSearchState.poolsPerPage);
+  
+  if (totalPages <= 1) {
+    allUI.poolsPagination.classList.add('hidden');
+    return;
+  }
+  
+  allUI.poolsPagination.classList.remove('hidden');
+  
+  // Update pagination controls
+  allUI.prevPage.disabled = currentPoolSearchState.currentPage <= 1;
+  allUI.nextPage.disabled = currentPoolSearchState.currentPage >= totalPages;
+  allUI.pageInfo.textContent = `Page ${currentPoolSearchState.currentPage} of ${totalPages}`;
+}
+
+function updateActiveFilters() {
+  const hasFilters = currentPoolSearchState.searchTerm || currentPoolSearchState.typeFilter;
+  
+  if (!hasFilters) {
+    allUI.activeFilters.classList.add('hidden');
+    return;
+  }
+  
+  allUI.activeFilters.classList.remove('hidden');
+  const filterTags = [];
+  
+  if (currentPoolSearchState.searchTerm) {
+    filterTags.push(`<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+      Search: ${escapeHtml(currentPoolSearchState.searchTerm)}
+      <button type="button" class="ml-1 h-3 w-3 rounded-full inline-flex items-center justify-center hover:bg-blue-200" onclick="clearSearchFilter()">
+        <svg class="h-2 w-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </span>`);
+  }
+  
+  if (currentPoolSearchState.typeFilter) {
+    const typeLabels = {
+      'confidence': 'Confidence Only',
+      'survivor': 'Survivor Only', 
+      'both': 'Both Games'
+    };
+    
+    filterTags.push(`<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+      Type: ${typeLabels[currentPoolSearchState.typeFilter]}
+      <button type="button" class="ml-1 h-3 w-3 rounded-full inline-flex items-center justify-center hover:bg-purple-200" onclick="clearTypeFilter()">
+        <svg class="h-2 w-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </span>`);
+  }
+  
+  allUI.filterTags.innerHTML = filterTags.join('');
+}
+
+// Global functions for filter removal (called from HTML)
+window.clearSearchFilter = function() {
+  currentPoolSearchState.searchTerm = '';
+  currentPoolSearchState.currentPage = 1;
+  allUI.poolSearch.value = '';
+  searchPublicPools();
+};
+
+window.clearTypeFilter = function() {
+  currentPoolSearchState.typeFilter = '';
+  currentPoolSearchState.currentPage = 1;
+  allUI.poolTypeFilter.value = '';
+  searchPublicPools();
+};
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
 
  
  // --- SAVE STATUS ---
@@ -3844,7 +6426,13 @@ if (!activePicks.mnfTotalPoints) {
   if (targetTab && targetContent) {
    targetTab.classList.add('active');
    targetContent.classList.remove('hidden');
-   renderAdminView(allUI.adminWeekSelector.value);
+   
+   // Load pool settings data if switching to pool settings tab
+   if (tabId === 'tab-pool-settings') {
+     renderAdminPoolSettings();
+   } else {
+     renderAdminView(allUI.adminWeekSelector.value);
+   }
    
    // Update URL hash for state persistence
    window.location.hash = `admin-${tabId.substring(4)}`;
