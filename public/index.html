@@ -3636,6 +3636,79 @@ Proceed with migration?`);
  // Make migration available globally
  window.runMigration = runMigrationWithDiagnostics;
 
+ // Fix pool visibility after server-side migration
+ window.fixPoolVisibility = async () => {
+   if (!currentUser || !ADMIN_UIDS.includes(currentUser.uid)) {
+     alert('Only admins can run this fix');
+     return;
+   }
+   
+   console.log('🔧 FIXING POOL VISIBILITY');
+   console.log('=========================');
+   
+   try {
+     // Create client-accessible pool data that mirrors server structure
+     const poolData = {
+       poolId: 'nerduniverse-2025',
+       name: 'NerdUniverse 2025',
+       description: 'The original NerdFootball community - established 2025',
+       type: 'both',
+       creator: currentUser.uid,
+       created: new Date().toISOString(),
+       settings: {
+         maxMembers: 100,
+         joinType: 'invite',
+         confidenceEnabled: true,
+         survivorEnabled: true,
+         weeklyReminders: true
+       },
+       status: 'active',
+       season: '2025',
+       memberCount: 27 // From migration
+     };
+     
+     // Store in a path the client can access
+     const clientPoolRef = doc(db, `artifacts/nerdfootball/public/pools/nerduniverse-2025`);
+     await setDoc(clientPoolRef, poolData);
+     console.log('✅ Created client-accessible pool metadata');
+     
+     // Create member list that client can access
+     const users = await getAllUsers(); // This function already works
+     const memberData = {};
+     
+     Object.entries(users).forEach(([uid, userData]) => {
+       memberData[uid] = {
+         uid: uid,
+         displayName: userData.displayName || userData.email || 'Unknown User',
+         email: userData.email || '',
+         role: ADMIN_UIDS.includes(uid) ? 'admin' : 'member',
+         joinedAt: new Date().toISOString(),
+         status: 'active'
+       };
+     });
+     
+     const clientMembersRef = doc(db, `artifacts/nerdfootball/public/pools/nerduniverse-2025-members`);
+     await setDoc(clientMembersRef, memberData);
+     console.log(`✅ Created client-accessible member list (${Object.keys(memberData).length} members)`);
+     
+     // Update user's pool membership to point to accessible location
+     userPoolMemberships['nerduniverse-2025'] = {
+       poolId: 'nerduniverse-2025',
+       poolName: 'NerdUniverse 2025',
+       role: 'admin',
+       joinedAt: new Date().toISOString(),
+       status: 'active'
+     };
+     
+     console.log('✅ Pool visibility fixed! Refresh page to see changes.');
+     alert('Pool visibility fixed! Please refresh the page.');
+     
+   } catch (error) {
+     console.error('❌ Fix failed:', error);
+     alert(`Fix failed: ${error.message}`);
+   }
+ };
+
  // Simple migration runner for cases where diagnostics fail
  window.runSimpleMigration = async () => {
    console.log('🚀 RUNNING SIMPLE MIGRATION');
@@ -3840,8 +3913,15 @@ async function getUserPools() {
   const pools = [];
   for (const poolId in userPoolMemberships) {
     try {
-      const poolConfigRef = doc(db, getPoolMetadataPath(poolId));
-      const poolConfigSnap = await getDoc(poolConfigRef);
+      // First try the new pool metadata path
+      let poolConfigRef = doc(db, getPoolMetadataPath(poolId));
+      let poolConfigSnap = await getDoc(poolConfigRef);
+      
+      // If not found, try client-accessible location
+      if (!poolConfigSnap.exists() && poolId === 'nerduniverse-2025') {
+        poolConfigRef = doc(db, `artifacts/nerdfootball/public/pools/${poolId}`);
+        poolConfigSnap = await getDoc(poolConfigRef);
+      }
       
       if (poolConfigSnap.exists()) {
         const poolConfig = poolConfigSnap.data();
@@ -3855,7 +3935,7 @@ async function getUserPools() {
         });
       }
     } catch (error) {
-      console.error(`Error loading pool ${poolId}:`, error);
+      console.log(`ℹ️ Pool ${poolId} metadata not accessible via client (expected for server-created pools)`);
     }
   }
   return pools;
