@@ -3468,12 +3468,20 @@ const getPoolBasePath = () => {
    console.log('🔍 MIGRATION STATUS DIAGNOSTIC');
    console.log('================================');
    
+   let poolExists = false;
+   let isMember = false;
+   let hasUserPools = false;
+   
+   // Check current active pool setting
+   console.log(`🎯 Current active pool: ${getCurrentPool()}`);
+   
+   // Check if NerdUniverse 2025 pool exists
    try {
-     // Check if NerdUniverse 2025 pool exists
      const poolConfigRef = doc(db, getPoolMetadataPath('nerduniverse-2025'));
      const poolConfigSnap = await getDoc(poolConfigRef);
      
      if (poolConfigSnap.exists()) {
+       poolExists = true;
        const poolData = poolConfigSnap.data();
        console.log('✅ NerdUniverse 2025 pool EXISTS');
        console.log(`   - Name: ${poolData.name}`);
@@ -3482,8 +3490,13 @@ const getPoolBasePath = () => {
      } else {
        console.log('❌ NerdUniverse 2025 pool does NOT exist');
      }
-     
-     // Check pool membership
+   } catch (error) {
+     console.log(`❌ Cannot access pool config: ${error.message}`);
+     console.log('   (This likely means the pool does not exist yet)');
+   }
+   
+   // Check pool membership
+   try {
      const poolMembersRef = doc(db, getPoolMembersPath('nerduniverse-2025'));
      const poolMembersSnap = await getDoc(poolMembersRef);
      
@@ -3493,6 +3506,7 @@ const getPoolBasePath = () => {
        console.log(`✅ Pool membership data exists (${memberCount} members)`);
        
        if (members[currentUser.uid]) {
+         isMember = true;
          const userRole = members[currentUser.uid].role;
          console.log(`✅ You ARE a member (Role: ${userRole})`);
        } else {
@@ -3501,12 +3515,18 @@ const getPoolBasePath = () => {
      } else {
        console.log('❌ No pool membership data found');
      }
-     
-     // Check your personal pool memberships
+   } catch (error) {
+     console.log(`❌ Cannot access pool membership: ${error.message}`);
+     console.log('   (Pool membership structure likely does not exist)');
+   }
+   
+   // Check your personal pool memberships
+   try {
      const userPoolsRef = doc(db, getUserPoolsPath(currentUser.uid));
      const userPoolsSnap = await getDoc(userPoolsRef);
      
      if (userPoolsSnap.exists()) {
+       hasUserPools = true;
        const userPools = userPoolsSnap.data();
        console.log(`✅ Your pool memberships: ${Object.keys(userPools).join(', ')}`);
        
@@ -3518,23 +3538,32 @@ const getPoolBasePath = () => {
      } else {
        console.log('❌ No personal pool membership data found');
      }
-     
-     // Check current active pool
-     console.log(`🎯 Current active pool: ${getCurrentPool()}`);
-     
-     // Quick data access test
-     try {
-       const testPicksPath = picksCollectionPath(1);
-       console.log(`📂 Your picks path: ${testPicksPath}`);
-       
-       const picksSnap = await getDocs(collection(db, testPicksPath));
-       console.log(`📊 Week 1 picks in current pool: ${picksSnap.size} picks`);
-     } catch (error) {
-       console.log(`❌ Error accessing picks data: ${error.message}`);
-     }
-     
    } catch (error) {
-     console.error('❌ Diagnostic error:', error);
+     console.log(`❌ Cannot access user pool memberships: ${error.message}`);
+     console.log('   (User pool membership structure likely does not exist)');
+   }
+   
+   // Test legacy data access (should always work)
+   try {
+     const legacyPicksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/1/submissions';
+     const legacyPicksSnap = await getDocs(collection(db, legacyPicksPath));
+     console.log(`✅ Legacy data accessible: ${legacyPicksSnap.size} picks in week 1`);
+   } catch (error) {
+     console.log(`❌ Cannot access legacy data: ${error.message}`);
+   }
+   
+   // Overall status
+   console.log('\n📋 SUMMARY:');
+   if (!poolExists && !isMember && !hasUserPools) {
+     console.log('🚨 MIGRATION NEEDED: Pool structure does not exist');
+     console.log('   → Run: runMigration() to create the pool');
+   } else if (poolExists && !isMember) {
+     console.log('⚠️  PARTIAL MIGRATION: Pool exists but you are not a member');
+     console.log('   → Migration may have failed partway through');
+   } else if (poolExists && isMember) {
+     console.log('✅ MIGRATION COMPLETE: Pool exists and you are a member');
+   } else {
+     console.log('❓ UNKNOWN STATE: Mixed results - may need re-migration');
    }
    
    console.log('================================');
@@ -3585,6 +3614,36 @@ Proceed with migration?`);
 
  // Make migration available globally
  window.runMigration = runMigrationWithDiagnostics;
+
+ // Simple migration runner for cases where diagnostics fail
+ window.runSimpleMigration = async () => {
+   console.log('🚀 RUNNING SIMPLE MIGRATION');
+   console.log('============================');
+   
+   const proceed = confirm(`
+🚀 SIMPLE MIGRATION
+
+This will:
+1. Create NerdUniverse 2025 pool
+2. Add all existing users as members  
+3. Preserve all your picks and data
+4. Set you as admin
+
+Continue?`);
+
+   if (!proceed) {
+     console.log('❌ Migration cancelled');
+     return;
+   }
+   
+   try {
+     await runNerdUniverseMigration(false);
+     console.log('✅ Migration completed! Try runDiagnostics() to verify.');
+   } catch (error) {
+     console.error('❌ Migration failed:', error);
+     alert(`Migration failed: ${error.message}`);
+   }
+ };
 
 // --- USER POOL MEMBERSHIP MANAGEMENT ---
 async function loadUserPoolMemberships() {
