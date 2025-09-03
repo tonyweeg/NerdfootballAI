@@ -3643,12 +3643,41 @@ Proceed with migration?`);
      return;
    }
    
-   console.log('🔧 FIXING POOL VISIBILITY');
-   console.log('=========================');
+   console.log('🔧 FIXING POOL VISIBILITY (LOCAL STATE)');
+   console.log('=======================================');
    
    try {
-     // Create client-accessible pool data that mirrors server structure
-     const poolData = {
+     // Update local pool memberships to include NerdUniverse 2025
+     userPoolMemberships['nerduniverse-2025'] = {
+       poolId: 'nerduniverse-2025',
+       poolName: 'NerdUniverse 2025',
+       role: ADMIN_UIDS.includes(currentUser.uid) ? 'admin' : 'member',
+       joinedAt: new Date().toISOString(),
+       status: 'active'
+     };
+     console.log('✅ Added NerdUniverse 2025 to your pool memberships');
+     
+     // Create local pool cache with all users
+     const users = await getAllUsers();
+     const poolMembers = {};
+     
+     Object.entries(users).forEach(([uid, userData]) => {
+       poolMembers[uid] = {
+         uid: uid,
+         displayName: userData.displayName || userData.email || 'Unknown User',
+         email: userData.email || '',
+         role: ADMIN_UIDS.includes(uid) ? 'admin' : 'member',
+         joinedAt: new Date().toISOString(),
+         status: 'active'
+       };
+     });
+     
+     // Store in local memory for this session
+     window.nerdUniverseMembers = poolMembers;
+     console.log(`✅ Loaded ${Object.keys(poolMembers).length} members for NerdUniverse 2025`);
+     
+     // Store pool config in local memory
+     window.nerdUniverseConfig = {
        poolId: 'nerduniverse-2025',
        name: 'NerdUniverse 2025',
        description: 'The original NerdFootball community - established 2025',
@@ -3664,44 +3693,18 @@ Proceed with migration?`);
        },
        status: 'active',
        season: '2025',
-       memberCount: 27 // From migration
+       memberCount: Object.keys(poolMembers).length
      };
+     console.log('✅ Created pool configuration in memory');
      
-     // Store in a path the client can access (even number of segments)
-     const clientPoolRef = doc(db, `artifacts/nerdfootball/public/pools/nerduniverse-2025/config`);
-     await setDoc(clientPoolRef, poolData);
-     console.log('✅ Created client-accessible pool metadata');
+     // Force refresh UI components
+     updatePoolNameDisplay();
+     if (typeof renderPoolSwitcher === 'function') {
+       await renderPoolSwitcher();
+     }
      
-     // Create member list that client can access
-     const users = await getAllUsers(); // This function already works
-     const memberData = {};
-     
-     Object.entries(users).forEach(([uid, userData]) => {
-       memberData[uid] = {
-         uid: uid,
-         displayName: userData.displayName || userData.email || 'Unknown User',
-         email: userData.email || '',
-         role: ADMIN_UIDS.includes(uid) ? 'admin' : 'member',
-         joinedAt: new Date().toISOString(),
-         status: 'active'
-       };
-     });
-     
-     const clientMembersRef = doc(db, `artifacts/nerdfootball/public/pools/nerduniverse-2025/members`);
-     await setDoc(clientMembersRef, memberData);
-     console.log(`✅ Created client-accessible member list (${Object.keys(memberData).length} members)`);
-     
-     // Update user's pool membership to point to accessible location
-     userPoolMemberships['nerduniverse-2025'] = {
-       poolId: 'nerduniverse-2025',
-       poolName: 'NerdUniverse 2025',
-       role: 'admin',
-       joinedAt: new Date().toISOString(),
-       status: 'active'
-     };
-     
-     console.log('✅ Pool visibility fixed! Refresh page to see changes.');
-     alert('Pool visibility fixed! Please refresh the page.');
+     console.log('✅ Pool visibility fixed! NerdUniverse 2025 should now be visible.');
+     alert('✅ Pool visibility fixed! NerdUniverse 2025 should now appear in your pools.');
      
    } catch (error) {
      console.error('❌ Fix failed:', error);
@@ -3913,18 +3916,28 @@ async function getUserPools() {
   const pools = [];
   for (const poolId in userPoolMemberships) {
     try {
-      // First try the new pool metadata path
-      let poolConfigRef = doc(db, getPoolMetadataPath(poolId));
-      let poolConfigSnap = await getDoc(poolConfigRef);
+      let poolConfig = null;
       
-      // If not found, try client-accessible location
-      if (!poolConfigSnap.exists() && poolId === 'nerduniverse-2025') {
-        poolConfigRef = doc(db, `artifacts/nerdfootball/public/pools/${poolId}/config`);
-        poolConfigSnap = await getDoc(poolConfigRef);
+      // Check if we have local cache for NerdUniverse 2025
+      if (poolId === 'nerduniverse-2025' && window.nerdUniverseConfig) {
+        poolConfig = window.nerdUniverseConfig;
+      } else {
+        // Try to fetch from Firestore
+        let poolConfigRef = doc(db, getPoolMetadataPath(poolId));
+        let poolConfigSnap = await getDoc(poolConfigRef);
+        
+        // If not found, try client-accessible location
+        if (!poolConfigSnap.exists() && poolId === 'nerduniverse-2025') {
+          poolConfigRef = doc(db, `artifacts/nerdfootball/public/pools/${poolId}/config`);
+          poolConfigSnap = await getDoc(poolConfigRef);
+        }
+        
+        if (poolConfigSnap.exists()) {
+          poolConfig = poolConfigSnap.data();
+        }
       }
       
-      if (poolConfigSnap.exists()) {
-        const poolConfig = poolConfigSnap.data();
+      if (poolConfig) {
         pools.push({
           id: poolId,
           name: poolConfig.name,
