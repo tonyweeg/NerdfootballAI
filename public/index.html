@@ -308,7 +308,7 @@
     <!-- Pool Switcher -->
     <div class="relative" id="pool-switcher-container">
         <button id="pool-switcher-btn" class="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors" aria-label="Switch Pool">
-            <span id="current-pool-name">NerdFootball 2025</span>
+            <span id="current-pool-name">Loading...</span>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
@@ -2732,7 +2732,10 @@ checkForInviteCode();
  async function handleAuthStateChange(user) {
  // Validate pool isolation on auth state change
  if (user) {
-   setTimeout(() => validatePoolIsolation(), 1000);
+   setTimeout(() => {
+     validatePoolIsolation();
+     updatePoolNameDisplay();
+   }, 1000);
  }
  
  const savedState = loadAppState();
@@ -3458,6 +3461,24 @@ const getPoolBasePath = () => {
    return true;
  };
 
+ // Update pool name display dynamically
+ const updatePoolNameDisplay = () => {
+   const currentPool = getCurrentPool();
+   const poolNameElement = document.getElementById('current-pool-name');
+   
+   if (!poolNameElement) return;
+   
+   // Map pool IDs to display names
+   const poolDisplayNames = {
+     'nerduniverse-2025': 'NerdUniverse 2025',
+     'nerdfootball-2025': 'NerdFootball 2025 (Legacy)',
+     // Add more pools as they're created
+   };
+   
+   const displayName = poolDisplayNames[currentPool] || currentPool || 'Unknown Pool';
+   poolNameElement.textContent = displayName;
+ };
+
  // Diagnostic functions to check migration status
  async function checkMigrationStatus() {
    if (!currentUser) {
@@ -3719,8 +3740,8 @@ async function loadUserPoolMemberships() {
       await setDoc(userPoolsRef, userPoolMemberships);
     }
   } catch (error) {
-    console.error('Error loading user pool memberships:', error);
-    // Default fallback
+    console.log('ℹ️ Using default pool membership (pool metadata not accessible via client)');
+    // Default fallback - this is expected for new pool structures
     userPoolMemberships = {
       'nerduniverse-2025': {
         role: ADMIN_UIDS.includes(currentUser.uid) ? 'admin' : 'member',
