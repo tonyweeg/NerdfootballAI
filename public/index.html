@@ -5,8 +5,9 @@
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
  <title>NerdfootballAI v3.0 - Pool Management</title>
  
- <!-- iOS Web App Meta Tags -->
+ <!-- Web App Meta Tags -->
  <meta name="apple-mobile-web-app-capable" content="yes">
+ <meta name="mobile-web-app-capable" content="yes">
  <meta name="apple-mobile-web-app-status-bar-style" content="default">
  <meta name="apple-mobile-web-app-title" content="NerdFootball">
  
@@ -3275,12 +3276,56 @@ const getUserPoolsPath = (uid) => `artifacts/${appId()}/users/${uid}/pools`;
 const getPoolMetadataPath = (poolId) => `artifacts/${appId()}/pools/${poolId}/metadata/config`;
 const getPoolMembersPath = (poolId) => `artifacts/${appId()}/pools/${poolId}/metadata/members`;
 
-const getPoolBasePath = () => `artifacts/${appId()}/pools/${getCurrentPool()}`; 
- const picksPath = (week, uid) => `${getPoolBasePath()}/data/nerdfootball_picks/${week}/submissions/${uid}`;
- const resultsPath = (week) => `${getPoolBasePath()}/data/nerdfootball_results/${week}`;
- const usersPath = () => `${getPoolBasePath()}/data/nerdfootball_users`;
- const survivorPicksPath = (uid) => `${getPoolBasePath()}/data/nerdSurvivor_picks/${uid}`;
- const survivorStatusPath = () => `${getPoolBasePath()}/data/nerdSurvivor_status/status`;
+const getPoolBasePath = () => {
+  const poolId = getCurrentPool();
+  // For backward compatibility with the default pool, use the legacy path structure
+  if (poolId === 'nerdfootball-2025') {
+    return `artifacts/${appId()}/public`;
+  }
+  // For new pools, use the cleaner structure without /data/
+  return `artifacts/${appId()}/pools/${poolId}`;
+};
+
+ const picksPath = (week, uid) => {
+   const poolId = getCurrentPool();
+   if (poolId === 'nerdfootball-2025') {
+     // Legacy path structure for backward compatibility
+     return `${getPoolBasePath()}/data/nerdfootball_picks/${week}/submissions/${uid}`;
+   }
+   return `${getPoolBasePath()}/nerdfootball_picks/${week}/submissions/${uid}`;
+ };
+ 
+ const resultsPath = (week) => {
+   const poolId = getCurrentPool();
+   if (poolId === 'nerdfootball-2025') {
+     return `${getPoolBasePath()}/data/nerdfootball_results/${week}`;
+   }
+   return `${getPoolBasePath()}/nerdfootball_results/${week}`;
+ };
+ 
+ const usersPath = () => {
+   const poolId = getCurrentPool();
+   if (poolId === 'nerdfootball-2025') {
+     return `${getPoolBasePath()}/data/nerdfootball_users`;
+   }
+   return `${getPoolBasePath()}/nerdfootball_users`;
+ };
+ 
+ const survivorPicksPath = (uid) => {
+   const poolId = getCurrentPool();
+   if (poolId === 'nerdfootball-2025') {
+     return `${getPoolBasePath()}/data/nerdSurvivor_picks/${uid}`;
+   }
+   return `${getPoolBasePath()}/nerdSurvivor_picks/${uid}`;
+ };
+ 
+ const survivorStatusPath = () => {
+   const poolId = getCurrentPool();
+   if (poolId === 'nerdfootball-2025') {
+     return `${getPoolBasePath()}/data/nerdSurvivor_status/status`;
+   }
+   return `${getPoolBasePath()}/nerdSurvivor_status/status`;
+ };
 
 // --- USER POOL MEMBERSHIP MANAGEMENT ---
 async function loadUserPoolMemberships() {
