@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nerdfootball-v2.1.0';
+const CACHE_NAME = 'nerdfootball-v2.1.1';
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -43,6 +43,7 @@ self.addEventListener('fetch', event => {
   if (event.request.url.includes('firebaseapp.com') || 
       event.request.url.includes('googleapis.com') ||
       event.request.url.includes('gstatic.com') ||
+      event.request.url.includes('cloudfunctions.net') ||
       event.request.url.includes('.json')) {
     return fetch(event.request);
   }

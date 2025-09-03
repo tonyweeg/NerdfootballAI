@@ -11,9 +11,9 @@ let transporter = null;
 // Try to set up email transport if credentials are available
 const setupEmailTransport = () => {
     try {
-        // Check for Gmail configuration in environment
-        const gmailEmail = functions.config().gmail?.email || process.env.GMAIL_EMAIL;
-        const gmailPassword = functions.config().gmail?.password || process.env.GMAIL_PASSWORD;
+        // Check for Gmail configuration in environment variables (Functions v2)
+        const gmailEmail = process.env.GMAIL_EMAIL;
+        const gmailPassword = process.env.GMAIL_PASSWORD;
         
         if (gmailEmail && gmailPassword) {
             transporter = nodemailer.createTransport({
@@ -83,7 +83,7 @@ Reply to: tonyweeg@gmail.com`;
         try {
             if (transporter) {
                 // Actually send the email
-                const gmailEmail = functions.config().gmail?.email || process.env.GMAIL_EMAIL;
+                const gmailEmail = process.env.GMAIL_EMAIL;
                 const mailOptions = {
                     from: `NerdFootball AI <${gmailEmail}>`,
                     to: recipient.email,
@@ -169,7 +169,7 @@ Reply to: tonyweeg@gmail.com`;
     try {
         if (transporter) {
             // Actually send the email
-            const gmailEmail = functions.config().gmail?.email || process.env.GMAIL_EMAIL;
+            const gmailEmail = process.env.GMAIL_EMAIL;
             const mailOptions = {
                 from: `NerdFootball AI <${gmailEmail}>`,
                 to: userEmail,

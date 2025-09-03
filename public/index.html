@@ -55,15 +55,32 @@
  color: white;
  }
  .admin-tab {
- border-color: transparent;
- border-bottom-width: 2px;
- padding: 1rem;
- font-weight: 500;
- color: #6B7280;
+ background-color: #f8fafc; /* slate-50 */
+ border: 2px solid #e2e8f0; /* slate-200 */
+ border-radius: 0.5rem; /* rounded-lg */
+ padding: 0.75rem 1.5rem; /* py-3 px-6 */
+ font-weight: 600; /* font-semibold */
+ color: #475569; /* slate-600 */
+ transition: all 0.2s ease-in-out;
+ box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+ cursor: pointer;
+ }
+ .admin-tab:hover {
+ background-color: #f1f5f9; /* slate-100 */
+ border-color: #cbd5e1; /* slate-300 */
+ color: #334155; /* slate-700 */
+ box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* shadow-md */
+ transform: translateY(-1px);
  }
  .admin-tab.active {
+ background-color: #475569; /* slate-600 */
  border-color: #475569; /* slate-600 */
- color: #334155; /* slate-700 */
+ color: white;
+ box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* shadow-md */
+ }
+ .admin-tab.active:hover {
+ background-color: #334155; /* slate-700 */
+ border-color: #334155; /* slate-700 */
  }
  .form-input {
  width: 100%;
@@ -396,13 +413,13 @@
  <h2 class="text-2xl font-bold text-slate-800">Admin Dashboard</h2>
  <select id="admin-week-selector" class="p-3 rounded-lg border-2 border-slate-300 bg-white"></select>
  </div>
- <div class="border-b border-gray-300 mb-6">
- <nav class="-mb-px flex space-x-8" aria-label="Tabs">
- <button id="tab-game-results" class="admin-tab active">Game Results</button>
- <button id="tab-user-mgmt" class="admin-tab">User Management</button>
- <button id="tab-picks-mgmt" class="admin-tab">Picks Management</button>
- <button id="tab-survivor-status" class="admin-tab">Survivor Status</button>
- <button id="tab-system-messenger" class="admin-tab">System Messenger</button>
+ <div class="mb-6">
+ <nav class="flex space-x-4" aria-label="Tabs">
+ <button id="tab-game-results" class="admin-tab active">Games</button>
+ <button id="tab-user-mgmt" class="admin-tab">Users</button>
+ <button id="tab-picks-mgmt" class="admin-tab">Picks</button>
+ <button id="tab-survivor-status" class="admin-tab">Survivors</button>
+ <button id="tab-system-messenger" class="admin-tab">Messaging</button>
  </nav>
  </div>
  <div id="admin-content-game-results" class="admin-content-section">
@@ -606,6 +623,7 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 
  const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
 let saveTimeout;
+let functions; // Declare functions globally
 
  document.addEventListener('DOMContentLoaded', () => {
  
@@ -839,6 +857,47 @@ messageStatusContent: document.getElementById('message-status-content'),
   
   setCacheData(firebaseCache.users, users);
   return users;
+ }
+
+ // Get cleaned user data (deduplicated) for leaderboards
+ async function getCleanUsers() {
+  // Use the same deduplication logic as fetchAllUsers but return as object
+  const users = await getCachedUsers();
+  const rawUsers = [];
+  Object.keys(users).forEach(id => {
+   rawUsers.push({ id: id, ...users[id] });
+  });
+  
+  // Handle duplicate email addresses - keep only the preferred UID
+  const emailMap = new Map();
+  const preferredUIDs = new Set(['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2']);
+  
+  rawUsers.forEach(user => {
+   if (!user.email) return;
+   
+   const existing = emailMap.get(user.email);
+   if (!existing) {
+    emailMap.set(user.email, user);
+   } else {
+    // If current user has preferred UID, replace existing
+    if (preferredUIDs.has(user.id)) {
+     emailMap.set(user.email, user);
+    } else if (!preferredUIDs.has(existing.id)) {
+     // Neither has preferred UID, keep the most recently updated
+     if (user.lastUpdated && (!existing.lastUpdated || user.lastUpdated > existing.lastUpdated)) {
+      emailMap.set(user.email, user);
+     }
+    }
+   }
+  });
+  
+  // Convert back to object format for leaderboard compatibility
+  const cleanUsers = {};
+  emailMap.forEach(user => {
+   cleanUsers[user.id] = user;
+  });
+  
+  return cleanUsers;
  }
 
  // Batch Firebase operations to reduce round-trips
@@ -1357,6 +1416,19 @@ async function previewMessage() {
 }
 
 async function sendSystemMessage() {
+    // Check if user is authenticated
+    if (!currentUser || !auth.currentUser) {
+        showMessageStatus('You must be logged in to send messages.', 'error');
+        return;
+    }
+    
+    // Check if user is admin
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+    if (!ADMIN_UIDS.includes(currentUser.uid)) {
+        showMessageStatus('Access denied: Admin privileges required.', 'error');
+        return;
+    }
+    
     const subject = allUI.messageSubject.value.trim();
     const body = allUI.messageBody.value.trim();
     
@@ -1384,6 +1456,16 @@ async function sendSystemMessage() {
         showMessageStatus(`Sending emails to ${recipients.length} recipients...`, 'info');
         
         const sendSystemMessageFn = httpsCallable(functions, 'sendSystemMessage');
+        
+        // Ensure user token is fresh before calling Cloud Function
+        try {
+            await auth.currentUser.getIdToken(true); // Force token refresh
+        } catch (tokenError) {
+            console.error('Failed to refresh auth token:', tokenError);
+            showMessageStatus('Authentication error. Please try logging out and back in.', 'error');
+            allUI.sendMessageBtn.disabled = false;
+            return;
+        }
         
         try {
             const result = await sendSystemMessageFn({
@@ -1521,7 +1603,7 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
  const app = initializeApp(firebaseConfig);
  db = getFirestore(app);
  auth = getAuth(app);
- const functions = getFunctions(app);
+ functions = getFunctions(app, 'us-central1'); // Initialize global functions variable with region
  onAuthStateChanged(auth, handleAuthStateChange);
  
  // Register service worker for caching
@@ -2306,6 +2388,16 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
    // Call Cloud Function to send pick confirmation email
    const sendPickConfirmationFn = httpsCallable(functions, 'sendPickConfirmation');
    
+   // Ensure user token is fresh before calling Cloud Function
+   if (auth.currentUser) {
+    try {
+     await auth.currentUser.getIdToken(true); // Force token refresh
+    } catch (tokenError) {
+     console.error('Failed to refresh auth token for pick confirmation:', tokenError);
+     // Continue anyway for pick confirmation as it's less critical
+    }
+   }
+   
    const userName = currentUser?.displayName || currentUser?.email || 'Nerd';
    
    const result = await sendPickConfirmationFn({
@@ -2355,7 +2447,7 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
     loader.classList.remove('hidden');
     targetBody.innerHTML = '';
 
-    const users = await getCachedUsers();
+    const users = await getCleanUsers();
     
     let scores = {};
     for (const id in users) {
@@ -2411,7 +2503,7 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
 
 // Function to calculate leaderboard data without displaying it
 async function calculateLeaderboard(weekNumber = null) {
-    const users = await getCachedUsers();
+    const users = await getCleanUsers();
     
     let scores = {};
     for (const id in users) {
@@ -2758,6 +2850,22 @@ async function calculateLeaderboard(weekNumber = null) {
     allUI.leaderboardContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.adminViewBtn.classList.add('active');
+    
+    // Restore admin tab state from URL hash or default to first tab
+    const hash = window.location.hash.substring(1);
+    if (hash.startsWith('admin-')) {
+        const tabId = `tab-${hash.substring(6)}`;
+        switchToAdminTab(tabId);
+    } else {
+        // Default to first admin tab if no hash present
+        const firstTab = allUI.adminTabs[0];
+        if (firstTab) {
+            switchToAdminTab(firstTab.id);
+        } else {
+            renderAdminView(allUI.adminWeekSelector.value);
+        }
+    }
+    
     allUI.menuPanel.classList.add('hidden');
     saveAppState();
  });
@@ -2881,15 +2989,50 @@ async function calculateLeaderboard(weekNumber = null) {
  await setDoc(docRef, currentAdminPicks);
  alert(`${allUI.userPicksSelector.options[allUI.userPicksSelector.selectedIndex].text}'s picks have been saved.`);
  });
- allUI.adminTabs.forEach(tab => {
- tab.addEventListener('click', (e) => {
- allUI.adminTabs.forEach(t => t.classList.remove('active'));
- e.target.classList.add('active');
- allUI.adminContentSections.forEach(s => s.classList.add('hidden'));
- const contentId = `admin-content-${e.target.id.substring(4)}`;
- document.getElementById(contentId).classList.remove('hidden');
- renderAdminView(allUI.adminWeekSelector.value);
+ // Admin tab switching with URL hash routing
+ function switchToAdminTab(tabId) {
+  allUI.adminTabs.forEach(t => t.classList.remove('active'));
+  allUI.adminContentSections.forEach(s => s.classList.add('hidden'));
+  
+  const targetTab = document.getElementById(tabId);
+  const contentId = `admin-content-${tabId.substring(4)}`;
+  const targetContent = document.getElementById(contentId);
+  
+  if (targetTab && targetContent) {
+   targetTab.classList.add('active');
+   targetContent.classList.remove('hidden');
+   renderAdminView(allUI.adminWeekSelector.value);
+   
+   // Update URL hash for state persistence
+   window.location.hash = `admin-${tabId.substring(4)}`;
+  }
+ }
+
+ // Handle hash change events for browser back/forward
+ window.addEventListener('hashchange', () => {
+  const hash = window.location.hash.substring(1); // Remove the #
+  if (hash.startsWith('admin-') && getCurrentView() === 'admin') {
+   const tabId = `tab-${hash.substring(6)}`; // Remove 'admin-' prefix
+   switchToAdminTab(tabId);
+  }
  });
+ 
+ // Restore admin tab state on page load if admin view is active
+ window.addEventListener('load', () => {
+  setTimeout(() => {
+   const hash = window.location.hash.substring(1);
+   if (hash.startsWith('admin-') && getCurrentView() === 'admin') {
+    const tabId = `tab-${hash.substring(6)}`;
+    switchToAdminTab(tabId);
+   }
+  }, 100); // Small delay to ensure DOM is ready
+ });
+
+ allUI.adminTabs.forEach(tab => {
+  tab.addEventListener('click', (e) => {
+   e.preventDefault();
+   switchToAdminTab(e.target.id);
+  });
  });
  
  allUI.menuBtn.addEventListener('click', () => {
