@@ -52,12 +52,11 @@ self.addEventListener('fetch', event => {
       .then(response => {
         // Return cached version or fetch from network
         return response || fetch(event.request);
-      }
+      })
       .catch(() => {
         // If fetch fails, just return nothing to avoid errors
         return new Response('', { status: 200 });
       })
-    )
   );
 });
 
