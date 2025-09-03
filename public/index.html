@@ -440,7 +440,27 @@
  <h3 class="text-xl font-bold">User Management</h3>
  <button id="cleanup-duplicates-btn" class="bg-orange-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-orange-700">Clean Up Duplicates</button>
  </div>
- <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-100"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th></tr></thead><tbody id="user-mgmt-body" class="bg-white divide-y divide-gray-200"></tbody></table>
+ <table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-gray-100">
+<tr>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 user-sort-header" data-sort="displayName">
+Name 
+<span class="sort-indicator ml-1">↕</span>
+</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 user-sort-header" data-sort="email">
+Email
+<span class="sort-indicator ml-1">↕</span>
+</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 user-sort-header" data-sort="role">
+Status
+<span class="sort-indicator ml-1">↕</span>
+</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+</tr>
+</thead>
+<tbody id="user-mgmt-body" class="bg-white divide-y divide-gray-200"></tbody>
+</table>
  </div>
  <div id="admin-content-picks-mgmt" class="admin-content-section hidden">
  <h3 class="text-xl font-bold mb-4">Edit User Picks</h3>
@@ -453,7 +473,31 @@
  </div>
  <div id="admin-content-survivor-status" class="admin-content-section hidden">
     <h3 class="text-xl font-bold mb-4">Survivor Pool Status</h3>
-    <table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-100"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">This Week's Pick</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th></tr></thead><tbody id="survivor-status-body" class="bg-white divide-y divide-gray-200"></tbody></table>
+    <table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-gray-100">
+<tr>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 survivor-sort-header" data-sort="displayName">
+User 
+<span class="sort-indicator ml-1">↕</span>
+</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 survivor-sort-header" data-sort="thisWeekPick">
+This Week's Pick
+<span class="sort-indicator ml-1">↕</span>
+</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 survivor-sort-header" data-sort="status">
+Status
+<span class="sort-indicator ml-1">↕</span>
+</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 survivor-sort-header" data-sort="role">
+Role
+<span class="sort-indicator ml-1">↕</span>
+</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+</tr>
+</thead>
+<tbody id="survivor-status-body" class="bg-white divide-y divide-gray-200"></tbody>
+</table>
 </div>
 <div id="admin-content-system-messenger" class="admin-content-section hidden">
    <h3 class="text-xl font-bold mb-4">System Messenger</h3>
@@ -972,7 +1016,9 @@ messageStatusContent: document.getElementById('message-status-content'),
   if (currentWeek !== getCurrentNflWeek()) params.set('week', currentWeek);
   if (currentView === 'leaderboard' && isSeasonView) params.set('lb', 'season');
   
-  const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+  // Preserve existing hash fragment
+  const currentHash = window.location.hash;
+  const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + currentHash;
   window.history.replaceState({}, '', newUrl);
  }
 
@@ -1130,27 +1176,70 @@ messageStatusContent: document.getElementById('message-status-content'),
     allUI.resultsGameList.innerHTML = '';
 
     weekData.games.forEach(game => {
-        const winner = currentResults[game.id] || null;
         const gameTime = new Date(game.kickoff);
         const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+        // Get existing scores if available
+        const gameResult = currentResults[game.id];
+        let awayScore = '';
+        let homeScore = '';
+        let winner = null;
+        
+        if (gameResult) {
+            if (typeof gameResult === 'string') {
+                // Legacy format - just winner
+                winner = gameResult;
+            } else if (typeof gameResult === 'object') {
+                // New format - winner and scores
+                winner = gameResult.winner;
+                awayScore = gameResult.awayScore || '';
+                homeScore = gameResult.homeScore || '';
+            }
+        }
 
         const gameEl = document.createElement('div');
         gameEl.className = 'p-4 border border-slate-300 rounded-lg bg-slate-100';
         gameEl.innerHTML = `
-            <div class="grid grid-cols-12 gap-4 items-center">
-                <div class="col-span-12 md:col-span-10">
-                    <div class="flex justify-around items-center">
-                        <div class="w-2/5 text-center">
-                            <button data-game-id="${game.id}" data-team="${game.away}" class="result-btn w-full p-2 rounded-lg border-2 ${winner === game.away ? 'selected' : ''}">${game.away}</button>
-                        </div>
-                        <div class="text-center">
-                            <span class="font-bold">@</span>
-                            <p class="text-xs text-slate-500 mt-1">${formattedTime}</p>
-                        </div>
-                        <div class="w-2/5 text-center">
-                            <button data-game-id="${game.id}" data-team="${game.home}" class="result-btn w-full p-2 rounded-lg border-2 ${winner === game.home ? 'selected' : ''}">${game.home}</button>
-                        </div>
+            <div class="space-y-4">
+                <div class="text-center">
+                    <p class="text-sm font-medium text-slate-600">${formattedTime}</p>
+                    <p class="text-xs text-slate-500">${game.stadium}</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4 items-center">
+                    <div class="text-center">
+                        <button data-game-id="${game.id}" data-team="${game.away}" class="result-btn w-full p-3 rounded-lg border-2 font-semibold mb-2 ${winner === game.away ? 'selected' : 'border-slate-300 bg-white hover:bg-slate-50'}">${game.away}</button>
+                        <input 
+                            type="number" 
+                            min="0" 
+                            max="99" 
+                            placeholder="Score" 
+                            value="${awayScore}"
+                            data-game-id="${game.id}" 
+                            data-team="away"
+                            class="score-input w-full p-2 text-center border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
                     </div>
+                    <div class="text-center">
+                        <button data-game-id="${game.id}" data-team="${game.home}" class="result-btn w-full p-3 rounded-lg border-2 font-semibold mb-2 ${winner === game.home ? 'selected' : 'border-slate-300 bg-white hover:bg-slate-50'}">${game.home}</button>
+                        <input 
+                            type="number" 
+                            min="0" 
+                            max="99" 
+                            placeholder="Score" 
+                            value="${homeScore}"
+                            data-game-id="${game.id}" 
+                            data-team="home"
+                            class="score-input w-full p-2 text-center border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+                </div>
+                <div class="text-center">
+                    <button 
+                        data-game-id="${game.id}" 
+                        class="auto-winner-btn text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-200"
+                    >
+                        Auto-select winner from scores
+                    </button>
                 </div>
             </div>`;
         allUI.resultsGameList.appendChild(gameEl);
@@ -1162,48 +1251,174 @@ messageStatusContent: document.getElementById('message-status-content'),
         gameButtons.forEach(b => b.classList.remove('selected'));
         e.target.classList.add('selected');
     }));
+
+    // Add event listeners for auto-winner buttons
+    allUI.resultsGameList.querySelectorAll('.auto-winner-btn').forEach(btn => btn.addEventListener('click', (e) => {
+        const gameId = e.target.dataset.gameId;
+        const awayScoreInput = allUI.resultsGameList.querySelector(`.score-input[data-game-id="${gameId}"][data-team="away"]`);
+        const homeScoreInput = allUI.resultsGameList.querySelector(`.score-input[data-game-id="${gameId}"][data-team="home"]`);
+        
+        const awayScore = parseInt(awayScoreInput.value) || 0;
+        const homeScore = parseInt(homeScoreInput.value) || 0;
+        
+        if (awayScore === 0 && homeScore === 0) {
+            alert('Please enter scores for both teams first');
+            return;
+        }
+        
+        // Clear current selection
+        const gameButtons = allUI.resultsGameList.querySelectorAll(`.result-btn[data-game-id="${gameId}"]`);
+        gameButtons.forEach(b => b.classList.remove('selected'));
+        
+        // Select winner based on higher score
+        if (awayScore > homeScore) {
+            // Away team wins - select first button (away team)
+            gameButtons[0].classList.add('selected');
+        } else if (homeScore > awayScore) {
+            // Home team wins - select second button (home team) 
+            gameButtons[1].classList.add('selected');
+        } else {
+            alert('Tie game! Please manually select the winner.');
+        }
+    }));
+
     calculateAndDisplayLeaderboard(weekNumber);
  }
 
 
+ // User management sorting state
+ let userSortField = 'role'; // Start by sorting by role (admins first)
+ let userSortDirection = 'desc'; // desc = admins first, asc = regular users first
+
  function renderUserManagement() {
- allUI.userMgmtBody.innerHTML = allUsers.map(user => `
- <tr>
- <td class="px-6 py-4 whitespace-nowrap">${user.displayName || 'N/A'}</td>
- <td class="px-6 py-4 whitespace-nowrap">${user.email}</td>
- <td class="px-6 py-4 whitespace-nowrap">
- <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
- Active
- </span>
- </td>
- <td class="px-6 py-4 whitespace-nowrap">
- <button data-user-id="${user.id}" class="user-remove-btn text-sm font-medium text-red-600 hover:text-red-900 ${ADMIN_UIDS.includes(user.id) ? 'opacity-50 cursor-not-allowed' : ''}">
- ${ADMIN_UIDS.includes(user.id) ? 'Admin' : 'Remove User'}
- </button>
- </td>
- </tr>
- `).join('');
- 
- allUI.userMgmtBody.querySelectorAll('.user-remove-btn').forEach(btn => {
- btn.addEventListener('click', async (e) => {
- const userId = e.target.dataset.userId;
- const userName = allUsers.find(u => u.id === userId)?.displayName || allUsers.find(u => u.id === userId)?.email;
- 
- if (ADMIN_UIDS.includes(userId)) {
- alert("You cannot remove admin accounts.");
- return;
+   // Create enhanced user objects with role information
+   const enhancedUsers = allUsers.map(user => ({
+     ...user,
+     role: ADMIN_UIDS.includes(user.id) ? 'admin' : 'user',
+     displayName: user.displayName || 'N/A'
+   }));
+
+   // Sort users based on current sort settings
+   const sortedUsers = sortUsers(enhancedUsers, userSortField, userSortDirection);
+
+   // Render the sorted users with row numbers
+   allUI.userMgmtBody.innerHTML = sortedUsers.map((user, index) => {
+     const isAdmin = user.role === 'admin';
+     const rowClass = isAdmin ? 'bg-blue-50' : '';
+     const statusClass = isAdmin ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
+     const statusText = isAdmin ? 'Admin' : 'Active';
+
+     return `
+       <tr class="${rowClass}">
+         <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${index + 1}</td>
+         <td class="px-6 py-4 whitespace-nowrap">
+           ${user.displayName}
+           ${isAdmin ? '<span class="ml-2 text-xs text-blue-600 font-semibold">👑</span>' : ''}
+         </td>
+         <td class="px-6 py-4 whitespace-nowrap">${user.email}</td>
+         <td class="px-6 py-4 whitespace-nowrap">
+           <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+             ${statusText}
+           </span>
+         </td>
+         <td class="px-6 py-4 whitespace-nowrap">
+           <button data-user-id="${user.id}" class="user-remove-btn text-sm font-medium ${isAdmin ? 'text-blue-600 opacity-50 cursor-not-allowed' : 'text-red-600 hover:text-red-900'}">
+             ${isAdmin ? 'Protected' : 'Remove User'}
+           </button>
+         </td>
+       </tr>
+     `;
+   }).join('');
+
+   // Update sort indicators
+   updateSortIndicators();
+
+   // Add event listeners for column sorting
+   document.querySelectorAll('.user-sort-header').forEach(header => {
+     header.replaceWith(header.cloneNode(true)); // Remove existing listeners
+   });
+   
+   document.querySelectorAll('.user-sort-header').forEach(header => {
+     header.addEventListener('click', (e) => {
+       const field = e.currentTarget.dataset.sort;
+       
+       if (userSortField === field) {
+         // Toggle direction if same field
+         userSortDirection = userSortDirection === 'desc' ? 'asc' : 'desc';
+       } else {
+         // New field, start with descending
+         userSortField = field;
+         userSortDirection = 'desc';
+       }
+       
+       renderUserManagement(); // Re-render with new sort
+     });
+   });
+
+   // Add event listeners for remove buttons
+   allUI.userMgmtBody.querySelectorAll('.user-remove-btn').forEach(btn => {
+     btn.addEventListener('click', async (e) => {
+       const userId = e.target.dataset.userId;
+       const userName = allUsers.find(u => u.id === userId)?.displayName || allUsers.find(u => u.id === userId)?.email;
+
+       if (ADMIN_UIDS.includes(userId)) {
+         alert("You cannot remove admin accounts.");
+         return;
+       }
+
+       if (confirm(`⚠️ WARNING: This will PERMANENTLY DELETE all data for "${userName}".\n\nThis includes:\n- User profile\n- All picks from all weeks\n- Pick history\n- Survivor picks\n- All associated data\n\nThis action CANNOT be undone.\n\nType "DELETE" to confirm:`)) {
+         const confirmation = prompt('Type "DELETE" to confirm user removal:');
+         if (confirmation === 'DELETE') {
+           await removeUserCompletely(userId, userName);
+         } else {
+           alert('User removal cancelled.');
+         }
+       }
+     });
+   });
  }
- 
- if (confirm(`⚠️ WARNING: This will PERMANENTLY DELETE all data for "${userName}".\n\nThis includes:\n- User profile\n- All picks from all weeks\n- Pick history\n- Survivor picks\n- All associated data\n\nThis action CANNOT be undone.\n\nType "DELETE" to confirm:`)) {
- const confirmation = prompt('Type "DELETE" to confirm user removal:');
- if (confirmation === 'DELETE') {
- await removeUserCompletely(userId, userName);
- } else {
- alert('User removal cancelled.');
+
+ // Sort users based on field and direction
+ function sortUsers(users, field, direction) {
+   return users.sort((a, b) => {
+     let aValue = a[field];
+     let bValue = b[field];
+
+     // Special handling for role to ensure admins come first when desc
+     if (field === 'role') {
+       aValue = aValue === 'admin' ? 1 : 0;
+       bValue = bValue === 'admin' ? 1 : 0;
+     }
+
+     // Handle string comparisons
+     if (typeof aValue === 'string' && typeof bValue === 'string') {
+       aValue = aValue.toLowerCase();
+       bValue = bValue.toLowerCase();
+     }
+
+     let result;
+     if (aValue < bValue) result = -1;
+     else if (aValue > bValue) result = 1;
+     else result = 0;
+
+     return direction === 'desc' ? -result : result;
+   });
  }
- }
- });
- });
+
+ // Update sort indicators in table headers
+ function updateSortIndicators() {
+   document.querySelectorAll('.user-sort-header').forEach(header => {
+     const indicator = header.querySelector('.sort-indicator');
+     const field = header.dataset.sort;
+     
+     if (field === userSortField) {
+       indicator.textContent = userSortDirection === 'desc' ? '↓' : '↑';
+       header.classList.add('text-blue-600');
+     } else {
+       indicator.textContent = '↕';
+       header.classList.remove('text-blue-600');
+     }
+   });
  }
 
  async function renderPicksManagement(weekNumber) {
@@ -1212,8 +1427,12 @@ messageStatusContent: document.getElementById('message-status-content'),
  allUI.saveUserPicksBtn.classList.add('hidden');
  }
  
- async function renderSurvivorStatus(weekNumber) {
-    allUI.survivorStatusBody.innerHTML = `<tr><td colspan="4" class="text-center py-4"><div class="loader"></div></td></tr>`;
+ // Survivor status sorting state
+let survivorSortField = 'role'; // Start by sorting by role (admins first)
+let survivorSortDirection = 'desc'; // desc = admins first, asc = regular users first
+
+async function renderSurvivorStatus(weekNumber) {
+    allUI.survivorStatusBody.innerHTML = `<tr><td colspan="5" class="text-center py-4"><div class="loader"></div></td></tr>`;
     
     const statusDocRef = doc(db, survivorStatusPath());
     const statusSnap = await getDoc(statusDocRef);
@@ -1226,30 +1445,100 @@ messageStatusContent: document.getElementById('message-status-content'),
         allPicks[doc.id] = doc.data();
     });
 
-    const tableRows = allUsers.map(user => {
+    // Create enhanced user objects with role and additional data for sorting
+    const enhancedUsers = allUsers.map(user => {
         const userStatus = allStatuses[user.id] || { eliminated: false };
         const userPicks = allPicks[user.id];
         const thisWeekPick = userPicks && userPicks.picks && userPicks.picks[weekNumber] ? userPicks.picks[weekNumber].team : 'No Pick';
         
+        return {
+            ...user,
+            role: user.isAdmin ? 'admin' : 'user',
+            eliminated: userStatus.eliminated,
+            eliminatedWeek: userStatus.eliminatedWeek,
+            thisWeekPick: thisWeekPick,
+            status: userStatus.eliminated ? `Eliminated (Week ${userStatus.eliminatedWeek})` : 'Active'
+        };
+    });
+
+    // Sort users based on current sort field and direction
+    enhancedUsers.sort((a, b) => {
+        let valueA = a[survivorSortField];
+        let valueB = b[survivorSortField];
+        
+        // Handle special cases for different field types
+        if (survivorSortField === 'role') {
+            // Admin comes before user
+            valueA = a.role === 'admin' ? 0 : 1;
+            valueB = b.role === 'admin' ? 0 : 1;
+        } else if (survivorSortField === 'eliminated') {
+            // Convert boolean to number for sorting
+            valueA = a.eliminated ? 1 : 0;
+            valueB = b.eliminated ? 1 : 0;
+        } else if (survivorSortField === 'displayName') {
+            // Use displayName or email as fallback
+            valueA = (a.displayName || a.email || '').toLowerCase();
+            valueB = (b.displayName || b.email || '').toLowerCase();
+        } else if (survivorSortField === 'thisWeekPick') {
+            valueA = (a.thisWeekPick || '').toLowerCase();
+            valueB = (b.thisWeekPick || '').toLowerCase();
+        }
+        
+        // Compare values
+        if (valueA < valueB) return survivorSortDirection === 'asc' ? -1 : 1;
+        if (valueA > valueB) return survivorSortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const tableRows = enhancedUsers.map((user, index) => {
         return `
-            <tr>
-                <td class="px-6 py-4 whitespace-nowrap">${user.displayName || user.email}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${thisWeekPick}</td>
+            <tr class="${user.role === 'admin' ? 'bg-blue-50' : ''}">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${index + 1}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${userStatus.eliminated ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
-                        ${userStatus.eliminated ? `Eliminated (Week ${userStatus.eliminatedWeek})` : 'Active'}
+                    ${user.displayName || user.email}
+                    ${user.role === 'admin' ? '<span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Admin</span>' : ''}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">${user.thisWeekPick}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.eliminated ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                        ${user.status}
                     </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <button data-user-id="${user.id}" data-eliminated="${!!userStatus.eliminated}" class="survivor-status-btn text-sm font-medium ${userStatus.eliminated ? 'text-green-600 hover:text-green-900' : 'text-red-600 hover:text-red-900'}">
-                        ${userStatus.eliminated ? 'Reinstate' : 'Eliminate'}
+                    <button data-user-id="${user.id}" data-eliminated="${!!user.eliminated}" class="survivor-status-btn text-sm font-medium ${user.eliminated ? 'text-green-600 hover:text-green-900' : 'text-red-600 hover:text-red-900'}">
+                        ${user.eliminated ? 'Reinstate' : 'Eliminate'}
                     </button>
                 </td>
             </tr>
         `;
     }).join('');
     
-    allUI.survivorStatusBody.innerHTML = tableRows || `<tr><td colspan="4" class="text-center py-4">No users in survivor pool.</td></tr>`;
+    allUI.survivorStatusBody.innerHTML = tableRows || `<tr><td colspan="5" class="text-center py-4">No users in survivor pool.</td></tr>`;
+
+    // Update sort indicators
+    document.querySelectorAll('.survivor-sort-header').forEach(header => {
+        const sortField = header.dataset.sort;
+        const indicator = header.querySelector('.sort-indicator');
+        if (sortField === survivorSortField) {
+            indicator.textContent = survivorSortDirection === 'asc' ? '↑' : '↓';
+        } else {
+            indicator.textContent = '↕';
+        }
+    });
+
+    // Add event listeners for sorting
+    document.querySelectorAll('.survivor-sort-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const sortField = header.dataset.sort;
+            if (survivorSortField === sortField) {
+                survivorSortDirection = survivorSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                survivorSortField = sortField;
+                survivorSortDirection = 'asc';
+            }
+            renderSurvivorStatus(weekNumber);
+        });
+    });
 
     allUI.survivorStatusBody.querySelectorAll('.survivor-status-btn').forEach(btn => {
         btn.addEventListener('click', async e => {
@@ -1422,6 +1711,11 @@ async function sendSystemMessage() {
         return;
     }
     
+    // Additional authentication validation
+    console.log('Current user UID:', currentUser.uid);
+    console.log('Auth current user UID:', auth.currentUser?.uid);
+    console.log('Auth current user token available:', !!auth.currentUser);
+    
     // Check if user is admin
     const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
     if (!ADMIN_UIDS.includes(currentUser.uid)) {
@@ -1455,11 +1749,15 @@ async function sendSystemMessage() {
         // Call Cloud Function to send emails
         showMessageStatus(`Sending emails to ${recipients.length} recipients...`, 'info');
         
+        // Create the callable function with explicit app context
         const sendSystemMessageFn = httpsCallable(functions, 'sendSystemMessage');
         
         // Ensure user token is fresh before calling Cloud Function
+        let idToken;
         try {
-            await auth.currentUser.getIdToken(true); // Force token refresh
+            console.log('Refreshing auth token...');
+            idToken = await auth.currentUser.getIdToken(true); // Force token refresh
+            console.log('Token refreshed successfully, token length:', idToken.length);
         } catch (tokenError) {
             console.error('Failed to refresh auth token:', tokenError);
             showMessageStatus('Authentication error. Please try logging out and back in.', 'error');
@@ -1467,7 +1765,22 @@ async function sendSystemMessage() {
             return;
         }
         
+        // Additional validation - check if the user is still properly authenticated
+        if (!auth.currentUser || !idToken) {
+            console.error('User not authenticated after token refresh');
+            showMessageStatus('Authentication failed. Please try logging out and back in.', 'error');
+            allUI.sendMessageBtn.disabled = false;
+            return;
+        }
+        
+        // Small delay to ensure token propagation
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         try {
+            console.log('Calling Cloud Function sendSystemMessage...');
+            console.log('Recipients count:', recipients.length);
+            console.log('Subject:', subject);
+            
             const result = await sendSystemMessageFn({
                 recipients: recipients.map(user => ({
                     email: user.email,
@@ -1477,6 +1790,8 @@ async function sendSystemMessage() {
                 subject: subject,
                 body: body
             });
+            
+            console.log('Cloud Function call successful:', result);
             
             const { successCount, failCount, failed } = result.data;
             
@@ -2270,6 +2585,204 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
   const firstKickoff = new Date(weekData.games[0].kickoff); 
   return new Date() > firstKickoff; 
  }
+
+ // Helper function to identify Monday Night Football games
+ function getMondayNightGame(games) {
+   if (!games || !Array.isArray(games)) return null;
+   
+   // Find all games that occur on Monday (day of week = 1)
+   const mondayGames = games.filter(game => {
+     const gameTime = new Date(game.kickoff);
+     return gameTime.getDay() === 1; // Monday
+   });
+   
+   // If multiple Monday games, return the latest one (last game of the week)
+   if (mondayGames.length > 1) {
+     return mondayGames.reduce((latest, current) => {
+       const latestTime = new Date(latest.kickoff);
+       const currentTime = new Date(current.kickoff);
+       return currentTime > latestTime ? current : latest;
+     });
+   }
+   
+   return mondayGames.length > 0 ? mondayGames[0] : null;
+ }
+
+ // Helper function to extract winner from game result (handles both old and new formats)
+ function getGameWinner(gameResult) {
+   if (!gameResult) return null;
+   
+   // Handle legacy format (just winner string)
+   if (typeof gameResult === 'string') {
+     return gameResult;
+   }
+   
+   // Handle new format (object with winner and scores)
+   if (typeof gameResult === 'object' && gameResult.winner) {
+     return gameResult.winner;
+   }
+   
+   return null;
+ }
+
+ // Helper function to calculate total points scored in a game
+ function calculateGameTotalPoints(gameResult) {
+   if (!gameResult) return null;
+   
+   // Handle legacy format (just winner string)
+   if (typeof gameResult === 'string') {
+     return null; // Can't calculate total from just winner
+   }
+   
+   // Handle new format (object with scores)
+   if (typeof gameResult === 'object') {
+     const homeScore = parseInt(gameResult.homeScore) || 0;
+     const awayScore = parseInt(gameResult.awayScore) || 0;
+     
+     // Only return total if both scores are available and valid
+     if (gameResult.homeScore !== null && gameResult.awayScore !== null) {
+       return homeScore + awayScore;
+     }
+   }
+   
+   return null;
+ }
+
+ // Sort leaderboard with Monday Night Football tiebreaker logic
+ async function sortLeaderboardWithTiebreaker(scores, weekNumber, scoreField = 'score') {
+   if (!weekNumber) {
+     // For season totals, just sort by score descending
+     return scores.sort((a, b) => b[scoreField] - a[scoreField]);
+   }
+   
+   // Get week data and identify Monday Night game
+   const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
+   const mondayNightGame = getMondayNightGame(weekData.games);
+   
+   if (!mondayNightGame) {
+     // No Monday Night game, use regular sorting
+     return scores.sort((a, b) => b[scoreField] - a[scoreField]);
+   }
+   
+   // Get game results and MNF actual total
+   const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
+   const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+   const mnfResult = gameResults[mondayNightGame.id];
+   const mnfActualTotal = mnfResult ? calculateGameTotalPoints(mnfResult) : null;
+   
+   // Get all users' picks to access MNF guesses
+   const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+   const userMnfGuesses = {};
+   picksSnap.forEach(pickDoc => {
+     const userPicks = pickDoc.data();
+     if (userPicks.mnfTotalPoints) {
+       userMnfGuesses[pickDoc.id] = parseInt(userPicks.mnfTotalPoints, 10);
+     }
+   });
+   
+   // Sort with tiebreaker logic
+   return scores.sort((a, b) => {
+     // First, sort by confidence points score (descending)
+     const scoreDiff = b[scoreField] - a[scoreField];
+     if (scoreDiff !== 0) return scoreDiff;
+     
+     // If scores are tied and MNF game has results, apply tiebreaker
+     if (mnfActualTotal !== null) {
+       const aGuess = userMnfGuesses[a.uid || a.userId] || 0;
+       const bGuess = userMnfGuesses[b.uid || b.userId] || 0;
+       
+       // Filter out guesses that go over
+       const aValid = aGuess <= mnfActualTotal;
+       const bValid = bGuess <= mnfActualTotal;
+       
+       // If one guess is valid and other is over, valid guess wins
+       if (aValid && !bValid) return -1;
+       if (bValid && !aValid) return 1;
+       
+       // If both valid or both invalid, closest to actual wins
+       const aDiff = Math.abs(mnfActualTotal - aGuess);
+       const bDiff = Math.abs(mnfActualTotal - bGuess);
+       
+       if (aValid && bValid) {
+         // Both under or equal - closest wins
+         return aDiff - bDiff;
+       } else {
+         // Both over - still closest wins, but they're both losers
+         return aDiff - bDiff;
+       }
+     }
+     
+     // No tiebreaker available, maintain original order
+     return 0;
+   });
+ }
+
+ // Render leaderboard rows with tiebreaker information
+ async function renderLeaderboardRows(sortedScores, weekNumber, scoreField = 'score') {
+   if (!sortedScores || sortedScores.length === 0) return '';
+   
+   let mnfActualTotal = null;
+   let userMnfGuesses = {};
+   let mondayNightGame = null;
+   
+   // Get MNF info if this is a weekly leaderboard
+   if (weekNumber) {
+     const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
+     mondayNightGame = getMondayNightGame(weekData.games);
+     
+     if (mondayNightGame) {
+       // Get game results and MNF actual total
+       const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
+       const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+       const mnfResult = gameResults[mondayNightGame.id];
+       mnfActualTotal = mnfResult ? calculateGameTotalPoints(mnfResult) : null;
+       
+       // Get all users' MNF guesses
+       const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+       picksSnap.forEach(pickDoc => {
+         const userPicks = pickDoc.data();
+         if (userPicks.mnfTotalPoints) {
+           userMnfGuesses[pickDoc.id] = parseInt(userPicks.mnfTotalPoints, 10);
+         }
+       });
+     }
+   }
+   
+   return sortedScores.map((s, index) => {
+     const score = s[scoreField];
+     
+     // Check if this user is tied with next user (for tiebreaker display)
+     const nextUser = sortedScores[index + 1];
+     const isTied = nextUser && nextUser[scoreField] === score;
+     const prevUser = sortedScores[index - 1];
+     const wasTied = prevUser && prevUser[scoreField] === score;
+     
+     let tiebreakerInfo = '';
+     if ((isTied || wasTied) && mondayNightGame && mnfActualTotal !== null) {
+       const userGuess = userMnfGuesses[s.uid || s.userId] || 'N/A';
+       const validGuess = userGuess !== 'N/A' && userGuess <= mnfActualTotal;
+       const difference = userGuess !== 'N/A' ? Math.abs(mnfActualTotal - userGuess) : 'N/A';
+       
+       tiebreakerInfo = `
+         <div class="text-xs text-blue-600 mt-1">
+           MNF Guess: ${userGuess} (Actual: ${mnfActualTotal}, Diff: ${difference})
+           ${validGuess ? '✓' : userGuess !== 'N/A' ? '✗ Over' : '✗ Missing'}
+         </div>
+       `;
+     }
+     
+     return `
+       <tr class="${(isTied || wasTied) ? 'bg-yellow-50' : ''}">
+         <td class="px-6 py-4 whitespace-nowrap font-medium">${index + 1}</td>
+         <td class="px-6 py-4 whitespace-nowrap">
+           ${s.displayName}
+           ${tiebreakerInfo}
+         </td>
+         <td class="px-6 py-4 whitespace-nowrap font-bold">${score}</td>
+       </tr>
+     `;
+   }).join('');
+ }
  
  async function loadAndRenderWeek(weekNumber) { 
  currentWeek = parseInt(weekNumber, 10);
@@ -2466,7 +2979,8 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
                 let userScore = 0;
                 Object.keys(userPicks).forEach(gameId => {
                     const pick = userPicks[gameId];
-                    if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
+                    const gameWinner = getGameWinner(gameResults[gameId]);
+                    if (gameWinner && pick.winner === gameWinner) {
                         userScore += pick.confidence;
                     }
                 });
@@ -2486,7 +3000,8 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
                     let userScore = 0;
                     Object.keys(userPicks).forEach(gameId => {
                         const pick = userPicks[gameId];
-                        if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
+                        const gameWinner = getGameWinner(gameResults[gameId]);
+                        if (gameWinner && pick.winner === gameWinner) {
                             userScore += pick.confidence;
                         }
                     });
@@ -2496,8 +3011,8 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
         }
     }
     
-    const sortedScores = Object.values(scores).sort((a, b) => b.score - a.score);
-    targetBody.innerHTML = sortedScores.map((s, index) => `<tr><td class="px-6 py-4 whitespace-nowrap font-medium">${index + 1}</td><td class="px-6 py-4 whitespace-nowrap">${s.displayName}</td><td class="px-6 py-4 whitespace-nowrap font-bold">${s.score}</td></tr>`).join('') || `<tr><td colspan="3" class="text-center py-4">No picks submitted yet.</td></tr>`;
+    const sortedScores = await sortLeaderboardWithTiebreaker(Object.values(scores), weekNumber);
+    targetBody.innerHTML = await renderLeaderboardRows(sortedScores, weekNumber, 'score') || `<tr><td colspan="3" class="text-center py-4">No picks submitted yet.</td></tr>`;
     loader.classList.add('hidden');
 }
 
@@ -2522,7 +3037,8 @@ async function calculateLeaderboard(weekNumber = null) {
                 let userScore = 0;
                 Object.keys(userPicks).forEach(gameId => {
                     const pick = userPicks[gameId];
-                    if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
+                    const gameWinner = getGameWinner(gameResults[gameId]);
+                    if (gameWinner && pick.winner === gameWinner) {
                         userScore += pick.confidence;
                     }
                 });
@@ -2542,7 +3058,8 @@ async function calculateLeaderboard(weekNumber = null) {
                     let userScore = 0;
                     Object.keys(userPicks).forEach(gameId => {
                         const pick = userPicks[gameId];
-                        if (gameResults[gameId] && pick.winner === gameResults[gameId]) {
+                        const gameWinner = getGameWinner(gameResults[gameId]);
+                        if (gameWinner && pick.winner === gameWinner) {
                             userScore += pick.confidence;
                         }
                     });
@@ -2552,7 +3069,7 @@ async function calculateLeaderboard(weekNumber = null) {
         }
     }
     
-    return Object.values(scores).sort((a, b) => b.totalScore - a.totalScore);
+    return await sortLeaderboardWithTiebreaker(Object.values(scores), weekNumber, 'totalScore');
 }
 
  function populateWeekSelectors() {
@@ -2595,8 +3112,9 @@ async function calculateLeaderboard(weekNumber = null) {
      
      // Check if user won this pick
      const gameResult = gameResults[game.id];
-     const userWon = gameHasStarted && gameResult && pick.winner === gameResult;
-     const userLost = gameHasStarted && gameResult && pick.winner !== gameResult;
+     const gameWinner = getGameWinner(gameResult);
+     const userWon = gameHasStarted && gameWinner && pick.winner === gameWinner;
+     const userLost = gameHasStarted && gameWinner && pick.winner !== gameWinner;
      
      activePicks.push({
       gameId: game.id,
@@ -2787,6 +3305,46 @@ async function calculateLeaderboard(weekNumber = null) {
  targetContainer.appendChild(gameRow);
  });
 
+ // Add Monday Night Football total points input
+ const mondayNightGame = getMondayNightGame(weekData.games);
+ if (mondayNightGame) {
+   const mnfTotalInput = document.createElement('div');
+   mnfTotalInput.className = 'mt-6 p-4 border border-blue-300 rounded-lg bg-blue-50';
+   const isLocked = isGameLocked(mondayNightGame);
+   const currentGuess = userPicks.mnfTotalPoints || '';
+   
+   mnfTotalInput.innerHTML = `
+     <div class="flex flex-col gap-2">
+       <div class="flex items-center gap-2">
+         <h3 class="text-lg font-bold text-blue-800">Monday Night Football Tiebreaker</h3>
+         <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full font-medium">Required</span>
+       </div>
+       <p class="text-sm text-blue-700">
+         Guess the total points scored by both teams in: <strong>${mondayNightGame.away} @ ${mondayNightGame.home}</strong>
+       </p>
+       <p class="text-xs text-blue-600">
+         This will be used as a tiebreaker if multiple players have the same weekly confidence points total.
+         Closest guess without going over wins the tie.
+       </p>
+       <div class="flex items-center gap-2 mt-2">
+         <label for="mnf-total-points" class="font-medium text-blue-800">Total Points:</label>
+         <input 
+           type="number" 
+           id="mnf-total-points" 
+           min="0" 
+           max="150" 
+           placeholder="Enter total points" 
+           value="${currentGuess}"
+           ${isLocked ? 'disabled' : ''} 
+           class="w-24 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isLocked ? 'bg-gray-100' : 'bg-white'}"
+         />
+         ${isLocked ? '<span class="text-xs text-gray-500">(Game has started)</span>' : ''}
+       </div>
+     </div>
+   `;
+   targetContainer.appendChild(mnfTotalInput);
+ }
+
  let activePicks = JSON.parse(JSON.stringify(userPicks));
  
  const saveFunction = targetContainer === allUI.gameList ? savePicksToFirestore : (wk, pks) => { currentAdminPicks = pks; };
@@ -2818,6 +3376,21 @@ async function calculateLeaderboard(weekNumber = null) {
  saveFunction(currentWeek, activePicks);
  });
  });
+
+ // Add event listener for MNF total points input
+ const mnfInput = targetContainer.querySelector('#mnf-total-points');
+ if (mnfInput) {
+   mnfInput.addEventListener('input', (e) => {
+     const totalPoints = parseInt(e.target.value, 10);
+     if (!isNaN(totalPoints) && totalPoints >= 0) {
+       activePicks.mnfTotalPoints = totalPoints;
+       saveFunction(currentWeek, activePicks);
+     } else if (e.target.value === '') {
+       delete activePicks.mnfTotalPoints;
+       saveFunction(currentWeek, activePicks);
+     }
+   });
+ }
  }
 
  function toggleViews(showAdmin) {
@@ -2931,9 +3504,33 @@ async function calculateLeaderboard(weekNumber = null) {
  allUI.saveResultsBtn.addEventListener('click', async () => {
  const weekNumber = allUI.adminWeekSelector.value;
  const newResults = {};
- allUI.resultsGameList.querySelectorAll('.result-btn.selected').forEach(btn => {
- newResults[btn.dataset.gameId] = btn.dataset.team;
+ 
+ // Get all unique game IDs
+ const gameIds = new Set();
+ allUI.resultsGameList.querySelectorAll('.result-btn').forEach(btn => {
+   gameIds.add(btn.dataset.gameId);
  });
+ 
+ // For each game, collect winner and scores
+ gameIds.forEach(gameId => {
+   const selectedBtn = allUI.resultsGameList.querySelector(`.result-btn[data-game-id="${gameId}"].selected`);
+   const awayScoreInput = allUI.resultsGameList.querySelector(`.score-input[data-game-id="${gameId}"][data-team="away"]`);
+   const homeScoreInput = allUI.resultsGameList.querySelector(`.score-input[data-game-id="${gameId}"][data-team="home"]`);
+   
+   const awayScore = parseInt(awayScoreInput?.value) || null;
+   const homeScore = parseInt(homeScoreInput?.value) || null;
+   const winner = selectedBtn?.dataset.team || null;
+   
+   // Store enhanced result object if we have scores or winner
+   if (winner || awayScore !== null || homeScore !== null) {
+     newResults[gameId] = {
+       winner: winner,
+       awayScore: awayScore,
+       homeScore: homeScore
+     };
+   }
+ });
+ 
  await setDoc(doc(db, resultsPath(weekNumber)), newResults);
  alert('Results saved successfully!');
  calculateAndDisplayLeaderboard(weekNumber);

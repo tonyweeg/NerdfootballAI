@@ -39,18 +39,25 @@ setupEmailTransport();
 
 // Cloud Function to send system messages
 exports.sendSystemMessage = functions.https.onCall(async (data, context) => {
+    // For Firebase Functions v2, auth context is in data.auth instead of context.auth
+    const authContext = context.auth || data.auth;
+    
     // Check if user is authenticated
-    if (!context.auth) {
+    if (!authContext) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
     
     // Check if user is admin
     const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
-    if (!ADMIN_UIDS.includes(context.auth.uid)) {
+    const userUid = authContext.uid || authContext.token?.uid;
+    
+    if (!ADMIN_UIDS.includes(userUid)) {
         throw new functions.https.HttpsError('permission-denied', 'User must be an admin');
     }
     
-    const { recipients, subject, body } = data;
+    // Extract data from the correct location (data.data for Firebase Functions v2)
+    const actualData = data.data || data;
+    const { recipients, subject, body } = actualData;
     
     if (!recipients || !subject || !body) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
