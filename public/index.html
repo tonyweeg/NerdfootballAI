@@ -1916,7 +1916,7 @@ migrationResultsContent: document.getElementById('migration-results-content')
         return;
     }
     
-    const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`);
+    const picksCollectionRef = collection(db, picksCollectionPath(weekNumber));
     const picksSnap = await getDocs(picksCollectionRef);
     const pickCounts = {};
     picksSnap.forEach(pickDoc => {
@@ -2730,6 +2730,11 @@ checkForInviteCode();
  }
 
  async function handleAuthStateChange(user) {
+ // Validate pool isolation on auth state change
+ if (user) {
+   setTimeout(() => validatePoolIsolation(), 1000);
+ }
+ 
  const savedState = loadAppState();
  
  if (user) {
@@ -3370,34 +3375,87 @@ const getPoolBasePath = () => {
   return `artifacts/${appId()}/pools/${poolId}`;
 };
 
- const picksPath = (week, uid) => {
-   // Always use the legacy path for picks data regardless of pool
-   // Pick data remains in the original location for all pools  
-   return `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
+ const picksPath = (week, uid, poolId = null) => {
+   const pool = poolId || getCurrentPool();
+   
+   // Maintain backward compatibility for legacy pools
+   if (pool === 'nerdfootball-2025' || pool === 'nerduniverse-2025') {
+     return `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
+   }
+   
+   // Use proper pool isolation for new pools
+   return `artifacts/${appId()}/pools/${pool}/data/nerdfootball_picks/${week}/submissions/${uid}`;
  };
  
- const resultsPath = (week) => {
-   // Always use the legacy path for results data regardless of pool
-   // Results data remains in the original location for all pools
-   return `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
+ const resultsPath = (week, poolId = null) => {
+   const pool = poolId || getCurrentPool();
+   
+   // Maintain backward compatibility for legacy pools
+   if (pool === 'nerdfootball-2025' || pool === 'nerduniverse-2025') {
+     return `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
+   }
+   
+   // Use proper pool isolation for new pools
+   return `artifacts/${appId()}/pools/${pool}/data/nerdfootball_results/${week}`;
  };
  
  const usersPath = () => {
-   // Always use the legacy path for user data regardless of pool
-   // User data remains in the original location for all pools
+   // User profiles remain global - users can be members of multiple pools
+   // This is the only path that should remain global
    return `artifacts/${appId()}/public/data/nerdfootball_users`;
  };
  
- const survivorPicksPath = (uid) => {
-   // Always use the legacy path for survivor picks regardless of pool
-   // Survivor data remains in the original location for all pools
-   return `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
+ const survivorPicksPath = (uid, poolId = null) => {
+   const pool = poolId || getCurrentPool();
+   
+   // Maintain backward compatibility for legacy pools
+   if (pool === 'nerdfootball-2025' || pool === 'nerduniverse-2025') {
+     return `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
+   }
+   
+   // Use proper pool isolation for new pools
+   return `artifacts/${appId()}/pools/${pool}/data/nerdSurvivor_picks/${uid}`;
  };
  
- const survivorStatusPath = () => {
-   // Always use the legacy path for survivor status regardless of pool
-   // Survivor status remains in the original location for all pools
-   return `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
+ const survivorStatusPath = (poolId = null) => {
+   const pool = poolId || getCurrentPool();
+   
+   // Maintain backward compatibility for legacy pools
+   if (pool === 'nerdfootball-2025' || pool === 'nerduniverse-2025') {
+     return `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
+   }
+   
+   // Use proper pool isolation for new pools
+   return `artifacts/${appId()}/pools/${pool}/data/nerdSurvivor_status/status`;
+ };
+
+ // Collection path helpers for proper pool isolation
+ const picksCollectionPath = (week, poolId = null) => {
+   const pool = poolId || getCurrentPool();
+   
+   if (!pool) {
+     throw new Error('No pool context available for picks data access');
+   }
+   
+   // Maintain backward compatibility for legacy pools
+   if (pool === 'nerdfootball-2025' || pool === 'nerduniverse-2025') {
+     return `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions`;
+   }
+   
+   // Use proper pool isolation for new pools
+   return `artifacts/${appId()}/pools/${pool}/data/nerdfootball_picks/${week}/submissions`;
+ };
+
+ // Validation helper to ensure pool isolation is working
+ const validatePoolIsolation = () => {
+   const currentPool = getCurrentPool();
+   if (!currentPool) {
+     console.error('⚠️ Pool isolation compromised: No current pool set');
+     return false;
+   }
+   
+   console.log(`🔒 Pool isolation active: ${currentPool}`);
+   return true;
  };
 
 // --- USER POOL MEMBERSHIP MANAGEMENT ---
@@ -4160,7 +4218,7 @@ async function updatePoolStatistics() {
     const currentPoolId = getCurrentPool();
     
     // Count active picks for current week
-    const picksCollectionRef = collection(db, `artifacts/${appId()}/pools/${currentPoolId}/data/nerdfootball_picks/${currentWeek}/submissions`);
+    const picksCollectionRef = collection(db, picksCollectionPath(currentWeek));
     const picksSnap = await getDocs(picksCollectionRef);
     
     allUI.activePicksCount.textContent = picksSnap.size.toString();
@@ -5390,7 +5448,7 @@ function escapeHtml(text) {
    const mnfActualTotal = mnfResult ? calculateGameTotalPoints(mnfResult) : null;
    
    // Get all users' picks to access MNF guesses
-   const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+   const picksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
    const userMnfGuesses = {};
    picksSnap.forEach(pickDoc => {
      const userPicks = pickDoc.data();
@@ -5457,7 +5515,7 @@ function escapeHtml(text) {
        mnfActualTotal = mnfResult ? calculateGameTotalPoints(mnfResult) : null;
        
        // Get all users' MNF guesses
-       const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+       const picksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
        picksSnap.forEach(pickDoc => {
          const userPicks = pickDoc.data();
          if (userPicks.mnfTotalPoints) {
@@ -5696,7 +5754,7 @@ function escapeHtml(text) {
     if (weekNumber) { // Weekly calculation
         const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
         const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
-        const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+        const picksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
         
         picksSnap.forEach(pickDoc => {
             const userId = pickDoc.id;
@@ -5717,7 +5775,7 @@ function escapeHtml(text) {
         for (let i = 1; i <= currentWeek; i++) {
             const resultsSnap = await getDoc(doc(db, resultsPath(i)));
             const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
-            const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${i}/submissions`));
+            const picksSnap = await getDocs(collection(db, picksCollectionPath(i)));
 
             picksSnap.forEach(pickDoc => {
                 const userId = pickDoc.id;
@@ -5754,7 +5812,7 @@ async function calculateLeaderboard(weekNumber = null) {
     if (weekNumber) { // Weekly calculation
         const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
         const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
-        const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`));
+        const picksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
         
         picksSnap.forEach(pickDoc => {
             const userId = pickDoc.id;
@@ -5775,7 +5833,7 @@ async function calculateLeaderboard(weekNumber = null) {
         for (let i = 1; i <= currentWeek; i++) {
             const resultsSnap = await getDoc(doc(db, resultsPath(i)));
             const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
-            const picksSnap = await getDocs(collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${i}/submissions`));
+            const picksSnap = await getDocs(collection(db, picksCollectionPath(i)));
 
             picksSnap.forEach(pickDoc => {
                 const userId = pickDoc.id;
@@ -6818,7 +6876,7 @@ async function runNerdUniverseMigration(isDryRun = false) {
         let totalConfidencePicks = 0;
         for (let week = 1; week <= 18; week++) {
             const picksSnapshot = await getDocs(collection(db, 
-                `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`));
+                picksCollectionPath(week, 'nerduniverse-2025')));
             totalConfidencePicks += picksSnapshot.size;
         }
         logMigration(`✅ Confidence picks verified: ${totalConfidencePicks} picks preserved`, 'success');
