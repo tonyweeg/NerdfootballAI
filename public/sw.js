@@ -1,9 +1,7 @@
-const CACHE_NAME = 'nerdfootball-v2.1.1';
+const CACHE_NAME = 'nerdfootball-v3.0.1';
 const urlsToCache = [
   '/',
-  '/manifest.json',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
+  '/manifest.json'
 ];
 
 // Install event - cache resources
@@ -39,13 +37,14 @@ self.addEventListener('activate', event => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', event => {
-  // Skip caching for Firebase and API calls
+  // Skip caching for Firebase, API calls, and external CDNs
   if (event.request.url.includes('firebaseapp.com') || 
       event.request.url.includes('googleapis.com') ||
       event.request.url.includes('gstatic.com') ||
       event.request.url.includes('cloudfunctions.net') ||
+      event.request.url.includes('tailwindcss.com') ||
       event.request.url.includes('.json')) {
-    return fetch(event.request);
+    return;
   }
 
   event.respondWith(
@@ -54,6 +53,10 @@ self.addEventListener('fetch', event => {
         // Return cached version or fetch from network
         return response || fetch(event.request);
       }
+      .catch(() => {
+        // If fetch fails, just return nothing to avoid errors
+        return new Response('', { status: 200 });
+      })
     )
   );
 });
