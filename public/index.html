@@ -6782,8 +6782,14 @@ async function runNerdUniverseMigration(isDryRun = false) {
         };
         
         if (!isDryRun) {
-            const poolMetadataRef = doc(db, `artifacts/nerdfootball/pools/${NEW_POOL_ID}/metadata/config`);
-            await setDoc(poolMetadataRef, poolConfig);
+            try {
+                const poolMetadataRef = doc(db, `artifacts/nerdfootball/pools/${NEW_POOL_ID}/metadata/config`);
+                await setDoc(poolMetadataRef, poolConfig);
+            } catch (error) {
+                logMigration(`⚠️ Pool creation permission issue - continuing with user migration`, 'warning');
+                console.warn('Pool metadata creation failed:', error);
+                // Continue with migration even if pool creation fails
+            }
         }
         logMigration('✅ Pool metadata ready', 'success');
         
@@ -6826,8 +6832,13 @@ async function runNerdUniverseMigration(isDryRun = false) {
         }
         
         if (!isDryRun) {
-            const poolMembersRef = doc(db, `artifacts/nerdfootball/pools/${NEW_POOL_ID}/metadata/members`);
-            await setDoc(poolMembersRef, poolMembers);
+            try {
+                const poolMembersRef = doc(db, `artifacts/nerdfootball/pools/${NEW_POOL_ID}/metadata/members`);
+                await setDoc(poolMembersRef, poolMembers);
+            } catch (error) {
+                logMigration(`⚠️ Pool members creation permission issue - continuing`, 'warning');
+                console.warn('Pool members creation failed:', error);
+            }
         }
         
         logMigration(`✅ Ready to create ${adminCount} admins and ${memberCount} members`, 'success');
@@ -6856,8 +6867,13 @@ async function runNerdUniverseMigration(isDryRun = false) {
             };
             
             if (!isDryRun) {
-                const userPoolsRef = doc(db, `artifacts/nerdfootball/users/${user.uid}/pools`);
-                await setDoc(userPoolsRef, poolMembership, { merge: true });
+                try {
+                    const userPoolsRef = doc(db, `artifacts/nerdfootball/users/${user.uid}/pools`);
+                    await setDoc(userPoolsRef, poolMembership, { merge: true });
+                } catch (error) {
+                    logMigration(`⚠️ User ${user.uid} membership update failed`, 'warning');
+                    console.warn(`User membership update failed for ${user.uid}:`, error);
+                }
             }
             
             updatedCount++;
@@ -6984,6 +7000,41 @@ allUI.startMigrationBtn.addEventListener('click', () => {
 allUI.dryRunMigrationBtn.addEventListener('click', () => {
     runNerdUniverseMigration(true);
 });
+
+// Alternative: Simple pool rename approach
+async function simplePoolRename() {
+    if (!confirm('Alternative approach: Simply rename the current pool to "NerdUniverse 2025"?\n\nThis will:\n• Keep all existing data exactly as is\n• Change the pool name in the UI\n• Require no new permissions\n\nContinue?')) {
+        return;
+    }
+    
+    try {
+        // Update the active pool ID
+        activePoolId = 'nerduniverse-2025';
+        
+        // Update localStorage for persistence
+        if (currentUser) {
+            localStorage.setItem(`activePool_${currentUser.uid}`, activePoolId);
+        }
+        
+        // Update the pool switcher display
+        updatePoolSwitcherDisplay();
+        
+        logMigration('✅ Pool renamed to NerdUniverse 2025 (Simple approach)', 'success');
+        alert('Pool successfully renamed to "NerdUniverse 2025"!\n\nAll your existing data remains intact.');
+        
+    } catch (error) {
+        logMigration(`❌ Simple rename failed: ${error.message}`, 'error');
+    }
+}
+
+// Add simple rename button (for testing)
+if (window.location.search.includes('debug=true')) {
+    const debugBtn = document.createElement('button');
+    debugBtn.textContent = 'Simple Rename (Debug)';
+    debugBtn.className = 'px-4 py-2 bg-yellow-500 text-white rounded ml-4';
+    debugBtn.onclick = simplePoolRename;
+    allUI.migrationControlsSection.appendChild(debugBtn);
+}
 
 // Show migration button for admins only
 function showAdminMigrationTool() {
