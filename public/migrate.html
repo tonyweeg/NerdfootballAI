@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdUniverse 2025 Migration Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .log-entry { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+        .log-success { background-color: #d1fae5; color: #065f46; }
+        .log-error { background-color: #fee2e2; color: #991b1b; }
+        .log-info { background-color: #e0e7ff; color: #3730a3; }
+        .log-warning { background-color: #fef3c7; color: #92400e; }
+    </style>
+</head>
+<body class="bg-slate-100">
+    <div class="container mx-auto max-w-4xl p-6">
+        <div class="bg-white rounded-lg shadow-lg p-8">
+            <h1 class="text-3xl font-bold text-slate-800 mb-2">NerdUniverse 2025 Migration Tool</h1>
+            <p class="text-slate-600 mb-6">Migrate all existing users and data to the NerdUniverse 2025 pool</p>
+            
+            <!-- Auth Check -->
+            <div id="auth-section" class="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h2 class="text-lg font-semibold text-yellow-900 mb-2">Authentication Required</h2>
+                <p class="text-yellow-700">Checking authentication status...</p>
+                <div id="auth-status"></div>
+            </div>
+            
+            <!-- Migration Info -->
+            <div class="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h2 class="text-lg font-semibold text-blue-900 mb-2">What this migration will do:</h2>
+                <ul class="list-disc list-inside text-blue-700 space-y-1">
+                    <li>Create the NerdUniverse 2025 pool</li>
+                    <li>Migrate all existing users with their current roles</li>
+                    <li>Preserve all confidence picks for all weeks</li>
+                    <li>Preserve all survivor picks and status</li>
+                    <li>Maintain backward compatibility with existing data</li>
+                    <li>Assign admin roles to existing admins</li>
+                </ul>
+            </div>
+            
+            <!-- Pre-flight Check -->
+            <div id="preflight-section" class="mb-8 hidden">
+                <h2 class="text-xl font-semibold text-slate-800 mb-4">Pre-flight Check</h2>
+                <div id="preflight-results" class="space-y-2"></div>
+            </div>
+            
+            <!-- Migration Controls -->
+            <div id="migration-controls" class="mb-8 hidden">
+                <button id="start-migration" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+                    Start Migration
+                </button>
+                <button id="dry-run" class="ml-4 px-6 py-3 bg-slate-600 text-white font-semibold rounded-lg hover:bg-slate-700 transition-colors">
+                    Dry Run (Test Only)
+                </button>
+            </div>
+            
+            <!-- Migration Progress -->
+            <div id="progress-section" class="mb-8 hidden">
+                <h2 class="text-xl font-semibold text-slate-800 mb-4">Migration Progress</h2>
+                <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
+                    <div id="progress-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <p id="progress-text" class="text-slate-600">Initializing...</p>
+            </div>
+            
+            <!-- Migration Log -->
+            <div id="log-section" class="mb-8">
+                <h2 class="text-xl font-semibold text-slate-800 mb-4">Migration Log</h2>
+                <div id="migration-log" class="bg-slate-50 border border-slate-200 rounded-lg p-4 h-96 overflow-y-auto font-mono text-sm">
+                    <div class="log-entry log-info">Waiting to start...</div>
+                </div>
+            </div>
+            
+            <!-- Results Summary -->
+            <div id="results-section" class="hidden">
+                <h2 class="text-xl font-semibold text-slate-800 mb-4">Migration Results</h2>
+                <div id="results-summary" class="bg-green-50 border border-green-200 rounded-lg p-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, getDocs, setDoc, collection, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBaS6oKjy7rrMY7RtfLjNP8rC8mUTzEhik",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "55015484896",
+            appId: "1:55015484896:web:2bbabdefaa63f19f51035f"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Constants
+        const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
+        const OLD_POOL_ID = 'nerdfootball-2025';
+        const NEW_POOL_ID = 'nerduniverse-2025';
+        const NEW_POOL_NAME = 'NerdUniverse 2025';
+        
+        let currentUser = null;
+        let isDryRun = false;
+        
+        // DOM elements
+        const authSection = document.getElementById('auth-section');
+        const authStatus = document.getElementById('auth-status');
+        const preflightSection = document.getElementById('preflight-section');
+        const preflightResults = document.getElementById('preflight-results');
+        const migrationControls = document.getElementById('migration-controls');
+        const progressSection = document.getElementById('progress-section');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const logSection = document.getElementById('log-section');
+        const migrationLog = document.getElementById('migration-log');
+        const resultsSection = document.getElementById('results-section');
+        const resultsSummary = document.getElementById('results-summary');
+        
+        // Logging functions
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            migrationLog.appendChild(entry);
+            migrationLog.scrollTop = migrationLog.scrollHeight;
+        }
+        
+        function updateProgress(percent, text) {
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = text;
+        }
+        
+        // Auth check
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                const isAdmin = ADMIN_UIDS.includes(user.uid);
+                
+                if (isAdmin) {
+                    authStatus.innerHTML = `
+                        <p class="text-green-700 font-semibold mt-2">✅ Authenticated as Admin: ${user.email}</p>
+                    `;
+                    authSection.className = 'mb-8 p-4 bg-green-50 border border-green-200 rounded-lg';
+                    
+                    // Run preflight check
+                    await runPreflightCheck();
+                    
+                    // Show controls
+                    migrationControls.classList.remove('hidden');
+                } else {
+                    authStatus.innerHTML = `
+                        <p class="text-red-700 font-semibold mt-2">❌ You must be an admin to run this migration</p>
+                        <p class="text-red-600">Current user: ${user.email}</p>
+                    `;
+                    authSection.className = 'mb-8 p-4 bg-red-50 border border-red-200 rounded-lg';
+                }
+            } else {
+                authStatus.innerHTML = `
+                    <p class="text-red-700 font-semibold mt-2">❌ Not authenticated</p>
+                    <a href="/index.html" class="text-blue-600 underline">Please sign in first</a>
+                `;
+                authSection.className = 'mb-8 p-4 bg-red-50 border border-red-200 rounded-lg';
+            }
+        });
+        
+        // Preflight check
+        async function runPreflightCheck() {
+            preflightSection.classList.remove('hidden');
+            preflightResults.innerHTML = '';
+            
+            const checks = [];
+            
+            // Check if NerdUniverse pool already exists
+            try {
+                const poolRef = doc(db, `artifacts/nerdfootball/pools/${NEW_POOL_ID}/metadata/config`);
+                const poolDoc = await getDoc(poolRef);
+                
+                if (poolDoc.exists()) {
+                    checks.push({
+                        status: 'warning',
+                        message: `Pool "${NEW_POOL_NAME}" already exists - migration will update it`
+                    });
+                } else {
+                    checks.push({
+                        status: 'success',
+                        message: `Pool "${NEW_POOL_NAME}" does not exist - will be created`
+                    });
+                }
+            } catch (error) {
+                checks.push({
+                    status: 'error',
+                    message: `Error checking pool existence: ${error.message}`
+                });
+            }
+            
+            // Check existing users
+            try {
+                const usersSnapshot = await getDocs(collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users'));
+                checks.push({
+                    status: 'success',
+                    message: `Found ${usersSnapshot.size} users to migrate`
+                });
+            } catch (error) {
+                checks.push({
+                    status: 'error',
+                    message: `Error checking users: ${error.message}`
+                });
+            }
+            
+            // Check existing picks
+            try {
+                let totalPicks = 0;
+                for (let week = 1; week <= 18; week++) {
+                    const picksSnapshot = await getDocs(collection(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`));
+                    totalPicks += picksSnapshot.size;
+                }
+                checks.push({
+                    status: 'success',
+                    message: `Found ${totalPicks} confidence picks to preserve`
+                });
+            } catch (error) {
+                checks.push({
+                    status: 'warning',
+                    message: `Could not verify picks: ${error.message}`
+                });
+            }
+            
+            // Display results
+            checks.forEach(check => {
+                const div = document.createElement('div');
+                const iconMap = {
+                    success: '✅',
+                    warning: '⚠️',
+                    error: '❌'
+                };
+                const colorMap = {
+                    success: 'text-green-700',
+                    warning: 'text-yellow-700',
+                    error: 'text-red-700'
+                };
+                
+                div.className = `${colorMap[check.status]} font-medium`;
+                div.textContent = `${iconMap[check.status]} ${check.message}`;
+                preflightResults.appendChild(div);
+            });
+        }
+        
+        // Migration function
+        async function runMigration(dryRun = false) {
+            isDryRun = dryRun;
+            progressSection.classList.remove('hidden');
+            migrationControls.classList.add('hidden');
+            migrationLog.innerHTML = '';
+            
+            log(`Starting ${dryRun ? 'DRY RUN' : 'ACTUAL'} migration to ${NEW_POOL_NAME}...`, 'info');
+            updateProgress(0, 'Initializing migration...');
+            
+            try {
+                // Step 1: Create pool
+                updateProgress(10, 'Creating pool metadata...');
+                log('Step 1: Creating NerdUniverse 2025 pool...', 'info');
+                
+                const poolConfig = {
+                    poolId: NEW_POOL_ID,
+                    name: NEW_POOL_NAME,
+                    description: 'The original NerdFootball community - established 2025',
+                    type: 'both',
+                    creator: ADMIN_UIDS[0],
+                    created: new Date().toISOString(),
+                    settings: {
+                        maxMembers: 100,
+                        joinType: 'invite',
+                        confidenceEnabled: true,
+                        survivorEnabled: true,
+                        weeklyReminders: true
+                    },
+                    status: 'active',
+                    season: '2025',
+                    memberCount: 0
+                };
+                
+                if (!dryRun) {
+                    const poolMetadataRef = doc(db, `artifacts/nerdfootball/pools/${NEW_POOL_ID}/metadata/config`);
+                    await setDoc(poolMetadataRef, poolConfig);
+                }
+                log('✅ Pool metadata created', 'success');
+                
+                // Step 2: Get users
+                updateProgress(20, 'Fetching existing users...');
+                log('Step 2: Fetching existing users...', 'info');
+                
+                const usersSnapshot = await getDocs(collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users'));
+                const users = [];
+                usersSnapshot.forEach(doc => {
+                    users.push({ uid: doc.id, ...doc.data() });
+                });
+                log(`✅ Found ${users.length} users to migrate`, 'success');
+                
+                // Step 3: Create pool members
+                updateProgress(40, 'Creating pool membership records...');
+                log('Step 3: Creating pool membership records...', 'info');
+                
+                const poolMembers = {};
+                let adminCount = 0, memberCount = 0;
+                
+                for (const user of users) {
+                    const isAdmin = ADMIN_UIDS.includes(user.uid);
+                    poolMembers[user.uid] = {
+                        uid: user.uid,
+                        displayName: user.displayName || user.email || 'Unknown User',
+                        email: user.email || '',
+                        role: isAdmin ? 'admin' : 'member',
+                        joinedAt: new Date().toISOString(),
+                        status: 'active'
+                    };
+                    
+                    if (isAdmin) {
+                        adminCount++;
+                        log(`👑 Admin: ${user.displayName || user.email}`, 'info');
+                    } else {
+                        memberCount++;
+                    }
+                }
+                
+                if (!dryRun) {
+                    const poolMembersRef = doc(db, `artifacts/nerdfootball/pools/${NEW_POOL_ID}/metadata/members`);
+                    await setDoc(poolMembersRef, poolMembers);
+                }
+                log(`✅ Created ${adminCount} admin and ${memberCount} member records`, 'success');
+                
+                // Step 4: Update user pool memberships
+                updateProgress(60, 'Updating user pool memberships...');
+                log('Step 4: Updating user pool memberships...', 'info');
+                
+                let updatedCount = 0;
+                for (const user of users) {
+                    const poolMembership = {
+                        [NEW_POOL_ID]: {
+                            poolId: NEW_POOL_ID,
+                            poolName: NEW_POOL_NAME,
+                            role: ADMIN_UIDS.includes(user.uid) ? 'admin' : 'member',
+                            joinedAt: new Date().toISOString(),
+                            status: 'active'
+                        },
+                        [OLD_POOL_ID]: {
+                            poolId: OLD_POOL_ID,
+                            poolName: 'Legacy Pool',
+                            role: ADMIN_UIDS.includes(user.uid) ? 'admin' : 'member',
+                            joinedAt: new Date().toISOString(),
+                            status: 'active'
+                        }
+                    };
+                    
+                    if (!dryRun) {
+                        const userPoolsRef = doc(db, `artifacts/nerdfootball/users/${user.uid}/pools`);
+                        await setDoc(userPoolsRef, poolMembership, { merge: true });
+                    }
+                    updatedCount++;
+                    updateProgress(60 + (20 * updatedCount / users.length), `Updated ${updatedCount}/${users.length} users...`);
+                }
+                log(`✅ Updated pool memberships for ${users.length} users`, 'success');
+                
+                // Step 5: Verify data integrity
+                updateProgress(85, 'Verifying data integrity...');
+                log('Step 5: Verifying picks integrity...', 'info');
+                
+                let totalConfidencePicks = 0;
+                for (let week = 1; week <= 18; week++) {
+                    const picksSnapshot = await getDocs(collection(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`));
+                    totalConfidencePicks += picksSnapshot.size;
+                }
+                log(`✅ Confidence picks verified: ${totalConfidencePicks} total picks`, 'success');
+                
+                const survivorSnapshot = await getDocs(collection(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_picks'));
+                log(`✅ Survivor picks verified: ${survivorSnapshot.size} users with picks`, 'success');
+                
+                // Step 6: Update pool member count
+                if (!dryRun) {
+                    updateProgress(95, 'Finalizing migration...');
+                    const poolMetadataRef = doc(db, `artifacts/nerdfootball/pools/${NEW_POOL_ID}/metadata/config`);
+                    await updateDoc(poolMetadataRef, { memberCount: users.length });
+                }
+                
+                // Complete
+                updateProgress(100, 'Migration completed!');
+                log('🎉 MIGRATION COMPLETED SUCCESSFULLY!', 'success');
+                
+                // Show results
+                resultsSection.classList.remove('hidden');
+                resultsSummary.innerHTML = `
+                    <h3 class="text-lg font-semibold text-green-900 mb-3">✅ Migration ${dryRun ? 'Dry Run' : ''} Completed Successfully!</h3>
+                    <div class="space-y-2 text-green-700">
+                        <p>• Pool Name: <strong>${NEW_POOL_NAME}</strong></p>
+                        <p>• Pool ID: <strong>${NEW_POOL_ID}</strong></p>
+                        <p>• Total Users Migrated: <strong>${users.length}</strong></p>
+                        <p>• Admins: <strong>${adminCount}</strong></p>
+                        <p>• Members: <strong>${memberCount}</strong></p>
+                        <p>• Confidence Picks Preserved: <strong>${totalConfidencePicks}</strong></p>
+                        <p>• Survivor Picks Preserved: <strong>${survivorSnapshot.size}</strong></p>
+                    </div>
+                    ${!dryRun ? `
+                    <div class="mt-4 pt-4 border-t border-green-200">
+                        <h4 class="font-semibold text-green-900 mb-2">Next Steps:</h4>
+                        <ol class="list-decimal list-inside text-green-700 space-y-1">
+                            <li>Update the default pool in index.html</li>
+                            <li>Test user access and admin privileges</li>
+                            <li>Announce the migration to users</li>
+                        </ol>
+                    </div>
+                    ` : ''}
+                `;
+                
+                if (!dryRun) {
+                    // Create migration log
+                    const migrationLogRef = doc(db, `artifacts/nerdfootball/migrations/${Date.now()}`);
+                    await setDoc(migrationLogRef, {
+                        type: 'pool_migration',
+                        fromPool: OLD_POOL_ID,
+                        toPool: NEW_POOL_ID,
+                        timestamp: serverTimestamp(),
+                        performedBy: currentUser.uid,
+                        usersCount: users.length,
+                        adminsCount: adminCount,
+                        membersCount: memberCount,
+                        confidencePicksCount: totalConfidencePicks,
+                        survivorPicksCount: survivorSnapshot.size,
+                        status: 'completed'
+                    });
+                    log('✅ Migration log saved to database', 'success');
+                }
+                
+            } catch (error) {
+                updateProgress(0, 'Migration failed');
+                log(`❌ Migration failed: ${error.message}`, 'error');
+                console.error('Migration error:', error);
+                
+                resultsSection.classList.remove('hidden');
+                resultsSummary.className = 'bg-red-50 border border-red-200 rounded-lg p-4';
+                resultsSummary.innerHTML = `
+                    <h3 class="text-lg font-semibold text-red-900 mb-2">❌ Migration Failed</h3>
+                    <p class="text-red-700">${error.message}</p>
+                `;
+            } finally {
+                migrationControls.classList.remove('hidden');
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('start-migration').addEventListener('click', () => {
+            if (confirm('Are you sure you want to start the migration? This will create the NerdUniverse 2025 pool and migrate all users.')) {
+                runMigration(false);
+            }
+        });
+        
+        document.getElementById('dry-run').addEventListener('click', () => {
+            runMigration(true);
+        });
+    </script>
+</body>
+</html>
