@@ -3458,6 +3458,134 @@ const getPoolBasePath = () => {
    return true;
  };
 
+ // Diagnostic functions to check migration status
+ async function checkMigrationStatus() {
+   if (!currentUser) {
+     console.log('❌ Not authenticated - please log in first');
+     return;
+   }
+
+   console.log('🔍 MIGRATION STATUS DIAGNOSTIC');
+   console.log('================================');
+   
+   try {
+     // Check if NerdUniverse 2025 pool exists
+     const poolConfigRef = doc(db, getPoolMetadataPath('nerduniverse-2025'));
+     const poolConfigSnap = await getDoc(poolConfigRef);
+     
+     if (poolConfigSnap.exists()) {
+       const poolData = poolConfigSnap.data();
+       console.log('✅ NerdUniverse 2025 pool EXISTS');
+       console.log(`   - Name: ${poolData.name}`);
+       console.log(`   - Members: ${poolData.memberCount || 'Unknown'}`);
+       console.log(`   - Created: ${poolData.created}`);
+     } else {
+       console.log('❌ NerdUniverse 2025 pool does NOT exist');
+     }
+     
+     // Check pool membership
+     const poolMembersRef = doc(db, getPoolMembersPath('nerduniverse-2025'));
+     const poolMembersSnap = await getDoc(poolMembersRef);
+     
+     if (poolMembersSnap.exists()) {
+       const members = poolMembersSnap.data();
+       const memberCount = Object.keys(members).length;
+       console.log(`✅ Pool membership data exists (${memberCount} members)`);
+       
+       if (members[currentUser.uid]) {
+         const userRole = members[currentUser.uid].role;
+         console.log(`✅ You ARE a member (Role: ${userRole})`);
+       } else {
+         console.log('❌ You are NOT a member of this pool');
+       }
+     } else {
+       console.log('❌ No pool membership data found');
+     }
+     
+     // Check your personal pool memberships
+     const userPoolsRef = doc(db, getUserPoolsPath(currentUser.uid));
+     const userPoolsSnap = await getDoc(userPoolsRef);
+     
+     if (userPoolsSnap.exists()) {
+       const userPools = userPoolsSnap.data();
+       console.log(`✅ Your pool memberships: ${Object.keys(userPools).join(', ')}`);
+       
+       if (userPools['nerduniverse-2025']) {
+         console.log(`✅ NerdUniverse 2025 in your memberships (${userPools['nerduniverse-2025'].role})`);
+       } else {
+         console.log('❌ NerdUniverse 2025 NOT in your memberships');
+       }
+     } else {
+       console.log('❌ No personal pool membership data found');
+     }
+     
+     // Check current active pool
+     console.log(`🎯 Current active pool: ${getCurrentPool()}`);
+     
+     // Quick data access test
+     try {
+       const testPicksPath = picksCollectionPath(1);
+       console.log(`📂 Your picks path: ${testPicksPath}`);
+       
+       const picksSnap = await getDocs(collection(db, testPicksPath));
+       console.log(`📊 Week 1 picks in current pool: ${picksSnap.size} picks`);
+     } catch (error) {
+       console.log(`❌ Error accessing picks data: ${error.message}`);
+     }
+     
+   } catch (error) {
+     console.error('❌ Diagnostic error:', error);
+   }
+   
+   console.log('================================');
+ }
+
+ // Add diagnostic button for admins
+ window.runDiagnostics = checkMigrationStatus;
+
+ // Simplified migration runner with better error handling
+ async function runMigrationWithDiagnostics() {
+   console.log('🚀 STARTING MIGRATION WITH DIAGNOSTICS');
+   console.log('======================================');
+   
+   // First run diagnostics
+   await checkMigrationStatus();
+   
+   // Ask user if they want to proceed
+   const proceed = confirm(`
+🚀 MIGRATION READY
+
+The migration will:
+1. Create NerdUniverse 2025 pool
+2. Add all existing users as members
+3. Preserve all your picks and data
+4. Set you as admin
+
+Proceed with migration?`);
+
+   if (!proceed) {
+     console.log('❌ Migration cancelled by user');
+     return;
+   }
+   
+   try {
+     // Run the actual migration
+     await runNerdUniverseMigration(false);
+     
+     // Run diagnostics again to verify success
+     console.log('\n🔍 POST-MIGRATION VERIFICATION');
+     console.log('===============================');
+     await checkMigrationStatus();
+     
+   } catch (error) {
+     console.error('❌ Migration failed:', error);
+     alert(`Migration failed: ${error.message}`);
+   }
+ }
+
+ // Make migration available globally
+ window.runMigration = runMigrationWithDiagnostics;
+
 // --- USER POOL MEMBERSHIP MANAGEMENT ---
 async function loadUserPoolMemberships() {
   if (!currentUser) return;
