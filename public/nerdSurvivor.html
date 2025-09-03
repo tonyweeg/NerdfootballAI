@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nerd Survivor v2.0</title>
+    <title>Nerd Survivor v2.80</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -71,7 +71,7 @@
                 </a>
                 <!-- Right side elements -->
                 <div class="flex items-center space-x-4">
-                    <span class="text-sm font-medium text-slate-600">v2.0</span>
+                    <span class="text-sm font-medium text-slate-600">v2.80</span>
                     <div class="flex items-center space-x-2 relative">
                         <span id="user-display" class="text-sm font-medium text-slate-700"></span>
                         <button id="menu-btn" class="p-2 rounded-md hover:bg-slate-200">
@@ -99,6 +99,11 @@
                 <p class="text-slate-600">Pick one winner each week. Lose once and you're out.</p>
             </div>
         </header>
+
+        <div id="survivor-timestamps-display" class="text-xs text-gray-500 mb-4 text-center">
+           <span id="survivor-last-access-time"></span>
+           <span id="survivor-last-pick-time" class="ml-4"></span>
+        </div>
 
         <!-- Hidden admin button for JavaScript functionality -->
         <button id="admin-btn" class="hidden"></button>
@@ -389,7 +394,16 @@
                 onAuthStateChanged(auth, user => {
                     currentUser = user;
                     if (user) {
+                        // Store previous access time before updating to current
+                        const currentLastAccess = localStorage.getItem('lastAccess');
+                        if (currentLastAccess) {
+                            localStorage.setItem('previousAccess', currentLastAccess);
+                        }
+                        localStorage.setItem('lastAccess', new Date().toISOString());
+                        
                         allUI.userDisplay.textContent = `Welcome, ${user.displayName ? user.displayName.split(' ')[0] : 'User'}`;
+                        updateSurvivorTimestamps();
+                        
                         // Show admin controls if admin user
                         if (user.uid === ADMIN_UID) {
                             allUI.menuAdminControls.classList.remove('hidden');
@@ -544,18 +558,52 @@
                 html += `</div>`;
                 mainContent.innerHTML = html;
 
+                // Check if picks are locked before adding event listeners
+                const isLocked = await checkSurvivorPickLocked();
+                
                 mainContent.querySelectorAll('.team-btn').forEach(btn => {
-                    btn.addEventListener('click', async e => {
-                        const { team, gameId } = e.target.dataset;
-                        const newPick = {
-                            team: team,
-                            gameId: gameId,
-                        };
-                        userPicks.picks[currentWeek] = newPick;
-                        await setDoc(picksDocRef, userPicks, { merge: true });
-                        renderApp(); // Re-render to show selection
-                    });
+                    if (!btn.disabled && !isLocked) {
+                        btn.addEventListener('click', async e => {
+                            // CRITICAL: Re-check lock status at time of click
+                            const currentlyLocked = await checkSurvivorPickLocked();
+                            if (currentlyLocked) {
+                                alert('Sorry, games have started! Survivor picks are now locked for this week.');
+                                renderApp(); // Re-render to show lock state
+                                return;
+                            }
+                            
+                            const { team, gameId } = e.target.dataset;
+                            const newPick = {
+                                team: team,
+                                gameId: gameId,
+                            };
+                            userPicks.picks[currentWeek] = newPick;
+                            
+                            // Store last survivor pick timestamp
+                            localStorage.setItem('lastSurvivorPick', new Date().toISOString());
+                            
+                            await setDoc(picksDocRef, userPicks, { merge: true });
+                            updateSurvivorTimestamps(); // Update display
+                            renderApp(); // Re-render to show selection
+                        });
+                    }
                 });
+                
+                // If locked, disable all buttons and show message
+                if (isLocked) {
+                    mainContent.querySelectorAll('.team-btn').forEach(btn => {
+                        btn.disabled = true;
+                        btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    });
+                    
+                    const lockMessage = document.createElement('div');
+                    lockMessage.className = 'bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6';
+                    lockMessage.innerHTML = `
+                        <p class="font-bold">Survivor Picks Locked</p>
+                        <p>Games have started for this week. No more survivor picks can be made.</p>
+                    `;
+                    mainContent.insertBefore(lockMessage, mainContent.firstChild);
+                }
             }
 
             async function renderAdminPanel() {
@@ -653,6 +701,76 @@
                     adminPanel.classList.add('hidden');
                 }
             });
+
+            // Timestamp formatting function (same as main app)
+            function formatTimestamp(isoString) {
+                if (!isoString) return '';
+                const date = new Date(isoString);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                
+                // Less than 24 hours - show relative time
+                if (diffHours < 24) {
+                    if (diffMins < 1) return 'just now';
+                    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+                    return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+                }
+                
+                // More than 24 hours - show formatted date
+                const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                const weekday = weekdays[date.getDay()];
+                const month = months[date.getMonth()];
+                const day = date.getDate();
+                const year = date.getFullYear();
+                
+                return `${weekday}, ${month} ${day}, ${year}`;
+            }
+
+            // Update survivor timestamps display
+            function updateSurvivorTimestamps() {
+                const lastAccessEl = document.getElementById('survivor-last-access-time');
+                const lastPickEl = document.getElementById('survivor-last-pick-time');
+                
+                if (lastAccessEl && lastPickEl) {
+                    // Show previous access, not current
+                    const previousAccess = localStorage.getItem('previousAccess');
+                    const lastSurvivorPick = localStorage.getItem('lastSurvivorPick');
+                    
+                    if (previousAccess) {
+                        lastAccessEl.textContent = `Last visit: ${formatTimestamp(previousAccess)}`;
+                    }
+                    
+                    if (lastSurvivorPick) {
+                        lastPickEl.textContent = `Last survivor pick: ${formatTimestamp(lastSurvivorPick)}`;
+                    }
+                }
+            }
+
+            // Check if any game has started for the current week (all survivor picks lock)
+            async function checkSurvivorPickLocked() {
+                try {
+                    const response = await fetch(`nfl_2025_week_${currentWeek}.json`);
+                    if (!response.ok) return false;
+                    const weekData = await response.json();
+                    
+                    if (!weekData.games || !Array.isArray(weekData.games)) return false;
+                    
+                    // Check if ANY game has started
+                    const now = new Date();
+                    return weekData.games.some(game => {
+                        const gameTime = new Date(game.kickoff);
+                        return now > gameTime;
+                    });
+                } catch (error) {
+                    console.error('Error checking game lock status:', error);
+                    return false;
+                }
+            }
 
             initializeSurvivorApp();
         });
