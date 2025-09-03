@@ -3,7 +3,7 @@
 <head>
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>NerdfootballAI v2.0</title>
+ <title>NerdfootballAI v2.80</title>
  
  <!-- iOS Web App Meta Tags -->
  <meta name="apple-mobile-web-app-capable" content="yes">
@@ -27,7 +27,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <meta name="version" content="2.1.0">
+ <meta name="version" content="2.80">
  
  <script src="https://cdn.tailwindcss.com"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -300,7 +300,7 @@
  </a>
  <!-- Right side elements -->
  <div class="flex items-center space-x-4">
- <span class="text-sm font-medium text-slate-600">v2.0</span>
+ <span class="text-sm font-medium text-slate-600">v2.80</span>
  <div class="flex items-center space-x-2 relative">
     <span id="user-display" class="text-sm font-medium text-slate-700"></span>
     <button id="menu-btn" class="p-2 rounded-md hover:bg-slate-200">
@@ -369,8 +369,16 @@
  <div id="save-status-icon" class="w-6 h-6"></div>
  <span id="save-status-text" class="text-sm font-medium"></span>
  </div>
+ <button id="top-save-picks-btn" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 mr-2 flex items-center gap-2">
+   <span id="save-picks-text">Save Picks</span>
+   <div id="save-picks-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+ </button>
  <button id="reset-picks-btn" class="bg-emerald-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-emerald-800">Reset Picks</button>
  </div>
+ </div>
+ <div id="timestamps-display" class="text-xs text-gray-500 mb-4 text-center">
+   <span id="last-access-time"></span>
+   <span id="last-update-time" class="ml-4"></span>
  </div>
  <main id="picks-form">
  <div id="lock-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6" role="alert">
@@ -739,6 +747,7 @@ let functions; // Declare functions globally
  leaderboardLoader: document.getElementById('leaderboard-loader'), leaderboardBody: document.getElementById('leaderboard-body'),
  saveStatusIcon: document.getElementById('save-status-icon'), saveStatusText: document.getElementById('save-status-text'),
  resetPicksBtn: document.getElementById('reset-picks-btn'),
+ topSavePicksBtn: document.getElementById('top-save-picks-btn'),
  adminTabs: document.querySelectorAll('.admin-tab'), adminContentSections: document.querySelectorAll('.admin-content-section'),
  userMgmtBody: document.getElementById('user-mgmt-body'),
  cleanupDuplicatesBtn: document.getElementById('cleanup-duplicates-btn'),
@@ -799,7 +808,7 @@ messageStatusContent: document.getElementById('message-status-content'),
  };
 
  // --- APP STATE ---
- let currentWeek = 1, currentUser = null, db, auth, unsubscribeFromPicks = null, saveTimeout = null;
+ let currentWeek = 1, currentUser = null, db, auth, unsubscribeFromPicks = null, saveTimeout = null, activePicks = {};
  let currentAdminPicks = {}, allUsers = [];
 
  // --- NFL TEAM DATA ---
@@ -1957,6 +1966,13 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
  const savedState = loadAppState();
  
  if (user) {
+ // Store previous access time before updating to current
+ const currentLastAccess = localStorage.getItem('lastAccess');
+ if (currentLastAccess) {
+   localStorage.setItem('previousAccess', currentLastAccess);
+ }
+ localStorage.setItem('lastAccess', new Date().toISOString());
+ 
  const userDocRef = doc(db, usersPath(), user.uid);
  const userDoc = await getDoc(userDocRef);
 
@@ -2816,7 +2832,9 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
  userPicks[game.id] = { winner: null, confidence: index + 1 }; 
  }); 
  } 
- renderWeekUI(weekData, userPicks, weekIsLocked, allUI.gameList); 
+ renderWeekUI(weekData, userPicks, weekIsLocked, allUI.gameList);
+ updatePicksButtonStates(weekData);
+ updateTimestamps(); 
  // Update picks summary if picks view is active
  if (!allUI.picksSummaryContainer.classList.contains('hidden')) {
   renderActivePicksSummary();
@@ -2845,6 +2863,11 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
   const lockedGames = [];
   const validChanges = [];
   const submissionTime = new Date().toISOString();
+
+  // Preserve Monday Night Football tiebreaker points
+  if (picks.mnfTotalPoints !== undefined) {
+    validatedPicks.mnfTotalPoints = picks.mnfTotalPoints;
+  }
 
   weekData.games.forEach(game => {
    const gameId = game.id.toString();
@@ -3270,6 +3293,106 @@ async function calculateLeaderboard(weekNumber = null) {
   await renderYearlyLeaderboard();
  }
 
+ function formatTimestamp(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  
+  // Less than 24 hours - show relative time
+  if (diffHours < 24) {
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+    return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+  }
+  
+  // More than 24 hours - show formatted date
+  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                  'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  const weekday = weekdays[date.getDay()];
+  const month = months[date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+  
+  return `${weekday}, ${month} ${day}, ${year}`;
+}
+
+function updateTimestamps() {
+  const lastAccessEl = document.getElementById('last-access-time');
+  const lastUpdateEl = document.getElementById('last-update-time');
+  
+  if (lastAccessEl && lastUpdateEl) {
+    // Show previous access, not current
+    const previousAccess = localStorage.getItem('previousAccess');
+    const lastUpdate = localStorage.getItem('lastPicksUpdate');
+    
+    if (previousAccess) {
+      lastAccessEl.textContent = `Last visit: ${formatTimestamp(previousAccess)}`;
+    }
+    
+    if (lastUpdate) {
+      lastUpdateEl.textContent = `Last picks update: ${formatTimestamp(lastUpdate)}`;
+    }
+  }
+}
+
+function updatePicksButtonStates(weekData) {
+  if (!weekData || !Array.isArray(weekData.games)) return;
+  
+  // Count unlocked games
+  let unlockedGameCount = 0;
+  let anyGameStarted = false;
+  
+  weekData.games.forEach(game => {
+    if (isGameLocked(game)) {
+      anyGameStarted = true;
+    } else {
+      unlockedGameCount++;
+    }
+  });
+  
+  // Disable Reset Picks button if ANY game has started
+  if (allUI.resetPicksBtn) {
+    allUI.resetPicksBtn.disabled = anyGameStarted;
+    if (anyGameStarted) {
+      allUI.resetPicksBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      allUI.resetPicksBtn.classList.remove('hover:bg-emerald-800');
+    } else {
+      allUI.resetPicksBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      allUI.resetPicksBtn.classList.add('hover:bg-emerald-800');
+    }
+  }
+  
+  // Disable Save Picks button if less than 2 games are unlocked
+  if (allUI.topSavePicksBtn) {
+    allUI.topSavePicksBtn.disabled = unlockedGameCount < 2;
+    if (unlockedGameCount < 2) {
+      allUI.topSavePicksBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      allUI.topSavePicksBtn.classList.remove('hover:bg-blue-700');
+    } else {
+      allUI.topSavePicksBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      allUI.topSavePicksBtn.classList.add('hover:bg-blue-700');
+    }
+  }
+  
+  // Also disable MNF save button if less than 2 games are unlocked
+  const mnfSaveBtn = document.getElementById('mnf-save-btn');
+  if (mnfSaveBtn) {
+    mnfSaveBtn.disabled = unlockedGameCount < 2;
+    if (unlockedGameCount < 2) {
+      mnfSaveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      mnfSaveBtn.classList.remove('hover:bg-blue-700');
+    } else {
+      mnfSaveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      mnfSaveBtn.classList.add('hover:bg-blue-700');
+    }
+  }
+}
+
  function renderWeekUI(weekData, userPicks, weekIsLocked, targetContainer = allUI.gameList) {
  targetContainer.innerHTML = '';
  if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) {
@@ -3314,7 +3437,7 @@ async function calculateLeaderboard(weekNumber = null) {
    const mnfTotalInput = document.createElement('div');
    mnfTotalInput.className = 'mt-6 p-4 border border-blue-300 rounded-lg bg-blue-50';
    const isLocked = isGameLocked(mondayNightGame);
-   const currentGuess = userPicks.mnfTotalPoints || '';
+   const currentGuess = userPicks.mnfTotalPoints || '0';
    
    mnfTotalInput.innerHTML = `
      <div class="flex flex-col gap-2">
@@ -3336,19 +3459,37 @@ async function calculateLeaderboard(weekNumber = null) {
            id="mnf-total-points" 
            min="0" 
            max="150" 
+           step="1"
+           pattern="[0-9]*"
+           inputmode="numeric"
            placeholder="Enter total points" 
            value="${currentGuess}"
            ${isLocked ? 'disabled' : ''} 
            class="w-24 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isLocked ? 'bg-gray-100' : 'bg-white'}"
          />
          ${isLocked ? '<span class="text-xs text-gray-500">(Game has started)</span>' : ''}
+         <button 
+           id="mnf-save-btn" 
+           class="ml-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+           ${isLocked ? 'disabled' : ''}>
+           Save Picks
+         </button>
+         <div id="mnf-save-status" class="hidden flex items-center gap-2 ml-2">
+           <div class="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+           <span class="text-xs text-green-600">Saving...</span>
+         </div>
        </div>
      </div>
    `;
    targetContainer.appendChild(mnfTotalInput);
  }
 
- let activePicks = JSON.parse(JSON.stringify(userPicks));
+ activePicks = JSON.parse(JSON.stringify(userPicks));
+
+// Initialize MNF tiebreaker points if not set  
+if (!activePicks.mnfTotalPoints) {
+  activePicks.mnfTotalPoints = 0;
+}
  
  const saveFunction = targetContainer === allUI.gameList ? savePicksToFirestore : (wk, pks) => { currentAdminPicks = pks; };
 
@@ -3382,16 +3523,75 @@ async function calculateLeaderboard(weekNumber = null) {
 
  // Add event listener for MNF total points input
  const mnfInput = targetContainer.querySelector('#mnf-total-points');
+ const mnfSaveStatus = targetContainer.querySelector('#mnf-save-status');
+ const mnfSaveBtn = targetContainer.querySelector('#mnf-save-btn');
+
+ // Functions to show/hide MNF save spinner
+ function showMnfSaveSpinner() {
+   if (mnfSaveStatus) {
+     mnfSaveStatus.classList.remove('hidden');
+   }
+ }
+
+ function hideMnfSaveSpinner() {
+   if (mnfSaveStatus) {
+     mnfSaveStatus.classList.add('hidden');
+   }
+ }
+
+ let mnfSaveTimeout;
+ 
  if (mnfInput) {
+   // Prevent non-numeric input
+   mnfInput.addEventListener('keydown', (e) => {
+     // Allow backspace, delete, tab, escape, enter, and arrow keys
+     if ([8, 9, 27, 13, 46, 37, 38, 39, 40].includes(e.keyCode) ||
+         // Allow Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+         (e.keyCode === 65 && e.ctrlKey === true) ||
+         (e.keyCode === 67 && e.ctrlKey === true) ||
+         (e.keyCode === 86 && e.ctrlKey === true) ||
+         (e.keyCode === 88 && e.ctrlKey === true)) {
+       return;
+     }
+     // Ensure that it's a number and stop the keypress if not
+     if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+       e.preventDefault();
+     }
+   });
+
    mnfInput.addEventListener('input', (e) => {
+     // Clear any existing timeout
+     if (mnfSaveTimeout) {
+       clearTimeout(mnfSaveTimeout);
+     }
+     
      const totalPoints = parseInt(e.target.value, 10);
      if (!isNaN(totalPoints) && totalPoints >= 0) {
        activePicks.mnfTotalPoints = totalPoints;
-       saveFunction(currentWeek, activePicks);
      } else if (e.target.value === '') {
        delete activePicks.mnfTotalPoints;
-       saveFunction(currentWeek, activePicks);
      }
+     
+     // Set a 5-second delay before auto-saving
+     mnfSaveTimeout = setTimeout(async () => {
+       showMnfSaveSpinner();
+       await saveFunction(currentWeek, activePicks);
+       setTimeout(hideMnfSaveSpinner, 500);
+     }, 5000);
+   });
+ }
+
+ // Add event listener for MNF Save button
+ if (mnfSaveBtn) {
+   mnfSaveBtn.addEventListener('click', async () => {
+     // Clear any pending auto-save timeout
+     if (mnfSaveTimeout) {
+       clearTimeout(mnfSaveTimeout);
+     }
+     
+     showMnfSaveSpinner();
+     await saveFunction(currentWeek, activePicks);
+     setTimeout(hideMnfSaveSpinner, 500);
    });
  }
  }
@@ -3416,6 +3616,7 @@ async function calculateLeaderboard(weekNumber = null) {
     allUI.picksViewBtn.classList.add('active');
     allUI.menuPanel.classList.add('hidden');
     await updatePicksSummary();
+    updateTimestamps();
     saveAppState();
  });
 
@@ -3542,6 +3743,12 @@ async function calculateLeaderboard(weekNumber = null) {
  const weekIsLocked = await getWeekLockStatus(currentWeek);
  if (weekIsLocked) return;
 
+ // Show confirmation dialog
+ const confirmReset = confirm('Are you sure you want to reset all picks for this week? This action cannot be undone.');
+ 
+ // If user clicks Cancel, abort the operation
+ if (!confirmReset) return;
+
  const weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
  if (!Array.isArray(weekData.games) || weekData.games.length === 0) return;
 
@@ -3551,6 +3758,42 @@ async function calculateLeaderboard(weekNumber = null) {
  });
  await savePicksToFirestore(currentWeek, resetPicks);
  });
+
+ // Top Save Picks button event listener
+ allUI.topSavePicksBtn.addEventListener('click', async () => {
+   const savePicksText = document.getElementById('save-picks-text');
+   const savePicksSpinner = document.getElementById('save-picks-spinner');
+   
+   // Show spinner and update text
+   savePicksText.textContent = 'Saving...';
+   savePicksSpinner.classList.remove('hidden');
+   allUI.topSavePicksBtn.disabled = true;
+   
+   try {
+     // Save picks
+     await savePicksToFirestore(currentWeek, activePicks);
+     
+     // Store last update time
+     localStorage.setItem('lastPicksUpdate', new Date().toISOString());
+     
+     // Keep spinner visible for 2 seconds total
+     setTimeout(async () => {
+       savePicksText.textContent = 'Save Picks';
+       savePicksSpinner.classList.add('hidden');
+       // Re-check button states to properly enable/disable
+       const games = await getGamesForWeek(currentWeek);
+       const weekData = { week: currentWeek, games: games };
+       updatePicksButtonStates(weekData);
+       updateTimestamps();
+     }, 2000);
+   } catch (error) {
+     console.error('Error saving picks:', error);
+     savePicksText.textContent = 'Save Picks';
+     savePicksSpinner.classList.add('hidden');
+     allUI.topSavePicksBtn.disabled = false;
+   }
+ });
+
  allUI.userPicksSelector.addEventListener('change', async (e) => {
  const selectedUserId = e.target.value;
  if (!selectedUserId) {
