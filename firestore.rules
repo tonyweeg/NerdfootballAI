@@ -1,0 +1,167 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is a pool admin
+    function isPoolAdmin(poolId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/artifacts/nerdfootball/pools/$(poolId)/metadata/members) &&
+        get(/databases/$(database)/documents/artifacts/nerdfootball/pools/$(poolId)/metadata/members).data[request.auth.uid].role == 'admin';
+    }
+    
+    // Check if user is a pool member
+    function isPoolMember(poolId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/artifacts/nerdfootball/pools/$(poolId)/metadata/members) &&
+        request.auth.uid in get(/databases/$(database)/documents/artifacts/nerdfootball/pools/$(poolId)/metadata/members).data;
+    }
+    
+    // Check if user is a global admin
+    function isGlobalAdmin() {
+      return isAuthenticated() && 
+        request.auth.uid in ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+    }
+    
+    // ============================================
+    // LEGACY DATA ACCESS (Public Data)
+    // ============================================
+    
+    // Legacy user profiles - all authenticated users can read
+    match /artifacts/nerdfootball/public/data/nerdfootball_users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Legacy picks data - all authenticated users can read/write their own
+    match /artifacts/nerdfootball/public/data/nerdfootball_picks/{week}/submissions/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Legacy results - all authenticated users can read, admins can write
+    match /artifacts/nerdfootball/public/data/nerdfootball_results/{week} {
+      allow read: if isAuthenticated();
+      allow write: if isGlobalAdmin();
+    }
+    
+    // Legacy survivor picks - all authenticated users can read/write their own
+    match /artifacts/nerdfootball/public/data/nerdSurvivor_picks/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Legacy survivor status - all authenticated users can read
+    match /artifacts/nerdfootball/public/data/nerdSurvivor_status/status {
+      allow read: if isAuthenticated();
+      allow write: if isGlobalAdmin();
+    }
+    
+    // ============================================
+    // POOL STRUCTURE (Multi-Pool Architecture)
+    // ============================================
+    
+    // Pool metadata - all authenticated users can read, admins can write
+    match /artifacts/nerdfootball/pools/{poolId}/metadata/config {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated(); // Any user can create a pool
+      allow update: if isPoolAdmin(poolId);
+      allow delete: if isGlobalAdmin();
+    }
+    
+    // Pool members - all authenticated users can read, admins can write
+    match /artifacts/nerdfootball/pools/{poolId}/metadata/members {
+      allow read: if isAuthenticated();
+      allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
+    }
+    
+    // Pool invites - pool members can read, admins can write
+    match /artifacts/nerdfootball/pools/{poolId}/metadata/invites {
+      allow read: if isPoolMember(poolId);
+      allow write: if isPoolAdmin(poolId);
+    }
+    
+    // Pool-specific picks data
+    match /artifacts/nerdfootball/pools/{poolId}/data/nerdfootball_picks/{week}/submissions/{userId} {
+      allow read: if isPoolMember(poolId);
+      allow write: if isPoolMember(poolId) && request.auth.uid == userId;
+    }
+    
+    // Pool-specific results
+    match /artifacts/nerdfootball/pools/{poolId}/data/nerdfootball_results/{week} {
+      allow read: if isPoolMember(poolId);
+      allow write: if isPoolAdmin(poolId);
+    }
+    
+    // Pool-specific survivor picks
+    match /artifacts/nerdfootball/pools/{poolId}/data/nerdSurvivor_picks/{userId} {
+      allow read: if isPoolMember(poolId);
+      allow write: if isPoolMember(poolId) && request.auth.uid == userId;
+    }
+    
+    // Pool-specific survivor status
+    match /artifacts/nerdfootball/pools/{poolId}/data/nerdSurvivor_status/status {
+      allow read: if isPoolMember(poolId);
+      allow write: if isPoolAdmin(poolId);
+    }
+    
+    // ============================================
+    // USER POOL MEMBERSHIPS
+    // ============================================
+    
+    // User's pool membership document
+    match /artifacts/nerdfootball/users/{userId}/pools/membership {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isGlobalAdmin());
+    }
+    
+    // ============================================
+    // INVITES
+    // ============================================
+    
+    // Global invite codes
+    match /artifacts/nerdfootball/invites/{inviteCode} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isGlobalAdmin();
+    }
+    
+    // ============================================
+    // MIGRATIONS & ADMIN
+    // ============================================
+    
+    // Migration logs - only global admins
+    match /artifacts/nerdfootball/migrations/{migrationId} {
+      allow read: if isGlobalAdmin();
+      allow write: if isGlobalAdmin();
+    }
+    
+    // ============================================
+    // CLIENT-ACCESSIBLE POOL DATA (Fallback)
+    // ============================================
+    
+    // Allow authenticated users to read/write temporary pool data
+    match /artifacts/nerdfootball/public/pools/{poolId}/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isGlobalAdmin();
+    }
+    
+    // ============================================
+    // CATCH-ALL DENY
+    // ============================================
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
