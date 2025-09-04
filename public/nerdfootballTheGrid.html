@@ -174,6 +174,15 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             
+            // 💎 Load Diamond-Level Cache System
+            const cacheScript = document.createElement('script');
+            cacheScript.src = 'gameStateCache.js';
+            document.head.appendChild(cacheScript);
+            
+            await new Promise(resolve => {
+                cacheScript.onload = resolve;
+            });
+            
             // UI Elements
             const allUI = {
                 userDisplay: document.getElementById('user-display'),
@@ -353,23 +362,27 @@
             };
             
             async function getGamesForWeek(weekNumber) {
-                try {
-                    const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
+                // 🚀 Diamond-level caching for Grid schedule data!
+                return await window.gameStateCache.cacheSchedule(weekNumber, async () => {
+                    try {
+                        console.log(`🔥 Grid: Fetching schedule for week ${weekNumber} (cache miss)`);
+                        const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+                        if (!response.ok) {
+                            throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
+                        }
+                        const weekData = await response.json();
+                        return Array.isArray(weekData.games) ? weekData.games.map(game => ({
+                            id: game.id,
+                            away: game.a,
+                            home: game.h,
+                            kickoff: game.dt,
+                            stadium: game.stadium,
+                        })) : [];
+                    } catch (error) {
+                        console.error(`Error fetching games for week ${weekNumber}:`, error);
+                        return [];
                     }
-                    const weekData = await response.json();
-                    return Array.isArray(weekData.games) ? weekData.games.map(game => ({
-                        id: game.id,
-                        away: game.a,
-                        home: game.h,
-                        kickoff: game.dt,
-                        stadium: game.stadium,
-                    })) : [];
-                } catch (error) {
-                    console.error(`Error fetching games for week ${weekNumber}:`, error);
-                    return [];
-                }
+                });
             }
 
             function getCurrentNflWeek() {
@@ -432,20 +445,33 @@
 
                 const now = new Date();
 
-                const usersSnap = await getDocs(collection(db, usersPath()));
-                const allUsers = [];
-                usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
+                // 💎🚀 DIAMOND-LEVEL GRID DATA CACHING - THE HOLY GRAIL! 🔥✨
+                const gridData = await window.gameStateCache.cacheGridData(selectedWeek, async () => {
+                    console.log(`🔥 Grid: Fetching ALL data for week ${selectedWeek} (cache miss)`);
+                    
+                    // Fetch users
+                    const usersSnap = await getDocs(collection(db, usersPath()));
+                    const allUsers = [];
+                    usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
 
-                const resultsDocRef = doc(db, resultsPath(selectedWeek));
-                const resultsSnap = await getDoc(resultsDocRef);
-                const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+                    // Fetch results
+                    const resultsDocRef = doc(db, resultsPath(selectedWeek));
+                    const resultsSnap = await getDoc(resultsDocRef);
+                    const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
 
-                const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
-                const picksSnap = await getDocs(picksCollectionRef);
-                const allPicks = {};
-                picksSnap.forEach(doc => {
-                    allPicks[doc.id] = doc.data();
+                    // Fetch picks
+                    const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
+                    const picksSnap = await getDocs(picksCollectionRef);
+                    const allPicks = {};
+                    picksSnap.forEach(doc => {
+                        allPicks[doc.id] = doc.data();
+                    });
+                    
+                    return { allUsers, gameResults, allPicks };
                 });
+                
+                // 🚀 Extract cached data - ZERO server calls for repeated access!
+                const { allUsers, gameResults, allPicks } = gridData;
                 
                 const userScores = allUsers.map(user => {
                     let totalPoints = 0;

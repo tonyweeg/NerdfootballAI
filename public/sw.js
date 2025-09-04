@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nerdfootball-v3.0.2';
+const CACHE_NAME = 'nerdfootball-v3.1.0';
 
 // NFL Team Helmet URLs for aggressive caching
 const HELMET_URLS = [
@@ -39,6 +39,7 @@ const HELMET_URLS = [
 const urlsToCache = [
   '/',
   '/manifest.json',
+  '/gameStateCache.js',
   ...HELMET_URLS
 ];
 

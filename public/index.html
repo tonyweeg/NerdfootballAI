@@ -1367,11 +1367,23 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 let saveTimeout;
 let functions; // Declare functions globally
 
- document.addEventListener('DOMContentLoaded', () => {
+ document.addEventListener('DOMContentLoaded', async () => {
+
+// 💎 Load Diamond-Level Cache System
+const cacheScript = document.createElement('script');
+cacheScript.src = 'gameStateCache.js';
+document.head.appendChild(cacheScript);
+
+await new Promise(resolve => {
+    cacheScript.onload = resolve;
+});
  
- // --- DATA & TIME LOGIC ---
+ // --- DATA & TIME LOGIC WITH DIAMOND CACHING 💎🔥 ---
  async function getGamesForWeek(weekNumber) {
+ // 🚀 Use diamond-level caching for schedule data!
+ return await window.gameStateCache.cacheSchedule(weekNumber, async () => {
  try {
+ console.log(`🔥 Fetching schedule for week ${weekNumber} (cache miss)`);
  const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
  if (!response.ok) {
  throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
@@ -1388,6 +1400,7 @@ let functions; // Declare functions globally
  console.error(`Error fetching games for week ${weekNumber}:`, error);
  return [];
  }
+ });
  }
 
  function getCurrentNflWeek() {
@@ -1660,16 +1673,21 @@ migrationResultsContent: document.getElementById('migration-results-content')
 
  // Optimized user fetching with cache
  async function getCachedUsers() {
-  if (isCacheValid(firebaseCache.users)) {
-   return firebaseCache.users.data;
-  }
-  
-  const usersSnap = await getDocs(collection(db, usersPath()));
-  const users = {};
-  usersSnap.forEach(doc => users[doc.id] = doc.data());
-  
-  setCacheData(firebaseCache.users, users);
-  return users;
+  // 💎 Diamond-level user caching with fallback to existing cache
+  return await window.gameStateCache.cacheUsers(async () => {
+    if (isCacheValid(firebaseCache.users)) {
+     console.log('💎 Using existing Firebase user cache');
+     return firebaseCache.users.data;
+    }
+    
+    console.log('🔥 Fetching users from Firestore (cache miss)');
+    const usersSnap = await getDocs(collection(db, usersPath()));
+    const users = {};
+    usersSnap.forEach(doc => users[doc.id] = doc.data());
+    
+    setCacheData(firebaseCache.users, users);
+    return users;
+  });
  }
 
  // Get cleaned user data (deduplicated) for leaderboards
