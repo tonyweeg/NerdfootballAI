@@ -35,16 +35,16 @@ service cloud.firestore {
     // LEGACY DATA ACCESS (Public Data)
     // ============================================
     
-    // Legacy user profiles - all authenticated users can read
+    // Legacy user profiles - all authenticated users can read, users can write their own, global admins can write any
     match /artifacts/nerdfootball/public/data/nerdfootball_users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isGlobalAdmin());
     }
     
-    // Legacy picks data - all authenticated users can read/write their own
+    // Legacy picks data - all authenticated users can read/write their own, global admins can write any
     match /artifacts/nerdfootball/public/data/nerdfootball_picks/{week}/submissions/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isGlobalAdmin());
     }
     
     // Legacy results - all authenticated users can read, admins can write
@@ -80,7 +80,7 @@ service cloud.firestore {
     // Pool members - all authenticated users can read, admins can write
     match /artifacts/nerdfootball/pools/{poolId}/metadata/members {
       allow read: if isAuthenticated();
-      allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
+      allow write: if isGlobalAdmin() || isPoolAdmin(poolId);
     }
     
     // Pool invites - pool members can read, admins can write
@@ -114,13 +114,39 @@ service cloud.firestore {
     }
     
     // ============================================
+    // POOL CONFIGS
+    // ============================================
+    
+    // Pool configuration documents - pool admins can read/write
+    match /poolConfigs/{poolId} {
+      allow read: if isAuthenticated();
+      allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
+    }
+    
+    // ============================================
     // USER POOL MEMBERSHIPS
     // ============================================
     
-    // User's pool membership document
+    // User's pool membership document (legacy path)
     match /artifacts/nerdfootball/users/{userId}/pools/membership {
       allow read: if isAuthenticated() && request.auth.uid == userId;
       allow write: if isAuthenticated() && (request.auth.uid == userId || isGlobalAdmin());
+    }
+    
+    // User's pools collection (new path)
+    match /userPools/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isGlobalAdmin());
+    }
+    
+    // ============================================
+    // AUDIT LOGS
+    // ============================================
+    
+    // Audit logs - pool admins and global admins can write, pool members can read
+    match /auditLogs/{poolId}/{document=**} {
+      allow read: if isPoolMember(poolId) || isGlobalAdmin();
+      allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
     }
     
     // ============================================

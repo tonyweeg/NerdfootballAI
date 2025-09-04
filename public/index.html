@@ -753,6 +753,63 @@ Role
            </div>
        </div>
 
+       <!-- Unassociated Users Management -->
+       <div class="bg-white border border-slate-200 rounded-lg">
+           <div class="px-6 py-4 border-b border-slate-200">
+               <h4 class="text-lg font-semibold text-slate-800">Add Users to <span id="add-users-pool-name">Pool</span></h4>
+               <p class="text-sm text-slate-600 mt-1">Add existing system users to this pool</p>
+           </div>
+           
+           <!-- Recent Users Section -->
+           <div class="p-6 border-b border-slate-200">
+               <div class="flex items-center justify-between mb-4">
+                   <h5 class="text-md font-medium text-slate-700">Recent Users</h5>
+                   <div id="recent-users-loading" class="hidden">
+                       <svg class="animate-spin h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                       </svg>
+                   </div>
+               </div>
+               <div id="recent-users-list" class="space-y-3">
+                   <div class="text-sm text-slate-500 text-center py-8">
+                       Loading recent users...
+                   </div>
+               </div>
+           </div>
+           
+           <!-- Search Users Section -->
+           <div class="p-6">
+               <div class="mb-4">
+                   <label for="user-search-input" class="block text-sm font-medium text-slate-700 mb-2">
+                       Search for User
+                   </label>
+                   <div class="relative">
+                       <input 
+                           type="text" 
+                           id="user-search-input" 
+                           class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-md leading-5 bg-white placeholder-slate-500 focus:outline-none focus:placeholder-slate-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                           placeholder="Search by name or email..."
+                       />
+                       <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                           <svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                           </svg>
+                       </div>
+                       <div id="search-loading" class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none hidden">
+                           <svg class="animate-spin h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                           </svg>
+                       </div>
+                   </div>
+               </div>
+               <div id="search-results-list" class="space-y-3">
+                   <!-- Search results will be populated here -->
+               </div>
+           </div>
+       </div>
+
        <!-- Invite Links Management -->
        <div class="bg-white border border-slate-200 rounded-lg">
            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -826,7 +883,7 @@ Role
             </div>
 
             <!-- Rules Content -->
-            <div class="space-y-6 max-h-96 overflow-y-auto">
+            <div class="space-y-6">
                 <!-- Confidence Pick Rules -->
                 <div class="border-b border-slate-200 pb-4">
                     <h3 class="text-xl font-bold text-slate-800 mb-3">🏈 Confidence Pick Rules</h3>
@@ -1447,6 +1504,72 @@ Role
         </div>
     </div>
 
+    <!-- Add User to Pool Modal -->
+    <div id="add-user-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex" role="dialog" aria-labelledby="add-user-title" aria-modal="true">
+        <div class="fixed inset-0 bg-black bg-opacity-50" aria-hidden="true"></div>
+        <div class="relative p-6 bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 id="add-user-title" class="text-lg font-semibold text-slate-800">Add User to Pool</h3>
+                <button id="close-add-user-modal" class="text-slate-400 hover:text-slate-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- User Info Display -->
+            <div class="mb-6 p-4 bg-slate-50 rounded-lg">
+                <div class="flex items-center space-x-3">
+                    <div class="flex-shrink-0 w-10 h-10 bg-slate-300 rounded-full flex items-center justify-center">
+                        <span id="modal-user-avatar" class="text-sm font-medium text-slate-700">?</span>
+                    </div>
+                    <div class="flex-1">
+                        <div id="modal-user-name" class="text-sm font-medium text-slate-900">User Name</div>
+                        <div id="modal-user-email" class="text-xs text-slate-500">user@example.com</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Role Selection -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-700 mb-3">Select Role</label>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="user-role" value="member" class="h-4 w-4 text-blue-600 border-slate-300 focus:ring-blue-500" checked>
+                        <span class="ml-3 text-sm text-slate-700">
+                            <span class="font-medium">Member</span>
+                            <span class="text-slate-500">- Can make picks and view leaderboard</span>
+                        </span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="user-role" value="admin" class="h-4 w-4 text-blue-600 border-slate-300 focus:ring-blue-500">
+                        <span class="ml-3 text-sm text-slate-700">
+                            <span class="font-medium">Admin</span>
+                            <span class="text-slate-500">- Full pool management access</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end space-x-3">
+                <button id="cancel-add-user" class="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-500">
+                    Cancel
+                </button>
+                <button id="confirm-add-user" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span id="add-user-btn-text">Add to Pool</span>
+                    <div id="add-user-loading" class="hidden inline-flex items-center">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Adding...
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- NerdUniverse Migration Modal -->
     <div id="migration-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex" role="dialog" aria-labelledby="migration-title" aria-modal="true">
         <div class="fixed inset-0 bg-black bg-opacity-50" aria-hidden="true"></div>
@@ -1514,7 +1637,7 @@ Role
  <script type="module">
  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
  import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updateEmail, signOut, GoogleAuthProvider, signInWithPopup, linkWithCredential, fetchSignInMethodsForEmail, verifyBeforeUpdateEmail, sendEmailVerification, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
- import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+ import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField, serverTimestamp, runTransaction, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
  const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
@@ -1697,6 +1820,22 @@ createInviteLinkBtn: document.getElementById('create-invite-link-btn'),
 inviteLinksContainer: document.getElementById('invite-links-container'),
 archivePoolBtn: document.getElementById('archive-pool-btn'),
 deletePoolBtn: document.getElementById('delete-pool-btn'),
+// Add Users to Pool Elements
+addUsersPoolName: document.getElementById('add-users-pool-name'),
+recentUsersList: document.getElementById('recent-users-list'),
+recentUsersLoading: document.getElementById('recent-users-loading'),
+userSearchInput: document.getElementById('user-search-input'),
+searchLoading: document.getElementById('search-loading'),
+searchResultsList: document.getElementById('search-results-list'),
+addUserModal: document.getElementById('add-user-modal'),
+closeAddUserModal: document.getElementById('close-add-user-modal'),
+modalUserAvatar: document.getElementById('modal-user-avatar'),
+modalUserName: document.getElementById('modal-user-name'),
+modalUserEmail: document.getElementById('modal-user-email'),
+cancelAddUser: document.getElementById('cancel-add-user'),
+confirmAddUser: document.getElementById('confirm-add-user'),
+addUserBtnText: document.getElementById('add-user-btn-text'),
+addUserLoading: document.getElementById('add-user-loading'),
 // Pool Discovery Elements
 discoverPoolsBtn: document.getElementById('discover-pools-btn'),
 poolDiscoveryModal: document.getElementById('pool-discovery-modal'),
@@ -2001,6 +2140,643 @@ migrationResultsContent: document.getElementById('migration-results-content')
  return allUsers; // 🔥 CRITICAL FIX: Return the deduplicated users array!
  }
 
+ // 💎 ADD USERS TO POOL FUNCTIONS - Diamond Level Implementation! 🚀
+
+ async function fetchRecentUsers() {
+  try {
+    console.log('🔍 Fetching recent users for pool addition...');
+    
+    // Get all users and sort by creation date (most recent first)
+    const usersCollectionRef = collection(db, usersPath());
+    const usersQuery = query(usersCollectionRef, orderBy('createdAt', 'desc'), limit(20));
+    const usersSnap = await getDocs(usersQuery);
+    
+    const recentUsers = [];
+    usersSnap.forEach(doc => {
+      recentUsers.push({ id: doc.id, ...doc.data() });
+    });
+    
+    // If createdAt field doesn't exist, fall back to fetching all and sorting by ID
+    if (recentUsers.length === 0) {
+      const allUsersSnap = await getDocs(usersCollectionRef);
+      const allUsersArray = [];
+      allUsersSnap.forEach(doc => {
+        allUsersArray.push({ id: doc.id, ...doc.data() });
+      });
+      
+      // Sort by ID descending as fallback (newer UIDs are typically larger)
+      allUsersArray.sort((a, b) => b.id.localeCompare(a.id));
+      return allUsersArray.slice(0, 10);
+    }
+    
+    console.log(`💎 Found ${recentUsers.length} recent users`);
+    return recentUsers.slice(0, 10);
+    
+  } catch (error) {
+    console.error('Error fetching recent users:', error);
+    return [];
+  }
+ }
+
+ async function filterUsersNotInPool(users, poolId) {
+  try {
+    console.log(`🔍 Filtering users not in pool: ${poolId}`);
+    
+    // Get current pool members
+    const poolMembersRef = doc(db, getPoolMembersPath(poolId));
+    const poolMembersSnap = await getDoc(poolMembersRef);
+    
+    const currentMembers = new Set();
+    if (poolMembersSnap.exists()) {
+      const membersData = poolMembersSnap.data();
+      Object.keys(membersData).forEach(uid => currentMembers.add(uid));
+    }
+    
+    // Filter out users already in the pool
+    const availableUsers = users.filter(user => !currentMembers.has(user.id));
+    
+    console.log(`💎 Found ${availableUsers.length} users not in pool (filtered ${currentMembers.size} existing members)`);
+    return availableUsers;
+    
+  } catch (error) {
+    console.error('Error filtering users not in pool:', error);
+    return users; // Return all users if filtering fails
+  }
+ }
+
+ async function searchUsers(searchTerm) {
+  try {
+    if (!searchTerm || searchTerm.trim().length < 2) {
+      return [];
+    }
+    
+    console.log(`🔍 Searching users with term: "${searchTerm}"`);
+    
+    const allUsers = await fetchAllUsers();
+    const searchRegex = new RegExp(searchTerm.trim(), 'i'); // Case insensitive
+    
+    const matchingUsers = allUsers.filter(user => {
+      const displayName = user.displayName || '';
+      const email = user.email || '';
+      return searchRegex.test(displayName) || searchRegex.test(email);
+    });
+    
+    console.log(`💎 Found ${matchingUsers.length} users matching "${searchTerm}"`);
+    return matchingUsers;
+    
+  } catch (error) {
+    console.error('Error searching users:', error);
+    return [];
+  }
+ }
+
+ // 💎 CORE ADD USER TO POOL FUNCTION - Complete Database Associations! 🚀
+ async function addUserToPool(userId, userEmail, userDisplayName, role, poolId, poolName, adminUID) {
+  try {
+    console.log(`💎 Adding user ${userId} (${userDisplayName}) to pool ${poolId} as ${role}`);
+    
+    // Validate inputs
+    if (!userId || !role || !poolId || !adminUID) {
+      throw new Error('Missing required parameters for user addition');
+    }
+    
+    // Validate user doesn't already exist in pool
+    const poolMembersRef = doc(db, getPoolMembersPath(poolId));
+    const poolMembersSnap = await getDoc(poolMembersRef);
+    
+    if (poolMembersSnap.exists()) {
+      const members = poolMembersSnap.data();
+      if (members[userId]) {
+        throw new Error(`User is already a member of this pool with role: ${members[userId].role}`);
+      }
+    }
+    
+    // Use transaction to ensure atomicity - ALL READS FIRST, THEN ALL WRITES
+    await runTransaction(db, async (transaction) => {
+      const now = new Date();
+      const timestamp = now.toISOString();
+      
+      // PHASE 1: ALL READS (must come first in Firestore transactions)
+      const poolConfigRef = doc(db, `poolConfigs/${poolId}`);
+      const poolConfigSnap = await transaction.get(poolConfigRef);
+      
+      // PHASE 2: ALL WRITES (after all reads are complete)
+      
+      // 1. Update poolMembers/{poolId} - Add user with role and metadata
+      const poolMemberData = {
+        [userId]: {
+          role: role,
+          addedBy: adminUID,
+          addedAt: timestamp,
+          email: userEmail,
+          displayName: userDisplayName,
+          status: 'active'
+        }
+      };
+      
+      transaction.update(poolMembersRef, poolMemberData);
+      console.log('✅ Updated poolMembers document');
+      
+      // 2. Update userPools/{userUID} - Add pool membership record
+      const userPoolsRef = doc(db, `userPools/${userId}`);
+      const userPoolData = {
+        [poolId]: {
+          role: role,
+          joinedAt: timestamp,
+          addedBy: adminUID,
+          poolName: poolName,
+          status: 'active'
+        }
+      };
+      
+      transaction.set(userPoolsRef, userPoolData, { merge: true });
+      console.log('✅ Updated userPools document');
+      
+      // 3. Initialize picks documents for current and future weeks
+      const currentWeek = getCurrentNflWeek();
+      const maxWeeks = 18; // NFL season weeks
+      
+      for (let week = currentWeek; week <= maxWeeks; week++) {
+        const picksDocRef = doc(db, picksPath(week, userId));
+        const initialPicksData = {
+          userId: userId,
+          poolId: poolId,
+          weekNumber: week,
+          picks: {}, // Empty picks object
+          survivorPick: '', // Empty survivor pick
+          mnfTotalPoints: 0,
+          lastUpdated: timestamp,
+          createdAt: timestamp
+        };
+        
+        transaction.set(picksDocRef, initialPicksData, { merge: true });
+      }
+      console.log(`✅ Initialized picks documents for weeks ${currentWeek}-${maxWeeks}`);
+      
+      // 4. Update pool member count statistics (using data from read phase)
+      if (poolConfigSnap.exists()) {
+        const currentConfig = poolConfigSnap.data();
+        const currentMemberCount = currentConfig.memberCount || 0;
+        
+        transaction.update(poolConfigRef, {
+          memberCount: currentMemberCount + 1,
+          lastUpdated: timestamp
+        });
+        console.log('✅ Updated pool member count statistics');
+      }
+      
+      // 5. Create audit log entry
+      const auditLogRef = doc(db, `auditLogs/${poolId}`, 'userActions', `${Date.now()}_${userId}`);
+      const auditData = {
+        action: 'USER_ADDED_TO_POOL',
+        targetUserId: userId,
+        targetUserEmail: userEmail,
+        targetUserDisplayName: userDisplayName,
+        role: role,
+        performedBy: adminUID,
+        poolId: poolId,
+        poolName: poolName,
+        timestamp: timestamp,
+        metadata: {
+          additionMethod: 'admin_interface',
+          userAgent: navigator.userAgent
+        }
+      };
+      
+      transaction.set(auditLogRef, auditData);
+      console.log('✅ Created audit log entry');
+    });
+    
+    console.log(`🎉 Successfully added ${userDisplayName} to pool ${poolName} as ${role}!`);
+    return { success: true, message: `${userDisplayName} successfully added as ${role}` };
+    
+  } catch (error) {
+    console.error('💥 Error adding user to pool:', error);
+    
+    // Provide specific error messages
+    if (error.message.includes('already a member')) {
+      return { success: false, message: error.message };
+    } else if (error.message.includes('Missing required parameters')) {
+      return { success: false, message: 'Invalid request - missing required information' };
+    } else if (error.code === 'permission-denied') {
+      return { success: false, message: 'Permission denied - insufficient privileges' };
+    } else if (error.code === 'network-request-failed') {
+      return { success: false, message: 'Network error - please check your connection and try again' };
+    } else {
+      return { success: false, message: 'Failed to add user - please try again' };
+    }
+  }
+ }
+
+ // 💎 ADD USERS SECTION INITIALIZATION & INTERACTIONS - Diamond Level! 🚀
+ 
+ let searchTimeout = null;
+ let currentSelectedUser = null;
+ 
+ async function initializeAddUsersSection() {
+  try {
+    console.log('💎 Initializing Add Users section...');
+    
+    const currentPool = getCurrentPool();
+    const poolName = getPoolDisplayName(currentPool);
+    
+    // Update pool name in the header
+    if (allUI.addUsersPoolName) {
+      allUI.addUsersPoolName.textContent = poolName;
+    }
+    
+    // Load and display recent users
+    await loadRecentUsersDisplay();
+    
+    // Setup search functionality
+    setupUserSearch();
+    
+    // Setup modal interactions
+    setupModalInteractions();
+    
+    console.log('✅ Add Users section initialized successfully');
+    
+  } catch (error) {
+    console.error('Error initializing Add Users section:', error);
+  }
+ }
+ 
+ async function loadRecentUsersDisplay() {
+  try {
+    // Show loading
+    if (allUI.recentUsersLoading) allUI.recentUsersLoading.classList.remove('hidden');
+    
+    // Fetch recent users
+    const recentUsers = await fetchRecentUsers();
+    const currentPoolId = getCurrentPool();
+    const availableUsers = await filterUsersNotInPool(recentUsers, currentPoolId);
+    
+    // Hide loading
+    if (allUI.recentUsersLoading) allUI.recentUsersLoading.classList.add('hidden');
+    
+    if (availableUsers.length === 0) {
+      allUI.recentUsersList.innerHTML = `
+        <div class="text-center py-8 text-slate-500">
+          <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+          </svg>
+          <p class="text-sm">No recent users available to add to this pool.</p>
+          <p class="text-xs text-slate-400 mt-1">Use the search below to find other users.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    // Display recent users with inline role toggles
+    const usersHTML = availableUsers.map(user => {
+      const avatar = (user.displayName || user.email || '?').charAt(0).toUpperCase();
+      const displayName = user.displayName || 'Unknown User';
+      const email = user.email || 'No email';
+      
+      return `
+        <div class="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
+          <div class="flex items-center space-x-3">
+            <div class="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+              <span class="text-sm font-medium text-white">${avatar}</span>
+            </div>
+            <div class="flex-1">
+              <div class="text-sm font-medium text-slate-900">${displayName}</div>
+              <div class="text-xs text-slate-500">${email}</div>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2">
+            <div class="inline-role-selector hidden" data-user-id="${user.id}" data-user-name="${displayName}" data-user-email="${email}">
+              <div class="flex items-center space-x-2 bg-slate-100 rounded-lg p-2">
+                <label class="flex items-center cursor-pointer">
+                  <input type="radio" name="role-${user.id}" value="member" class="h-3 w-3 text-blue-600" checked>
+                  <span class="ml-1 text-xs text-slate-700">Member</span>
+                </label>
+                <label class="flex items-center cursor-pointer">
+                  <input type="radio" name="role-${user.id}" value="admin" class="h-3 w-3 text-blue-600">
+                  <span class="ml-1 text-xs text-slate-700">Admin</span>
+                </label>
+                <button class="confirm-add-btn text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700" data-user-id="${user.id}">
+                  Add
+                </button>
+                <button class="cancel-add-btn text-xs px-2 py-1 bg-slate-300 text-slate-700 rounded hover:bg-slate-400" data-user-id="${user.id}">
+                  Cancel
+                </button>
+              </div>
+            </div>
+            <button class="add-user-btn px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700" data-user-id="${user.id}" data-user-name="${displayName}" data-user-email="${email}">
+              Add to Pool
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    allUI.recentUsersList.innerHTML = usersHTML;
+    
+    // Setup inline add button interactions
+    setupInlineAddButtons();
+    
+    console.log(`💎 Displayed ${availableUsers.length} recent users`);
+    
+  } catch (error) {
+    console.error('Error loading recent users display:', error);
+    allUI.recentUsersList.innerHTML = `
+      <div class="text-center py-8 text-red-500">
+        <p class="text-sm">Error loading recent users.</p>
+        <button onclick="loadRecentUsersDisplay()" class="text-xs text-blue-600 hover:text-blue-800 mt-1">Try again</button>
+      </div>
+    `;
+  }
+ }
+ 
+ function setupInlineAddButtons() {
+  // Add user buttons (show role selector)
+  document.querySelectorAll('.add-user-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const userId = e.target.dataset.userId;
+      const container = e.target.closest('.flex.items-center.justify-between');
+      const addBtn = container.querySelector('.add-user-btn');
+      const roleSelector = container.querySelector('.inline-role-selector');
+      
+      // Hide add button, show role selector
+      addBtn.classList.add('hidden');
+      roleSelector.classList.remove('hidden');
+    });
+  });
+  
+  // Cancel buttons
+  document.querySelectorAll('.cancel-add-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const userId = e.target.dataset.userId;
+      const container = e.target.closest('.flex.items-center.justify-between');
+      const addBtn = container.querySelector('.add-user-btn');
+      const roleSelector = container.querySelector('.inline-role-selector');
+      
+      // Show add button, hide role selector
+      addBtn.classList.remove('hidden');
+      roleSelector.classList.add('hidden');
+    });
+  });
+  
+  // Confirm add buttons
+  document.querySelectorAll('.confirm-add-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const userId = e.target.dataset.userId;
+      const container = e.target.closest('.flex.items-center.justify-between');
+      const roleSelector = container.querySelector('.inline-role-selector');
+      const selectedRole = roleSelector.querySelector(`input[name="role-${userId}"]:checked`).value;
+      const userName = roleSelector.dataset.userName;
+      const userEmail = roleSelector.dataset.userEmail;
+      
+      await executeAddUser(userId, userEmail, userName, selectedRole);
+    });
+  });
+ }
+ 
+ function setupUserSearch() {
+  if (!allUI.userSearchInput) return;
+  
+  allUI.userSearchInput.addEventListener('input', (e) => {
+    const searchTerm = e.target.value.trim();
+    
+    // Clear previous timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    // Show loading if there's a search term
+    if (searchTerm.length >= 2) {
+      if (allUI.searchLoading) allUI.searchLoading.classList.remove('hidden');
+    } else {
+      if (allUI.searchLoading) allUI.searchLoading.classList.add('hidden');
+      allUI.searchResultsList.innerHTML = '';
+      return;
+    }
+    
+    // Debounce search with 300ms delay
+    searchTimeout = setTimeout(async () => {
+      await performUserSearch(searchTerm);
+    }, 300);
+  });
+ }
+ 
+ async function performUserSearch(searchTerm) {
+  try {
+    if (allUI.searchLoading) allUI.searchLoading.classList.remove('hidden');
+    
+    const matchingUsers = await searchUsers(searchTerm);
+    const currentPoolId = getCurrentPool();
+    const availableUsers = await filterUsersNotInPool(matchingUsers, currentPoolId);
+    
+    if (allUI.searchLoading) allUI.searchLoading.classList.add('hidden');
+    
+    if (availableUsers.length === 0) {
+      allUI.searchResultsList.innerHTML = `
+        <div class="text-center py-4 text-slate-500">
+          <p class="text-sm">No users found matching "${searchTerm}"</p>
+        </div>
+      `;
+      return;
+    }
+    
+    // Display search results (modal dialog approach)
+    const resultsHTML = availableUsers.map(user => {
+      const avatar = (user.displayName || user.email || '?').charAt(0).toUpperCase();
+      const displayName = user.displayName || 'Unknown User';
+      const email = user.email || 'No email';
+      
+      return `
+        <div class="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer search-user-item" data-user-id="${user.id}" data-user-name="${displayName}" data-user-email="${email}">
+          <div class="flex items-center space-x-3">
+            <div class="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+              <span class="text-xs font-medium text-white">${avatar}</span>
+            </div>
+            <div class="flex-1">
+              <div class="text-sm font-medium text-slate-900">${displayName}</div>
+              <div class="text-xs text-slate-500">${email}</div>
+            </div>
+          </div>
+          <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </div>
+      `;
+    }).join('');
+    
+    allUI.searchResultsList.innerHTML = resultsHTML;
+    
+    // Setup search result click handlers
+    document.querySelectorAll('.search-user-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const userId = e.currentTarget.dataset.userId;
+        const userName = e.currentTarget.dataset.userName;
+        const userEmail = e.currentTarget.dataset.userEmail;
+        
+        openAddUserModal(userId, userName, userEmail);
+      });
+    });
+    
+    console.log(`💎 Found ${availableUsers.length} users matching "${searchTerm}"`);
+    
+  } catch (error) {
+    console.error('Error performing user search:', error);
+    if (allUI.searchLoading) allUI.searchLoading.classList.add('hidden');
+    allUI.searchResultsList.innerHTML = `
+      <div class="text-center py-4 text-red-500">
+        <p class="text-sm">Error searching users. Please try again.</p>
+      </div>
+    `;
+  }
+ }
+ 
+ function setupModalInteractions() {
+  // Close modal buttons
+  [allUI.closeAddUserModal, allUI.cancelAddUser].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', closeAddUserModal);
+    }
+  });
+  
+  // Confirm add user in modal
+  if (allUI.confirmAddUser) {
+    allUI.confirmAddUser.addEventListener('click', async (e) => {
+      e.preventDefault();
+      
+      if (!currentSelectedUser) {
+        console.error('No user selected for addition');
+        return;
+      }
+      
+      const selectedRole = document.querySelector('input[name="user-role"]:checked')?.value || 'member';
+      await executeAddUser(currentSelectedUser.id, currentSelectedUser.email, currentSelectedUser.name, selectedRole, true);
+    });
+  }
+ }
+ 
+ function openAddUserModal(userId, userName, userEmail) {
+  currentSelectedUser = { id: userId, name: userName, email: userEmail };
+  
+  // Update modal content
+  if (allUI.modalUserName) allUI.modalUserName.textContent = userName;
+  if (allUI.modalUserEmail) allUI.modalUserEmail.textContent = userEmail;
+  if (allUI.modalUserAvatar) allUI.modalUserAvatar.textContent = (userName || userEmail || '?').charAt(0).toUpperCase();
+  
+  // Reset role selection to member
+  const memberRadio = document.querySelector('input[name="user-role"][value="member"]');
+  if (memberRadio) memberRadio.checked = true;
+  
+  // Show modal
+  if (allUI.addUserModal) allUI.addUserModal.classList.remove('hidden');
+ }
+ 
+ function closeAddUserModal() {
+  currentSelectedUser = null;
+  if (allUI.addUserModal) allUI.addUserModal.classList.add('hidden');
+ }
+ 
+ async function executeAddUser(userId, userEmail, userName, role, isFromModal = false) {
+  try {
+    console.log(`💎 Executing add user: ${userId} (${userName}) as ${role}`);
+    
+    // Show loading state
+    if (isFromModal) {
+      allUI.addUserBtnText.classList.add('hidden');
+      allUI.addUserLoading.classList.remove('hidden');
+      allUI.confirmAddUser.disabled = true;
+    }
+    
+    const currentPoolId = getCurrentPool();
+    const poolName = getPoolDisplayName(currentPoolId);
+    const adminUID = currentUser.uid;
+    
+    // Execute the addition
+    const result = await addUserToPool(userId, userEmail, userName, role, currentPoolId, poolName, adminUID);
+    
+    if (result.success) {
+      // Success feedback
+      showMessage(`✅ ${result.message}`, 'success');
+      
+      // Close modal if open
+      if (isFromModal) {
+        closeAddUserModal();
+      }
+      
+      // Refresh displays
+      await Promise.all([
+        loadPoolMembers(), // Refresh pool members list
+        loadRecentUsersDisplay() // Refresh recent users (remove the added user)
+      ]);
+      
+      // Clear search if there was one
+      if (allUI.userSearchInput) {
+        allUI.userSearchInput.value = '';
+        allUI.searchResultsList.innerHTML = '';
+      }
+      
+    } else {
+      // Error feedback
+      showMessage(`❌ ${result.message}`, 'error');
+    }
+    
+  } catch (error) {
+    console.error('Error in executeAddUser:', error);
+    showMessage('❌ Unexpected error occurred while adding user', 'error');
+  } finally {
+    // Reset loading state
+    if (isFromModal && allUI.confirmAddUser) {
+      allUI.addUserBtnText.classList.remove('hidden');
+      allUI.addUserLoading.classList.add('hidden');
+      allUI.confirmAddUser.disabled = false;
+    }
+  }
+ }
+ 
+ function showMessage(message, type = 'info') {
+  // Create or update a toast message
+  let toast = document.getElementById('add-user-toast');
+  
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'add-user-toast';
+    toast.className = 'fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg max-w-sm';
+    document.body.appendChild(toast);
+  }
+  
+  // Set styling based on type
+  toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg max-w-sm ${
+    type === 'success' ? 'bg-green-500 text-white' :
+    type === 'error' ? 'bg-red-500 text-white' :
+    'bg-blue-500 text-white'
+  }`;
+  
+  toast.innerHTML = `
+    <div class="flex items-center space-x-2">
+      <span class="text-sm font-medium">${message}</span>
+      <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+  `;
+  
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    if (toast && toast.parentNode) {
+      toast.remove();
+    }
+  }, 5000);
+ }
+ 
+ function getPoolDisplayName(poolId) {
+  // Get pool name from metadata or use fallback
+  if (typeof getCurrentPoolName === 'function') {
+    return getCurrentPoolName();
+  }
+  return poolId.replace(/-/g, ' ').replace(/^\w/, c => c.toUpperCase());
+ }
+
  async function cleanupDuplicateUsers() {
   try {
    console.log('Starting cleanup of duplicate users...');
@@ -2071,9 +2847,17 @@ migrationResultsContent: document.getElementById('migration-results-content')
    // Step 4: Clean up any other user references (if any exist in other collections)
    console.log('Checking for other user references...');
    
-   // Step 5: Refresh the user list
-   await fetchAllUsers();
-   renderUserManagement();
+   // Step 5: Refresh the user list (with small delay to avoid connection issues)
+   setTimeout(async () => {
+     try {
+       await fetchAllUsers();
+       renderUserManagement();
+     } catch (error) {
+       console.log('Non-critical cache refresh error after user deletion:', error);
+       // Still render with existing data
+       renderUserManagement();
+     }
+   }, 1000);
    
    alert(`✅ User "${userName}" has been completely removed from the system.\n\nAll data deleted:\n- User profile\n- All weekly picks (weeks 1-18)\n- Survivor picks\n- All associated data`);
    
@@ -2633,7 +3417,7 @@ async function getFilteredRecipients(recipientType, weekNumber) {
 }
 
 async function updateRecipientCount() {
-    const weekNumber = allUI.adminWeekSelector ? allUI.adminWeekSelector.value : getCurrentWeek();
+    const weekNumber = allUI.adminWeekSelector ? allUI.adminWeekSelector.value : getCurrentNflWeek();
     const recipientType = allUI.messageRecipients.value;
     const recipients = await getFilteredRecipients(recipientType, weekNumber);
     allUI.recipientCountNumber.textContent = recipients.length;
@@ -2688,7 +3472,7 @@ async function sendSystemMessage() {
         return;
     }
     
-    const weekNumber = allUI.adminWeekSelector ? allUI.adminWeekSelector.value : getCurrentWeek();
+    const weekNumber = allUI.adminWeekSelector ? allUI.adminWeekSelector.value : getCurrentNflWeek();
     const recipientType = allUI.messageRecipients.value;
     
     showMessageStatus('Preparing to send messages...', 'info');
@@ -4579,6 +5363,9 @@ async function loadPoolManagementData() {
     
     // Update statistics
     await updatePoolStatistics();
+    
+    // 💎 Load add users functionality
+    await initializeAddUsersSection();
     
   } catch (error) {
     console.error('Error loading pool management data:', error);
