@@ -2077,9 +2077,12 @@ migrationResultsContent: document.getElementById('migration-results-content')
  let userSortField = 'role'; // Start by sorting by role (admins first)
  let userSortDirection = 'desc'; // desc = admins first, asc = regular users first
 
- function renderUserManagement() {
+ async function renderUserManagement() {
+   // 💎🔥 DIAMOND FIX: Use deduplicated users instead of stale allUsers global!
+   const cleanUsers = await fetchAllUsers();
+   
    // Create enhanced user objects with role information
-   const enhancedUsers = allUsers.map(user => ({
+   const enhancedUsers = cleanUsers.map(user => ({
      ...user,
      role: ADMIN_UIDS.includes(user.id) ? 'admin' : 'user',
      displayName: user.displayName || 'N/A'
@@ -2126,7 +2129,7 @@ migrationResultsContent: document.getElementById('migration-results-content')
    });
    
    document.querySelectorAll('.user-sort-header').forEach(header => {
-     header.addEventListener('click', (e) => {
+     header.addEventListener('click', async (e) => {
        const field = e.currentTarget.dataset.sort;
        
        if (userSortField === field) {
@@ -2138,7 +2141,7 @@ migrationResultsContent: document.getElementById('migration-results-content')
          userSortDirection = 'desc';
        }
        
-       renderUserManagement(); // Re-render with new sort
+       await renderUserManagement(); // Re-render with new sort
      });
    });
 
@@ -2146,7 +2149,7 @@ migrationResultsContent: document.getElementById('migration-results-content')
    allUI.userMgmtBody.querySelectorAll('.user-remove-btn').forEach(btn => {
      btn.addEventListener('click', async (e) => {
        const userId = e.target.dataset.userId;
-       const userName = allUsers.find(u => u.id === userId)?.displayName || allUsers.find(u => u.id === userId)?.email;
+       const userName = cleanUsers.find(u => u.id === userId)?.displayName || cleanUsers.find(u => u.id === userId)?.email;
 
        if (ADMIN_UIDS.includes(userId)) {
          alert("You cannot remove admin accounts.");
@@ -2694,7 +2697,7 @@ async function calculateWeeklyLeaderboard(weekNumber) {
  const activeTab = document.querySelector('.admin-tab.active').id;
  switch (activeTab) {
  case 'tab-game-results': await renderGameResultsAdmin(weekNumber); break;
- case 'tab-user-mgmt': renderUserManagement(); break;
+ case 'tab-user-mgmt': await renderUserManagement(); break;
  case 'tab-picks-mgmt': await renderPicksManagement(weekNumber); break;
  case 'tab-survivor-status': await renderSurvivorStatus(weekNumber); break;
 case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
