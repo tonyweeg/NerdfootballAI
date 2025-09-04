@@ -2092,6 +2092,12 @@ migrationResultsContent: document.getElementById('migration-results-content')
  }
 
  function updateUrl() {
+  // CRITICAL FIX: Don't update URL during initial page load
+  if (isInitialLoad) {
+   console.log('💎 Skipping URL update during initial load');
+   return;
+  }
+  
   const currentView = getCurrentView();
   const isSeasonView = allUI.lbSeasonBtn.classList.contains('active');
   const params = new URLSearchParams();
@@ -3697,7 +3703,10 @@ checkForInviteCode();
  // }
  }
 
- async function handleAuthStateChange(user) {
+ // Flag to prevent URL updates during initial page load
+let isInitialLoad = true;
+
+async function handleAuthStateChange(user) {
  console.log('💎 handleAuthStateChange called with user:', user ? user.uid : 'null');
  // Validate pool isolation on auth state change
  if (user) {
@@ -3808,6 +3817,12 @@ switch (savedState.currentView) {
   default:
    allUI.picksViewBtn.click();
  }
+
+ // CRITICAL FIX: Allow URL updates after initial load is complete
+ setTimeout(() => {
+  isInitialLoad = false;
+  console.log('💎 Initial load complete, URL updates now enabled');
+ }, 2000);
 
  } else {
  currentUser = null;
