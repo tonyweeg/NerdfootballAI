@@ -4474,10 +4474,38 @@ async function loadPoolMembers() {
         return;
       }
       
-      // Update member count
-      allUI.memberCount.textContent = memberEntries.length;
+      // 💎🔥 DIAMOND FIX: Get deduplicated user data to eliminate legacy/ghost users!
+      const allUsers = await fetchAllUsers();
+      const userMap = new Map();
+      const emailMap = new Map(); // Track which UIDs are preferred for each email
+      
+      allUsers.forEach(user => {
+        userMap.set(user.id, user);
+        if (user.email) {
+          emailMap.set(user.email, user.id); // Latest processed becomes preferred
+        }
+      });
+      
+      console.log('💎 Pool Members - Using deduplicated user data to eliminate ghost users');
+      
+      let displayedMemberCount = 0;
       
       memberEntries.forEach(([uid, member]) => {
+        // 💎 Get deduplicated user data and check if this is a ghost user
+        const userData = userMap.get(uid);
+        
+        // Skip ghost/legacy users that have been replaced by preferred UIDs
+        if (!userData && member.email && emailMap.has(member.email)) {
+          const preferredUID = emailMap.get(member.email);
+          console.log(`🚫 Skipping ghost user ${uid} (${member.email}) - replaced by preferred UID: ${preferredUID}`);
+          return; // Skip this legacy user entirely
+        }
+        
+        const displayName = userData?.displayName || member.displayName || 'Unknown User';
+        const email = userData?.email || member.email || 'No email';
+        
+        console.log(`💎 Member ${uid}: Using ${userData ? 'deduplicated' : 'fallback'} data - ${displayName} (${email})`);
+        
         const row = document.createElement('tr');
         row.className = 'hover:bg-slate-50';
         
@@ -4531,13 +4559,13 @@ async function loadPoolMembers() {
               <div class="flex-shrink-0 h-8 w-8">
                 <div class="h-8 w-8 bg-slate-200 rounded-full flex items-center justify-center">
                   <span class="text-sm font-medium text-slate-700">
-                    ${(member.displayName || member.email).charAt(0).toUpperCase()}
+                    ${(displayName || email).charAt(0).toUpperCase()}
                   </span>
                 </div>
               </div>
               <div class="ml-3">
-                <div class="text-sm font-medium text-slate-900">${member.displayName || 'Unknown'}</div>
-                <div class="text-sm text-slate-500">${member.email}</div>
+                <div class="text-sm font-medium text-slate-900">${displayName}</div>
+                <div class="text-sm text-slate-500">${email}</div>
               </div>
             </div>
           </td>
@@ -4548,7 +4576,11 @@ async function loadPoolMembers() {
         `;
         
         allUI.poolMembersTbody.appendChild(row);
+        displayedMemberCount++; // Count only displayed (non-ghost) members
       });
+      
+      // Update member count to reflect actual displayed members (excluding ghosts)
+      allUI.memberCount.textContent = displayedMemberCount;
       
     } else {
       allUI.memberCount.textContent = '0';
