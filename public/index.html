@@ -595,19 +595,19 @@ Role
 
        <!-- Subject -->
        <div>
-           <label for="message-subject" class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-           <input type="text" id="message-subject" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-slate-500 focus:border-slate-500 sm:text-sm" placeholder="Enter email subject">
+           <label for="message-subject" class="block text-sm font-medium text-gray-700 mb-2">📱 Notification Title</label>
+           <input type="text" id="message-subject" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-slate-500 focus:border-slate-500 sm:text-sm" placeholder="Enter notification title">
        </div>
 
        <!-- Message Body -->
        <div>
-           <label for="message-body" class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-           <textarea id="message-body" rows="6" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-slate-500 focus:border-slate-500 sm:text-sm" placeholder="Enter your message here..."></textarea>
+           <label for="message-body" class="block text-sm font-medium text-gray-700 mb-2">💬 Notification Message</label>
+           <textarea id="message-body" rows="6" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-slate-500 focus:border-slate-500 sm:text-sm" placeholder="Enter push notification message..."></textarea>
        </div>
 
        <!-- Preview -->
        <div id="message-preview-section" class="hidden">
-           <label class="block text-sm font-medium text-gray-700 mb-2">Email Preview</label>
+           <label class="block text-sm font-medium text-gray-700 mb-2">🔔 Notification Preview</label>
            <div id="message-preview" class="bg-gray-50 border border-gray-300 rounded-md p-4 text-sm whitespace-pre-wrap"></div>
        </div>
 
@@ -619,7 +619,7 @@ Role
        <!-- Action Buttons -->
        <div class="flex space-x-4">
            <button id="preview-message-btn" class="bg-slate-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-700">Preview Message</button>
-           <button id="send-message-btn" class="bg-blue-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Send Message</button>
+           <button id="send-message-btn" class="bg-blue-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled>🔔 Send Push Notification</button>
        </div>
 
        <!-- Status Messages -->
@@ -1495,6 +1495,13 @@ Role
  import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updateEmail, signOut, GoogleAuthProvider, signInWithPopup, linkWithCredential, fetchSignInMethodsForEmail, verifyBeforeUpdateEmail, sendEmailVerification, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField, serverTimestamp, runTransaction, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+
+// --- FCM INTEGRATION ---
+// Include FCM integration module
+const fcmScript = document.createElement('script');
+fcmScript.src = '/fcm-integration.js';
+fcmScript.defer = true;
+document.head.appendChild(fcmScript);
 
  const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
 let saveTimeout;
@@ -3345,11 +3352,6 @@ async function sendSystemMessage() {
         return;
     }
     
-    // Additional authentication validation
-    console.log('Current user UID:', currentUser.uid);
-    console.log('Auth current user UID:', auth.currentUser?.uid);
-    console.log('Auth current user token available:', !!auth.currentUser);
-    
     // Check if user is admin
     const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
     if (!ADMIN_UIDS.includes(currentUser.uid)) {
@@ -3357,21 +3359,22 @@ async function sendSystemMessage() {
         return;
     }
     
-    const subject = allUI.messageSubject.value.trim();
+    const title = allUI.messageSubject.value.trim();
     const body = allUI.messageBody.value.trim();
     
-    if (!subject || !body) {
-        showMessageStatus('Please enter both subject and message body.', 'error');
+    if (!title || !body) {
+        showMessageStatus('Please enter both title and message body.', 'error');
         return;
     }
     
     const weekNumber = allUI.adminWeekSelector ? allUI.adminWeekSelector.value : getCurrentNflWeek();
     const recipientType = allUI.messageRecipients.value;
     
-    showMessageStatus('Preparing to send messages...', 'info');
+    showMessageStatus('🔔 Preparing to send push notifications...', 'info');
     allUI.sendMessageBtn.disabled = true;
     
     try {
+        // Get recipients and their FCM tokens
         const recipients = await getFilteredRecipients(recipientType, weekNumber);
         
         if (recipients.length === 0) {
@@ -3380,69 +3383,71 @@ async function sendSystemMessage() {
             return;
         }
         
-        // Call Cloud Function to send emails
-        showMessageStatus(`Sending emails to ${recipients.length} recipients...`, 'info');
+        showMessageStatus(`📱 Collecting FCM tokens from ${recipients.length} users...`, 'info');
         
-        // Create the callable function with explicit app context
-        const sendSystemMessageFn = httpsCallable(functions, 'sendSystemMessage');
+        // Collect FCM tokens for users who have enabled notifications
+        const fcmTokens = [];
+        const usersWithoutTokens = [];
         
-        // Ensure user token is fresh before calling Cloud Function
-        let idToken;
-        try {
-            console.log('Refreshing auth token...');
-            idToken = await auth.currentUser.getIdToken(true); // Force token refresh
-            console.log('Token refreshed successfully, token length:', idToken.length);
-        } catch (tokenError) {
-            console.error('Failed to refresh auth token:', tokenError);
-            showMessageStatus('Authentication error. Please try logging out and back in.', 'error');
-            allUI.sendMessageBtn.disabled = false;
-            return;
-        }
-        
-        // Additional validation - check if the user is still properly authenticated
-        if (!auth.currentUser || !idToken) {
-            console.error('User not authenticated after token refresh');
-            showMessageStatus('Authentication failed. Please try logging out and back in.', 'error');
-            allUI.sendMessageBtn.disabled = false;
-            return;
-        }
-        
-        // Small delay to ensure token propagation
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        try {
-            console.log('Calling Cloud Function sendSystemMessage...');
-            console.log('Recipients count:', recipients.length);
-            console.log('Subject:', subject);
-            
-            const result = await sendSystemMessageFn({
-                recipients: recipients.map(user => ({
-                    email: user.email,
-                    displayName: user.displayName || user.email,
-                    id: user.id
-                })),
-                subject: subject,
-                body: body
-            });
-            
-            console.log('Cloud Function call successful:', result);
-            
-            const { successCount, failCount, failed } = result.data;
-            
-            let message = `Successfully sent ${successCount} email${successCount !== 1 ? 's' : ''}.`;
-            
-            if (failCount > 0) {
-                const failedEmails = failed.map(f => `${f.email}: ${f.error}`).join('\n');
-                message += `\n\n${failCount} email${failCount !== 1 ? 's' : ''} failed:\n${failedEmails}`;
-                showMessageStatus(message, 'warning');
-            } else {
-                showMessageStatus(message, 'success');
+        for (const user of recipients) {
+            try {
+                const tokensSnapshot = await getDocs(collection(db, `users/${user.id}/fcm_tokens`));
+                if (!tokensSnapshot.empty) {
+                    tokensSnapshot.forEach(doc => {
+                        const tokenData = doc.data();
+                        if (tokenData.token) {
+                            fcmTokens.push(tokenData.token);
+                        }
+                    });
+                } else {
+                    usersWithoutTokens.push(user.displayName || user.email);
+                }
+            } catch (error) {
+                console.log(`Could not get FCM tokens for ${user.email}:`, error);
+                usersWithoutTokens.push(user.displayName || user.email);
             }
-            
-        } catch (error) {
-            console.error('Error calling sendSystemMessage function:', error);
-            showMessageStatus(`Error sending emails: ${error.message}`, 'error');
         }
+        
+        if (fcmTokens.length === 0) {
+            showMessageStatus('❌ No users have enabled push notifications yet. Ask users to enable notifications on the website first.', 'warning');
+            allUI.sendMessageBtn.disabled = false;
+            return;
+        }
+        
+        // Show status of who will receive notifications
+        const statusMsg = `📤 Sending to ${fcmTokens.length} users with notifications enabled` + 
+                         (usersWithoutTokens.length > 0 ? ` (${usersWithoutTokens.length} users haven't enabled notifications)` : '');
+        showMessageStatus(statusMsg, 'info');
+        
+        // Call FCM Cloud Function
+        const sendFCMSystemMessageFn = httpsCallable(functions, 'sendFCMSystemMessage');
+        
+        // Refresh auth token
+        const idToken = await auth.currentUser.getIdToken(true);
+        
+        const result = await sendFCMSystemMessageFn({
+            title: title,
+            body: body,
+            targetTokens: fcmTokens,
+            priority: 'normal',
+            clickAction: '/'
+        });
+        
+        console.log('FCM notification sent successfully:', result);
+        
+        const { successCount, failureCount } = result.data;
+        
+        let message = `✅ Successfully sent ${successCount} push notification${successCount !== 1 ? 's' : ''}.`;
+        
+        if (failureCount > 0) {
+            message += `\n⚠️ ${failureCount} notification${failureCount !== 1 ? 's' : ''} failed to deliver.`;
+        }
+        
+        if (usersWithoutTokens.length > 0) {
+            message += `\n\n📝 Users without notifications enabled (${usersWithoutTokens.length}): ${usersWithoutTokens.slice(0, 5).join(', ')}${usersWithoutTokens.length > 5 ? '...' : ''}`;
+        }
+        
+        showMessageStatus(message, failureCount > 0 ? 'warning' : 'success');
         
         // Clear form
         allUI.messageSubject.value = '';
@@ -3450,8 +3455,8 @@ async function sendSystemMessage() {
         allUI.messagePreviewSection.classList.add('hidden');
         
     } catch (error) {
-        console.error('Error sending system messages:', error);
-        showMessageStatus(`Error: ${error.message}`, 'error');
+        console.error('Error sending FCM notifications:', error);
+        showMessageStatus(`❌ Error sending notifications: ${error.message}`, 'error');
     } finally {
         allUI.sendMessageBtn.disabled = false;
     }
@@ -3551,8 +3556,11 @@ case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
  measurementId: "G-8RVRHE3HRC"
  };
  const app = initializeApp(firebaseConfig);
+ window.firebaseApp = app; // Make Firebase app globally available for FCM
  db = getFirestore(app);
+ window.db = db; // Make Firestore globally available for FCM
  auth = getAuth(app);
+ window.auth = auth; // Make Auth globally available for FCM
  functions = getFunctions(app, 'us-central1'); // Initialize global functions variable with region
  onAuthStateChanged(auth, handleAuthStateChange);
 console.log('💎 onAuthStateChanged listener set up');

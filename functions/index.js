@@ -130,6 +130,247 @@ Reply to: tonyweeg@gmail.com`;
     };
 });
 
+// === NEW FCM CLOUD FUNCTIONS ===
+
+// Cloud Function to send FCM system messages (replaces sendSystemMessage)
+exports.sendFCMSystemMessage = functions.https.onCall(async (data, context) => {
+    // For Firebase Functions v2, auth context is in data.auth instead of context.auth
+    const authContext = context.auth || data.auth;
+    
+    // Check if user is authenticated
+    if (!authContext) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+    
+    // Check if user is admin
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+    const userUid = authContext.uid || authContext.token?.uid;
+    
+    if (!ADMIN_UIDS.includes(userUid)) {
+        throw new functions.https.HttpsError('permission-denied', 'User must be an admin');
+    }
+    
+    // Extract data
+    const actualData = data.data || data;
+    const { title, body, topic = 'all-users', targetTokens, priority = 'normal', clickAction = '/' } = actualData;
+    
+    if (!title || !body) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: title and body');
+    }
+    
+    try {
+        let response;
+        
+        if (targetTokens && targetTokens.length > 0) {
+            // Send to specific tokens
+            const message = {
+                notification: {
+                    title: title,
+                    body: body
+                },
+                data: {
+                    click_action: clickAction,
+                    type: 'system_message',
+                    priority: priority,
+                    timestamp: Date.now().toString()
+                },
+                webpush: {
+                    notification: {
+                        icon: '/favicon.ico',
+                        badge: '/favicon.ico',
+                        requireInteraction: priority === 'high',
+                        actions: [
+                            {
+                                action: 'open',
+                                title: 'Open App'
+                            }
+                        ]
+                    },
+                    fcmOptions: {
+                        link: clickAction
+                    }
+                },
+                tokens: targetTokens
+            };
+            
+            response = await admin.messaging().sendEachForMulticast(message);
+        } else {
+            // Send to topic
+            const message = {
+                notification: {
+                    title: title,
+                    body: body
+                },
+                data: {
+                    click_action: clickAction,
+                    type: 'system_message',
+                    priority: priority,
+                    timestamp: Date.now().toString()
+                },
+                webpush: {
+                    notification: {
+                        icon: '/favicon.ico',
+                        badge: '/favicon.ico',
+                        requireInteraction: priority === 'high',
+                        actions: [
+                            {
+                                action: 'open',
+                                title: 'Open App'
+                            }
+                        ]
+                    },
+                    fcmOptions: {
+                        link: clickAction
+                    }
+                },
+                topic: topic
+            };
+            
+            response = await admin.messaging().send(message);
+        }
+        
+        console.log('FCM message sent successfully:', response);
+        
+        return {
+            success: true,
+            messageId: response.messageId || response.responses?.map(r => r.messageId),
+            successCount: response.successCount || 1,
+            failureCount: response.failureCount || 0,
+            results: response.responses || [response]
+        };
+        
+    } catch (error) {
+        console.error('Error sending FCM message:', error);
+        throw new functions.https.HttpsError('internal', `Failed to send FCM message: ${error.message}`);
+    }
+});
+
+// Cloud Function to send FCM pick confirmation (replaces sendPickConfirmation)
+exports.sendFCMPickConfirmation = functions.https.onCall(async (data, context) => {
+    // Check if user is authenticated
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+    
+    const { userToken, userName, picks, weekNumber, gameType = 'regular' } = data;
+    
+    if (!userToken || !picks || !weekNumber) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
+    }
+    
+    // Format picks for notification
+    let picksSummary = '';
+    let pickCount = 0;
+    
+    if (gameType === 'survivor') {
+        // Survivor pick format
+        const pick = picks.team || picks;
+        picksSummary = `Survivor Pick: ${pick}`;
+        pickCount = 1;
+    } else {
+        // Regular picks format
+        Object.entries(picks).forEach(([gameId, pick]) => {
+            if (pick && pick.team) {
+                pickCount++;
+            }
+        });
+        picksSummary = `${pickCount} picks submitted for Week ${weekNumber}`;
+    }
+    
+    const title = gameType === 'survivor' 
+        ? `✅ Survivor Pick Confirmed - Week ${weekNumber}`
+        : `✅ Picks Confirmed - Week ${weekNumber}`;
+        
+    const body = gameType === 'survivor'
+        ? `${picksSummary}. Good luck this week!`
+        : `${picksSummary}. Good luck this week!`;
+    
+    const message = {
+        notification: {
+            title: title,
+            body: body
+        },
+        data: {
+            click_action: gameType === 'survivor' ? '/nerdSurvivor.html' : '/',
+            type: 'pick_confirmation',
+            priority: 'normal',
+            week_number: weekNumber.toString(),
+            game_type: gameType,
+            timestamp: Date.now().toString()
+        },
+        webpush: {
+            notification: {
+                icon: '/favicon.ico',
+                badge: '/favicon.ico',
+                requireInteraction: false,
+                actions: [
+                    {
+                        action: 'view',
+                        title: 'View Picks'
+                    }
+                ]
+            },
+            fcmOptions: {
+                link: gameType === 'survivor' ? '/nerdSurvivor.html' : '/'
+            }
+        },
+        token: userToken
+    };
+    
+    try {
+        const response = await admin.messaging().send(message);
+        console.log(`Pick confirmation FCM sent to user: ${response}`);
+        
+        return {
+            success: true,
+            messageId: response,
+            pickCount: pickCount,
+            gameType: gameType
+        };
+        
+    } catch (error) {
+        console.error(`Failed to send pick confirmation FCM:`, error);
+        return {
+            success: false,
+            error: error.message,
+            pickCount: pickCount,
+            gameType: gameType
+        };
+    }
+});
+
+// Cloud Function to subscribe user to FCM topics
+exports.subscribeToFCMTopic = functions.https.onCall(async (data, context) => {
+    // Check if user is authenticated
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+    
+    const { tokens, topic } = data;
+    
+    if (!tokens || !topic) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: tokens and topic');
+    }
+    
+    try {
+        const response = await admin.messaging().subscribeToTopic(tokens, topic);
+        console.log('Successfully subscribed to topic:', topic, response);
+        
+        return {
+            success: true,
+            successCount: response.successCount,
+            failureCount: response.failureCount,
+            errors: response.errors
+        };
+        
+    } catch (error) {
+        console.error('Error subscribing to topic:', error);
+        throw new functions.https.HttpsError('internal', `Failed to subscribe to topic: ${error.message}`);
+    }
+});
+
+// === LEGACY EMAIL FUNCTIONS (DEPRECATED) ===
+
 // Cloud Function to send pick confirmation emails
 exports.sendPickConfirmation = functions.https.onCall(async (data, context) => {
     // Check if user is authenticated

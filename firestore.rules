@@ -152,6 +152,26 @@ service cloud.firestore {
     }
     
     // ============================================
+    // FCM TOKENS AND NOTIFICATION PREFERENCES
+    // ============================================
+    
+    // User FCM tokens - users can read/write their own tokens
+    match /users/{userId}/fcm_tokens/{tokenId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // User notification preferences - users can read/write their own preferences
+    match /users/{userId}/notification_settings/{document=**} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Notification analytics - users can read their own, admins can read all
+    match /notification_logs/{logId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isGlobalAdmin());
+      allow write: if isGlobalAdmin();
+    }
+    
+    // ============================================
     // AUDIT LOGS
     // ============================================
     
