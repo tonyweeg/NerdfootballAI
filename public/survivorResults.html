@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏆 Survivor Pool Results - NerdFootball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .survivor-active {
+            background-color: #dcfce7; /* Light green */
+        }
+        .survivor-eliminated {
+            background-color: #fce7e7; /* Light rose */
+        }
+        .survivor-grid {
+            min-height: 600px;
+        }
+        .loading-spinner {
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo/Title -->
+                <div class="flex items-center">
+                    <i class="fas fa-skull-crossbones text-2xl text-red-600 mr-3"></i>
+                    <h1 class="text-2xl font-bold text-gray-900">Survivor Pool Results</h1>
+                </div>
+
+                <!-- Navigation -->
+                <div class="flex items-center space-x-4">
+                    <!-- Pool Switcher -->
+                    <div class="relative" id="pool-switcher-container">
+                        <button id="pool-switcher-btn" class="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors">
+                            <span id="current-pool-name">Loading...</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        <div id="pool-switcher-dropdown" class="hidden absolute top-full right-0 mt-1 w-64 bg-white rounded-md shadow-lg z-30 ring-1 ring-black ring-opacity-5">
+                            <div class="py-1">
+                                <div id="user-pools-list" class="max-h-64 overflow-y-auto">
+                                    <!-- Pools will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hamburger Menu -->
+                    <div class="relative">
+                        <button id="menu-btn" class="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
+                            <span class="sr-only">Open menu</span>
+                            <i class="fas fa-bars h-6 w-6"></i>
+                        </button>
+                        <div id="menu-panel" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 ring-1 ring-black ring-opacity-5">
+                            <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                <!-- Navigation Links -->
+                                <a href="./index.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Main Picks</a>
+                                <a href="./nerdSurvivor.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Nerd Survivor</a>
+                                <a href="./survivorResults.html" class="block px-4 py-2 text-sm text-orange-700 bg-orange-50 font-medium" role="menuitem">🏆 Survivor Results</a>
+                                <a href="./nerdfootballTheGrid.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">The Grid</a>
+                                <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Rules of the Nerd</a>
+                                
+                                <!-- Admin Only Section -->
+                                <div id="menu-admin-controls" class="hidden">
+                                    <div class="border-t border-gray-200 my-1"></div>
+                                    <button id="menu-admin-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Admin</button>
+                                    <button id="survivor-admin-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem" style="display: none !important;">Survivor Admin</button>
+                                    <a href="./user-sync-diagnostic.html" class="block px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 font-medium" role="menuitem">💎 User Diagnostic Tool</a>
+                                </div>
+                                
+                                <!-- Account Section -->
+                                <div class="border-t border-gray-200 my-1"></div>
+                                <button id="settings-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Settings</button>
+                                <button id="logout-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Logout</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User Info -->
+                    <div class="flex items-center">
+                        <div id="user-display" class="text-sm text-gray-700">
+                            <span id="user-name">Loading...</span>
+                        </div>
+                        <button id="logout-btn" class="ml-3 text-sm text-red-600 hover:text-red-800">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <!-- Loading State -->
+        <div id="loading-container" class="text-center py-12">
+            <div class="loading-spinner w-12 h-12 mx-auto border-4 border-gray-200 rounded-full"></div>
+            <p class="mt-4 text-gray-600">Loading survivor results...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-container" class="hidden text-center py-12">
+            <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">Error Loading Results</h2>
+            <p id="error-message" class="text-gray-600"></p>
+            <button id="retry-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                Try Again
+            </button>
+        </div>
+
+        <!-- Results Grid -->
+        <div id="results-container" class="hidden">
+            <!-- Stats Summary -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Pool Summary</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-gray-900" id="total-players">0</div>
+                        <div class="text-sm text-gray-600">Total Players</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600" id="active-players">0</div>
+                        <div class="text-sm text-gray-600">Still Alive</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600" id="eliminated-players">0</div>
+                        <div class="text-sm text-gray-600">Eliminated</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600" id="current-week">1</div>
+                        <div class="text-sm text-gray-600">Current Week</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-gray-900">Survivor Pool Status</h2>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center text-sm">
+                                <div class="w-4 h-4 bg-green-200 rounded mr-2"></div>
+                                <span class="text-gray-600">Active</span>
+                            </div>
+                            <div class="flex items-center text-sm">
+                                <div class="w-4 h-4 bg-rose-200 rounded mr-2"></div>
+                                <span class="text-gray-600">Eliminated</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto survivor-grid">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Player
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Current Week Pick
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Pick Week
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Eliminated Week
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Weeks Survived
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-tbody" class="bg-white divide-y divide-gray-200">
+                            <!-- Results will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- No Results State -->
+            <div id="no-results" class="hidden text-center py-12">
+                <i class="fas fa-users-slash text-4xl text-gray-400 mb-4"></i>
+                <h2 class="text-xl font-semibold text-gray-900 mb-2">No Survivor Pool Data</h2>
+                <p class="text-gray-600 mb-4">No players have joined the survivor pool yet.</p>
+                <a href="./nerdSurvivor.html" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    <i class="fas fa-plus mr-2"></i>
+                    Join Survivor Pool
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase and App JavaScript -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+            measurementId: "G-8RVRHE3HRC"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
+        let currentUser = null;
+        let currentPool = 'nerduniverse-2025'; // Default pool
+
+        // Helper functions
+        const appId = () => 'nerdfootball';
+        
+        const survivorPicksPath = (uid) => `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
+        const survivorStatusPath = () => `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
+        const poolMembersPath = (poolId) => `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+
+        // UI Elements
+        const elements = {
+            loadingContainer: document.getElementById('loading-container'),
+            errorContainer: document.getElementById('error-container'),
+            resultsContainer: document.getElementById('results-container'),
+            noResults: document.getElementById('no-results'),
+            resultsTbody: document.getElementById('results-tbody'),
+            totalPlayers: document.getElementById('total-players'),
+            activePlayers: document.getElementById('active-players'),
+            eliminatedPlayers: document.getElementById('eliminated-players'),
+            currentWeek: document.getElementById('current-week'),
+            userName: document.getElementById('user-name'),
+            logoutBtn: document.getElementById('logout-btn'),
+            menuBtn: document.getElementById('menu-btn'),
+            menuPanel: document.getElementById('menu-panel'),
+            menuAdminControls: document.getElementById('menu-admin-controls'),
+            retryBtn: document.getElementById('retry-btn'),
+            errorMessage: document.getElementById('error-message'),
+            poolSwitcherBtn: document.getElementById('pool-switcher-btn'),
+            poolSwitcherDropdown: document.getElementById('pool-switcher-dropdown'),
+            currentPoolName: document.getElementById('current-pool-name')
+        };
+
+        // Show/hide functions
+        function showLoading() {
+            elements.loadingContainer.classList.remove('hidden');
+            elements.errorContainer.classList.add('hidden');
+            elements.resultsContainer.classList.add('hidden');
+            elements.noResults.classList.add('hidden');
+        }
+
+        function showError(message) {
+            elements.errorMessage.textContent = message;
+            elements.loadingContainer.classList.add('hidden');
+            elements.errorContainer.classList.remove('hidden');
+            elements.resultsContainer.classList.add('hidden');
+            elements.noResults.classList.add('hidden');
+        }
+
+        function showResults() {
+            elements.loadingContainer.classList.add('hidden');
+            elements.errorContainer.classList.add('hidden');
+            elements.resultsContainer.classList.remove('hidden');
+            elements.noResults.classList.add('hidden');
+        }
+
+        function showNoResults() {
+            elements.loadingContainer.classList.add('hidden');
+            elements.errorContainer.classList.add('hidden');
+            elements.resultsContainer.classList.add('hidden');
+            elements.noResults.classList.remove('hidden');
+        }
+
+        // Get current NFL week
+        function getCurrentWeek() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-05'); // NFL Season start
+            const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
+            return Math.max(1, Math.min(18, weeksDiff + 1));
+        }
+
+        // Load survivor results
+        async function loadSurvivorResults() {
+            showLoading();
+            
+            try {
+                console.log('Loading survivor results for pool:', currentPool);
+                
+                // Get pool members
+                const poolMembersDoc = await getDoc(doc(db, poolMembersPath(currentPool)));
+                if (!poolMembersDoc.exists()) {
+                    console.log('No pool members found');
+                    showNoResults();
+                    return;
+                }
+
+                const poolMembers = poolMembersDoc.data();
+                const memberIds = Object.keys(poolMembers);
+                
+                if (memberIds.length === 0) {
+                    showNoResults();
+                    return;
+                }
+
+                // Hybrid approach: Get essential data for winner/loser status (optimized: 22 reads → 4-6 reads)
+                console.log('Fetching survivor data with winner/loser status...');
+                const startTime = performance.now();
+                
+                const currentWeek = getCurrentWeek();
+                
+                // Get status document (contains elimination status and current picks)
+                const statusDoc = await getDoc(doc(db, survivorStatusPath()));
+                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+                
+                // We need historical picks to show latest pick and results, but only for active users
+                // This is more efficient than the original 22 reads
+                const userResults = [];
+                const activeUsers = memberIds.filter(uid => !allStatuses[uid]?.eliminated);
+                const eliminatedUsers = memberIds.filter(uid => allStatuses[uid]?.eliminated);
+                
+                // For active users, get their individual picks to show latest status
+                console.log(`Fetching detailed picks for ${activeUsers.length} active users (eliminated users use status data only)`);
+                
+                const activeUserPromises = activeUsers.map(async uid => {
+                    try {
+                        const userPicksDoc = await getDoc(doc(db, survivorPicksPath(uid)));
+                        const userPicksData = userPicksDoc.exists() ? userPicksDoc.data() : {};
+                        const userPicks = userPicksData.picks || {};
+                        
+                        // Find current week pick first, then latest pick
+                        const currentWeekPickObj = userPicks[currentWeek];
+                        const currentWeekPick = currentWeekPickObj ? currentWeekPickObj.team : null;
+                        
+                        // Find latest pick as fallback
+                        const pickWeeks = Object.keys(userPicks).map(w => parseInt(w)).sort((a, b) => b - a);
+                        const latestWeek = pickWeeks.length > 0 ? pickWeeks[0] : null;
+                        const latestPickObj = latestWeek ? userPicks[latestWeek] : null;
+                        const latestPick = latestPickObj ? latestPickObj.team : null;
+                        
+                        // Show current week pick if available, otherwise latest pick
+                        const displayPick = currentWeekPick || latestPick;
+                        const displayWeek = currentWeekPick ? currentWeek : latestWeek;
+                        
+                        return {
+                            uid,
+                            userPicks,
+                            displayPick,
+                            displayWeek,
+                            currentWeekPick,
+                            totalPicks: Object.keys(userPicks).length
+                        };
+                    } catch (error) {
+                        console.error(`Error loading picks for user ${uid}:`, error);
+                        return { uid, userPicks: {}, displayPick: null, displayWeek: null, currentWeekPick: null, totalPicks: 0 };
+                    }
+                });
+                
+                const activeUsersData = await Promise.all(activeUserPromises);
+                
+                // Process active users with full pick data
+                for (const userData of activeUsersData) {
+                    const { uid, displayPick, displayWeek, currentWeekPick, totalPicks } = userData;
+                    const userStatus = allStatuses[uid] || { eliminated: false };
+                    
+                    userResults.push({
+                        uid,
+                        displayName: poolMembers[uid].displayName || poolMembers[uid].email || 'Unknown User',
+                        email: poolMembers[uid].email || '',
+                        isEliminated: false,
+                        eliminatedWeek: null,
+                        latestPick: displayPick || 'No picks yet',
+                        latestPickWeek: displayWeek,
+                        currentWeekPick: currentWeekPick,
+                        weeksSurvived: currentWeek - 1,
+                        totalPicks: totalPicks
+                    });
+                }
+                
+                // Process eliminated users using status data only (no additional reads needed)
+                for (const uid of eliminatedUsers) {
+                    const userStatus = allStatuses[uid] || { eliminated: true };
+                    
+                    userResults.push({
+                        uid,
+                        displayName: poolMembers[uid].displayName || poolMembers[uid].email || 'Unknown User',
+                        email: poolMembers[uid].email || '',
+                        isEliminated: true,
+                        eliminatedWeek: userStatus.eliminatedWeek || 'Unknown',
+                        latestPick: userStatus.currentWeekPick || 'Eliminated',
+                        latestPickWeek: userStatus.eliminatedWeek ? userStatus.eliminatedWeek - 1 : null,
+                        currentWeekPick: null,
+                        weeksSurvived: userStatus.eliminatedWeek ? (userStatus.eliminatedWeek - 1) : 0,
+                        totalPicks: 1 // Approximate for eliminated users
+                    });
+                }
+                
+                console.log(`Hybrid data fetch completed in ${(performance.now() - startTime).toFixed(0)}ms`);
+                console.log(`Firebase reads: ${memberIds.length + 2} → ${activeUsers.length + 2} reads (${Math.round((1 - (activeUsers.length + 2)/(memberIds.length + 2)) * 100)}% reduction)`);
+
+                // Sort results: Active users first (by weeks survived DESC), then eliminated users (by elimination week DESC)
+                userResults.sort((a, b) => {
+                    if (a.isEliminated !== b.isEliminated) {
+                        return a.isEliminated ? 1 : -1; // Active first
+                    }
+                    if (a.isEliminated) {
+                        return (b.eliminatedWeek || 0) - (a.eliminatedWeek || 0); // Later elimination first
+                    }
+                    return b.weeksSurvived - a.weeksSurvived; // More weeks survived first
+                });
+
+                renderResults(userResults);
+                
+            } catch (error) {
+                console.error('Error loading survivor results:', error);
+                showError('Failed to load survivor results. Please try again.');
+            }
+        }
+
+        // Render results table
+        function renderResults(userResults) {
+            if (userResults.length === 0) {
+                showNoResults();
+                return;
+            }
+
+            const currentWeek = getCurrentWeek();
+            const activeCount = userResults.filter(u => !u.isEliminated).length;
+            const eliminatedCount = userResults.filter(u => u.isEliminated).length;
+
+            // Update summary stats
+            elements.totalPlayers.textContent = userResults.length;
+            elements.activePlayers.textContent = activeCount;
+            elements.eliminatedPlayers.textContent = eliminatedCount;
+            elements.currentWeek.textContent = currentWeek;
+
+            // Render table rows
+            elements.resultsTbody.innerHTML = userResults.map((user, index) => {
+                const rowClass = user.isEliminated ? 'survivor-eliminated' : 'survivor-active';
+                const statusBadge = user.isEliminated 
+                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                         <i class="fas fa-skull mr-1"></i> Eliminated
+                       </span>`
+                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                         <i class="fas fa-heart mr-1"></i> Active
+                       </span>`;
+
+                // Prioritize showing current week pick
+                const currentWeekNum = getCurrentWeek();
+                const hasCurrentWeekPick = user.currentWeekPick;
+                
+                const pickDisplay = hasCurrentWeekPick 
+                    ? `${user.currentWeekPick} (Current)` 
+                    : user.latestPick 
+                        ? `${user.latestPick} (Week ${user.latestPickWeek})` 
+                        : 'No picks yet';
+                        
+                const pickWeekDisplay = hasCurrentWeekPick 
+                    ? `Week ${currentWeekNum}` 
+                    : user.latestPickWeek 
+                        ? `Week ${user.latestPickWeek}` 
+                        : '-';
+                const eliminatedWeek = user.eliminatedWeek ? `Week ${user.eliminatedWeek}` : '-';
+                const weeksSurvived = user.weeksSurvived >= 0 ? user.weeksSurvived : 0;
+
+                return `
+                    <tr class="${rowClass}">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-8 w-8">
+                                    <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                        <span class="text-sm font-medium text-gray-600">${user.displayName.charAt(0).toUpperCase()}</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">${user.displayName}</div>
+                                    <div class="text-sm text-gray-500">${user.email}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            ${statusBadge}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${pickDisplay}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${pickWeekDisplay}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${eliminatedWeek}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm font-medium text-gray-900">${weeksSurvived}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            showResults();
+        }
+
+        // Event listeners
+        elements.retryBtn.addEventListener('click', loadSurvivorResults);
+        
+        elements.menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            elements.menuPanel.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!elements.menuPanel.contains(e.target) && !elements.menuBtn.contains(e.target)) {
+                elements.menuPanel.classList.add('hidden');
+            }
+        });
+
+        elements.logoutBtn.addEventListener('click', () => {
+            auth.signOut();
+        });
+
+        // Auth state listener
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                elements.userName.textContent = user.displayName || user.email;
+                
+                // Show admin controls if user is admin
+                if (ADMIN_UIDS.includes(user.uid)) {
+                    elements.menuAdminControls.classList.remove('hidden');
+                }
+                
+                // Load results
+                loadSurvivorResults();
+            } else {
+                // Redirect to main page if not authenticated
+                window.location.href = './index.html';
+            }
+        });
+
+        // Initialize page
+        elements.currentPoolName.textContent = currentPool;
+        console.log('Survivor Results page initialized');
+    </script>
+</body>
+</html>

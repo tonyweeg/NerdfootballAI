@@ -53,6 +53,12 @@ service cloud.firestore {
       allow write: if isGlobalAdmin();
     }
     
+    // Pool members - all authenticated users can read (needed for Grid)
+    match /artifacts/nerdfootball/pools/{poolId}/metadata/members {
+      allow read: if isAuthenticated();
+      allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
+    }
+    
     // Legacy survivor picks - all authenticated users can read/write their own
     match /artifacts/nerdfootball/public/data/nerdSurvivor_picks/{userId} {
       allow read: if isAuthenticated();
@@ -61,6 +67,12 @@ service cloud.firestore {
     
     // Legacy survivor status - all authenticated users can read
     match /artifacts/nerdfootball/public/data/nerdSurvivor_status/status {
+      allow read: if isAuthenticated();
+      allow write: if isGlobalAdmin();
+    }
+    
+    // Leaderboard summaries - all authenticated users can read, admins can write
+    match /artifacts/nerdfootball/leaderboard_summaries/{document=**} {
       allow read: if isAuthenticated();
       allow write: if isGlobalAdmin();
     }

@@ -121,21 +121,30 @@
     </button>
     <div id="menu-panel" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 ring-1 ring-black ring-opacity-5">
         <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-            <!-- All Users Section -->
+            <!-- View Toggles -->
             <button id="menu-picks-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">My Picks</button>
             <button id="leaderboard-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Leaderboard</button>
+            
+            <!-- Navigation Links -->
+            <div class="border-t border-gray-200 my-1"></div>
+            <a href="./index.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Main Picks</a>
+            <a href="./nerdSurvivor.html" class="block px-4 py-2 text-sm text-gray-700 bg-gray-50 font-medium" role="menuitem">Nerd Survivor</a>
+            <a href="./survivorResults.html" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">🏆 Survivor Results</a>
+            <a href="./nerdfootballTheGrid.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">The Grid</a>
+            <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Rules of the Nerd</a>
             
             <!-- Admin Only Section -->
             <div id="menu-admin-controls" class="hidden">
                  <div class="border-t border-gray-200 my-1"></div>
                  <button id="menu-admin-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Admin</button>
                  <button id="survivor-admin-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem" style="display: none !important;">Survivor Admin</button>
+                 <a href="./user-sync-diagnostic.html" class="block px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 font-medium" role="menuitem">💎 User Diagnostic Tool</a>
             </div>
-            <a href="./nerdSurvivor.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 bg-slate-100 font-medium" role="menuitem">Nerd Survivor</a>
-            <a href="./nerdfootballTheGrid.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">The Grid</a>
+            
+            <!-- Account Section -->
+            <div class="border-t border-gray-200 my-1"></div>
             <button id="settings-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Settings</button>
             <div id="admin-migration-btn" class="hidden" style="display: none !important;">
-                <div class="border-t border-gray-200 my-1"></div>
                 <button id="migration-tool-btn" class="w-full text-left block px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 font-medium" role="menuitem">NerdUniverse Migration</button>
             </div>
             <button id="logout-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Logout</button>
@@ -156,6 +165,15 @@
         
         <div id="main-content" class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
             <!-- User picks view will be rendered here -->
+        </div>
+        
+        <!-- Survivor Results Button (for pool members) -->
+        <div id="survivor-results-section" class="hidden mt-6 text-center">
+            <a href="./survivorResults.html" class="inline-flex items-center px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors shadow-sm">
+                <i class="fas fa-trophy mr-2"></i>
+                View Survivor Results
+            </a>
+            <p class="text-sm text-gray-600 mt-2">See who's still alive in the survivor pool</p>
         </div>
         
         <div id="admin-panel" class="hidden bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200 mt-6">
@@ -513,6 +531,8 @@
 
                 if (myStatus && myStatus.eliminated) {
                     mainContent.innerHTML = `<h2 class="text-2xl font-bold text-center text-red-600">You have been eliminated.</h2><p class="text-center mt-2">You were eliminated in Week ${myStatus.eliminatedWeek}. Better luck next year!</p>`;
+                    // Show survivor results button even for eliminated players
+                    document.getElementById('survivor-results-section').classList.remove('hidden');
                     return;
                 }
                 
@@ -618,6 +638,9 @@
                 html += `</div>`;
                 mainContent.innerHTML = html;
                 
+                // Show survivor results button for pool members
+                document.getElementById('survivor-results-section').classList.remove('hidden');
+                
                 // Update timestamps now that elements exist
                 updateSurvivorTimestamps();
 
@@ -652,7 +675,17 @@
                             // Store last survivor pick timestamp
                             localStorage.setItem('lastSurvivorPick', new Date().toISOString());
                             
-                            await setDoc(picksDocRef, userPicks, { merge: true });
+                            // Update both individual picks document and status document in parallel
+                            const statusUpdate = {};
+                            statusUpdate[`${currentUser.uid}.currentWeekPick`] = team;
+                            statusUpdate[`${currentUser.uid}.currentWeekPickDetails`] = newPick;
+                            statusUpdate[`${currentUser.uid}.lastUpdated`] = new Date().toISOString();
+                            
+                            await Promise.all([
+                                setDoc(picksDocRef, userPicks, { merge: true }),
+                                setDoc(statusDocRef, statusUpdate, { merge: true })
+                            ]);
+                            
                             updateSurvivorTimestamps(); // Update display
                             renderApp(); // Re-render to show selection
                         });
@@ -695,9 +728,24 @@
                     allPicks[doc.id] = doc.data();
                 });
 
-                const usersSnap = await getDocs(collection(db, usersPath()));
+                // 💎 DIAMOND STANDARD: Use pool members for survivor admin
+                const poolId = 'nerduniverse-2025';
+                const poolMembersRef = doc(db, `artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+                const poolMembersSnap = await getDoc(poolMembersRef);
+                
                 allUsers = [];
-                usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
+                if (poolMembersSnap.exists()) {
+                    const members = poolMembersSnap.data();
+                    for (const [uid, memberData] of Object.entries(members)) {
+                        allUsers.push({
+                            id: uid,
+                            uid: uid,
+                            displayName: memberData.displayName || memberData.email || 'Unknown',
+                            email: memberData.email || '',
+                            ...memberData
+                        });
+                    }
+                }
                 allUsers.sort((a,b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
 
                 const tableRows = allUsers.map(user => {
@@ -730,8 +778,19 @@
                         const userId = e.target.dataset.userId;
                         if(confirm(`Are you sure you want to reset this week's pick for this user?`)){
                             const userPicksDocRef = doc(db, survivorPicksPath(userId));
-                            const updateData = { [`picks.${currentWeek}`]: deleteField() };
-                            await updateDoc(userPicksDocRef, updateData);
+                            const statusDocRef = doc(db, survivorStatusPath());
+                            
+                            // Clear pick from both documents
+                            const statusUpdate = {};
+                            statusUpdate[`${userId}.currentWeekPick`] = deleteField();
+                            statusUpdate[`${userId}.currentWeekPickDetails`] = deleteField();
+                            statusUpdate[`${userId}.lastUpdated`] = new Date().toISOString();
+                            
+                            await Promise.all([
+                                updateDoc(userPicksDocRef, { [`picks.${currentWeek}`]: deleteField() }),
+                                setDoc(statusDocRef, statusUpdate, { merge: true })
+                            ]);
+                            
                             renderAdminPanel();
                         }
                     });

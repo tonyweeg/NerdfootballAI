@@ -411,7 +411,7 @@
             }
 
             const appId = () => 'nerdfootball'; 
-            const poolId = 'nerduniverse-2025'; // Default pool for the Grid
+            const poolId = 'NERDPOOL'; // Default pool for the Grid
             const picksPath = (week, uid) => `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
             const resultsPath = (week) => `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
             const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
@@ -527,6 +527,100 @@
                     }
                     
                     console.log(`✅ Final user count: ${userMap.size} users loaded`);
+                    
+                    // CRITICAL: ADMIN PROTECTION - Eliminate ALL conflicts with admin users
+                    emailToUsers.forEach((users, email) => {
+                        if (users.length > 1) {
+                            console.log(`🚫 EMAIL CONFLICT: ${users.length} users with email "${email}"`);
+                            users.forEach(u => console.log(`   - ${u.id} (name: ${u.displayName || 'none'}) (role: ${u.role || 'none'})`));
+                            
+                            // Find real admin users (those with proper admin data)
+                            const adminUsers = users.filter(u => 
+                                u.role === 'admin' || 
+                                u.isAdmin === true || 
+                                u.id !== 'okl4sw2aDhW3yKpOfOwe5lH7OQj1' // Any non-ghost is preferred over ghost
+                            );
+                            
+                            // If we have admin users, eliminate ALL non-admin duplicates
+                            if (adminUsers.length > 0) {
+                                console.log(`🔥 ADMIN EMAIL PROTECTION: Eliminating ${users.length - adminUsers.length} ghost/duplicate users`);
+                                
+                                // Remove ALL non-admin users with this email from candidates
+                                users.forEach(user => {
+                                    if (!adminUsers.includes(user)) {
+                                        const ghostIndex = userCandidates.findIndex(u => u.id === user.id);
+                                        if (ghostIndex !== -1) {
+                                            userCandidates.splice(ghostIndex, 1);
+                                            console.log(`🚫🚫 ELIMINATED GHOST/DUPLICATE: ${user.id} (protecting admin with same email)`);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                    
+                    // Process each name group, keeping only the best user
+                    nameToUsers.forEach((users, displayName) => {
+                        if (users.length === 1) {
+                            // Single user - keep it UNLESS it's the known ghost
+                            const user = users[0];
+                            if (user.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
+                                console.log('🚫🚫 BLOCKING KNOWN GHOST USER:', user.id);
+                                return;
+                            }
+                            userMap.set(user.id, user);
+                            console.log('✅ Single user kept:', displayName, user.id);
+                        } else {
+                            // Multiple users with same name - keep the most complete one
+                            console.log(`🚫 GHOST CONFLICT: ${users.length} users named "${displayName}"`);
+                            users.forEach(u => console.log(`   - ${u.id} (email: ${u.email || 'none'})`));
+                            
+                            // Filter out known ghost users first
+                            const validUsers = users.filter(u => u.id !== 'okl4sw2aDhW3yKpOfOwe5lH7OQj1');
+                            if (validUsers.length === 0) {
+                                console.log('🚫 ALL USERS WERE GHOSTS - SKIPPING GROUP');
+                                return;
+                            }
+                            
+                            // Find the best user (most complete profile) from valid users
+                            const bestUser = validUsers.reduce((best, current) => {
+                                const bestScore = (best.email ? 1 : 0) + (best.displayName ? 1 : 0) + (Object.keys(best).length);
+                                const currentScore = (current.email ? 1 : 0) + (current.displayName ? 1 : 0) + (Object.keys(current).length);
+                                return currentScore > bestScore ? current : best;
+                            });
+                            
+                            userMap.set(bestUser.id, bestUser);
+                            console.log(`✅ Best user selected: ${displayName} -> ${bestUser.id}`);
+                            
+                            // Log rejected ghosts
+                            users.forEach(user => {
+                                if (user.id !== bestUser.id) {
+                                    console.log(`🚫 GHOST ELIMINATED: ${user.id} (duplicate of ${bestUser.id})`);
+                                }
+                            });
+                        }
+                    });
+                    console.log('🚨 Raw user count:', rawUserCount);
+                    console.log('🚨 Deduplicated user count:', userMap.size);
+                    
+                    // If no users found in legacy path, try pool members
+                    if (userMap.size === 0) {
+                        console.log('🚨 No users in legacy path, trying pool members');
+                        const poolMembersDoc = await getDoc(doc(db, poolMembersPath()));
+                        if (poolMembersDoc.exists()) {
+                            const members = poolMembersDoc.data();
+                            console.log('🚨 Pool members found:', Object.keys(members).length);
+                            for (const [uid, memberData] of Object.entries(members)) {
+                                userMap.set(uid, {
+                                    id: uid,
+                                    uid: uid,
+                                    displayName: memberData.displayName || 'Unknown',
+                                    email: memberData.email || '',
+                                    ...memberData
+                                });
+                            }
+                        }
+                    }
                     
                     const allUsers = Array.from(userMap.values());
 
