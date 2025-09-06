@@ -661,11 +661,29 @@
                     let pointsLeft = 0;
                     const userPicks = allPicks[user.id] || {};
                     
+                    // Debug specific user
+                    if (user.id === 'w9a0168NrKRH3sgB4BoFYCt7miV2') {
+                        console.log(`🔍 DEBUG USER ${user.displayName} (${user.id}):`);
+                        console.log('  - Has picks:', Object.keys(userPicks).length > 0);
+                        console.log('  - Pick data:', userPicks);
+                    }
+                    
                     games.forEach(game => {
                         const pick = userPicks[game.id];
                         if (pick) {
-                            // 💎 DIAMOND FIX: Ensure confidence is a valid number
-                            const confidence = parseInt(pick.confidence) || 0;
+                            // 💎 DIAMOND FIX: Ensure confidence is a valid number (handles 0 correctly)
+                            const confidence = pick.confidence != null ? parseInt(pick.confidence) : 0;
+                            
+                            // Debug specific user's calculations
+                            if (user.id === 'w9a0168NrKRH3sgB4BoFYCt7miV2' && pick.winner) {
+                                console.log(`  - Game ${game.id}: ${pick.winner} (confidence: ${confidence})`);
+                                if (gameResults[game.id]) {
+                                    const actualWinner = getGameWinner(gameResults[game.id]);
+                                    const isCorrect = pick.winner === actualWinner;
+                                    console.log(`    Result: ${actualWinner}, Correct: ${isCorrect}`);
+                                }
+                            }
+                            
                             if (gameResults[game.id]) {
                                 if (pick.winner === getGameWinner(gameResults[game.id])) {
                                     totalPoints += confidence;
@@ -675,6 +693,11 @@
                             }
                         }
                     });
+
+                    // Debug final calculation for specific user
+                    if (user.id === 'w9a0168NrKRH3sgB4BoFYCt7miV2') {
+                        console.log(`  - Final points: ${totalPoints}, Points left: ${pointsLeft}`);
+                    }
 
                     return {
                         ...user,
@@ -785,7 +808,7 @@
                                     <div class="flex justify-center mb-1">
                                         <span class="helmet-icon ${helmetClass}" title="${pick.winner}"></span>
                                     </div>
-                                    <div class="text-xs text-gray-600">${pick.confidence != null ? pick.confidence : '?'}</div>
+                                    <div class="text-xs text-gray-600">${pick.confidence !== undefined && pick.confidence !== null && pick.confidence !== '' ? pick.confidence : 0}</div>
                                 </div>`;
                             }
                         } else if (gameStarted) {
@@ -796,7 +819,7 @@
                                     <div class="flex justify-center mb-1">
                                         <span class="helmet-icon ${helmetClass}" title="${pick.winner}"></span>
                                     </div>
-                                    <div class="text-xs text-gray-600">${pick.confidence != null ? pick.confidence : '?'}</div>
+                                    <div class="text-xs text-gray-600">${pick.confidence !== undefined && pick.confidence !== null && pick.confidence !== '' ? pick.confidence : 0}</div>
                                 </div>`;
                                 if(gameResults[game.id]){
                                     // 💎 DIAMOND FIX: Use getGameWinner to extract winner from result object

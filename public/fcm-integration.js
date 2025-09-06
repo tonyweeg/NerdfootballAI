@@ -9,16 +9,16 @@ class FCMManager {
         this.initialized = false;
     }
 
-    // Diamond Level: Wait for Firebase to be fully loaded
+    // Diamond Level: Wait for Firebase to be fully loaded (v11 modular SDK)
     async waitForFirebase(maxAttempts = 50, delay = 100) {
         for (let i = 0; i < maxAttempts; i++) {
-            if (window.firebase && window.firebase.messaging) {
-                console.log('✅ Firebase messaging ready');
+            if (window.firebaseApp && window.db && window.auth) {
+                console.log('✅ Firebase v11 modular SDK ready');
                 return true;
             }
             await new Promise(resolve => setTimeout(resolve, delay));
         }
-        throw new Error('Firebase messaging not available after waiting');
+        throw new Error('Firebase v11 modular SDK not available after waiting');
     }
 
     // Initialize FCM - Diamond Level: Modern Firebase v11 API
@@ -36,8 +36,8 @@ class FCMManager {
             await this.waitForFirebase();
             
             // Use modern Firebase v11 API
-            const { onMessage } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js');
-            this.messaging = window.firebase.messaging();
+            const { getMessaging, onMessage } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js');
+            this.messaging = getMessaging(window.firebaseApp);
             this.initialized = true;
             
             // Listen for foreground messages using modern API
