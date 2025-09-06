@@ -304,9 +304,98 @@
             return Math.max(1, Math.min(18, weeksDiff + 1));
         }
 
+        // 💎 DIAMOND FIX: Optimized weeks survived calculation with batch loading
+        let cachedWeekResults = null;
+        
+        async function loadAllWeekResults(currentWeek) {
+            if (cachedWeekResults) return cachedWeekResults;
+            
+            console.log('🚀 Batch loading results for weeks 1-' + currentWeek);
+            const startTime = performance.now();
+            
+            try {
+                // Load all week results in parallel
+                const resultPromises = [];
+                for (let week = 1; week <= currentWeek; week++) {
+                    resultPromises.push(
+                        getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/week${week}`))
+                            .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
+                            .catch(error => {
+                                console.error(`Error loading week ${week} results:`, error);
+                                return { week, data: null };
+                            })
+                    );
+                }
+                
+                const allResults = await Promise.all(resultPromises);
+                cachedWeekResults = {};
+                allResults.forEach(({ week, data }) => {
+                    cachedWeekResults[week] = data;
+                });
+                
+                console.log(`📊 Loaded ${allResults.length} week results in ${(performance.now() - startTime).toFixed(0)}ms`);
+                return cachedWeekResults;
+            } catch (error) {
+                console.error('Error batch loading week results:', error);
+                return {};
+            }
+        }
+        
+        function calculateWeeksSurvived(userPicks, currentWeek, allWeekResults) {
+            try {
+                let weeksSurvived = 0;
+                
+                // Check each week from 1 to current week
+                for (let week = 1; week <= currentWeek; week++) {
+                    const weekPick = userPicks[week];
+                    if (!weekPick || !weekPick.team) {
+                        // No pick for this week - stop counting
+                        break;
+                    }
+                    
+                    const weekResults = allWeekResults[week];
+                    if (weekResults) {
+                        // Find if user's team won any game this week
+                        let teamWon = false;
+                        Object.values(weekResults).forEach(gameResult => {
+                            if (gameResult && gameResult.winner === weekPick.team) {
+                                teamWon = true;
+                            }
+                        });
+                        
+                        if (teamWon) {
+                            weeksSurvived = week; // User survived this week
+                        } else {
+                            // Team lost or no result yet
+                            if (week < currentWeek) {
+                                // Past week with no win = eliminated
+                                break;
+                            } else {
+                                // Current week - no result yet, don't count it
+                                break;
+                            }
+                        }
+                    } else if (week < currentWeek) {
+                        // Past week with no results = assume eliminated
+                        break;
+                    }
+                    // Current week with no results yet = don't count it
+                }
+                
+                return weeksSurvived;
+            } catch (error) {
+                console.error('Error calculating weeks survived for user:', error);
+                // Fallback to old logic
+                return Math.max(0, currentWeek - 1);
+            }
+        }
+
         // Load survivor results
         async function loadSurvivorResults() {
             showLoading();
+            
+            // Reset cache for fresh data
+            cachedWeekResults = null;
             
             try {
                 console.log('Loading survivor results for pool:', currentPool);
@@ -382,10 +471,16 @@
                 
                 const activeUsersData = await Promise.all(activeUserPromises);
                 
-                // Process active users with full pick data
+                // 💎 DIAMOND OPTIMIZATION: Batch load all week results once
+                const allWeekResults = await loadAllWeekResults(currentWeek);
+                
+                // Process active users with full pick data - Real-time weeks calculation
                 for (const userData of activeUsersData) {
-                    const { uid, displayPick, displayWeek, currentWeekPick, totalPicks } = userData;
+                    const { uid, userPicks, displayPick, displayWeek, currentWeekPick, totalPicks } = userData;
                     const userStatus = allStatuses[uid] || { eliminated: false };
+                    
+                    // Calculate weeks survived with pre-loaded results (no more Firebase calls!)
+                    const weeksSurvived = calculateWeeksSurvived(userPicks, currentWeek, allWeekResults);
                     
                     userResults.push({
                         uid,
@@ -396,7 +491,7 @@
                         latestPick: displayPick || 'No picks yet',
                         latestPickWeek: displayWeek,
                         currentWeekPick: currentWeekPick,
-                        weeksSurvived: currentWeek - 1,
+                        weeksSurvived: weeksSurvived,
                         totalPicks: totalPicks
                     });
                 }
