@@ -65,6 +65,22 @@
 - Understand existing code before modifying
 - When in doubt, ask for clarification
 
+### 9. Performance & Refactoring Standards
+- **Always scan for similar patterns** when fixing performance issues
+- **Check for N+1 query problems** in any database-related code
+- **Search codebase for duplicate inefficient logic** before concluding refactoring
+- **Seek user approval** before implementing broader performance optimizations
+- **Document performance improvements** with before/after metrics
+- Example: If fixing `getDocs(collection(db, users/${user.id}/...))` in one function, search entire codebase for similar patterns
+
+### 10. Cross-Impact Analysis Standards
+- **CRITICAL**: Before removing/modifying any code element, search entire codebase for dependencies
+- Use `grep` to find all references to variables, functions, DOM elements before deletion
+- Check if shared functions/elements are used by multiple features
+- When removing UI elements, verify corresponding JavaScript references are safe
+- Example: Removing `#leaderboard-body` requires checking if `allUI.leaderboardBody` is used elsewhere
+- Ask user for confirmation when potential cross-impacts are identified
+
 ## 🚨 Known Issues to Always Check
 
 ### Ghost Users

@@ -59,10 +59,10 @@ service cloud.firestore {
       allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
     }
     
-    // Legacy survivor picks - all authenticated users can read/write their own
+    // Legacy survivor picks - all authenticated users can read/write their own, admins can write any
     match /artifacts/nerdfootball/public/data/nerdSurvivor_picks/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isGlobalAdmin());
     }
     
     // Legacy survivor status - all authenticated users can read
@@ -116,7 +116,7 @@ service cloud.firestore {
     // Pool-specific survivor picks
     match /artifacts/nerdfootball/pools/{poolId}/data/nerdSurvivor_picks/{userId} {
       allow read: if isPoolMember(poolId);
-      allow write: if isPoolMember(poolId) && request.auth.uid == userId;
+      allow write: if isPoolMember(poolId) && (request.auth.uid == userId || isPoolAdmin(poolId));
     }
     
     // Pool-specific survivor status
@@ -155,9 +155,10 @@ service cloud.firestore {
     // FCM TOKENS AND NOTIFICATION PREFERENCES
     // ============================================
     
-    // User FCM tokens - users can read/write their own tokens
+    // User FCM tokens - users can read/write their own tokens, admins can read all tokens for messaging
     match /users/{userId}/fcm_tokens/{tokenId} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isGlobalAdmin(); // Allow admins to read FCM tokens for messaging
     }
     
     // User notification preferences - users can read/write their own preferences

@@ -5,6 +5,32 @@ const nodemailer = require('nodemailer');
 // Initialize Firebase Admin
 admin.initializeApp();
 
+// Configure VAPID key for web push notifications
+const VAPID_KEY = 'BDZpKfQuommUrNF2w2pt_0TwpmUJU_J6ynLEOa10r_pqzcioqxKjOduP-UFxxtBh4OHzf11poHZOuyqJyHKozuY';
+
+// Diamond Level: Auto-cleanup expired FCM tokens
+async function cleanupExpiredToken(expiredToken) {
+    try {
+        // Query all users to find and remove this expired token
+        const usersQuery = admin.firestore().collectionGroup('fcm_tokens')
+            .where('token', '==', expiredToken);
+            
+        const snapshot = await usersQuery.get();
+        const deletePromises = [];
+        
+        snapshot.forEach(doc => {
+            console.log(`Removing expired token from user: ${doc.ref.path}`);
+            deletePromises.push(doc.ref.delete());
+        });
+        
+        await Promise.all(deletePromises);
+        return { success: true, deletedCount: deletePromises.length };
+    } catch (error) {
+        console.error('Error cleaning up expired token:', expiredToken, error);
+        return { success: false, error: error.message };
+    }
+}
+
 // Configure nodemailer transporter (will be null if not configured)
 let transporter = null;
 
@@ -188,12 +214,46 @@ exports.sendFCMSystemMessage = functions.https.onCall(async (data, context) => {
                     },
                     fcmOptions: {
                         link: clickAction
+                    },
+                    headers: {
+                        TTL: '86400'
                     }
                 },
                 tokens: targetTokens
             };
             
+            console.log('FCM Message being sent:', JSON.stringify(message, null, 2));
+            console.log('Target tokens:', targetTokens);
+            
             response = await admin.messaging().sendEachForMulticast(message);
+            
+            // Log detailed response
+            console.log('FCM Response:', JSON.stringify(response, null, 2));
+            
+            // Handle failed tokens - Diamond Level cleanup
+            if (response.failureCount > 0) {
+                console.log('FCM Failures detected - cleaning up invalid tokens:');
+                const cleanupPromises = [];
+                
+                response.responses.forEach((resp, index) => {
+                    if (!resp.success) {
+                        const failedToken = targetTokens[index];
+                        console.log(`Token ${failedToken} failed:`, resp.error);
+                        
+                        // If token is expired/invalid, remove it from all users
+                        if (resp.error.code === 'messaging/registration-token-not-registered') {
+                            console.log(`Removing expired token: ${failedToken}`);
+                            cleanupPromises.push(cleanupExpiredToken(failedToken));
+                        }
+                    }
+                });
+                
+                // Clean up expired tokens in parallel
+                if (cleanupPromises.length > 0) {
+                    await Promise.allSettled(cleanupPromises);
+                    console.log(`Cleaned up ${cleanupPromises.length} expired tokens`);
+                }
+            }
         } else {
             // Send to topic
             const message = {
@@ -221,6 +281,9 @@ exports.sendFCMSystemMessage = functions.https.onCall(async (data, context) => {
                     },
                     fcmOptions: {
                         link: clickAction
+                    },
+                    headers: {
+                        TTL: '86400'
                     }
                 },
                 topic: topic

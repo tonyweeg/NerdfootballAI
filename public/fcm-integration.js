@@ -9,7 +9,19 @@ class FCMManager {
         this.initialized = false;
     }
 
-    // Initialize FCM
+    // Diamond Level: Wait for Firebase to be fully loaded
+    async waitForFirebase(maxAttempts = 50, delay = 100) {
+        for (let i = 0; i < maxAttempts; i++) {
+            if (window.firebase && window.firebase.messaging) {
+                console.log('✅ Firebase messaging ready');
+                return true;
+            }
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        throw new Error('Firebase messaging not available after waiting');
+    }
+
+    // Initialize FCM - Diamond Level: Modern Firebase v11 API
     async initialize() {
         if (this.initialized) return;
         
@@ -20,13 +32,15 @@ class FCMManager {
                 return false;
             }
 
-            // Import Firebase messaging
-            const { getMessaging, getToken, onMessage } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js');
+            // Wait for Firebase to be ready - Diamond Level
+            await this.waitForFirebase();
             
-            this.messaging = getMessaging(window.firebaseApp);
+            // Use modern Firebase v11 API
+            const { onMessage } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js');
+            this.messaging = window.firebase.messaging();
             this.initialized = true;
             
-            // Listen for foreground messages
+            // Listen for foreground messages using modern API
             onMessage(this.messaging, (payload) => {
                 this.handleForegroundMessage(payload);
             });
@@ -53,7 +67,7 @@ class FCMManager {
             if (permission === 'granted') {
                 console.log('Notification permission granted.');
                 
-                // Get registration token
+                // Get registration token using modern API
                 const { getToken } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js');
                 const token = await getToken(this.messaging, { 
                     vapidKey: this.vapidKey 
@@ -86,8 +100,18 @@ class FCMManager {
         }
 
         try {
-            const { doc, setDoc, getDoc } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+            const { doc, setDoc, getDoc, collection, getDocs, deleteDoc } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
             
+            // First, clean up old tokens for this user
+            const tokensCollection = collection(window.db, `users/${user.uid}/fcm_tokens`);
+            const oldTokens = await getDocs(tokensCollection);
+            
+            for (const tokenDoc of oldTokens.docs) {
+                await deleteDoc(tokenDoc.ref);
+                console.log('Removed old FCM token:', tokenDoc.id);
+            }
+            
+            // Save the new token
             const tokenDoc = doc(window.db, `users/${user.uid}/fcm_tokens/${token}`);
             await setDoc(tokenDoc, {
                 token: token,
@@ -125,6 +149,13 @@ class FCMManager {
     // Subscribe user to FCM topics
     async subscribeToTopic(tokens, topic) {
         try {
+            // Make sure user is authenticated first
+            const user = window.auth?.currentUser;
+            if (!user) {
+                console.log('No authenticated user for topic subscription');
+                return null;
+            }
+
             const { getFunctions, httpsCallable } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js');
             const functions = getFunctions(window.firebaseApp, 'us-central1');
             const subscribeToFCMTopic = httpsCallable(functions, 'subscribeToFCMTopic');
@@ -183,8 +214,18 @@ class FCMManager {
 
     // Show notification settings modal
     async showNotificationSettings() {
-        const preferences = await this.getNotificationPreferences();
-        if (!preferences) return;
+        let preferences = await this.getNotificationPreferences();
+        
+        // If no preferences exist, create default ones
+        if (!preferences) {
+            preferences = {
+                systemMessages: true,
+                pickConfirmations: true,
+                gameResults: false,
+                weeklyReminders: true,
+                enabled: true
+            };
+        }
 
         return new Promise((resolve) => {
             const modal = document.createElement('div');
@@ -528,11 +569,12 @@ class FCMManager {
                     transition: all 0.2s;
                 }
                 .fcm-btn-primary {
-                    background: #4F46E5;
-                    color: white;
+                    background: #7DD3FC;
+                    color: #0F172A;
+                    font-weight: 600;
                 }
                 .fcm-btn-primary:hover {
-                    background: #4338CA;
+                    background: #38BDF8;
                 }
                 .fcm-btn-secondary {
                     background: #F3F4F6;
@@ -562,62 +604,237 @@ class FCMManager {
 // Create global FCM manager instance
 window.fcmManager = new FCMManager();
 
-// Add notification settings button to page when authenticated user detected
-function addNotificationSettingsButton() {
-    // Only add once
-    if (document.querySelector('.fcm-settings-btn')) return;
-    
-    // Wait for auth to be available
-    if (!window.auth?.currentUser) {
-        setTimeout(addNotificationSettingsButton, 1000);
+// Add notification settings to existing user settings modal
+function integrateWithUserSettings() {
+    // Wait for auth and UI to be available
+    if (!window.auth?.currentUser || !window.allUI?.notificationSettingsSection) {
+        setTimeout(integrateWithUserSettings, 2000);
         return;
     }
     
-    // Create settings button
-    const settingsBtn = document.createElement('button');
-    settingsBtn.className = 'fcm-settings-btn';
-    settingsBtn.innerHTML = '🔔 Notification Settings';
-    settingsBtn.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #4F46E5;
-        color: white;
-        border: none;
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
-        z-index: 1000;
-        transition: all 0.2s;
-    `;
+    console.log('Integrating FCM settings with user settings modal for user:', window.auth.currentUser.uid);
     
-    settingsBtn.onmouseover = () => {
-        settingsBtn.style.background = '#4338CA';
-        settingsBtn.style.transform = 'translateY(-2px)';
-    };
+    // Hook into the existing settings modal open event
+    const originalSettingsBtn = window.allUI?.settingsBtn;
+    if (originalSettingsBtn) {
+        originalSettingsBtn.addEventListener('click', populateNotificationSettings);
+    }
     
-    settingsBtn.onmouseout = () => {
-        settingsBtn.style.background = '#4F46E5';
-        settingsBtn.style.transform = 'translateY(0)';
-    };
+    // Also populate when settings modal is shown
+    const settingsModal = window.allUI?.settingsModal;
+    if (settingsModal) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    if (!settingsModal.classList.contains('hidden')) {
+                        populateNotificationSettings();
+                    }
+                }
+            });
+        });
+        observer.observe(settingsModal, { attributes: true });
+    }
     
-    settingsBtn.onclick = () => {
-        window.fcmManager.showNotificationSettings();
-    };
+    // Make sure to populate settings when form is saved
+    const settingsForm = window.allUI?.settingsForm;
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', handleSettingsFormSubmit);
+    }
+}
+
+// Populate notification settings in the user settings modal
+window.populateNotificationSettings = async function() {
+    // Try to get the elements directly if allUI isn't available yet
+    const statusDiv = window.allUI?.notificationStatus || document.getElementById('notification-status');
+    const preferencesDiv = window.allUI?.notificationPreferences || document.getElementById('notification-preferences');
     
-    document.body.appendChild(settingsBtn);
+    if (!statusDiv || !preferencesDiv) {
+        console.log('Notification settings elements not found');
+        return;
+    }
+    
+    console.log('Populating notification settings...');
+    console.log('Elements found:', {statusDiv: !!statusDiv, preferencesDiv: !!preferencesDiv});
+    
+    try {
+        // Check if user has FCM enabled
+        const hasPermission = window.fcmManager?.hasPermission();
+        const currentToken = window.fcmManager?.getCurrentToken();
+        const preferences = await window.fcmManager?.getNotificationPreferences();
+        
+        console.log('FCM Status:', {
+            hasPermission,
+            hasToken: !!currentToken,
+            preferences,
+            fcmManager: !!window.fcmManager
+        });
+        
+        // Populate status
+        if (hasPermission && currentToken) {
+            statusDiv.className = 'mb-4 p-3 rounded-lg border bg-sky-50 border-sky-200';
+            statusDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 text-sky-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-medium text-sky-800">Push Notifications Enabled</p>
+                            <p class="text-xs text-sky-600">You'll receive real-time notifications</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            statusDiv.className = 'mb-4 p-3 rounded-lg border bg-yellow-50 border-yellow-200';
+            statusDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div>
+                                <p class="text-sm font-medium text-yellow-800">Push Notifications Disabled</p>
+                                <p class="text-xs text-yellow-600">Enable to receive real-time updates</p>
+                            </div>
+                        </div>
+                        <button id="enable-notifications-btn" class="px-3 py-1 bg-sky-600 text-white text-sm rounded hover:bg-sky-700">
+                            Enable Now
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Add click handler for enable button
+            const enableBtn = statusDiv.querySelector('#enable-notifications-btn');
+            if (enableBtn) {
+                enableBtn.addEventListener('click', async () => {
+                    const token = await window.fcmManager?.requestPermissionAndGetToken();
+                    if (token) {
+                        populateNotificationSettings(); // Refresh the display
+                    }
+                });
+            }
+        }
+        
+        // Populate preferences (only show if notifications are enabled)
+        if (hasPermission && currentToken && preferences) {
+            preferencesDiv.innerHTML = `
+                <div class="space-y-3">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="pref-system-messages" class="notification-pref-checkbox mr-3" ${preferences.systemMessages ? 'checked' : ''}>
+                        <div>
+                            <span class="text-sm font-medium text-slate-700">📢 System Announcements</span>
+                            <p class="text-xs text-slate-500">Important updates from admins</p>
+                        </div>
+                    </label>
+                    
+                    <label class="flex items-center">
+                        <input type="checkbox" id="pref-pick-confirmations" class="notification-pref-checkbox mr-3" ${preferences.pickConfirmations ? 'checked' : ''}>
+                        <div>
+                            <span class="text-sm font-medium text-slate-700">✅ Pick Confirmations</span>
+                            <p class="text-xs text-slate-500">Confirmation when your picks are saved</p>
+                        </div>
+                    </label>
+                    
+                    <label class="flex items-center">
+                        <input type="checkbox" id="pref-game-results" class="notification-pref-checkbox mr-3" ${preferences.gameResults ? 'checked' : ''}>
+                        <div>
+                            <span class="text-sm font-medium text-slate-700">🏈 Game Results</span>
+                            <p class="text-xs text-slate-500">Notifications when games finish</p>
+                        </div>
+                    </label>
+                    
+                    <label class="flex items-center">
+                        <input type="checkbox" id="pref-weekly-reminders" class="notification-pref-checkbox mr-3" ${preferences.weeklyReminders ? 'checked' : ''}>
+                        <div>
+                            <span class="text-sm font-medium text-slate-700">⏰ Weekly Reminders</span>
+                            <p class="text-xs text-slate-500">Don't forget to make your picks</p>
+                        </div>
+                    </label>
+                </div>
+            `;
+        } else {
+            preferencesDiv.innerHTML = `
+                <div class="text-center py-4 text-slate-500">
+                    <p class="text-sm">Enable push notifications to manage preferences</p>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Error populating notification settings:', error);
+        statusDiv.className = 'mb-4 p-3 rounded-lg border bg-red-50 border-red-200';
+        statusDiv.innerHTML = `
+            <p class="text-sm text-red-800">Unable to load notification settings</p>
+        `;
+    }
+}
+
+// Handle settings form submit to save notification preferences
+async function handleSettingsFormSubmit(event) {
+    const checkboxes = document.querySelectorAll('.notification-pref-checkbox');
+    if (checkboxes.length > 0) {
+        // Save notification preferences
+        const preferences = {
+            systemMessages: document.getElementById('pref-system-messages')?.checked || false,
+            pickConfirmations: document.getElementById('pref-pick-confirmations')?.checked || false,
+            gameResults: document.getElementById('pref-game-results')?.checked || false,
+            weeklyReminders: document.getElementById('pref-weekly-reminders')?.checked || false,
+            enabled: true
+        };
+        
+        const success = await window.fcmManager?.updateNotificationPreferences(preferences);
+        if (success) {
+            console.log('✅ Notification preferences saved successfully');
+        }
+    }
 }
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         window.fcmManager.initialize();
-        addNotificationSettingsButton();
+        integrateWithUserSettings();
     });
 } else {
     window.fcmManager.initialize();
-    addNotificationSettingsButton();
+    integrateWithUserSettings();
 }
+
+// Add global console commands for debugging
+window.openNotificationSettings = () => {
+    if (window.fcmManager) {
+        window.fcmManager.showNotificationSettings();
+    } else {
+        console.error('FCM Manager not available');
+    }
+};
+
+window.requestFCMPermission = async () => {
+    console.log('🔔 Manually requesting FCM permission and token...');
+    if (window.fcmManager) {
+        const token = await window.fcmManager.requestPermissionAndGetToken();
+        if (token) {
+            console.log('✅ FCM Token obtained:', token);
+            return token;
+        } else {
+            console.log('❌ Failed to get FCM token');
+            return null;
+        }
+    } else {
+        console.error('FCM Manager not available');
+        return null;
+    }
+};
+
+window.checkFCMStatus = async () => {
+    console.log('🔔 Checking FCM status...');
+    console.log('- Notification permission:', Notification.permission);
+    console.log('- Current FCM token:', window.fcmManager?.currentToken);
+    console.log('- FCM initialized:', window.fcmManager?.initialized);
+    console.log('- Auth user:', window.auth?.currentUser?.uid);
+};
+
+console.log('🔔 FCM Integration loaded.');
+console.log('Commands: openNotificationSettings(), requestFCMPermission(), checkFCMStatus()');
+console.log('💡 Notification settings moved to user settings modal (no persistent button)');
