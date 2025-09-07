@@ -3484,6 +3484,49 @@ migrationResultsContent: document.getElementById('migration-results-content')
      if (!originalUserPicks[gameId]) originalUserPicks[gameId] = {};
      originalUserPicks[gameId].confidence = confidence;
  }
+
+ // Validate and fix confidence values for admin picks
+ function validateAndFixConfidenceValues(picks, gamesForWeek) {
+     const validatedPicks = JSON.parse(JSON.stringify(picks)); // Deep copy
+     
+     // Get all game IDs for this week
+     const gameIds = gamesForWeek.map(game => game.id);
+     const numGames = gameIds.length;
+     
+     if (numGames === 0) return validatedPicks;
+     
+     // Collect current confidence values and find any zeros
+     const confidenceMap = {};
+     const zeroConfidenceGames = [];
+     
+     gameIds.forEach(gameId => {
+         if (validatedPicks[gameId] && validatedPicks[gameId].confidence !== undefined) {
+             const confidence = validatedPicks[gameId].confidence;
+             if (confidence === 0) {
+                 zeroConfidenceGames.push(gameId);
+             } else {
+                 confidenceMap[confidence] = gameId;
+             }
+         }
+     });
+     
+     // Find missing confidence values (1 to numGames)
+     const missingConfidences = [];
+     for (let i = 1; i <= numGames; i++) {
+         if (!confidenceMap[i]) {
+             missingConfidences.push(i);
+         }
+     }
+     
+     // Assign missing confidence values to games with confidence 0
+     zeroConfidenceGames.forEach((gameId, index) => {
+         if (index < missingConfidences.length) {
+             validatedPicks[gameId].confidence = missingConfidences[index];
+         }
+     });
+     
+     return validatedPicks;
+ }
  
  // Survivor status sorting state
 let survivorSortField = 'role'; // Start by sorting by role (admins first)
@@ -8689,9 +8732,12 @@ allUI.refreshSummaryBtn.addEventListener('click', async () => {
     if (!user) return;
     
     try {
-        // Save the updated picks
+        // Validate and fix confidence values before saving
+        const validatedPicks = validateAndFixConfidenceValues(originalUserPicks, editableGamesForUser);
+        
+        // Save the validated picks
         const docRef = doc(db, picksPath(weekNumber, selectedUserForPicks));
-        await setDoc(docRef, originalUserPicks);
+        await setDoc(docRef, validatedPicks);
         
         // Trigger leaderboard recalculation
         await recalculateLeaderboardAfterPickUpdate(weekNumber);
