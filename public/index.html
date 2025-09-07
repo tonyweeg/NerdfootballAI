@@ -46,6 +46,30 @@
    background-position: center;
    display: inline-block;
  }
+
+ .helmet-mini {
+   background-size: contain;
+   background-repeat: no-repeat;
+   background-position: center;
+   display: inline-block;
+ }
+
+ /* Mobile optimizations for the new picks layout */
+ @media (max-width: 640px) {
+   .winner-btn span {
+     font-size: 0.875rem;
+   }
+   
+   .helmet-mini {
+     width: 20px !important;
+     height: 20px !important;
+   }
+   
+   .confidence-select {
+     padding: 0.5rem 0.25rem !important;
+     font-size: 0.875rem !important;
+   }
+ }
  
  /* Team-specific helmet classes */
  .helmet-ari { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fari_Arizona_Cardinals.png?alt=media&token=38143dcd-6075-4fa3-9f3c-98518a6ec3f3'); }
@@ -7996,6 +8020,23 @@ function getGameState(game) {
     }
 }
 
+function getTeamHelmetClass(teamName) {
+    const teamMap = {
+        "Arizona Cardinals": "helmet-ari", "Atlanta Falcons": "helmet-atl", "Baltimore Ravens": "helmet-bal", 
+        "Buffalo Bills": "helmet-buf", "Carolina Panthers": "helmet-car", "Chicago Bears": "helmet-chi", 
+        "Cincinnati Bengals": "helmet-cin", "Cleveland Browns": "helmet-cle", "Dallas Cowboys": "helmet-dal", 
+        "Denver Broncos": "helmet-den", "Detroit Lions": "helmet-det", "Green Bay Packers": "helmet-gb", 
+        "Houston Texans": "helmet-hou", "Indianapolis Colts": "helmet-ind", "Jacksonville Jaguars": "helmet-jax", 
+        "Kansas City Chiefs": "helmet-kc", "Las Vegas Raiders": "helmet-lv", "Los Angeles Chargers": "helmet-lac", 
+        "Los Angeles Rams": "helmet-lar", "Miami Dolphins": "helmet-mia", "Minnesota Vikings": "helmet-min", 
+        "New England Patriots": "helmet-ne", "New Orleans Saints": "helmet-no", "New York Giants": "helmet-nyg", 
+        "New York Jets": "helmet-nyj", "Philadelphia Eagles": "helmet-phi", "Pittsburgh Steelers": "helmet-pit", 
+        "San Francisco 49ers": "helmet-sf", "Seattle Seahawks": "helmet-sea", "Tampa Bay Buccaneers": "helmet-tb", 
+        "Tennessee Titans": "helmet-ten", "Washington Commanders": "helmet-was"
+    };
+    return teamMap[teamName] || '';
+}
+
 // Check if individual game is locked (started)
  function isGameLocked(game) {
   // SECURITY FIX: Use proper game state validation to prevent picks during IN_PROGRESS games
@@ -8986,30 +9027,106 @@ function updatePicksButtonStates(weekData) {
  
  weekData.games.forEach(game => {
  const pick = userPicks[game.id] || { winner: null, confidence: 0 };
+ const gameState = getGameState(game);
+ const isLocked = isGameLocked(game);
  const gameRow = document.createElement('div');
- gameRow.className = 'p-4 border border-slate-300 rounded-lg bg-slate-100';
+ 
+ // Determine background colors based on game state
+ let gameRowBg = 'bg-white border-slate-200';
+ if (isLocked) {
+     gameRowBg = 'bg-slate-50 border-slate-300';
+ }
+ 
+ gameRow.className = `p-3 border rounded-lg shadow-sm ${gameRowBg} mb-3`;
  const gameTime = new Date(game.kickoff);
  const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
+ // Get helmet classes
+ const awayHelmetClass = getTeamHelmetClass(game.away);
+ const homeHelmetClass = getTeamHelmetClass(game.home);
+
+ // Determine button styles based on state
+ function getTeamButtonClasses(team, isHome = false) {
+     const isSelected = pick.winner === team;
+     const isWinner = gameState === 'COMPLETED' && game.winner === team;
+     const baseClasses = 'winner-btn flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 font-semibold transition-all duration-200 text-sm';
+     
+     if (isLocked) {
+         if (isWinner) {
+             return `${baseClasses} bg-green-100 border-green-400 text-green-800 opacity-90`;
+         } else if (isSelected) {
+             return `${baseClasses} bg-red-100 border-red-300 text-red-700 opacity-70`;
+         } else {
+             return `${baseClasses} bg-slate-100 border-slate-300 text-slate-600 opacity-60`;
+         }
+     } else {
+         if (isSelected) {
+             return `${baseClasses} bg-blue-600 border-blue-600 text-white shadow-md hover:bg-blue-700`;
+         } else {
+             return `${baseClasses} bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 hover:shadow-md`;
+         }
+     }
+ }
+
  gameRow.innerHTML = `
- <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
- <div class="md:col-span-8">
- <div class="flex flex-col sm:flex-row justify-around items-center gap-2">
- <button data-game-id="${game.id}" data-team="${game.away}" ${isGameLocked(game) ? 'disabled' : ''} class="winner-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 border-slate-400 font-semibold ${pick.winner === game.away ? 'selected' : 'bg-slate-50 hover:bg-slate-200'}">${game.away}</button>
- <span class="text-slate-500 font-bold">@</span>
- <button data-game-id="${game.id}" data-team="${game.home}" ${isGameLocked(game) ? 'disabled' : ''} class="winner-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 border-slate-400 font-semibold ${pick.winner === game.home ? 'selected' : 'bg-slate-50 hover:bg-slate-200'}">${game.home}</button>
+ <div class="flex items-center justify-between gap-3">
+     <div class="flex-1 flex items-center justify-between gap-2 min-w-0">
+         <button data-game-id="${game.id}" data-team="${game.away}" ${isLocked ? 'disabled' : ''} 
+                 class="${getTeamButtonClasses(game.away)} flex-1 min-w-0">
+             <div class="helmet-mini ${awayHelmetClass} w-6 h-6 bg-contain bg-center bg-no-repeat flex-shrink-0"></div>
+             <span class="truncate">${game.away}</span>
+         </button>
+         
+         <div class="flex items-center gap-1 text-slate-400 font-bold text-lg flex-shrink-0">
+             <span class="text-xs text-slate-500">${formattedTime.split(',')[0]}</span>
+             <span>@</span>
+         </div>
+         
+         <button data-game-id="${game.id}" data-team="${game.home}" ${isLocked ? 'disabled' : ''} 
+                 class="${getTeamButtonClasses(game.home, true)} flex-1 min-w-0">
+             <div class="helmet-mini ${homeHelmetClass} w-6 h-6 bg-contain bg-center bg-no-repeat flex-shrink-0"></div>
+             <span class="truncate">${game.home}</span>
+         </button>
+     </div>
+     
+     <div class="w-20 flex-shrink-0">
+         <select id="confidence-${game.id}" name="confidence-${game.id}" data-game-id="${game.id}" 
+                 ${isLocked ? 'disabled' : ''} 
+                 class="confidence-select w-full py-2 px-2 text-center rounded-md border-2 ${
+                     isLocked 
+                         ? 'border-slate-300 bg-slate-100 text-slate-600' 
+                         : pick.confidence > 0
+                             ? 'border-blue-400 bg-blue-50 text-blue-800 font-bold'
+                             : 'border-slate-300 bg-white text-slate-700'
+                 } text-sm">
+             ${isLocked ? 
+                 `<option value="${pick.confidence}" selected>${pick.confidence}</option>` : 
+                 [...confidenceOptions, pick.confidence]
+                     .filter((v, i, a) => a.indexOf(v) === i)
+                     .sort((a, b) => a - b)
+                     .map(opt => `<option value="${opt}" ${pick.confidence === opt ? 'selected' : ''}>${opt}</option>`)
+                     .join('')
+             }
+         </select>
+     </div>
  </div>
+ 
+ ${gameState === 'IN_PROGRESS' ? `
+ <div class="mt-2 pt-2 border-t border-slate-200">
+     <div class="flex items-center gap-2 text-xs text-orange-600">
+         <div class="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+         <span class="font-medium">Game in Progress</span>
+     </div>
  </div>
- <div class="md:col-span-4">
- <select id="confidence-${game.id}" name="confidence-${game.id}" data-game-id="${game.id}" ${isGameLocked(game) ? 'disabled' : ''} class="confidence-select w-full p-3 rounded-lg border-2 border-slate-300 bg-white">${isGameLocked(game) ? `<option value="${pick.confidence}" selected>${pick.confidence}</option>` : [...confidenceOptions, pick.confidence].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b).map(opt => `<option value="${opt}" ${pick.confidence === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>
+ ` : gameState === 'COMPLETED' && game.winner ? `
+ <div class="mt-2 pt-2 border-t border-slate-200">
+     <div class="flex items-center gap-2 text-xs text-green-600">
+         <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+         <span class="font-medium">Winner: ${game.winner}</span>
+     </div>
  </div>
- </div>
- <div class="mt-3 pt-3 border-t border-slate-300 text-xs text-slate-600 grid grid-cols-2 md:grid-cols-4 gap-2">
- <div><p class="font-bold">Date & Time</p><p>${formattedTime}</p></div>
- <div><p class="font-bold">Stadium</p><p>${game.stadium}</p></div>
- <div><p class="font-bold">Weather</p><p>${game.weather || 'TBD'}</p></div>
- <div><p class="font-bold">Starting QBs</p><p>${(game.startingQBs && game.startingQBs.away) ? `${game.startingQBs.away} vs ${game.startingQBs.home}` : 'TBD'}</p></div>
- </div>`;
+ ` : ''}`;
+ 
  targetContainer.appendChild(gameRow);
  });
 
@@ -9080,8 +9197,32 @@ if (!activePicks.mnfTotalPoints) {
  const gameId = e.target.dataset.gameId;
  const team = e.target.dataset.team;
  activePicks[gameId].winner = team;
- targetContainer.querySelectorAll(`.winner-btn[data-game-id="${gameId}"]`).forEach(b => b.classList.remove('selected'));
- e.target.classList.add('selected');
+ 
+ // Update visual state by re-rendering the UI instead of just toggling classes
+ // This ensures the new color scheme is applied correctly
+ const gameData = weekData.games.find(game => game.id === gameId);
+ if (gameData) {
+   // Find the game row and update button classes
+   const gameButtons = targetContainer.querySelectorAll(`.winner-btn[data-game-id="${gameId}"]`);
+   gameButtons.forEach(button => {
+     const buttonTeam = button.dataset.team;
+     const isSelected = buttonTeam === team;
+     const isLocked = isGameLocked(gameData);
+     
+     // Remove all state classes
+     button.className = button.className.replace(/bg-\S+|border-\S+|text-\S+|shadow\S*|hover:\S+|opacity-\S+/g, '');
+     
+     // Apply new classes based on state
+     if (!isLocked) {
+       if (isSelected) {
+         button.className += ' bg-blue-600 border-blue-600 text-white shadow-md hover:bg-blue-700';
+       } else {
+         button.className += ' bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 hover:shadow-md';
+       }
+     }
+   });
+ }
+ 
  saveFunction(currentWeek, activePicks);
  });
  });
