@@ -8780,11 +8780,14 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      // Format game time
      const gameTime = new Date(pick.game.kickoff);
      const now = new Date();
+     const gameHasStarted = now > gameTime;
      const isToday = gameTime.toDateString() === now.toDateString();
      const isTomorrow = gameTime.toDateString() === new Date(now.getTime() + 24*60*60*1000).toDateString();
      
      let timeDisplay = '';
-     if (isToday) {
+     if (gameHasStarted && !pick.userWon && !pick.userLost) {
+      timeDisplay = 'In Progress';
+     } else if (isToday) {
       timeDisplay = gameTime.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
      } else if (isTomorrow) {
       timeDisplay = 'Tom ' + gameTime.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
@@ -8793,9 +8796,30 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
                    gameTime.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
      }
      
+     // Team color mapping for gradients
+     const teamColors = {
+       'ARI': '#97233F', 'ATL': '#A71930', 'BAL': '#241773', 'BUF': '#00338D',
+       'CAR': '#0085CA', 'CHI': '#0B162A', 'CIN': '#FB4F14', 'CLE': '#311D00',
+       'DAL': '#041E42', 'DEN': '#FB4F14', 'DET': '#0076B6', 'GB': '#203731',
+       'HOU': '#03202F', 'IND': '#002C5F', 'JAX': '#101820', 'KC': '#E31837',
+       'LV': '#000000', 'LAC': '#0080C6', 'LAR': '#003594', 'MIA': '#008E97',
+       'MIN': '#4F2683', 'NE': '#002244', 'NO': '#101820', 'NYG': '#0B2265',
+       'NYJ': '#125740', 'PHI': '#004C54', 'PIT': '#101820', 'SF': '#AA0000',
+       'SEA': '#002244', 'TB': '#D50A0A', 'TEN': '#0C2340', 'WAS': '#5A1414'
+     };
+     
+     // Generate mock pick percentages (in production, this would come from actual data)
+     const userTeamColor = teamColors[teamAbbr] || '#64748b';
+     const opponentTeamColor = teamColors[opponentAbbr] || '#64748b';
+     const userPickPercentage = Math.floor(Math.random() * 60) + 20; // 20-80%
+     
+     // Create gradient background
+     const gradientStyle = `background: linear-gradient(to right, ${userTeamColor} 0%, ${userTeamColor} ${userPickPercentage}%, ${opponentTeamColor} ${userPickPercentage}%, ${opponentTeamColor} 100%); opacity: 0.15;`;
+     
      // Determine background color and text style based on game status
      let bgClass = 'bg-slate-50 hover:bg-slate-100'; // Default for games not started
      let textClass = '';
+     let glowClass = '';
      
      if (pick.gameHasStarted) {
       if (pick.userWon) {
@@ -8804,19 +8828,28 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
       } else if (pick.userLost) {
        bgClass = 'bg-rose-100 hover:bg-rose-200'; // Light pale rose for losses
        textClass = '';
+      } else {
+       // Game in progress
+       bgClass = 'bg-blue-50 hover:bg-blue-100';
+       glowClass = 'shadow-lg shadow-emerald-200 ring-2 ring-emerald-400 ring-opacity-50';
       }
      }
      
      return `
-      <div class="flex items-center ${bgClass} rounded-lg p-2 shadow-sm border cursor-pointer transition-colors duration-150">
-       <img src="${logoUrl}" alt="${pick.team}" class="w-8 h-8 rounded-sm mr-3 flex-shrink-0" onerror="this.style.visibility='hidden'; this.style.width='8px';">
-       <div class="flex-1 min-w-0">
-        <div class="text-sm text-slate-800 ${textClass} truncate">${pick.team} (${pick.confidence})</div>
-        <div class="text-xs text-slate-600 mt-1">
-         ${homeAwayIndicator} ${opponent}
-        </div>
-        <div class="text-xs text-slate-500 mt-0.5">
-         ${timeDisplay}
+      <div class="relative flex items-center ${bgClass} rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 ${glowClass}">
+       <!-- Team gradient overlay -->
+       <div class="absolute inset-0 rounded-lg" style="${gradientStyle}"></div>
+       <!-- Content layer -->
+       <div class="relative z-10 flex items-center w-full">
+        <img src="${logoUrl}" alt="${pick.team}" class="w-8 h-8 rounded-sm mr-3 flex-shrink-0" onerror="this.style.visibility='hidden'; this.style.width='8px';">
+        <div class="flex-1 min-w-0">
+         <div class="text-sm text-slate-800 ${textClass} truncate">${pick.team} (${pick.confidence})</div>
+         <div class="text-xs text-slate-600 mt-1">
+          ${homeAwayIndicator} ${opponent}
+         </div>
+         <div class="text-xs text-slate-500 mt-0.5 ${gameHasStarted && !pick.userWon && !pick.userLost ? 'text-emerald-600 font-medium' : ''}">
+          ${timeDisplay}
+         </div>
         </div>
        </div>
       </div>
