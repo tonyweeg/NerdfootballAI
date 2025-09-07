@@ -3,6 +3,54 @@
 ## Core Philosophy
 **"Diamond Level" means absolute precision, no mistakes, and comprehensive verification at every step.**
 
+## 🏆 GOLDEN BENCHMARK STANDARD - v1.0
+**THIS IS THE PRODUCTION STANDARD - NEVER GO BELOW THIS**
+
+### 📌 Benchmark Details:
+- **Branch**: `golden-benchmark-v1` (protected in GitHub)
+- **Tag**: `v1.0-golden` (permanent reference point)
+- **Documentation**: `GOLDEN-BENCHMARK.md` (feature checklist)
+- **Test Suite**: `test-golden-benchmark.js` (automated verification)
+- **Commit**: `3d73d9b` (b474270 + confidence fix)
+
+### 🛡️ Development Workflow - ALWAYS FOLLOW:
+
+#### Before ANY new development:
+```bash
+git checkout golden-benchmark-v1
+git checkout -b feature/new-feature
+```
+
+#### Before ANY deployment:
+```bash
+# Run the golden benchmark test
+node test-golden-benchmark.js
+
+# Only deploy if ALL tests pass
+firebase deploy --only hosting
+```
+
+#### If ANYTHING breaks:
+```bash
+# Instant recovery to golden standard
+git checkout golden-benchmark-v1
+firebase deploy --only hosting
+```
+
+#### To compare changes:
+```bash
+# See what's different from golden standard
+git diff golden-benchmark-v1
+```
+
+### ✅ Golden Standard Features (MUST ALL WORK):
+- Hamburger menu navigation (top-right, slides from right)
+- Confidence pool with locked game protection
+- The Grid with pre-game security
+- Survivor pool functionality
+- Admin features (user management, pool settings)
+- No ghost users (okl4sw2aDhW3yKpOfOwe5lH7OQj1 blocked)
+
 ## 🎯 Critical Standards
 
 ### 1. Testing BEFORE Deployment
