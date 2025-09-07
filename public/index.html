@@ -32,6 +32,7 @@
  
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+ <script src="./pickAnalyticsIntegration.js"></script>
  <style>
  body {
  font-family: 'Inter', sans-serif;
@@ -661,6 +662,7 @@
  <button id="tab-picks-mgmt" class="admin-tab">Picks</button>
  <button id="tab-survivor-status" class="admin-tab">Survivors</button>
  <button id="tab-system-messenger" class="admin-tab">Messaging</button>
+ <button id="tab-analytics" class="admin-tab">Analytics</button>
 <button id="tab-pool-settings" class="admin-tab">Pool Settings</button>
  </nav>
  </div>
@@ -1085,6 +1087,171 @@ Role
        </div>
    </div>
 </div>
+
+<div id="admin-content-analytics" class="admin-content-section hidden">
+    <div class="flex items-center justify-between mb-6">
+        <h3 class="text-xl font-bold text-slate-800">Pick Analytics</h3>
+        <div class="flex space-x-2">
+            <button id="refresh-analytics-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                Refresh Data
+            </button>
+            <button id="export-analytics-btn" class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors">
+                Export CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- Analytics Loading State -->
+    <div id="analytics-loading" class="hidden text-center py-12">
+        <div class="loader mx-auto mb-4"></div>
+        <p class="text-slate-600">Loading analytics data...</p>
+    </div>
+
+    <!-- Analytics Error State -->
+    <div id="analytics-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">Error Loading Analytics</h3>
+                <p id="analytics-error-message" class="text-sm text-red-700 mt-1"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Content -->
+    <div id="analytics-content" class="space-y-6">
+        <!-- Week Summary Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white border border-slate-200 rounded-lg p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-slate-600">Total Games</p>
+                        <p id="analytics-total-games" class="text-2xl font-bold text-slate-900">--</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-green-100 rounded-lg">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-slate-600">Picksets</p>
+                        <p id="analytics-total-picksets" class="text-2xl font-bold text-slate-900">--</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-purple-100 rounded-lg">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-slate-600">Consensus Games</p>
+                        <p id="analytics-consensus-games" class="text-2xl font-bold text-slate-900">--</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-4">
+                <div class="flex items-center">
+                    <div class="p-2 bg-orange-100 rounded-lg">
+                        <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-slate-600">Contrarian Games</p>
+                        <p id="analytics-contrarian-games" class="text-2xl font-bold text-slate-900">--</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Analytics Table -->
+        <div class="bg-white border border-slate-200 rounded-lg">
+            <div class="px-6 py-4 border-b border-slate-200">
+                <h4 class="text-lg font-semibold text-slate-800">Game-by-Game Analytics</h4>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Game</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Pick Distribution</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Avg Confidence</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Popularity</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Contrarian %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analytics-games-table" class="bg-white divide-y divide-slate-200">
+                        <!-- Analytics data will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- User Clusters -->
+        <div class="bg-white border border-slate-200 rounded-lg">
+            <div class="px-6 py-4 border-b border-slate-200">
+                <h4 class="text-lg font-semibold text-slate-800">User Pick Clusters</h4>
+                <p class="text-sm text-slate-600">Groups of users with similar picking patterns</p>
+            </div>
+            <div class="p-6">
+                <div id="analytics-clusters-content" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Clusters will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Confidence Analysis -->
+        <div class="bg-white border border-slate-200 rounded-lg">
+            <div class="px-6 py-4 border-b border-slate-200">
+                <h4 class="text-lg font-semibold text-slate-800">Confidence Analysis</h4>
+                <p class="text-sm text-slate-600">How confident users are in their picks</p>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h5 class="text-md font-medium text-slate-700 mb-3">Highest Confidence Games</h5>
+                        <div id="analytics-high-confidence" class="space-y-2">
+                            <!-- High confidence games will be populated here -->
+                        </div>
+                    </div>
+                    <div>
+                        <h5 class="text-md font-medium text-slate-700 mb-3">Lowest Confidence Games</h5>
+                        <div id="analytics-low-confidence" class="space-y-2">
+                            <!-- Low confidence games will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last Updated -->
+        <div class="text-center">
+            <p class="text-sm text-slate-500">
+                Last updated: <span id="analytics-last-updated">Never</span>
+            </p>
+        </div>
+    </div>
+</div>
+
  </div>
  </div>
  </div>
@@ -1901,13 +2068,29 @@ await new Promise(resolve => {
  throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
  }
  const weekData = await response.json();
- return Array.isArray(weekData.games) ? weekData.games.map(game => ({
+ let games = Array.isArray(weekData.games) ? weekData.games.map(game => ({
  id: game.id,
  away: game.a,
  home: game.h,
  kickoff: game.dt.slice(0, -1),
  stadium: game.stadium
  })) : [];
+ 
+ // 💎 CRITICAL FIX: Merge in game results from Firestore
+ try {
+   const resultsDoc = await getDoc(doc(db, resultsPath(weekNumber)));
+   if (resultsDoc.exists()) {
+     const results = resultsDoc.data();
+     games = games.map(game => ({
+       ...game,
+       winner: results[game.id]?.winner || results[game.id] || undefined
+     }));
+   }
+ } catch (error) {
+   console.warn(`Failed to load results for Week ${weekNumber}:`, error);
+ }
+ 
+ return games;
  } catch (error) {
  console.error(`Error fetching games for week ${weekNumber}:`, error);
  return [];
@@ -4911,8 +5094,270 @@ async function calculateWeeklyLeaderboard(weekNumber) {
  case 'tab-picks-mgmt': await renderPicksManagement(weekNumber); break;
  case 'tab-survivor-status': await renderSurvivorStatus(weekNumber); break;
 case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
+case 'tab-analytics': await renderAnalytics(weekNumber); break;
  }
  }
+
+// --- ANALYTICS FUNCTIONALITY ---
+let analyticsClient = null;
+let analyticsUI = null;
+
+async function renderAnalytics(weekNumber) {
+    const loadingEl = document.getElementById('analytics-loading');
+    const errorEl = document.getElementById('analytics-error');
+    const contentEl = document.getElementById('analytics-content');
+
+    // Show loading state
+    loadingEl.classList.remove('hidden');
+    errorEl.classList.add('hidden');
+    contentEl.classList.add('hidden');
+
+    try {
+        // Initialize analytics client if not already done
+        if (!analyticsClient) {
+            analyticsClient = new PickAnalyticsClient(functions, getCurrentPool());
+            analyticsUI = new PickAnalyticsUI(analyticsClient);
+        }
+
+        // Fetch analytics data
+        const result = await analyticsClient.getWeeklyAnalytics(weekNumber);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
+        const data = result.data;
+        
+        // Update summary statistics
+        document.getElementById('analytics-total-games').textContent = data.metadata?.uniqueGames || 0;
+        document.getElementById('analytics-total-picksets').textContent = data.totalPicksets || 0;
+        
+        // Calculate consensus and contrarian games
+        let consensusGames = 0;
+        let contrarianGames = 0;
+        
+        Object.values(data.gameAnalytics || {}).forEach(gameData => {
+            if (gameData.popularityScore >= 70) consensusGames++;
+            if (gameData.contrarian?.score >= 30) contrarianGames++;
+        });
+        
+        document.getElementById('analytics-consensus-games').textContent = consensusGames;
+        document.getElementById('analytics-contrarian-games').textContent = contrarianGames;
+
+        // Render games table
+        renderAnalyticsGamesTable(data.gameAnalytics);
+
+        // Render user clusters
+        renderAnalyticsClusters(data.pickClusters);
+
+        // Render confidence analysis
+        renderAnalyticsConfidence(data.confidenceAnalytics);
+
+        // Update last updated timestamp
+        if (data.metadata?.lastUpdated) {
+            const timestamp = data.metadata.lastUpdated.seconds 
+                ? new Date(data.metadata.lastUpdated.seconds * 1000)
+                : new Date(data.metadata.lastUpdated);
+            document.getElementById('analytics-last-updated').textContent = timestamp.toLocaleString();
+        }
+
+        // Hide loading, show content
+        loadingEl.classList.add('hidden');
+        contentEl.classList.remove('hidden');
+
+    } catch (error) {
+        console.error('Error rendering analytics:', error);
+        
+        // Show error state
+        loadingEl.classList.add('hidden');
+        document.getElementById('analytics-error-message').textContent = error.message;
+        errorEl.classList.remove('hidden');
+    }
+}
+
+function renderAnalyticsGamesTable(gameAnalytics) {
+    const tableBody = document.getElementById('analytics-games-table');
+    tableBody.innerHTML = '';
+
+    if (!gameAnalytics || Object.keys(gameAnalytics).length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="5" class="px-6 py-4 text-center text-slate-500">
+                    No analytics data available for this week
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    Object.entries(gameAnalytics).forEach(([gameId, gameData]) => {
+        const row = document.createElement('tr');
+        
+        // Format team percentages for display
+        const teamPercentagesHtml = analyticsUI.formatTeamPercentages(gameId, gameData.teamPercentages, gameData.totalPicks);
+        
+        // Confidence badge color
+        const avgConf = gameData.confidenceStats?.average || 0;
+        const confColor = avgConf >= 12 ? 'text-green-600 bg-green-100' : 
+                         avgConf <= 6 ? 'text-red-600 bg-red-100' : 
+                         'text-yellow-600 bg-yellow-100';
+        
+        // Popularity badge color
+        const popColor = gameData.popularityScore >= 70 ? 'text-purple-600 bg-purple-100' : 
+                        gameData.popularityScore <= 30 ? 'text-orange-600 bg-orange-100' : 
+                        'text-blue-600 bg-blue-100';
+
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
+                Game ${gameId}
+                <div class="text-xs text-slate-500">${gameData.totalPicks} picks</div>
+            </td>
+            <td class="px-6 py-4 text-sm text-slate-900">
+                ${teamPercentagesHtml}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${confColor}">
+                    ${avgConf.toFixed(1)}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${popColor}">
+                    ${gameData.popularityScore}%
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                ${gameData.contrarian?.score || 0}%
+            </td>
+        `;
+        
+        tableBody.appendChild(row);
+    });
+}
+
+function renderAnalyticsClusters(pickClusters) {
+    const container = document.getElementById('analytics-clusters-content');
+    
+    if (!pickClusters) {
+        container.innerHTML = '<div class="text-slate-500 text-center col-span-2">No cluster data available</div>';
+        return;
+    }
+    
+    container.innerHTML = analyticsUI.formatPickClusters(pickClusters);
+}
+
+function renderAnalyticsConfidence(confidenceAnalytics) {
+    const highConfidenceEl = document.getElementById('analytics-high-confidence');
+    const lowConfidenceEl = document.getElementById('analytics-low-confidence');
+
+    if (!confidenceAnalytics || !confidenceAnalytics.extremes) {
+        highConfidenceEl.innerHTML = '<div class="text-slate-500">No data available</div>';
+        lowConfidenceEl.innerHTML = '<div class="text-slate-500">No data available</div>';
+        return;
+    }
+
+    // Render high confidence games
+    const highConfGames = confidenceAnalytics.extremes.highestConfidence || [];
+    if (highConfGames.length === 0) {
+        highConfidenceEl.innerHTML = '<div class="text-slate-500">No high confidence games</div>';
+    } else {
+        highConfidenceEl.innerHTML = highConfGames.map(game => `
+            <div class="flex justify-between items-center p-2 bg-green-50 rounded">
+                <span class="text-sm">Game ${game.gameId}</span>
+                <span class="text-sm font-semibold text-green-600">${game.average.toFixed(1)} avg</span>
+            </div>
+        `).join('');
+    }
+
+    // Render low confidence games
+    const lowConfGames = confidenceAnalytics.extremes.lowestConfidence || [];
+    if (lowConfGames.length === 0) {
+        lowConfidenceEl.innerHTML = '<div class="text-slate-500">No low confidence games</div>';
+    } else {
+        lowConfidenceEl.innerHTML = lowConfGames.map(game => `
+            <div class="flex justify-between items-center p-2 bg-red-50 rounded">
+                <span class="text-sm">Game ${game.gameId}</span>
+                <span class="text-sm font-semibold text-red-600">${game.average.toFixed(1)} avg</span>
+            </div>
+        `).join('');
+    }
+}
+
+// Event listeners for analytics buttons
+document.addEventListener('DOMContentLoaded', () => {
+    const refreshBtn = document.getElementById('refresh-analytics-btn');
+    const exportBtn = document.getElementById('export-analytics-btn');
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            const weekNumber = parseInt(document.getElementById('admin-week-selector')?.value) || getCurrentNflWeek();
+            
+            if (analyticsClient) {
+                // Force recalculation
+                const result = await analyticsClient.recalculateAnalytics(weekNumber);
+                if (result.success) {
+                    await renderAnalytics(weekNumber);
+                } else {
+                    console.error('Failed to refresh analytics:', result.error);
+                }
+            }
+        });
+    }
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', async () => {
+            const weekNumber = parseInt(document.getElementById('admin-week-selector')?.value) || getCurrentNflWeek();
+            
+            try {
+                const result = await analyticsClient.getWeeklyAnalytics(weekNumber);
+                if (result.success) {
+                    downloadAnalyticsCSV(result.data, weekNumber);
+                } else {
+                    console.error('Failed to export analytics:', result.error);
+                }
+            } catch (error) {
+                console.error('Error exporting analytics:', error);
+            }
+        });
+    }
+});
+
+function downloadAnalyticsCSV(data, weekNumber) {
+    const rows = [
+        ['Game ID', 'Team 1', 'Team 1 %', 'Team 2', 'Team 2 %', 'Total Picks', 'Avg Confidence', 'Popularity Score', 'Contrarian %']
+    ];
+
+    Object.entries(data.gameAnalytics || {}).forEach(([gameId, gameData]) => {
+        const teams = Object.keys(gameData.teamPercentages || {});
+        const team1 = teams[0] || 'N/A';
+        const team2 = teams[1] || 'N/A';
+        const team1Pct = gameData.teamPercentages?.[team1]?.percentage || 0;
+        const team2Pct = gameData.teamPercentages?.[team2]?.percentage || 0;
+
+        rows.push([
+            gameId,
+            team1,
+            team1Pct,
+            team2,
+            team2Pct,
+            gameData.totalPicks || 0,
+            (gameData.confidenceStats?.average || 0).toFixed(1),
+            gameData.popularityScore || 0,
+            gameData.contrarian?.score || 0
+        ]);
+    });
+
+    const csvContent = rows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-week-${weekNumber}-${getCurrentPool()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
 
  // --- INITIALIZATION & AUTH ---
  async function initializeAppAndAuth() {
@@ -8780,12 +9225,22 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      // Format game time
      const gameTime = new Date(pick.game.kickoff);
      const now = new Date();
-     const gameHasStarted = now > gameTime;
      const isToday = gameTime.toDateString() === now.toDateString();
      const isTomorrow = gameTime.toDateString() === new Date(now.getTime() + 24*60*60*1000).toDateString();
      
+     // CRITICAL DEBUG: Let's see exactly what's happening
+     const currentTime = new Date();
+     const gameKickoff = new Date(pick.game.kickoff);
+     const gameWinner = getGameWinner(pick.gameResult);
+     const hasActuallyStarted = currentTime > gameKickoff;
+     
+     
+     // FIXED: Use actual time check, not the potentially incorrect pick.gameHasStarted
+     const isInProgress = hasActuallyStarted && !gameWinner;
+     
+     
      let timeDisplay = '';
-     if (gameHasStarted && !pick.userWon && !pick.userLost) {
+     if (isInProgress) {
       timeDisplay = 'In Progress';
      } else if (isToday) {
       timeDisplay = gameTime.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
@@ -8808,37 +9263,31 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
        'SEA': '#002244', 'TB': '#D50A0A', 'TEN': '#0C2340', 'WAS': '#5A1414'
      };
      
-     // Generate mock pick percentages (in production, this would come from actual data)
-     const userTeamColor = teamColors[teamAbbr] || '#64748b';
-     const opponentTeamColor = teamColors[opponentAbbr] || '#64748b';
-     const userPickPercentage = Math.floor(Math.random() * 60) + 20; // 20-80%
-     
-     // Create gradient background
-     const gradientStyle = `background: linear-gradient(to right, ${userTeamColor} 0%, ${userTeamColor} ${userPickPercentage}%, ${opponentTeamColor} ${userPickPercentage}%, ${opponentTeamColor} 100%); opacity: 0.15;`;
-     
      // Determine background color and text style based on game status
-     let bgClass = 'bg-slate-50 hover:bg-slate-100'; // Default for games not started
+     let bgClass = 'bg-gradient-to-r from-cyan-50 to-blue-50 hover:from-cyan-100 hover:to-blue-100'; // Ocean breeze theme default
      let textClass = '';
      let glowClass = '';
+     let gradientOverlay = ''; // Only show for truly in-progress games
      
-     if (pick.gameHasStarted) {
-      if (pick.userWon) {
-       bgClass = 'bg-green-100 hover:bg-green-200'; // Light pale green for wins
-       textClass = 'font-bold';
-      } else if (pick.userLost) {
-       bgClass = 'bg-rose-100 hover:bg-rose-200'; // Light pale rose for losses
-       textClass = '';
-      } else {
-       // Game in progress
-       bgClass = 'bg-blue-50 hover:bg-blue-100';
-       glowClass = 'shadow-lg shadow-emerald-200 ring-2 ring-emerald-400 ring-opacity-50';
-      }
+     if (pick.userWon) {
+      bgClass = 'bg-green-100 hover:bg-green-200'; // Light pale green for wins
+      textClass = 'font-bold';
+     } else if (pick.userLost) {
+      bgClass = 'bg-rose-100 hover:bg-rose-200'; // Light pale rose for losses
+      textClass = '';
+     } else if (isInProgress) {
+      // GRADIENT COMPLETELY DISABLED FOR SECURITY
+      bgClass = 'bg-blue-50 hover:bg-blue-100';
+      glowClass = 'shadow-lg shadow-emerald-200 ring-2 ring-emerald-400 ring-opacity-50';
+      
+      // NO GRADIENT - SECURITY LEAK PREVENTION
+      gradientOverlay = '';
      }
+     // All other games (not started, or started but finished) get ocean breeze theme
      
      return `
       <div class="relative flex items-center ${bgClass} rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 ${glowClass}">
-       <!-- Team gradient overlay -->
-       <div class="absolute inset-0 rounded-lg" style="${gradientStyle}"></div>
+       ${gradientOverlay}
        <!-- Content layer -->
        <div class="relative z-10 flex items-center w-full">
         <img src="${logoUrl}" alt="${pick.team}" class="w-8 h-8 rounded-sm mr-3 flex-shrink-0" onerror="this.style.visibility='hidden'; this.style.width='8px';">
@@ -8847,7 +9296,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
          <div class="text-xs text-slate-600 mt-1">
           ${homeAwayIndicator} ${opponent}
          </div>
-         <div class="text-xs text-slate-500 mt-0.5 ${gameHasStarted && !pick.userWon && !pick.userLost ? 'text-emerald-600 font-medium' : ''}">
+         <div class="text-xs text-slate-500 mt-0.5 ${isInProgress ? 'text-emerald-600 font-medium' : ''}">
           ${timeDisplay}
          </div>
         </div>
@@ -9064,9 +9513,25 @@ function updatePicksButtonStates(weekData) {
  const isLocked = isGameLocked(game);
  const gameRow = document.createElement('div');
  
+ 
  // Determine background colors based on game state
  let gameRowBg = 'bg-white border-slate-200';
- if (isLocked) {
+ 
+ const userWonGame = gameState === 'COMPLETED' && game.winner && pick.winner === game.winner;
+ const userLostGame = gameState === 'COMPLETED' && game.winner && pick.winner && pick.winner !== game.winner;
+ const gameInProgress = gameState === 'IN_PROGRESS';
+ 
+ if (userWonGame) {
+     // User picked the winning team - GREEN row
+     gameRowBg = 'bg-green-50 border-green-200';
+ } else if (userLostGame) {
+     // User picked the losing team - ROSE row
+     gameRowBg = 'bg-rose-50 border-rose-200';
+ } else if (gameInProgress) {
+     // Game in progress - OCEAN BREEZE row
+     gameRowBg = 'bg-gradient-to-r from-cyan-50 to-blue-50 border-cyan-200';
+ } else if (isLocked) {
+     // Default locked styling
      gameRowBg = 'bg-slate-50 border-slate-300';
  }
  

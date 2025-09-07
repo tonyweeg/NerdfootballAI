@@ -506,3 +506,20 @@ Reply to: tonyweeg@gmail.com`;
         return { success: false, error: error.message, emailServiceConfigured: !!transporter };
     }
 });
+
+// Import and export pick analytics functions
+const {
+    onPicksUpdate,
+    onLegacyPicksUpdate,
+    calculateAnalytics,
+    getAnalytics,
+    onGameResultUpdate,
+    onIndividualGameUpdate
+} = require('./pickAnalytics');
+
+exports.onPicksUpdate = onPicksUpdate;
+exports.onLegacyPicksUpdate = onLegacyPicksUpdate;
+exports.calculateAnalytics = calculateAnalytics;
+exports.getAnalytics = getAnalytics;
+exports.onGameResultUpdate = onGameResultUpdate;
+exports.onIndividualGameUpdate = onIndividualGameUpdate;
