@@ -1,6 +1,15 @@
 class EspnNerdApiClient {
     constructor() {
-        this.functions = firebase.functions();
+        // Use the global functions instance if available (from main app)
+        if (typeof functions !== 'undefined' && functions) {
+            this.functions = functions;
+        } else if (typeof firebase !== 'undefined' && firebase.functions) {
+            // Fallback for standalone usage
+            this.functions = firebase.functions();
+        } else {
+            console.error('Firebase Functions not initialized');
+        }
+        
         this.cache = new Map();
         this.CACHE_DURATION = {
             LIVE_GAMES: 30 * 1000,    // 30 seconds during live games
@@ -39,7 +48,16 @@ class EspnNerdApiClient {
     // Call Firebase Function with error handling
     async callFunction(functionName, data = {}) {
         try {
-            const callable = this.functions.httpsCallable(functionName);
+            // Use global httpsCallable if available, otherwise use legacy API
+            let callable;
+            if (typeof window !== 'undefined' && window.httpsCallable) {
+                callable = window.httpsCallable(this.functions, functionName);
+            } else if (this.functions && this.functions.httpsCallable) {
+                callable = this.functions.httpsCallable(functionName);
+            } else {
+                throw new Error('httpsCallable not available');
+            }
+            
             const result = await callable(data);
             
             if (!result.data.success) {

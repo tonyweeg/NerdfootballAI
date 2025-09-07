@@ -523,3 +523,18 @@ exports.calculateAnalytics = calculateAnalytics;
 exports.getAnalytics = getAnalytics;
 exports.onGameResultUpdate = onGameResultUpdate;
 exports.onIndividualGameUpdate = onIndividualGameUpdate;
+
+// Import and export ESPN API functions
+const {
+    fetchCurrentWeekGames,
+    fetchGamesByDate,
+    fetchNflTeams,
+    fetchSeasonSchedule,
+    espnApiStatus
+} = require('./espnNerdApi');
+
+exports.fetchCurrentWeekGames = fetchCurrentWeekGames;
+exports.fetchGamesByDate = fetchGamesByDate;
+exports.fetchNflTeams = fetchNflTeams;
+exports.fetchSeasonSchedule = fetchSeasonSchedule;
+exports.espnApiStatus = espnApiStatus;

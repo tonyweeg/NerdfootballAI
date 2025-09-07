@@ -29,6 +29,25 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Week Selector -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <label class="text-sm font-medium text-gray-700">Select Week:</label>
+                    <select id="weekSelector" class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                    <button id="loadWeekData" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                        Load Week Data
+                    </button>
+                </div>
+                <div class="text-sm text-gray-600">
+                    <span>Viewing: </span>
+                    <span id="viewingWeek" class="font-semibold">Current Week</span>
+                </div>
+            </div>
+        </div>
 
         <!-- Status Overview -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -178,12 +197,14 @@
     <script>
         // Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyBw3f7DG9TI3e6Wk9UjZe_qO9xHgYUNBgw",
-            authDomain: "nerdfootball-17614.firebaseapp.com",
-            projectId: "nerdfootball-17614",
-            storageBucket: "nerdfootball-17614.appspot.com",
-            messagingSenderId: "1013893764266",
-            appId: "1:1013893764266:web:46cfb8c5b5f4a3e9c8b01a"
+            apiKey: "AIzaSyCmTpVTRtCTqKx_Y8K7LEY4mBNqFz2cbYw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.firebasestorage.app",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+            measurementId: "G-8RVRHE3HRC"
         };
 
         // Initialize Firebase
@@ -204,8 +225,35 @@
             constructor() {
                 this.logs = [];
                 this.currentData = null;
+                this.currentWeek = 1;
+                this.selectedWeek = null;
+                this.initializeWeekSelector();
                 this.initializeEventListeners();
                 this.loadInitialStatus();
+            }
+            
+            // Initialize week selector
+            initializeWeekSelector() {
+                // We're in Week 1 of the regular season
+                // For now, only show Week 1 since no future weeks should be shown
+                this.currentWeek = 1; // Week 1 of regular season
+                
+                // Populate week selector
+                const weekSelector = document.getElementById('weekSelector');
+                weekSelector.innerHTML = '';
+                
+                // Add weeks up to current week only (no future weeks)
+                for (let week = 1; week <= this.currentWeek; week++) {
+                    const option = document.createElement('option');
+                    option.value = week;
+                    option.textContent = `Week ${week}${week === this.currentWeek ? ' (Current)' : ''}`;
+                    weekSelector.appendChild(option);
+                }
+                
+                // Set to current week by default
+                weekSelector.value = this.currentWeek;
+                this.selectedWeek = this.currentWeek;
+                document.getElementById('viewingWeek').textContent = `Week ${this.currentWeek}`;
             }
 
             // Initialize event listeners
@@ -219,6 +267,16 @@
                 document.getElementById('loadData').addEventListener('click', () => this.loadData());
                 document.getElementById('downloadData').addEventListener('click', () => this.downloadData());
                 document.getElementById('clearLogs').addEventListener('click', () => this.clearLogs());
+                
+                // Week selector events
+                document.getElementById('weekSelector').addEventListener('change', (e) => {
+                    this.selectedWeek = parseInt(e.target.value);
+                    document.getElementById('viewingWeek').textContent = `Week ${this.selectedWeek}`;
+                });
+                
+                document.getElementById('loadWeekData').addEventListener('click', () => {
+                    this.loadWeekData(this.selectedWeek);
+                });
             }
 
             // Load initial status
@@ -226,6 +284,8 @@
                 this.log('Dashboard initialized');
                 await this.updateStatus();
                 this.refreshCacheStatus();
+                // Load current week data by default
+                await this.loadWeekData(this.currentWeek);
             }
 
             // Add log entry
@@ -475,6 +535,40 @@
             }
 
             // Load data for preview
+            // Load data for specific week
+            async loadWeekData(week) {
+                this.log(`Loading data for Week ${week}...`);
+                this.showLoading(`Loading Week ${week} data...`);
+                
+                try {
+                    const data = await window.espnApi.getWeekGames(week);
+                    this.currentData = data;
+                    this.displayData(data);
+                    this.log(`Successfully loaded Week ${week} data: ${data.length} games`, 'success');
+                    this.hideLoading();
+                    
+                    // Update viewing week display
+                    document.getElementById('viewingWeek').textContent = `Week ${week}`;
+                    
+                    // Update test results with game info
+                    const testResults = document.getElementById('testResults');
+                    testResults.innerHTML = `
+                        <div class="p-3 bg-green-50 border border-green-200 rounded">
+                            <p class="text-sm text-green-800">Week ${week}: ${data.length} games loaded</p>
+                            ${data.slice(0, 3).map(game => `
+                                <div class="text-xs text-gray-600 mt-1">
+                                    • ${game.awayTeam} @ ${game.homeTeam}
+                                </div>
+                            `).join('')}
+                            ${data.length > 3 ? `<div class="text-xs text-gray-500 mt-1">...and ${data.length - 3} more</div>` : ''}
+                        </div>
+                    `;
+                } catch (error) {
+                    this.log(`Error loading Week ${week} data: ${error.message}`, 'error');
+                    this.hideLoading();
+                }
+            }
+            
             async loadData() {
                 const dataType = document.getElementById('dataType').value;
                 this.showLoading('Loading data...');

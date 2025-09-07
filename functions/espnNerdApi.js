@@ -43,7 +43,10 @@ class EspnNerdApi {
             try {
                 this.incrementRateLimit();
                 
-                const response = await fetch(`${this.BASE_URL}${endpoint}`, {
+                const url = `${this.BASE_URL}${endpoint}`;
+                console.log(`ESPN API Request: ${url}`);
+                
+                const response = await fetch(url, {
                     headers: {
                         'User-Agent': 'NerdFootball/1.0 (Contact: admin@nerdfootball.com)',
                         'Accept': 'application/json'
@@ -52,6 +55,8 @@ class EspnNerdApi {
                 });
 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`ESPN API Error Response: ${errorText}`);
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
@@ -77,13 +82,13 @@ class EspnNerdApi {
     // Get current NFL week
     getCurrentWeek() {
         const now = new Date();
-        const seasonStart = new Date('2025-09-04'); // NFL Season start
+        const seasonStart = new Date('2024-09-05'); // 2024 NFL Season started Sept 5
         const weekMs = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
         
         if (now < seasonStart) return 1;
         
         const weeksDiff = Math.floor((now - seasonStart) / weekMs) + 1;
-        return Math.min(Math.max(weeksDiff, 1), 18); // Clamp between 1 and 18
+        return Math.min(Math.max(weeksDiff, 1), 22); // Clamp between 1 and 22 (includes playoffs)
     }
 
     // Normalize ESPN team name to NerdFootball format
@@ -201,7 +206,7 @@ class EspnNerdApi {
 
     // Get date range for a specific NFL week
     getWeekDates(week) {
-        const seasonStart = new Date('2025-09-04'); // First Thursday of 2025 season
+        const seasonStart = new Date('2024-09-05'); // First Thursday of 2024 season
         const weekOffset = (week - 1) * 7;
         const weekStart = new Date(seasonStart.getTime() + (weekOffset * 24 * 60 * 60 * 1000));
         
@@ -338,10 +343,23 @@ const espnApi = new EspnNerdApi();
 // Fetch current week games
 exports.fetchCurrentWeekGames = functions.https.onCall(async (data, context) => {
     try {
+        // If no week specified, fetch current ESPN scoreboard (no dates = current games)
         const week = data.week || espnApi.getCurrentWeek();
+        
         const games = await espnApi.getCachedOrFetch(
-            `games_week_${week}`,
-            () => espnApi.fetchGames(null, week),
+            `games_current`,
+            async () => {
+                // Don't specify dates to get current/upcoming games from ESPN
+                const endpoint = '/scoreboard';
+                const espnData = await espnApi.makeRequest(endpoint);
+                
+                if (!espnData.events || !Array.isArray(espnData.events)) {
+                    console.warn('No events found in ESPN response');
+                    return [];
+                }
+                
+                return espnData.events.map(game => espnApi.transformGameData(game, week * 100));
+            },
             espnApi.CACHE_DURATION.PRE_GAME
         );
         
@@ -424,7 +442,8 @@ exports.espnApiStatus = functions.https.onCall(async (data, context) => {
 });
 
 // Scheduled function to update live games (runs every 30 seconds during game days)
-exports.scheduledGameUpdates = functions.pubsub.schedule('*/30 * * * *').onRun(async (context) => {
+// TODO: Re-enable when scheduler API is available
+/*exports.scheduledGameUpdates = functions.pubsub.schedule('every 30 minutes').onRun(async (context) => {
     try {
         const currentWeek = espnApi.getCurrentWeek();
         const weekDates = espnApi.getWeekDates(currentWeek);
@@ -467,6 +486,7 @@ exports.scheduledGameUpdates = functions.pubsub.schedule('*/30 * * * *').onRun(a
         console.error('Scheduled game update error:', error);
         return { success: false, error: error.message };
     }
-});
+});*/
 
-module.exports = { EspnNerdApi };
+// Export class for direct usage
+module.exports.EspnNerdApi = EspnNerdApi;
