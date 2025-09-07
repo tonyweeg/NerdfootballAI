@@ -223,6 +223,16 @@
     background-color: #9ca3af;
     color: #e5e7eb;
   }
+  .team-btn.used-team {
+    background-color: #fecaca; /* red-200 */
+    border-color: #f87171; /* red-400 */
+    opacity: 0.6;
+  }
+  .team-btn.used-team:disabled {
+    background-color: #fca5a5; /* red-300 */
+    border-color: #ef4444; /* red-500 */
+    opacity: 0.7;
+  }
     background-color: #dbeafe !important; /* blue-100 */
     border-color: #2563eb !important; /* blue-600 */
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
@@ -10381,6 +10391,41 @@ const SurvivorView = {
         }
     },
     
+    // Determine row background color based on user's current pick status
+    getPlayerRowStatus: function(user, currentWeek, allWeekResults) {
+        if (user.isEliminated) {
+            return 'loser'; // Blood red for eliminated players
+        }
+        
+        if (!user.currentWeekPick) {
+            return 'pending'; // Muted yellow for no pick yet
+        }
+        
+        // Check if current week games have started/completed
+        const currentWeekResults = allWeekResults[currentWeek];
+        if (!currentWeekResults) {
+            return 'pending'; // No results yet, games haven't started
+        }
+        
+        // Find if user's current week pick won
+        let teamWon = false;
+        let gameStarted = false;
+        Object.values(currentWeekResults).forEach(gameResult => {
+            if (gameResult && (gameResult.away === user.currentWeekPick || gameResult.home === user.currentWeekPick)) {
+                gameStarted = true;
+                if (gameResult.winner === user.currentWeekPick) {
+                    teamWon = true;
+                }
+            }
+        });
+        
+        if (!gameStarted) {
+            return 'pending'; // Game hasn't started yet
+        }
+        
+        return teamWon ? 'winner' : 'loser';
+    },
+    
     loadSurvivorResults: async function() {
         this.showLoading();
         
@@ -10465,6 +10510,9 @@ const SurvivorView = {
             // 💎 DIAMOND OPTIMIZATION: Batch load all week results once
             const allWeekResults = await this.loadAllWeekResults(currentWeek);
             
+            // Store allWeekResults for status calculation
+            this.currentWeekResults = allWeekResults;
+            
             // Process active users with full pick data - Real-time weeks calculation
             for (const userData of activeUsersData) {
                 const { uid, userPicks, displayPick, displayWeek, currentWeekPick, totalPicks } = userData;
@@ -10545,6 +10593,19 @@ const SurvivorView = {
 
         // Render table rows
         allUI.survivorResultsTbody.innerHTML = userResults.map((user, index) => {
+            // Get row status for background color
+            const playerStatus = this.getPlayerRowStatus(user, currentWeek, this.currentWeekResults || {});
+            
+            // Define background colors based on status
+            let rowBgClass = '';
+            if (playerStatus === 'pending') {
+                rowBgClass = 'bg-yellow-50'; // Muted yellow for pending
+            } else if (playerStatus === 'winner') {
+                rowBgClass = 'bg-green-200'; // Visible green for winners
+            } else if (playerStatus === 'loser') {
+                rowBgClass = 'bg-red-50'; // Blood red for losers/eliminated
+            }
+            
             const rowClass = user.isEliminated ? 'survivor-eliminated' : 'survivor-active';
             const statusBadge = user.isEliminated 
                 ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -10573,8 +10634,8 @@ const SurvivorView = {
             const weeksSurvived = user.weeksSurvived >= 0 ? user.weeksSurvived : 0;
 
             return `
-                <tr class="${rowClass}">
-                    <td class="px-6 py-4 whitespace-nowrap">
+                <tr class="${rowClass} ${rowBgClass}">
+                    <td class="px-6 py-4 whitespace-nowrap text-left">
                         <div class="flex items-center">
                             <div class="flex-shrink-0 h-8 w-8">
                                 <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
@@ -10583,23 +10644,22 @@ const SurvivorView = {
                             </div>
                             <div class="ml-4">
                                 <div class="text-sm font-medium text-gray-900">${user.displayName}</div>
-                                <div class="text-sm text-gray-500">${user.email}</div>
                             </div>
                         </div>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
                         ${statusBadge}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900">
                         ${pickDisplay}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
                         ${pickWeekDisplay}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
                         ${eliminatedWeek}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
                         <span class="text-sm font-medium text-gray-900">${weeksSurvived}</span>
                     </td>
                 </tr>
@@ -10881,14 +10941,16 @@ const SurvivorPicksView = {
                      <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                         <div class="md:col-span-8">
                             <div class="flex flex-col sm:flex-row justify-around items-center gap-2">
-                                <button data-team="${game.away}" data-game-id="${game.id}" class="team-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 ${awaySelected ? 'selected' : ''} flex flex-col items-center space-y-2" ${isLocked || (awayTeamPicked && !awaySelected) ? 'disabled' : ''}>
+                                <button data-team="${game.away}" data-game-id="${game.id}" class="team-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 ${awaySelected ? 'selected' : ''} ${awayTeamPicked && !awaySelected ? 'used-team' : ''} flex flex-col items-center space-y-2" ${isLocked || (awayTeamPicked && !awaySelected) ? 'disabled' : ''}>
                                     <span class="helmet-icon-lg ${awayHelmetClass}" title="${game.away}"></span>
                                     <span class="text-sm font-medium">${game.away}</span>
+                                    ${awayTeamPicked && !awaySelected ? '<span class="text-xs text-red-600 mt-1">Already Used</span>' : ''}
                                 </button>
                                 <span class="font-bold text-slate-500">@</span>
-                                <button data-team="${game.home}" data-game-id="${game.id}" class="team-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 ${homeSelected ? 'selected' : ''} flex flex-col items-center space-y-2" ${isLocked || (homeTeamPicked && !homeSelected) ? 'disabled' : ''}>
+                                <button data-team="${game.home}" data-game-id="${game.id}" class="team-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 ${homeSelected ? 'selected' : ''} ${homeTeamPicked && !homeSelected ? 'used-team' : ''} flex flex-col items-center space-y-2" ${isLocked || (homeTeamPicked && !homeSelected) ? 'disabled' : ''}>
                                     <span class="helmet-icon-lg ${homeHelmetClass}" title="${game.home}"></span>
                                     <span class="text-sm font-medium">${game.home}</span>
+                                    ${homeTeamPicked && !homeSelected ? '<span class="text-xs text-red-600 mt-1">Already Used</span>' : ''}
                                 </button>
                             </div>
                         </div>
@@ -10937,6 +10999,13 @@ const SurvivorPicksView = {
                     
                     if (!team) {
                         console.error('Team is undefined - button missing data-team attribute');
+                        return;
+                    }
+                    
+                    // CRITICAL SURVIVOR RULE: Check if team was already used in any previous week
+                    const previouslyPickedTeams = Object.values(userPicks.picks).map(p => p.team);
+                    if (previouslyPickedTeams.includes(team)) {
+                        alert(`⚠️ SURVIVOR RULE VIOLATION: You already used ${team} in a previous week. You can only use each team once per season.`);
                         return;
                     }
                     

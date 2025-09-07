@@ -13,6 +13,15 @@
         .survivor-eliminated {
             background-color: #fce7e7; /* Light rose */
         }
+        .survivor-won {
+            background-color: #dcfce7; /* Light green - weekly winner */
+        }
+        .survivor-lost {
+            background-color: #fce7e7; /* Light red - weekly loser */
+        }
+        .survivor-pending {
+            background-color: #fef3c7; /* Light yellow - pending game */
+        }
         .survivor-grid {
             min-height: 600px;
         }
@@ -142,11 +151,15 @@
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center text-sm">
                                 <div class="w-4 h-4 bg-green-200 rounded mr-2"></div>
-                                <span class="text-gray-600">Active</span>
+                                <span class="text-gray-600">Won</span>
+                            </div>
+                            <div class="flex items-center text-sm">
+                                <div class="w-4 h-4 bg-yellow-200 rounded mr-2"></div>
+                                <span class="text-gray-600">Pending</span>
                             </div>
                             <div class="flex items-center text-sm">
                                 <div class="w-4 h-4 bg-rose-200 rounded mr-2"></div>
-                                <span class="text-gray-600">Eliminated</span>
+                                <span class="text-gray-600">Lost/Eliminated</span>
                             </div>
                         </div>
                     </div>
@@ -385,6 +398,79 @@
             }
         }
 
+        // Get player row status based on current week pick result
+        function getPlayerRowStatus(user, currentWeek, allWeekResults) {
+            console.log(`🎯 getPlayerRowStatus for ${user.displayName} (${user.uid.slice(-8)})`);
+            console.log(`   - Eliminated: ${user.isEliminated}`);
+            console.log(`   - Current Week Pick: ${user.currentWeekPick}`);
+            console.log(`   - Current Week: ${currentWeek}`);
+            
+            if (user.isEliminated) {
+                console.log(`   → ELIMINATED (red)`);
+                return 'survivor-eliminated'; // Red for eliminated users
+            }
+            
+            // Check current week pick result
+            if (user.currentWeekPick) {
+                const weekResults = allWeekResults[currentWeek];
+                console.log(`   - Week ${currentWeek} results available: ${weekResults ? 'Yes' : 'No'}`);
+                
+                if (weekResults) {
+                    console.log(`   - Checking ${Object.keys(weekResults).length} games for team: ${user.currentWeekPick}`);
+                    
+                    // Check if user's team won any game this week
+                    let teamWon = false;
+                    let teamLost = false;
+                    let gameFinished = false;
+                    let gamesWithUserTeam = [];
+                    
+                    Object.entries(weekResults).forEach(([gameId, gameResult]) => {
+                        if (gameResult) {
+                            console.log(`     ${gameId}: ${gameResult.homeTeam} vs ${gameResult.awayTeam}, winner: ${gameResult.winner}`);
+                            
+                            if (gameResult.homeTeam === user.currentWeekPick || gameResult.awayTeam === user.currentWeekPick) {
+                                console.log(`       ✅ Found user's team in this game!`);
+                                gamesWithUserTeam.push({gameId, gameResult});
+                                gameFinished = true;
+                                
+                                if (gameResult.winner === user.currentWeekPick) {
+                                    console.log(`       🎉 User's team WON!`);
+                                    teamWon = true;
+                                } else if (gameResult.winner && gameResult.winner !== user.currentWeekPick) {
+                                    console.log(`       😞 User's team LOST to ${gameResult.winner}`);
+                                    teamLost = true;
+                                }
+                            }
+                        }
+                    });
+                    
+                    console.log(`   - Games with user's team: ${gamesWithUserTeam.length}`);
+                    console.log(`   - Team won: ${teamWon}, Team lost: ${teamLost}, Game finished: ${gameFinished}`);
+                    
+                    if (teamWon) {
+                        console.log(`   → WON (green)`);
+                        return 'survivor-won'; // Green for weekly winners
+                    } else if (teamLost) {
+                        console.log(`   → LOST (red)`);
+                        return 'survivor-lost'; // Red for weekly losers
+                    } else if (gameFinished) {
+                        console.log(`   → GAME FINISHED BUT NO WIN (red)`);
+                        return 'survivor-lost'; // Red if game finished but team didn't win
+                    } else {
+                        console.log(`   → PENDING GAMES (yellow)`);
+                        return 'survivor-pending'; // Yellow for pending games
+                    }
+                } else {
+                    console.log(`   → NO RESULTS YET (yellow)`);
+                    return 'survivor-pending'; // Yellow if no results yet
+                }
+            }
+            
+            // Default to active if no current week pick but not eliminated
+            console.log(`   → DEFAULT ACTIVE (green)`);
+            return 'survivor-active';
+        }
+
         // Load survivor results
         async function loadSurvivorResults() {
             showLoading();
@@ -550,7 +636,7 @@
 
             // Render table rows
             elements.resultsTbody.innerHTML = userResults.map((user, index) => {
-                const rowClass = user.isEliminated ? 'survivor-eliminated' : 'survivor-active';
+                const rowClass = getPlayerRowStatus(user, currentWeek, cachedWeekResults || {});
                 const statusBadge = user.isEliminated 
                     ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                          <i class="fas fa-skull mr-1"></i> Eliminated
