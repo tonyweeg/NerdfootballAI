@@ -56,8 +56,8 @@ class PickAnalyticsClient {
                 }
             }
 
-            // Call Firebase function
-            const getAnalyticsFunction = this.functions.httpsCallable('getAnalytics');
+            // Use the global httpsCallable from the main app (same pattern as other functions)
+            const getAnalyticsFunction = window.httpsCallable(this.functions, 'getAnalytics');
             const result = await getAnalyticsFunction({
                 poolId: this.poolId,
                 week: week.toString()
@@ -93,7 +93,7 @@ class PickAnalyticsClient {
     // Force recalculation of analytics
     async recalculateAnalytics(week) {
         try {
-            const calculateFunction = this.functions.httpsCallable('calculateAnalytics');
+            const calculateFunction = window.httpsCallable(this.functions, 'calculateAnalytics');
             const result = await calculateFunction({
                 poolId: this.poolId,
                 week: week.toString(),

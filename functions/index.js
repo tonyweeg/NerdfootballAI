@@ -507,7 +507,7 @@ Reply to: tonyweeg@gmail.com`;
     }
 });
 
-// Import and export pick analytics functions
+// Import and export pick analytics functions - DIAMOND LEVEL ANALYTICS
 const {
     onPicksUpdate,
     onLegacyPicksUpdate,
