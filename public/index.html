@@ -198,6 +198,31 @@
     border-color: #9ca3af; /* gray-400 */
   }
   .team-pick-btn.selected {
+    background-color: #334155; /* slate-700 */
+    color: white;
+    border-color: #1e293b; /* slate-800 */
+  }
+
+  /* Survivor-specific styles */
+  .helmet-icon-lg {
+    width: 64px;
+    height: 64px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    display: inline-block;
+  }
+  .team-btn.selected {
+    background-color: #334155; /* slate-700 */
+    color: white;
+    border-color: #1e293b; /* slate-800 */
+  }
+  .team-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #9ca3af;
+    color: #e5e7eb;
+  }
     background-color: #dbeafe !important; /* blue-100 */
     border-color: #2563eb !important; /* blue-600 */
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
@@ -475,11 +500,12 @@
             <button id="menu-picks-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn active" role="menuitem">My Picks</button>
             <button id="leaderboard-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Leaderboard</button>
             <button id="grid-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">The Grid</button>
+            <button id="survivor-picks-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Survivor Picks</button>
             
             <!-- Navigation Links -->
             <div class="border-t border-gray-200 my-1"></div>
             <a href="./index.html" class="block px-4 py-2 text-sm text-gray-700 bg-gray-50 font-medium" role="menuitem">Main Picks</a>
-            <a href="./nerdSurvivor.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Nerd Survivor</a>
+            <a href="./index.html?view=survivor-picks" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Nerd Survivor</a>
             <a href="./index.html?view=survivor" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">🏆 Survivor Results</a>
             <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Rules of the Nerd</a>
             
@@ -1163,6 +1189,13 @@ Role
                     </a>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Survivor Picks View -->
+    <div id="survivor-picks-container" class="hidden">
+        <div class="max-w-5xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <!-- Content will be dynamically populated by SurvivorPicksView -->
         </div>
     </div>
 
@@ -1892,7 +1925,7 @@ await new Promise(resolve => {
  adminViewBtn: document.getElementById('menu-admin-view-btn'),
  survivorAdminBtn: document.getElementById('survivor-admin-btn'),
  leaderboardViewBtn: document.getElementById('leaderboard-view-btn'),
- gridViewBtn: document.getElementById('grid-view-btn'), closeRulesBtn: document.getElementById('close-rules-btn'), rulesUserName: document.getElementById('rules-user-name'),
+ gridViewBtn: document.getElementById('grid-view-btn'), survivorPicksViewBtn: document.getElementById('survivor-picks-view-btn'), closeRulesBtn: document.getElementById('close-rules-btn'), rulesUserName: document.getElementById('rules-user-name'),
  weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
  gameList: document.getElementById('game-list'), resultsGameList: document.getElementById('results-game-list'),
  saveResultsBtn: document.getElementById('save-results-btn'),
@@ -2070,6 +2103,7 @@ gridTableLoader: document.getElementById('grid-table-loader'),
 gridTableContent: document.getElementById('grid-table-content'),
 gridYearlyLeaderboardLink: document.getElementById('grid-yearly-leaderboard-link'),
 survivorContainer: document.getElementById('survivor-container'),
+survivorPicksContainer: document.getElementById('survivor-picks-container'),
 survivorLoadingContainer: document.getElementById('survivor-loading-container'),
 survivorErrorContainer: document.getElementById('survivor-error-container'),
 survivorErrorMessage: document.getElementById('survivor-error-message'),
@@ -2369,6 +2403,7 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
     allUI.leaderboardContainer.classList.add('hidden');
     allUI.gridContainer.classList.add('hidden');
     allUI.survivorContainer.classList.add('hidden');
+    allUI.survivorPicksContainer.classList.add('hidden');
     
     // Clear active state from all view toggle buttons
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
@@ -5020,6 +5055,9 @@ switch (savedState.currentView) {
   case 'survivor':
    SurvivorView.show();
    break;
+  case 'survivor-picks':
+   SurvivorPicksView.show();
+   break;
   case 'rules':
    console.log('💎 Rules view no longer available - redirecting to standalone page');
    window.location.href = './nerdfootballRules.html';
@@ -5038,8 +5076,18 @@ switch (savedState.currentView) {
  } else {
  currentUser = null;
  allUI.loadingView.classList.add('hidden');
- allUI.loginView.classList.remove('hidden');
- allUI.appView.classList.add('hidden');
+ 
+ // Check if specific views should be shown even without authentication
+ const savedState = loadAppState();
+ if (savedState.currentView === 'survivor-picks') {
+   console.log('💎 Showing survivor-picks view for unauthenticated user');
+   allUI.loginView.classList.add('hidden');
+   allUI.appView.classList.remove('hidden');
+   SurvivorPicksView.show();
+ } else {
+   allUI.loginView.classList.remove('hidden');
+   allUI.appView.classList.add('hidden');
+ }
  }
  }
  
@@ -9074,6 +9122,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.picksContainer.classList.toggle('hidden', !showAdmin);
     allUI.leaderboardContainer.classList.add('hidden'); // Always hide leaderboard when toggling admin/picks
     allUI.survivorContainer.classList.add('hidden'); // Always hide survivor when toggling admin/picks
+    allUI.survivorPicksContainer.classList.add('hidden'); // Always hide survivor picks when toggling admin/picks
 
     allUI.adminViewBtn.classList.toggle('active', showAdmin);
     allUI.picksViewBtn.classList.toggle('active', !showAdmin);
@@ -9088,6 +9137,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.leaderboardContainer.classList.add('hidden');
     allUI.gridContainer.classList.add('hidden');
     allUI.survivorContainer.classList.add('hidden');
+    allUI.survivorPicksContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.picksViewBtn.classList.add('active');
     allUI.menuPanel.classList.add('hidden');
@@ -9103,6 +9153,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.leaderboardContainer.classList.add('hidden');
     allUI.gridContainer.classList.add('hidden');
     allUI.survivorContainer.classList.add('hidden');
+    allUI.survivorPicksContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.adminViewBtn.classList.add('active');
     
@@ -9141,6 +9192,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.adminContainer.classList.add('hidden');
     allUI.gridContainer.classList.add('hidden');
     allUI.survivorContainer.classList.add('hidden');
+    allUI.survivorPicksContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.remove('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.leaderboardViewBtn.classList.add('active');
@@ -9155,6 +9207,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.adminContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.add('hidden');
     allUI.survivorContainer.classList.add('hidden');
+    allUI.survivorPicksContainer.classList.add('hidden');
     allUI.gridContainer.classList.remove('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.gridViewBtn.classList.add('active');
@@ -10502,8 +10555,373 @@ const SurvivorView = {
     }
 };
 
+// Survivor Picks View object
+const SurvivorPicksView = {
+    show: async function() {
+        console.log('🏈 Showing Survivor Picks view');
+        hideAllViews();
+        allUI.survivorPicksContainer.classList.remove('hidden');
+        await this.renderSurvivorPicks();
+        updateUrl();
+    },
+    
+    renderSurvivorPicks: async function() {
+        const container = allUI.survivorPicksContainer.firstElementChild;
+        if (!container) return;
+        
+        // Show loading
+        container.innerHTML = '<div class="text-center py-12"><div class="loader"></div><p class="mt-4 text-slate-600">Loading Survivor Picks...</p></div>';
+        
+        try {
+            // Get current user
+            if (!auth.currentUser) {
+                container.innerHTML = '<div class="text-center py-12"><p class="text-slate-600">Please log in to access Survivor Pool.</p></div>';
+                return;
+            }
+            
+            // Initialize survivor picks functionality
+            await this.initializeSurvivorPicksApp(container);
+            
+        } catch (error) {
+            console.error('Error rendering survivor picks:', error);
+            container.innerHTML = '<div class="text-center py-12"><p class="text-red-600">Error loading Survivor Picks. Please try again.</p></div>';
+        }
+    },
+    
+    initializeSurvivorPicksApp: async function(container) {
+        // Initialize survivor-specific variables
+        this.currentUser = auth.currentUser;
+        this.currentWeek = this.getCurrentNflWeek();
+        this.ADMIN_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
+        
+        // Check if user is eliminated first
+        const statusDocRef = doc(db, this.survivorStatusPath());
+        const statusSnap = await getDoc(statusDocRef);
+        const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
+        const myStatus = allStatuses[this.currentUser.uid];
+        
+        if (myStatus && myStatus.eliminated) {
+            container.innerHTML = `
+                <div class="text-center py-12">
+                    <h2 class="text-2xl font-bold text-center text-red-600">You have been eliminated.</h2>
+                    <p class="text-center mt-2">You were eliminated in Week ${myStatus.eliminatedWeek}. Better luck next year!</p>
+                    <div class="mt-6">
+                        <a href="./index.html?view=survivor" class="inline-flex items-center px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors shadow-sm">
+                            🏆 View Survivor Results
+                        </a>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        // Get user's picks
+        const picksDocRef = doc(db, this.survivorPicksPath(this.currentUser.uid));
+        const picksSnap = await getDoc(picksDocRef);
+        const userPicks = picksSnap.exists() ? picksSnap.data() : { picks: {} };
+        
+        // Get weekly games
+        const weeklyGames = await this.getGamesForWeek(this.currentWeek);
+        if (!weeklyGames || weeklyGames.length === 0) {
+            container.innerHTML = `<p class="text-center text-red-600 py-12">Could not load games for Week ${this.currentWeek}. Please check back later.</p>`;
+            return;
+        }
+        
+        // Check if week is locked
+        const isLocked = await this.checkSurvivorPickLocked();
+        
+        // Render the survivor picks interface
+        this.renderSurvivorPicksHTML(container, userPicks, weeklyGames, isLocked);
+    },
+    
+    getCurrentNflWeek: function() {
+        const seasonStartDate = new Date('2025-09-04T00:00:00Z');
+        const now = new Date();
+        if (now < seasonStartDate) return 1;
+        const diffTime = Math.abs(now - seasonStartDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const week = Math.ceil(diffDays / 7);
+        return week > 18 ? 18 : week;
+    },
+    
+    survivorPicksPath: function(uid) {
+        return `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`;
+    },
+    
+    survivorStatusPath: function() {
+        return `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`;
+    },
+    
+    getGamesForWeek: async function(weekNumber) {
+        // Use existing cache system if available
+        if (window.gameStateCache) {
+            return await window.gameStateCache.cacheSchedule(weekNumber, async () => {
+                return await this.fetchWeeklyGames(weekNumber);
+            });
+        } else {
+            return await this.fetchWeeklyGames(weekNumber);
+        }
+    },
+    
+    fetchWeeklyGames: async function(weekNumber) {
+        try {
+            console.log(`🔥 Survivor: Fetching schedule for week ${weekNumber}`);
+            const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
+            }
+            const weekData = await response.json();
+            return Array.isArray(weekData.games) ? weekData.games.map(game => ({
+                id: game.id,
+                away: game.a,
+                home: game.h,
+                kickoff: game.dt.slice(0, -1),
+                stadium: game.stadium,
+                weather: 'TBD',
+                startingQBs: {away: 'TBD', home: 'TBD'}
+            })) : [];
+        } catch (error) {
+            console.error(`Error fetching games for week ${weekNumber}:`, error);
+            return [];
+        }
+    },
+    
+    checkSurvivorPickLocked: async function() {
+        try {
+            const response = await fetch(`nfl_2025_week_${this.currentWeek}.json`);
+            if (!response.ok) return false;
+            const weekData = await response.json();
+            
+            if (!weekData.games || !Array.isArray(weekData.games)) return false;
+            
+            // Check if ANY game has started
+            const now = new Date();
+            return weekData.games.some(game => {
+                const gameTime = new Date(game.kickoff);
+                return now > gameTime;
+            });
+        } catch (error) {
+            console.error('Error checking game lock status:', error);
+            return false;
+        }
+    },
+    
+    getHelmetClass: function(teamName) {
+        const teamMap = {
+            "Arizona Cardinals": "helmet-ari",
+            "Atlanta Falcons": "helmet-atl",
+            "Baltimore Ravens": "helmet-bal",
+            "Buffalo Bills": "helmet-buf",
+            "Carolina Panthers": "helmet-car",
+            "Chicago Bears": "helmet-chi",
+            "Cincinnati Bengals": "helmet-cin",
+            "Cleveland Browns": "helmet-cle",
+            "Dallas Cowboys": "helmet-dal",
+            "Denver Broncos": "helmet-den",
+            "Detroit Lions": "helmet-det",
+            "Green Bay Packers": "helmet-gb",
+            "Houston Texans": "helmet-hou",
+            "Indianapolis Colts": "helmet-ind",
+            "Jacksonville Jaguars": "helmet-jax",
+            "Kansas City Chiefs": "helmet-kc",
+            "Las Vegas Raiders": "helmet-lv",
+            "Los Angeles Chargers": "helmet-lac",
+            "Los Angeles Rams": "helmet-lar",
+            "Miami Dolphins": "helmet-mia",
+            "Minnesota Vikings": "helmet-min",
+            "New England Patriots": "helmet-ne",
+            "New Orleans Saints": "helmet-no",
+            "New York Giants": "helmet-nyg",
+            "New York Jets": "helmet-nyj",
+            "Philadelphia Eagles": "helmet-phi",
+            "Pittsburgh Steelers": "helmet-pit",
+            "San Francisco 49ers": "helmet-sf",
+            "Seattle Seahawks": "helmet-sea",
+            "Tampa Bay Buccaneers": "helmet-tb",
+            "Tennessee Titans": "helmet-ten",
+            "Washington Commanders": "helmet-was"
+        };
+        return teamMap[teamName] || "";
+    },
+    
+    renderSurvivorPicksHTML: function(container, userPicks, weeklyGames, isLocked) {
+        const myPickThisWeek = userPicks.picks[this.currentWeek];
+        
+        let html = `<div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
+            <h2 class="text-2xl font-bold text-center mb-4">Survivor Pool Week ${this.currentWeek}</h2>`;
+            
+        if(isLocked) {
+             html += `<div class="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6" role="alert"><p class="font-bold">Picks are locked for Week ${this.currentWeek}.</p></div>`;
+        }
+
+        // Show current pick if user has made one
+        if (myPickThisWeek) {
+            const pickedGame = weeklyGames.find(game => 
+                game.away === myPickThisWeek.team || game.home === myPickThisWeek.team
+            );
+            
+            if (pickedGame) {
+                const opponent = pickedGame.away === myPickThisWeek.team ? pickedGame.home : pickedGame.away;
+                const isHome = pickedGame.home === myPickThisWeek.team;
+                const gameTime = new Date(pickedGame.kickoff);
+                const formattedTime = gameTime.toLocaleString('en-US', { 
+                    weekday: 'short',
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: '2-digit' 
+                });
+                
+                const helmetClass = this.getHelmetClass(myPickThisWeek.team);
+                
+                html += `
+                    <div class="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-6">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-lg font-bold text-green-800">Your Week ${this.currentWeek} Pick</h3>
+                        </div>
+                        <p class="text-xs text-slate-600 italic mb-3">Pick one winner each week. Lose once and you're out.</p>
+                        <div class="flex items-center space-x-3">
+                            <span class="helmet-icon-lg ${helmetClass}" title="${myPickThisWeek.team}"></span>
+                            <div class="flex-1">
+                                <p class="text-lg font-bold text-green-700">${myPickThisWeek.team}</p>
+                                <p class="text-sm text-slate-600">${formattedTime} • ${isHome ? 'vs' : '@'} ${opponent}</p>
+                                <p class="text-xs text-slate-500">${pickedGame.stadium}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        html += `<div class="space-y-6">`;
+        weeklyGames.forEach(game => {
+            const previouslyPickedTeams = Object.values(userPicks.picks).map(p => p.team);
+            const awayTeamPicked = previouslyPickedTeams.includes(game.away);
+            const homeTeamPicked = previouslyPickedTeams.includes(game.home);
+
+            const awaySelected = myPickThisWeek && myPickThisWeek.team === game.away;
+            const homeSelected = myPickThisWeek && myPickThisWeek.team === game.home;
+            
+            const gameTime = new Date(game.kickoff);
+            const formattedTime = gameTime.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+            const awayHelmetClass = this.getHelmetClass(game.away);
+            const homeHelmetClass = this.getHelmetClass(game.home);
+            
+            html += `
+                <div class="p-4 border border-slate-300 rounded-lg ${ (awayTeamPicked && !awaySelected) || (homeTeamPicked && !homeSelected) ? 'bg-slate-200' : 'bg-white'}">
+                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                        <div class="md:col-span-8">
+                            <div class="flex flex-col sm:flex-row justify-around items-center gap-2">
+                                <button data-team="${game.away}" data-game-id="${game.id}" class="team-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 ${awaySelected ? 'selected' : ''} flex flex-col items-center space-y-2" ${isLocked || (awayTeamPicked && !awaySelected) ? 'disabled' : ''}>
+                                    <span class="helmet-icon-lg ${awayHelmetClass}" title="${game.away}"></span>
+                                    <span class="text-sm font-medium">${game.away}</span>
+                                </button>
+                                <span class="font-bold text-slate-500">@</span>
+                                <button data-team="${game.home}" data-game-id="${game.id}" class="team-btn w-full sm:w-2/5 text-center p-3 rounded-lg border-2 ${homeSelected ? 'selected' : ''} flex flex-col items-center space-y-2" ${isLocked || (homeTeamPicked && !homeSelected) ? 'disabled' : ''}>
+                                    <span class="helmet-icon-lg ${homeHelmetClass}" title="${game.home}"></span>
+                                    <span class="text-sm font-medium">${game.home}</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="md:col-span-4 text-xs text-slate-600 text-center md:text-left">
+                             <div><p class="font-bold">Date & Time</p><p>${formattedTime}</p></div>
+                             <div><p class="font-bold">Stadium</p><p>${game.stadium}</p></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+        
+        // Show survivor results button  
+        html += `
+            <div class="mt-6 text-center">
+                <a href="./index.html?view=survivor" class="inline-flex items-center px-6 py-3 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors shadow-sm">
+                    🏆 View Survivor Results
+                </a>
+                <p class="text-sm text-gray-600 mt-2">See who's still alive in the survivor pool</p>
+            </div>
+        `;
+        
+        html += `</div>`;
+        
+        container.innerHTML = html;
+        
+        // Add event listeners to team buttons
+        this.attachSurvivorEventListeners(container, userPicks, isLocked);
+    },
+    
+    attachSurvivorEventListeners: function(container, userPicks, isLocked) {
+        container.querySelectorAll('.team-btn').forEach(btn => {
+            if (!btn.disabled && !isLocked) {
+                btn.addEventListener('click', async (e) => {
+                    // Re-check lock status at time of click
+                    const currentlyLocked = await this.checkSurvivorPickLocked();
+                    if (currentlyLocked) {
+                        alert('Sorry, games have started! Survivor picks are now locked for this week.');
+                        this.show(); // Re-render to show lock state
+                        return;
+                    }
+                    
+                    const team = e.target.dataset.team;
+                    const gameId = e.target.dataset.gameId;
+                    
+                    if (!team) {
+                        console.error('Team is undefined - button missing data-team attribute');
+                        return;
+                    }
+                    
+                    const newPick = {
+                        team: team,
+                        gameId: gameId,
+                    };
+                    userPicks.picks[this.currentWeek] = newPick;
+                    
+                    // Store last survivor pick timestamp
+                    localStorage.setItem('lastSurvivorPick', new Date().toISOString());
+                    
+                    // Update both documents in parallel
+                    const picksDocRef = doc(db, this.survivorPicksPath(this.currentUser.uid));
+                    const statusDocRef = doc(db, this.survivorStatusPath());
+                    
+                    const statusUpdate = {};
+                    statusUpdate[`${this.currentUser.uid}.currentWeekPick`] = team;
+                    statusUpdate[`${this.currentUser.uid}.currentWeekPickDetails`] = newPick;
+                    statusUpdate[`${this.currentUser.uid}.lastUpdated`] = new Date().toISOString();
+                    
+                    await Promise.all([
+                        setDoc(picksDocRef, userPicks, { merge: true }),
+                        setDoc(statusDocRef, statusUpdate, { merge: true })
+                    ]);
+                    
+                    this.show(); // Re-render to show selection
+                });
+            }
+        });
+    }
+};
+
 // Initialize Survivor View event listeners
 allUI.survivorRetryBtn.addEventListener('click', () => SurvivorView.loadSurvivorResults());
+
+// Add Survivor Picks View button event listener
+if (allUI.survivorPicksViewBtn) {
+    allUI.survivorPicksViewBtn.addEventListener('click', () => {
+        allUI.picksContainer.classList.add('hidden');
+        allUI.picksSummaryContainer.classList.add('hidden');
+        allUI.adminContainer.classList.add('hidden');
+        allUI.leaderboardContainer.classList.add('hidden');
+        allUI.gridContainer.classList.add('hidden');
+        allUI.survivorContainer.classList.add('hidden');
+        allUI.survivorPicksContainer.classList.remove('hidden');
+        document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+        allUI.survivorPicksViewBtn.classList.add('active');
+        SurvivorPicksView.show();
+        allUI.menuPanel.classList.add('hidden');
+        saveAppState();
+    });
+}
 
  console.log('💎 About to call initializeAppAndAuth');
 initializeAppAndAuth();
