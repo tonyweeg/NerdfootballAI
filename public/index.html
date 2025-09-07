@@ -190,6 +190,55 @@
     border-color: #2563eb !important; /* blue-600 */
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
   }
+
+  /* Grid View Specific Styles */
+  .grid-table tr:nth-child(even) {
+    background-color: #f8fafc; /* slate-50 */
+  }
+  .grid-table tr:hover {
+    background-color: #e2e8f0 !important; /* slate-200 */
+  }
+  .grid-table tr:hover td {
+    background-color: #e2e8f0 !important; /* slate-200 */
+  }
+  .grid-table td.highlight-column {
+    background-color: #f1f5f9; /* slate-100 */
+  }
+  .grid-table tr:hover td.highlight-column {
+    background-color: #cbd5e1 !important; /* slate-300 */
+  }
+  th, td {
+    white-space: nowrap;
+  }
+  th {
+    position: sticky;
+    top: 0;
+    background-color: #f9fafb; /* gray-50 */
+  }
+  .place-col {
+    position: sticky;
+    left: 0;
+    background-color: #f9fafb; /* gray-50 */
+    z-index: 11;
+  }
+  .player-name {
+    position: sticky;
+    left: 60px; /* Adjust based on place column width */
+    background-color: #f9fafb; /* gray-50 */
+    z-index: 10;
+  }
+  .sortable-header {
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .grid-helmet-icon {
+    width: 16px;
+    height: 16px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    display: inline-block;
+  }
  </style>
 </head>
 <body class="bg-slate-200 text-slate-800">
@@ -413,13 +462,13 @@
             <!-- View Toggles -->
             <button id="menu-picks-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn active" role="menuitem">My Picks</button>
             <button id="leaderboard-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Leaderboard</button>
+            <button id="grid-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">The Grid</button>
             
             <!-- Navigation Links -->
             <div class="border-t border-gray-200 my-1"></div>
             <a href="./index.html" class="block px-4 py-2 text-sm text-gray-700 bg-gray-50 font-medium" role="menuitem">Main Picks</a>
             <a href="./nerdSurvivor.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Nerd Survivor</a>
             <a href="./survivorResults.html" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">🏆 Survivor Results</a>
-            <a href="./nerdfootballTheGrid.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">The Grid</a>
             <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Rules of the Nerd</a>
             
             <!-- Admin Only Section -->
@@ -974,6 +1023,29 @@ Role
  </div>
  </div>
 
+ <!-- Grid View -->
+ <div id="grid-container" class="hidden">
+    <div class="bg-white p-6 rounded-2xl shadow-lg">
+        <h2 class="text-2xl font-bold mb-4 text-center">NerdfootballAI - The Grid</h2>
+        <div class="text-center mb-4">
+            <p class="text-slate-600 mb-2">Weekly picks at a glance.</p>
+            <div class="mb-4">
+                <a href="#" id="grid-yearly-leaderboard-link" class="text-slate-600 hover:text-slate-800 font-medium">View Yearly Leaderboard &rarr;</a>
+            </div>
+            <div id="grid-week-selector-container" class="mb-4 text-center">
+                <label for="grid-week-selector" class="text-lg font-medium text-gray-700 mr-2">Week:</label>
+                <select id="grid-week-selector" class="p-2 rounded-lg border-2 border-gray-300 bg-white"></select>
+            </div>
+        </div>
+        <div id="grid-table-container" class="overflow-x-auto">
+            <div id="grid-table-loader" class="text-center py-8">
+                <div class="loader"></div>
+                <p class="text-slate-600 mt-2">Loading grid...</p>
+            </div>
+            <div id="grid-table-content"></div>
+        </div>
+    </div>
+ </div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex">
@@ -1700,7 +1772,8 @@ await new Promise(resolve => {
  picksViewBtn: document.getElementById('menu-picks-view-btn'),
  adminViewBtn: document.getElementById('menu-admin-view-btn'),
  survivorAdminBtn: document.getElementById('survivor-admin-btn'),
- leaderboardViewBtn: document.getElementById('leaderboard-view-btn'), closeRulesBtn: document.getElementById('close-rules-btn'), rulesUserName: document.getElementById('rules-user-name'),
+ leaderboardViewBtn: document.getElementById('leaderboard-view-btn'),
+ gridViewBtn: document.getElementById('grid-view-btn'), closeRulesBtn: document.getElementById('close-rules-btn'), rulesUserName: document.getElementById('rules-user-name'),
  weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
  gameList: document.getElementById('game-list'), resultsGameList: document.getElementById('results-game-list'),
  saveResultsBtn: document.getElementById('save-results-btn'),
@@ -1869,7 +1942,14 @@ migrationControlsSection: document.getElementById('migration-controls-section'),
 startMigrationBtn: document.getElementById('start-migration-btn'),
 dryRunMigrationBtn: document.getElementById('dry-run-migration-btn'),
 migrationResultsSection: document.getElementById('migration-results-section'),
-migrationResultsContent: document.getElementById('migration-results-content')
+migrationResultsContent: document.getElementById('migration-results-content'),
+// Grid Elements
+gridContainer: document.getElementById('grid-container'),
+gridWeekSelector: document.getElementById('grid-week-selector'),
+gridTableContainer: document.getElementById('grid-table-container'),
+gridTableLoader: document.getElementById('grid-table-loader'),
+gridTableContent: document.getElementById('grid-table-content'),
+gridYearlyLeaderboardLink: document.getElementById('grid-yearly-leaderboard-link')
  };
 
  // --- APP STATE ---
@@ -1946,6 +2026,51 @@ migrationResultsContent: document.getElementById('migration-results-content')
   'Tampa Bay Buccaneers': 'TB',
   'Tennessee Titans': 'TEN',
   'Washington Commanders': 'WAS'
+ };
+
+ // --- GRID VIEW SPECIFIC DATA ---
+ const GridView = {
+  currentSortField: 'place',
+  currentSortDirection: 'asc',
+  cachedUserScores: [],
+  
+  // Team abbreviations for the grid
+  TEAM_ABBREVIATIONS: {
+    "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF", 
+    "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE", 
+    "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB", 
+    "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX", "Kansas City Chiefs": "KC", 
+    "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LAR", "Miami Dolphins": "MIA", 
+    "Minnesota Vikings": "MIN", "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG", 
+    "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT", "San Francisco 49ers": "SF", 
+    "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB", "Tennessee Titans": "TEN", "Washington Commanders": "WAS"
+  },
+
+  // Helper function to get helmet CSS class from team name
+  getHelmetClass(teamName) {
+    const teamMap = {
+      "Arizona Cardinals": "helmet-ari", "Atlanta Falcons": "helmet-atl", "Baltimore Ravens": "helmet-bal", 
+      "Buffalo Bills": "helmet-buf", "Carolina Panthers": "helmet-car", "Chicago Bears": "helmet-chi", 
+      "Cincinnati Bengals": "helmet-cin", "Cleveland Browns": "helmet-cle", "Dallas Cowboys": "helmet-dal", 
+      "Denver Broncos": "helmet-den", "Detroit Lions": "helmet-det", "Green Bay Packers": "helmet-gb", 
+      "Houston Texans": "helmet-hou", "Indianapolis Colts": "helmet-ind", "Jacksonville Jaguars": "helmet-jax", 
+      "Kansas City Chiefs": "helmet-kc", "Las Vegas Raiders": "helmet-lv", "Los Angeles Chargers": "helmet-lac", 
+      "Los Angeles Rams": "helmet-lar", "Miami Dolphins": "helmet-mia", "Minnesota Vikings": "helmet-min", 
+      "New England Patriots": "helmet-ne", "New Orleans Saints": "helmet-no", "New York Giants": "helmet-nyg", 
+      "New York Jets": "helmet-nyj", "Philadelphia Eagles": "helmet-phi", "Pittsburgh Steelers": "helmet-pit", 
+      "San Francisco 49ers": "helmet-sf", "Seattle Seahawks": "helmet-sea", "Tampa Bay Buccaneers": "helmet-tb", 
+      "Tennessee Titans": "helmet-ten", "Washington Commanders": "helmet-was"
+    };
+    return teamMap[teamName] || "";
+  },
+
+  // Helper function to extract winner from game result (handles both old and new formats)
+  getGameWinner(gameResult) {
+    if (!gameResult) return null;
+    if (typeof gameResult === 'string') return gameResult;
+    if (typeof gameResult === 'object' && gameResult.winner) return gameResult.winner;
+    return null;
+  }
  };
 
  // --- FIREBASE OPTIMIZATION ---
@@ -2137,6 +2262,7 @@ migrationResultsContent: document.getElementById('migration-results-content')
  function getCurrentView() {
   if (allUI.adminContainer && !allUI.adminContainer.classList.contains('hidden')) return 'admin';
   if (allUI.leaderboardContainer && !allUI.leaderboardContainer.classList.contains('hidden')) return 'leaderboard';
+  if (allUI.gridContainer && !allUI.gridContainer.classList.contains('hidden')) return 'grid';
   if (allUI.rulesContainer && !allUI.rulesContainer.classList.contains('hidden')) return 'rules';
   return 'picks';
  }
@@ -2173,6 +2299,309 @@ migrationResultsContent: document.getElementById('migration-results-content')
   const currentHash = window.location.hash;
   const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + currentHash;
   window.history.replaceState({}, '', newUrl);
+ }
+
+ // --- GRID VIEW FUNCTIONS ---
+ async function renderGrid() {
+  try {
+    console.log('🚨 Grid renderGrid STARTED');
+    
+    if (!currentUser) {
+        console.log('🚨 No current user');
+        allUI.gridTableContent.innerHTML = `<p class="text-center text-slate-600">Please log in to view The Grid.</p>`;
+        return;
+    }
+    
+    allUI.gridTableLoader.style.display = 'block';
+    allUI.gridTableContent.innerHTML = '';
+    
+    const selectedWeek = allUI.gridWeekSelector.value || currentWeek;
+    console.log('🚨 Getting games for week', selectedWeek);
+    
+    const games = await getGamesForWeek(selectedWeek);
+    console.log('🚨 Got games:', games.length);
+
+    const now = new Date();
+
+    // Fetch all necessary data using existing cache system
+    let gridData;
+    try {
+        console.log(`🔥 Grid: Fetching data for week ${selectedWeek}`);
+        
+        // Use pool members path (same as admin) instead of legacy users path
+        const poolMembersDoc = await getDoc(doc(db, poolMembersPath()));
+        let userMap = new Map();
+        
+        if (poolMembersDoc.exists()) {
+            const members = poolMembersDoc.data();
+            console.log('✅ Pool members found:', Object.keys(members).length);
+            
+            for (const [uid, memberData] of Object.entries(members)) {
+                // Block ghost user
+                if (uid === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
+                    console.log('🚫 GHOST USER BLOCKED FROM GRID:', uid);
+                    continue;
+                }
+                userMap.set(uid, {
+                    id: uid,
+                    uid: uid,
+                    displayName: memberData.displayName || memberData.email || 'Unknown',
+                    email: memberData.email || '',
+                    role: memberData.role || 'member',
+                    ...memberData
+                });
+            }
+        } else {
+            // Fallback to users collection with ghost blocking
+            const usersSnap = await getDocs(collection(db, usersPath()));
+            usersSnap.forEach(doc => {
+                if (doc.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
+                    console.log('🚫 GHOST USER BLOCKED FROM GRID FALLBACK:', doc.id);
+                    return;
+                }
+                const userData = { id: doc.id, uid: doc.id, ...doc.data() };
+                userMap.set(doc.id, userData);
+            });
+        }
+        
+        const allUsersForGrid = Array.from(userMap.values());
+
+        // Fetch results
+        const resultsDocRef = doc(db, resultsPath(selectedWeek));
+        const resultsSnap = await getDoc(resultsDocRef);
+        const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+
+        // Fetch picks
+        const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
+        const picksSnap = await getDocs(picksCollectionRef);
+        const allPicks = {};
+        picksSnap.forEach(doc => {
+            allPicks[doc.id] = doc.data();
+        });
+        
+        gridData = { allUsers: allUsersForGrid, gameResults, allPicks };
+    } catch (error) {
+        console.error('❌ Grid data error:', error);
+        allUI.gridTableContent.innerHTML = `<p class="text-red-600">Error loading grid: ${error.message}</p>`;
+        return;
+    }
+    
+    const { allUsers: allUsersForGrid, gameResults, allPicks } = gridData;
+    
+    console.log('🚨 Grid users count:', allUsersForGrid.length);
+    const userScores = allUsersForGrid.map(user => {
+        let totalPoints = 0;
+        let pointsLeft = 0;
+        const userPicks = allPicks[user.id] || {};
+        
+        games.forEach(game => {
+            const pick = userPicks[game.id];
+            if (pick) {
+                const confidence = pick.confidence != null ? parseInt(pick.confidence) : 0;
+                
+                if (gameResults[game.id]) {
+                    if (pick.winner === GridView.getGameWinner(gameResults[game.id])) {
+                        totalPoints += confidence;
+                    }
+                } else { 
+                    pointsLeft += confidence;
+                }
+            }
+        });
+
+        return {
+            ...user,
+            totalPoints,
+            pointsLeft,
+            possibleTotal: totalPoints + pointsLeft,
+            picks: userPicks
+        };
+    });
+    
+    GridView.cachedUserScores = userScores;
+    applyGridSorting();
+    
+    let tableHTML = `<table class="min-w-full divide-y divide-gray-200 grid-table">`;
+    tableHTML += `<thead class="bg-gray-50"><tr>`;
+    tableHTML += `<th class="place-col sortable-header px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100" onclick="sortGrid('place')">Place ↕</th>`;
+    tableHTML += `<th class="player-name sortable-header px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100" onclick="sortGrid('player')">Player ↕</th>`;
+    tableHTML += `<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>`;
+    tableHTML += `<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Possible</th>`;
+    games.forEach(game => {
+        const awayAbbr = GridView.TEAM_ABBREVIATIONS[game.away] || game.away;
+        const homeAbbr = GridView.TEAM_ABBREVIATIONS[game.home] || game.home;
+        tableHTML += `<th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">${awayAbbr}@${homeAbbr}</th>`;
+    });
+    tableHTML += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+
+    GridView.cachedUserScores.forEach((user, userIndex) => {
+        const isCurrentUser = user.uid === currentUser.uid;
+        
+        // Check for missing upcoming picks
+        const upcomingGames = games.filter(game => {
+            const kickoffTime = game.kickoff.endsWith('Z') ? game.kickoff.slice(0, -1) : game.kickoff;
+            const gameTime = new Date(kickoffTime);
+            return now < gameTime;
+        });
+        
+        const hasMissingUpcomingPicks = upcomingGames.some(game => 
+            !user.picks[game.id] || !user.picks[game.id].winner
+        );
+        
+        const shouldShowWarning = upcomingGames.length > 0 && hasMissingUpcomingPicks;
+        
+        const rowClass = isCurrentUser ? 'bg-blue-50 font-bold' : '';
+        tableHTML += `<tr class="${rowClass}">`;
+        tableHTML += `<td class="place-col px-3 py-2 text-sm font-bold text-center text-gray-700">${userIndex + 1}</td>`;
+        
+        let nameClass;
+        if (isCurrentUser) {
+            nameClass = 'font-bold text-blue-700';
+        } else if (shouldShowWarning) {
+            nameClass = 'font-bold text-red-600';
+        } else {
+            nameClass = 'font-medium text-gray-900';
+        }
+        
+        tableHTML += `<td class="player-name px-3 py-2 text-sm ${nameClass}">${user.displayName}${isCurrentUser ? ' (You)' : ''}${shouldShowWarning && !isCurrentUser ? ' ⚠️' : ''}</td>`;
+        
+        const anyGameStarted = games.some(game => now >= new Date(game.kickoff));
+        if (!anyGameStarted) {
+            tableHTML += `<td class="px-3 py-2 text-sm font-bold text-gray-400">0</td>`;
+            tableHTML += `<td class="px-3 py-2 text-sm text-gray-400">0</td>`;
+        } else {
+            tableHTML += `<td class="px-3 py-2 text-sm font-bold">${user.totalPoints}</td>`;
+            tableHTML += `<td class="px-3 py-2 text-sm">${user.possibleTotal}</td>`;
+        }
+        
+        games.forEach((game, gameIndex) => {
+            const pick = user.picks[game.id];
+            const kickoffTime = game.kickoff.endsWith('Z') ? game.kickoff.slice(0, -1) : game.kickoff;
+            const gameTime = new Date(kickoffTime);
+            const gameStarted = now >= gameTime;
+            
+            let cellContent = '-';
+            let cellClass = '';
+            
+            // Security: Only show picks if it's current user OR game has started
+            if (!isCurrentUser && !gameStarted) {
+                cellContent = `<div class="text-center text-gray-400 text-sm">-</div>`;
+                cellClass = 'text-gray-400';
+            } else if (!gameStarted && isCurrentUser) {
+                // Show current user's own picks even before game starts
+                if (pick && pick.winner) {
+                    const helmetClass = GridView.getHelmetClass(pick.winner);
+                    cellContent = `<div class="text-center">
+                        <div class="flex justify-center mb-1">
+                            <span class="grid-helmet-icon ${helmetClass}" title="${pick.winner}"></span>
+                        </div>
+                        <div class="text-xs text-gray-600">${pick.confidence !== undefined && pick.confidence !== null && pick.confidence !== '' ? pick.confidence : 0}</div>
+                    </div>`;
+                }
+            } else if (gameStarted) {
+                // Show ALL picks after game has started
+                if (pick && pick.winner) {
+                    const helmetClass = GridView.getHelmetClass(pick.winner);
+                    cellContent = `<div class="text-center">
+                        <div class="flex justify-center mb-1">
+                            <span class="grid-helmet-icon ${helmetClass}" title="${pick.winner}"></span>
+                        </div>
+                        <div class="text-xs text-gray-600">${pick.confidence !== undefined && pick.confidence !== null && pick.confidence !== '' ? pick.confidence : 0}</div>
+                    </div>`;
+                    if(gameResults[game.id]){
+                        const actualWinner = GridView.getGameWinner(gameResults[game.id]);
+                        const isWin = pick.winner === actualWinner;
+                        cellClass = isWin ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                    }
+                }
+            }
+            tableHTML += `<td class="px-2 py-2 ${cellClass} game-cell" data-game="${gameIndex}">${cellContent}</td>`;
+        });
+        tableHTML += `</tr>`;
+    });
+
+    tableHTML += `</tbody></table>`;
+    
+    allUI.gridTableLoader.style.display = 'none';
+    allUI.gridTableContent.innerHTML = tableHTML;
+    
+    // Add column hover effects
+    const gameCells = allUI.gridTableContent.querySelectorAll('.game-cell');
+    gameCells.forEach(cell => {
+        cell.addEventListener('mouseenter', () => {
+            const gameIndex = cell.dataset.game;
+            const allCellsInColumn = allUI.gridTableContent.querySelectorAll(`.game-cell[data-game="${gameIndex}"]`);
+            allCellsInColumn.forEach(c => c.classList.add('highlight-column'));
+        });
+        
+        cell.addEventListener('mouseleave', () => {
+            const gameIndex = cell.dataset.game;
+            const allCellsInColumn = allUI.gridTableContent.querySelectorAll(`.game-cell[data-game="${gameIndex}"]`);
+            allCellsInColumn.forEach(c => c.classList.remove('highlight-column'));
+        });
+    });
+    
+    console.log('🚨 Grid renderGrid COMPLETED SUCCESSFULLY');
+  } catch (error) {
+    console.error('💥 CRITICAL ERROR in renderGrid:', error);
+    allUI.gridTableLoader.style.display = 'none';
+    allUI.gridTableContent.innerHTML = `<p class="text-red-600">Error loading grid: ${error.message}</p>`;
+  }
+ }
+
+ function applyGridSorting() {
+  const currentUserIndex = GridView.cachedUserScores.findIndex(u => u.uid === currentUser?.uid);
+  let currentUserData = null;
+  let otherUsers = [...GridView.cachedUserScores];
+  
+  if (currentUserIndex !== -1) {
+    currentUserData = otherUsers.splice(currentUserIndex, 1)[0];
+  }
+  
+  if (GridView.currentSortField === 'place') {
+    otherUsers.sort((a, b) => {
+      if (GridView.currentSortDirection === 'asc') {
+        return b.totalPoints - a.totalPoints;
+      } else {
+        return a.totalPoints - b.totalPoints;
+      }
+    });
+  } else if (GridView.currentSortField === 'player') {
+    otherUsers.sort((a, b) => {
+      const nameA = (a.displayName || '').toLowerCase();
+      const nameB = (b.displayName || '').toLowerCase();
+      if (GridView.currentSortDirection === 'asc') {
+        return nameA.localeCompare(nameB);
+      } else {
+        return nameB.localeCompare(nameA);
+      }
+    });
+  }
+  
+  if (currentUserData) {
+    GridView.cachedUserScores = [currentUserData, ...otherUsers];
+  } else {
+    GridView.cachedUserScores = otherUsers;
+  }
+ }
+
+ function populateGridWeekSelectors() {
+  const options = Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}">Week ${i + 1}</option>`).join('');
+  allUI.gridWeekSelector.innerHTML = options;
+  allUI.gridWeekSelector.value = currentWeek;
+ }
+
+ // Global function for sorting (called from HTML onclick)
+ window.sortGrid = function(field) {
+  if (GridView.currentSortField === field) {
+    GridView.currentSortDirection = GridView.currentSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    GridView.currentSortField = field;
+    GridView.currentSortDirection = 'asc';
+  }
+  
+  applyGridSorting();
+  renderGrid();
  }
 
  // --- ADMIN LOGIC ---
@@ -4439,6 +4868,9 @@ switch (savedState.currentView) {
    break;
   case 'leaderboard':
    allUI.leaderboardViewBtn.click();
+   break;
+  case 'grid':
+   allUI.gridViewBtn.click();
    break;
   case 'rules':
    console.log('💎 Rules view no longer available - redirecting to standalone page');
@@ -8505,6 +8937,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.picksSummaryContainer.classList.remove('hidden');
     allUI.adminContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.add('hidden');
+    allUI.gridContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.picksViewBtn.classList.add('active');
     allUI.menuPanel.classList.add('hidden');
@@ -8518,6 +8951,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.picksSummaryContainer.classList.add('hidden');
     allUI.adminContainer.classList.remove('hidden');
     allUI.leaderboardContainer.classList.add('hidden');
+    allUI.gridContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.adminViewBtn.classList.add('active');
     
@@ -8554,10 +8988,25 @@ if (!activePicks.mnfTotalPoints) {
     allUI.picksContainer.classList.add('hidden');
     allUI.picksSummaryContainer.classList.add('hidden');
     allUI.adminContainer.classList.add('hidden');
+    allUI.gridContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.remove('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.leaderboardViewBtn.classList.add('active');
     renderPublicLeaderboard();
+    allUI.menuPanel.classList.add('hidden');
+    saveAppState();
+ });
+
+ allUI.gridViewBtn.addEventListener('click', () => {
+    allUI.picksContainer.classList.add('hidden');
+    allUI.picksSummaryContainer.classList.add('hidden');
+    allUI.adminContainer.classList.add('hidden');
+    allUI.leaderboardContainer.classList.add('hidden');
+    allUI.gridContainer.classList.remove('hidden');
+    document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+    allUI.gridViewBtn.classList.add('active');
+    populateGridWeekSelectors();
+    renderGrid();
     allUI.menuPanel.classList.add('hidden');
     saveAppState();
  });
@@ -8600,6 +9049,19 @@ if (!activePicks.mnfTotalPoints) {
   saveAppState();
  });
  allUI.adminWeekSelector.addEventListener('change', (e) => renderAdminView(e.target.value));
+ 
+ // Grid view event listeners
+ if (allUI.gridWeekSelector) {
+   allUI.gridWeekSelector.addEventListener('change', renderGrid);
+ }
+ if (allUI.gridYearlyLeaderboardLink) {
+   allUI.gridYearlyLeaderboardLink.addEventListener('click', (e) => {
+     e.preventDefault();
+     allUI.leaderboardViewBtn.click();
+     setTimeout(() => allUI.lbSeasonBtn.click(), 100);
+   });
+ }
+ 
  allUI.saveResultsBtn.addEventListener('click', async () => {
  const weekNumber = allUI.adminWeekSelector.value;
  const newResults = {};
