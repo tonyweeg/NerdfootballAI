@@ -8963,7 +8963,26 @@ function updatePicksButtonStates(weekData) {
  return;
  }
  const totalGames = weekData.games.length;
- const confidenceOptions = Array.from({ length: totalGames }, (_, i) => i + 1);
+ 
+ // CRITICAL BUG FIX: Only allow confidence values from unlocked games to be selected
+ const lockedConfidenceValues = new Set();
+ const availableConfidenceValues = new Set();
+ 
+ // Collect confidence values from locked games (these cannot be used)
+ weekData.games.forEach(game => {
+   if (isGameLocked(game) && userPicks[game.id] && userPicks[game.id].confidence > 0) {
+     lockedConfidenceValues.add(userPicks[game.id].confidence);
+   }
+ });
+ 
+ // Build available confidence values (excluding locked ones)
+ for (let i = 1; i <= totalGames; i++) {
+   if (!lockedConfidenceValues.has(i)) {
+     availableConfidenceValues.add(i);
+   }
+ }
+ 
+ const confidenceOptions = Array.from(availableConfidenceValues).sort((a, b) => a - b);
  
  weekData.games.forEach(game => {
  const pick = userPicks[game.id] || { winner: null, confidence: 0 };
@@ -8982,7 +9001,7 @@ function updatePicksButtonStates(weekData) {
  </div>
  </div>
  <div class="md:col-span-4">
- <select id="confidence-${game.id}" name="confidence-${game.id}" data-game-id="${game.id}" ${isGameLocked(game) ? 'disabled' : ''} class="confidence-select w-full p-3 rounded-lg border-2 border-slate-300 bg-white">${confidenceOptions.map(opt => `<option value="${opt}" ${pick.confidence === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>
+ <select id="confidence-${game.id}" name="confidence-${game.id}" data-game-id="${game.id}" ${isGameLocked(game) ? 'disabled' : ''} class="confidence-select w-full p-3 rounded-lg border-2 border-slate-300 bg-white">${isGameLocked(game) ? `<option value="${pick.confidence}" selected>${pick.confidence}</option>` : [...confidenceOptions, pick.confidence].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b).map(opt => `<option value="${opt}" ${pick.confidence === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select>
  </div>
  </div>
  <div class="mt-3 pt-3 border-t border-slate-300 text-xs text-slate-600 grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -9075,6 +9094,14 @@ if (!activePicks.mnfTotalPoints) {
  if (newConfidence === oldConfidence) return;
  const otherGameId = Object.keys(activePicks).find(id => id !== gameId && activePicks[id].confidence === newConfidence);
  if (otherGameId) {
+ // CRITICAL BUG FIX: Check if the other game is locked before swapping
+ const otherGame = weekData.games.find(game => game.id === otherGameId);
+ if (otherGame && isGameLocked(otherGame)) {
+ // Cannot swap with locked game - revert the change
+ e.target.value = oldConfidence;
+ alert('Cannot swap confidence with a game that has already started.');
+ return;
+ }
  activePicks[otherGameId].confidence = oldConfidence;
  const otherSelect = targetContainer.querySelector(`.confidence-select[data-game-id="${otherGameId}"]`);
  if (otherSelect) otherSelect.value = oldConfidence;
