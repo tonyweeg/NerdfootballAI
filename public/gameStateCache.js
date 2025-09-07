@@ -231,6 +231,205 @@ class GameStateCache {
         
         console.log(`💎 Invalidated ${keysToDelete.length} cache entries for Week ${weekNumber} 🔥`);
     }
+    
+    // 💎 DIAMOND CRITICAL: Clear all leaderboard and scoring cache after data cleanup
+    clearAllLeaderboardCache() {
+        const keysToDelete = [];
+        
+        // Clear all cached data that affects leaderboard calculations
+        for (const [key, value] of this.cache.entries()) {
+            // Clear picks, grid data, users, and any scoring-related cache
+            if (key.includes('picks_') || key.includes('grid_') || key.includes('users_') || 
+                key.includes('results_') || key.includes('leaderboard_')) {
+                keysToDelete.push(key);
+            }
+        }
+        
+        keysToDelete.forEach(key => {
+            this.cache.delete(key);
+            this.memoryCache.delete(key);
+        });
+        
+        console.log(`💎 CRITICAL CACHE CLEAR: Invalidated ${keysToDelete.length} leaderboard-related cache entries 🚨`);
+        return keysToDelete.length;
+    }
+    
+    // 💎 Force complete cache flush for data integrity fixes
+    clearAllCache() {
+        const totalEntries = this.cache.size + this.memoryCache.size;
+        
+        this.cache.clear();
+        this.memoryCache.clear();
+        this.weekStates.clear();
+        this.gameStates.clear();
+        
+        console.log(`💎 COMPLETE CACHE FLUSH: Cleared all ${totalEntries} cache entries 🔥`);
+        return totalEntries;
+    }
+
+    // 💎 CRITICAL SYSTEM: Comprehensive Cache Invalidation Management 🚨
+    // This system ensures NO stale cache when underlying data changes
+    
+    // Clear all pick-related cache (when user saves picks)
+    invalidatePicksCache(weekNumber = null, userId = null) {
+        const keysToDelete = [];
+        
+        for (const [key, value] of this.cache.entries()) {
+            // Clear picks cache for specific week or all weeks
+            if (key.includes('picks_')) {
+                if (!weekNumber || key.includes(`picks_${weekNumber}`)) {
+                    keysToDelete.push(key);
+                }
+            }
+            
+            // Clear leaderboard cache (picks affect standings)
+            if (key.includes('leaderboard_') || key.includes('grid_') || key.includes('season_standings')) {
+                keysToDelete.push(key);
+            }
+            
+            // Clear user-specific data if provided
+            if (userId && key.includes(userId)) {
+                keysToDelete.push(key);
+            }
+        }
+        
+        keysToDelete.forEach(key => {
+            this.cache.delete(key);
+            this.memoryCache.delete(key);
+        });
+        
+        console.log(`💎 PICKS CACHE INVALIDATED: Cleared ${keysToDelete.length} entries (Week: ${weekNumber || 'All'}, User: ${userId || 'All'}) 🚨`);
+        return keysToDelete.length;
+    }
+    
+    // Clear all game results cache (when admin updates scores)
+    invalidateResultsCache(weekNumber = null) {
+        const keysToDelete = [];
+        
+        for (const [key, value] of this.cache.entries()) {
+            // Clear results cache for specific week or all weeks
+            if (key.includes('results_')) {
+                if (!weekNumber || key.includes(`results_${weekNumber}`)) {
+                    keysToDelete.push(key);
+                }
+            }
+            
+            // Clear schedule cache (scores affect game state)
+            if (key.includes('schedule_')) {
+                if (!weekNumber || key.includes(`schedule_${weekNumber}`)) {
+                    keysToDelete.push(key);
+                }
+            }
+            
+            // Clear ALL leaderboard and grid cache (results change everything)
+            if (key.includes('leaderboard_') || key.includes('grid_') || 
+                key.includes('season_standings') || key.includes('week_standings')) {
+                keysToDelete.push(key);
+            }
+        }
+        
+        // Reset week state to force recalculation
+        if (weekNumber) {
+            this.weekStates.delete(weekNumber);
+            this.gameStates.delete(weekNumber);
+        }
+        
+        keysToDelete.forEach(key => {
+            this.cache.delete(key);
+            this.memoryCache.delete(key);
+        });
+        
+        console.log(`💎 RESULTS CACHE INVALIDATED: Cleared ${keysToDelete.length} entries (Week: ${weekNumber || 'All'}) 🚨`);
+        return keysToDelete.length;
+    }
+    
+    // Clear all user-related cache (when users are added/removed from pool)
+    invalidateUsersCache() {
+        const keysToDelete = [];
+        
+        for (const [key, value] of this.cache.entries()) {
+            // Clear all user data cache
+            if (key.includes('users_') || key.includes('pool_members_')) {
+                keysToDelete.push(key);
+            }
+            
+            // Clear ALL cache that depends on user list
+            if (key.includes('leaderboard_') || key.includes('grid_') || 
+                key.includes('picks_') || key.includes('season_standings')) {
+                keysToDelete.push(key);
+            }
+        }
+        
+        keysToDelete.forEach(key => {
+            this.cache.delete(key);
+            this.memoryCache.delete(key);
+        });
+        
+        console.log(`💎 USERS CACHE INVALIDATED: Cleared ${keysToDelete.length} entries 🚨`);
+        return keysToDelete.length;
+    }
+    
+    // Clear survivor pool cache (when survivor picks change)
+    invalidateSurvivorCache(weekNumber = null) {
+        const keysToDelete = [];
+        
+        for (const [key, value] of this.cache.entries()) {
+            // Clear survivor cache for specific week or all weeks
+            if (key.includes('survivor_')) {
+                if (!weekNumber || key.includes(`survivor_${weekNumber}`)) {
+                    keysToDelete.push(key);
+                }
+            }
+        }
+        
+        keysToDelete.forEach(key => {
+            this.cache.delete(key);
+            this.memoryCache.delete(key);
+        });
+        
+        console.log(`💎 SURVIVOR CACHE INVALIDATED: Cleared ${keysToDelete.length} entries (Week: ${weekNumber || 'All'}) 🚨`);
+        return keysToDelete.length;
+    }
+    
+    // 💎 MASTER CACHE INVALIDATION: Call this for any major data change
+    invalidateAfterDataUpdate(updateType, weekNumber = null, userId = null) {
+        let totalCleared = 0;
+        
+        console.log(`💎 MASTER CACHE INVALIDATION triggered: ${updateType} (Week: ${weekNumber || 'All'}, User: ${userId || 'All'}) 🚨`);
+        
+        switch (updateType) {
+            case 'user_picks_saved':
+                totalCleared += this.invalidatePicksCache(weekNumber, userId);
+                break;
+                
+            case 'game_results_updated':
+                totalCleared += this.invalidateResultsCache(weekNumber);
+                break;
+                
+            case 'admin_picks_saved':
+                totalCleared += this.invalidatePicksCache(weekNumber, userId);
+                break;
+                
+            case 'survivor_picks_saved':
+                totalCleared += this.invalidateSurvivorCache(weekNumber);
+                break;
+                
+            case 'users_modified':
+                totalCleared += this.invalidateUsersCache();
+                break;
+                
+            case 'complete_refresh':
+                totalCleared += this.clearAllCache();
+                break;
+                
+            default:
+                // Conservative approach - clear all leaderboard-related cache
+                totalCleared += this.clearAllLeaderboardCache();
+        }
+        
+        console.log(`💎 MASTER CACHE INVALIDATION COMPLETE: ${totalCleared} entries cleared 🔥`);
+        return totalCleared;
+    }
 
     // 📈 Cache Statistics for Performance Monitoring
     getStats() {

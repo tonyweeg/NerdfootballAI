@@ -3369,6 +3369,11 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
     // Execute the addition
     const result = await addUserToPool(userId, userEmail, userName, role, currentPoolId, poolName, adminUID);
     
+    // 💎 CRITICAL: Invalidate all cache affected by user pool modifications
+    if (result.success) {
+      window.gameStateCache.invalidateAfterDataUpdate('users_modified');
+    }
+    
     if (result.success) {
       // Success feedback
       showMessage(`✅ ${result.message}`, 'success');
@@ -3538,6 +3543,9 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
    alert(`✅ User "${userName}" has been completely removed from the system.\n\nAll data deleted:\n- User profile\n- All weekly picks (weeks 1-18)\n- Survivor picks\n- All associated data`);
    
    console.log(`Successfully completed removal of user: ${userId} (${userName})`);
+   
+   // 💎 CRITICAL: Invalidate all cache affected by user removal
+   window.gameStateCache.invalidateAfterDataUpdate('users_modified');
    
   } catch (error) {
    console.error('Error during user removal:', error);
@@ -8297,6 +8305,9 @@ function getGameState(game) {
   try { 
    await setDoc(docRef, validatedPicks); 
    
+   // 💎 CRITICAL: Invalidate all cache affected by picks changes
+   window.gameStateCache.invalidateAfterDataUpdate('user_picks_saved', weekNum, currentUser.uid);
+   
    let statusMessage = 'Picks Saved!';
    if (lockedGames.length > 0) {
     statusMessage = `Saved! ${lockedGames.length} locked games skipped`;
@@ -9324,6 +9335,9 @@ if (!activePicks.mnfTotalPoints) {
  });
  
  await setDoc(doc(db, resultsPath(weekNumber)), newResults);
+
+ // 💎 CRITICAL: Invalidate all cache affected by game results changes
+ window.gameStateCache.invalidateAfterDataUpdate('game_results_updated', weekNumber);
  
  // Update the leaderboard summary for optimization
  try {
@@ -9338,23 +9352,28 @@ if (!activePicks.mnfTotalPoints) {
  // Live leaderboard removed from Games tab per user request
  });
 
-// 💎 DIAMOND LEVEL: Manual refresh of leaderboard summary cache
+// 💎 DIAMOND LEVEL: Comprehensive cache refresh with data integrity protection
 allUI.refreshSummaryBtn.addEventListener('click', async () => {
     try {
         allUI.refreshSummaryBtn.disabled = true;
-        allUI.refreshSummaryBtn.textContent = '🔄 Refreshing Cache...';
+        allUI.refreshSummaryBtn.textContent = '🔄 Refreshing All Cache...';
         
-        console.log('💎 Manual leaderboard cache refresh triggered by admin');
+        console.log('💎 Manual comprehensive cache refresh triggered by admin');
+        
+        // 💎 CRITICAL: Complete cache invalidation for data integrity
+        const clearedEntries = window.gameStateCache.invalidateAfterDataUpdate('complete_refresh');
+        
+        // Force update leaderboard summary after cache clear
         await updateLeaderboardSummary();
         
-        alert('✅ Leaderboard cache refreshed successfully!');
-        allUI.refreshSummaryBtn.textContent = '💎 Refresh Leaderboard Cache';
+        alert(`✅ Complete cache refresh successful!\n\n🔥 Cleared ${clearedEntries} cache entries\n💎 All data will be fresh on next load`);
+        allUI.refreshSummaryBtn.textContent = '💎 Refresh Cache';
         
         // Cache refreshed - no leaderboard to refresh on Games tab
     } catch (error) {
-        console.error('Failed to refresh leaderboard cache:', error);
+        console.error('Failed to refresh cache:', error);
         alert('❌ Failed to refresh cache: ' + error.message);
-        allUI.refreshSummaryBtn.textContent = '💎 Refresh Leaderboard Cache';
+        allUI.refreshSummaryBtn.textContent = '💎 Refresh Cache';
     } finally {
         allUI.refreshSummaryBtn.disabled = false;
     }
@@ -9432,6 +9451,9 @@ allUI.refreshSummaryBtn.addEventListener('click', async () => {
         const docRef = doc(db, picksPath(weekNumber, selectedUserForPicks));
         await setDoc(docRef, validatedPicks);
         
+        // 💎 CRITICAL: Invalidate all cache affected by admin picks changes
+        window.gameStateCache.invalidateAfterDataUpdate('admin_picks_saved', weekNumber, selectedUserForPicks);
+        
         // Trigger leaderboard recalculation
         await recalculateLeaderboardAfterPickUpdate(weekNumber);
         
@@ -9503,6 +9525,9 @@ allUI.saveSurvivorPickBtn.addEventListener('click', async () => {
         
         await setDoc(survivorPicksDocRef, survivorData, { merge: true });
         
+        // 💎 CRITICAL: Invalidate all cache affected by survivor picks changes
+        window.gameStateCache.invalidateAfterDataUpdate('survivor_picks_saved', weekNumber);
+        
         alert(`Survivor pick saved: ${user.displayName || user.email} -> ${selectedSurvivorTeam}`);
         
         // Refresh survivor status view
@@ -9543,6 +9568,9 @@ allUI.clearSurvivorPickBtn.addEventListener('click', async () => {
         const survivorData = { picks: { [weekNumber]: { team: '' } } };
         
         await setDoc(survivorPicksDocRef, survivorData, { merge: true });
+        
+        // 💎 CRITICAL: Invalidate all cache affected by survivor picks changes
+        window.gameStateCache.invalidateAfterDataUpdate('survivor_picks_saved', weekNumber);
         
         alert(`Survivor pick cleared for ${user.displayName || user.email}`);
         
@@ -10934,6 +10962,9 @@ const SurvivorPicksView = {
                         setDoc(picksDocRef, userPicks, { merge: true }),
                         setDoc(statusDocRef, statusUpdate, { merge: true })
                     ]);
+                    
+                    // 💎 CRITICAL: Invalidate all cache affected by survivor picks changes
+                    window.gameStateCache.invalidateAfterDataUpdate('survivor_picks_saved', this.currentWeek);
                     
                     this.show(); // Re-render to show selection
                 });
