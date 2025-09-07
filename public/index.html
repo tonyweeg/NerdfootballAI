@@ -10319,7 +10319,7 @@ const SurvivorView = {
             const resultPromises = [];
             for (let week = 1; week <= currentWeek; week++) {
                 resultPromises.push(
-                    getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/week${week}`))
+                    getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`))
                         .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
                         .catch(error => {
                             console.error(`Error loading week ${week} results:`, error);
@@ -10393,37 +10393,60 @@ const SurvivorView = {
     
     // Determine row background color based on user's current pick status
     getPlayerRowStatus: function(user, currentWeek, allWeekResults) {
+        console.log('🔍 SURVIVOR DEBUG - getPlayerRowStatus for:', user.displayName, '(', user.uid, ')');
+        console.log('👤 User eliminated?', user.isEliminated);
+        console.log('🏈 User current week pick:', user.currentWeekPick);
+        console.log('📅 Current week:', currentWeek);
+        console.log('🎮 All week results:', allWeekResults);
+        
         if (user.isEliminated) {
+            console.log('❌ RESULT: loser (eliminated)');
             return 'loser'; // Blood red for eliminated players
         }
         
         if (!user.currentWeekPick) {
+            console.log('⚠️ RESULT: pending (no pick)');
             return 'pending'; // Muted yellow for no pick yet
         }
         
         // Check if current week games have started/completed
         const currentWeekResults = allWeekResults[currentWeek];
+        console.log('📊 Current week results:', currentWeekResults);
+        
         if (!currentWeekResults) {
+            console.log('📭 RESULT: pending (no results yet)');
             return 'pending'; // No results yet, games haven't started
         }
         
         // Find if user's current week pick won
         let teamWon = false;
         let gameStarted = false;
+        
         Object.values(currentWeekResults).forEach(gameResult => {
-            if (gameResult && (gameResult.away === user.currentWeekPick || gameResult.home === user.currentWeekPick)) {
+            console.log('🏈 Checking game result:', gameResult);
+            console.log('🏆 Winner:', gameResult?.winner);
+            console.log('👤 User pick:', user.currentWeekPick);
+            console.log('🔍 Winner matches user pick?', gameResult?.winner === user.currentWeekPick);
+            
+            if (gameResult && gameResult.winner) {
                 gameStarted = true;
                 if (gameResult.winner === user.currentWeekPick) {
                     teamWon = true;
+                    console.log('🎉 USER WON! User picked:', user.currentWeekPick, 'Winner:', gameResult.winner);
+                } else {
+                    console.log('💔 User lost. User picked:', user.currentWeekPick, 'Winner was:', gameResult.winner);
                 }
             }
         });
         
         if (!gameStarted) {
+            console.log('⏳ RESULT: pending (game not started)');
             return 'pending'; // Game hasn't started yet
         }
         
-        return teamWon ? 'winner' : 'loser';
+        const result = teamWon ? 'winner' : 'loser';
+        console.log('🏁 FINAL RESULT:', result);
+        return result;
     },
     
     loadSurvivorResults: async function() {

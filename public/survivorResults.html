@@ -322,14 +322,14 @@
             const startTime = performance.now();
             
             try {
-                // Load all week results in parallel
+                // 🔧 DIAMOND FIX: Load all week results in parallel, handle missing data gracefully
                 const resultPromises = [];
                 for (let week = 1; week <= currentWeek; week++) {
                     resultPromises.push(
-                        getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/week${week}`))
+                        getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`))
                             .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
                             .catch(error => {
-                                console.error(`Error loading week ${week} results:`, error);
+                                console.log(`ℹ️ Week ${week} results not available (expected for future weeks)`);
                                 return { week, data: null };
                             })
                     );
@@ -339,6 +339,19 @@
                 cachedWeekResults = {};
                 allResults.forEach(({ week, data }) => {
                     cachedWeekResults[week] = data;
+                    
+                    // 🔍 DETAILED DEBUGGING: Log actual game results structure
+                    console.log(`📋 Week ${week} results structure:`);
+                    if (data) {
+                        console.log(`   - Games found: ${Object.keys(data).length}`);
+                        Object.entries(data).forEach(([gameId, gameResult]) => {
+                            if (gameResult) {
+                                console.log(`   - ${gameId}: homeScore=${gameResult.homeScore}, awayScore=${gameResult.awayScore} → Winner: ${gameResult.winner}`);
+                            }
+                        });
+                    } else {
+                        console.log('   - No data available');
+                    }
                 });
                 
                 console.log(`📊 Loaded ${allResults.length} week results in ${(performance.now() - startTime).toFixed(0)}ms`);
@@ -426,18 +439,25 @@
                     
                     Object.entries(weekResults).forEach(([gameId, gameResult]) => {
                         if (gameResult) {
-                            console.log(`     ${gameId}: ${gameResult.homeTeam} vs ${gameResult.awayTeam}, winner: ${gameResult.winner}`);
+                            console.log(`     ${gameId}: homeScore=${gameResult.homeScore}, awayScore=${gameResult.awayScore}, winner: ${gameResult.winner}`);
                             
-                            if (gameResult.homeTeam === user.currentWeekPick || gameResult.awayTeam === user.currentWeekPick) {
-                                console.log(`       ✅ Found user's team in this game!`);
-                                gamesWithUserTeam.push({gameId, gameResult});
+                            // 🔧 FIXED: Direct winner comparison - game results only have winner field, not homeTeam/awayTeam
+                            const userTeam = user.currentWeekPick;
+                            const winnerMatch = gameResult.winner === userTeam;
+                            
+                            console.log(`       🔍 Winner comparison for "${userTeam}":`);
+                            console.log(`         - Winner: "${gameResult.winner}" === "${userTeam}" ? ${winnerMatch}`);
+                            
+                            // If this game has a winner, check if it matches user's pick
+                            if (gameResult.winner) {
                                 gameFinished = true;
+                                gamesWithUserTeam.push({gameId, gameResult});
                                 
-                                if (gameResult.winner === user.currentWeekPick) {
+                                if (winnerMatch) {
                                     console.log(`       🎉 User's team WON!`);
                                     teamWon = true;
-                                } else if (gameResult.winner && gameResult.winner !== user.currentWeekPick) {
-                                    console.log(`       😞 User's team LOST to ${gameResult.winner}`);
+                                } else {
+                                    console.log(`       😞 User's team did not win (game winner: ${gameResult.winner})`);
                                     teamLost = true;
                                 }
                             }
@@ -479,7 +499,7 @@
             cachedWeekResults = null;
             
             try {
-                console.log('Loading survivor results for pool:', currentPool);
+                console.log('🔍 Loading survivor results for pool:', currentPool);
                 
                 // Get pool members
                 const poolMembersDoc = await getDoc(doc(db, poolMembersPath(currentPool)));
@@ -491,6 +511,12 @@
 
                 const poolMembers = poolMembersDoc.data();
                 const memberIds = Object.keys(poolMembers);
+                
+                console.log(`👥 Pool members (${memberIds.length} total):`);
+                memberIds.forEach(uid => {
+                    const member = poolMembers[uid];
+                    console.log(`   - ${uid.slice(-8)}: ${member.displayName} (${member.email})`);
+                });
                 
                 if (memberIds.length === 0) {
                     showNoResults();
@@ -504,14 +530,35 @@
                 const currentWeek = getCurrentWeek();
                 
                 // Get status document (contains elimination status and current picks)
-                const statusDoc = await getDoc(doc(db, survivorStatusPath()));
-                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+                // 🔧 DIAMOND FIX: Handle missing status document gracefully
+                let statusDoc, allStatuses = {};
+                try {
+                    statusDoc = await getDoc(doc(db, survivorStatusPath()));
+                    allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+                } catch (error) {
+                    console.log('⚠️ Status document not found, treating all users as active');
+                    statusDoc = { exists: () => false };
+                    allStatuses = {};
+                }
+                
+                console.log(`📊 Survivor status document:`);
+                console.log(`   - Document exists: ${statusDoc.exists()}`);
+                console.log(`   - Status data:`, allStatuses);
+                
+                memberIds.forEach(uid => {
+                    const status = allStatuses[uid] || {};
+                    console.log(`   - ${uid.slice(-8)}: eliminated=${status.eliminated || false}, week=${status.eliminatedWeek || 'N/A'}, currentPick=${status.currentWeekPick || 'N/A'}`);
+                });
                 
                 // We need historical picks to show latest pick and results, but only for active users
-                // This is more efficient than the original 22 reads
+                // 🔧 DIAMOND FIX: When no status document exists, treat all users as active
                 const userResults = [];
                 const activeUsers = memberIds.filter(uid => !allStatuses[uid]?.eliminated);
                 const eliminatedUsers = memberIds.filter(uid => allStatuses[uid]?.eliminated);
+                
+                console.log(`🎮 User categorization:`);
+                console.log(`   - Active users (${activeUsers.length}): ${activeUsers.map(u => u.slice(-8)).join(', ')}`);
+                console.log(`   - Eliminated users (${eliminatedUsers.length}): ${eliminatedUsers.map(u => u.slice(-8)).join(', ')}`);
                 
                 // For active users, get their individual picks to show latest status
                 console.log(`Fetching detailed picks for ${activeUsers.length} active users (eliminated users use status data only)`);
@@ -522,9 +569,19 @@
                         const userPicksData = userPicksDoc.exists() ? userPicksDoc.data() : {};
                         const userPicks = userPicksData.picks || {};
                         
+                        // 🔍 DETAILED DEBUGGING: Log user pick data structure
+                        console.log(`👤 User ${uid.slice(-8)} pick data structure:`);
+                        console.log(`   - Document exists: ${userPicksDoc.exists()}`);
+                        console.log(`   - Raw data:`, userPicksData);
+                        console.log(`   - Processed picks:`, userPicks);
+                        console.log(`   - Weeks with picks: ${Object.keys(userPicks).join(', ')}`);
+                        
                         // Find current week pick first, then latest pick
                         const currentWeekPickObj = userPicks[currentWeek];
                         const currentWeekPick = currentWeekPickObj ? currentWeekPickObj.team : null;
+                        
+                        console.log(`   - Week ${currentWeek} pick object:`, currentWeekPickObj);
+                        console.log(`   - Week ${currentWeek} team: ${currentWeekPick}`);
                         
                         // Find latest pick as fallback
                         const pickWeeks = Object.keys(userPicks).map(w => parseInt(w)).sort((a, b) => b - a);
@@ -532,9 +589,15 @@
                         const latestPickObj = latestWeek ? userPicks[latestWeek] : null;
                         const latestPick = latestPickObj ? latestPickObj.team : null;
                         
+                        console.log(`   - Latest week: ${latestWeek}`);
+                        console.log(`   - Latest pick object:`, latestPickObj);
+                        console.log(`   - Latest team: ${latestPick}`);
+                        
                         // Show current week pick if available, otherwise latest pick
                         const displayPick = currentWeekPick || latestPick;
                         const displayWeek = currentWeekPick ? currentWeek : latestWeek;
+                        
+                        console.log(`   - Display pick: ${displayPick} (Week ${displayWeek})`);
                         
                         return {
                             uid,
@@ -578,6 +641,7 @@
                 }
                 
                 // Process eliminated users using status data only (no additional reads needed)
+                // 🔧 DIAMOND FIX: Handle case where no eliminated users exist (no status document)
                 for (const uid of eliminatedUsers) {
                     const userStatus = allStatuses[uid] || { eliminated: true };
                     
