@@ -80,6 +80,18 @@
  .helmet-tb { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ftb_Tampa_Bay_Buccaneers.png?alt=media'); }
  .helmet-ten { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ften_Tennessee_Titans.png?alt=media'); }
  .helmet-was { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fwas_Washington_Commanders.png?alt=media'); }
+
+ /* Survivor Results View Styles */
+ .survivor-active {
+   background-color: #dcfce7; /* Light green */
+ }
+ .survivor-eliminated {
+   background-color: #fce7e7; /* Light rose */
+ }
+ .survivor-grid {
+   min-height: 600px;
+ }
+
  .winner-btn.selected, .result-btn.selected {
  background-color: #334155; /* slate-700 */
  color: white;
@@ -468,7 +480,7 @@
             <div class="border-t border-gray-200 my-1"></div>
             <a href="./index.html" class="block px-4 py-2 text-sm text-gray-700 bg-gray-50 font-medium" role="menuitem">Main Picks</a>
             <a href="./nerdSurvivor.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Nerd Survivor</a>
-            <a href="./survivorResults.html" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">🏆 Survivor Results</a>
+            <a href="./index.html?view=survivor" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">🏆 Survivor Results</a>
             <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Rules of the Nerd</a>
             
             <!-- Admin Only Section -->
@@ -1046,6 +1058,113 @@ Role
         </div>
     </div>
  </div>
+
+    <!-- Survivor Results View -->
+    <div id="survivor-container" class="hidden">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <!-- Loading State -->
+            <div id="survivor-loading-container" class="text-center py-12">
+                <div class="loading-spinner w-12 h-12 mx-auto border-4 border-gray-200 rounded-full"></div>
+                <p class="mt-4 text-gray-600">Loading survivor results...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="survivor-error-container" class="hidden text-center py-12">
+                <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                <h2 class="text-xl font-semibold text-gray-900 mb-2">Error Loading Results</h2>
+                <p id="survivor-error-message" class="text-gray-600"></p>
+                <button id="survivor-retry-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    Try Again
+                </button>
+            </div>
+
+            <!-- Results Grid -->
+            <div id="survivor-results-container" class="hidden">
+                <!-- Stats Summary -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">Pool Summary</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-gray-900" id="survivor-total-players">0</div>
+                            <div class="text-sm text-gray-600">Total Players</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600" id="survivor-active-players">0</div>
+                            <div class="text-sm text-gray-600">Still Alive</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-red-600" id="survivor-eliminated-players">0</div>
+                            <div class="text-sm text-gray-600">Eliminated</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600" id="survivor-current-week">1</div>
+                            <div class="text-sm text-gray-600">Current Week</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Table -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-lg font-semibold text-gray-900">Survivor Pool Status</h2>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex items-center text-sm">
+                                    <div class="w-4 h-4 bg-green-200 rounded mr-2"></div>
+                                    <span class="text-gray-600">Active</span>
+                                </div>
+                                <div class="flex items-center text-sm">
+                                    <div class="w-4 h-4 bg-rose-200 rounded mr-2"></div>
+                                    <span class="text-gray-600">Eliminated</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto survivor-grid">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Player
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Status
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Current Week Pick
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Pick Week
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Eliminated Week
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Weeks Survived
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="survivor-results-tbody" class="bg-white divide-y divide-gray-200">
+                                <!-- Results will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- No Results State -->
+                <div id="survivor-no-results" class="hidden text-center py-12">
+                    <i class="fas fa-users-slash text-4xl text-gray-400 mb-4"></i>
+                    <h2 class="text-xl font-semibold text-gray-900 mb-2">No Survivor Pool Data</h2>
+                    <p class="text-gray-600 mb-4">No players have joined the survivor pool yet.</p>
+                    <a href="./nerdSurvivor.html" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                        <i class="fas fa-plus mr-2"></i>
+                        Join Survivor Pool
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex">
@@ -1949,7 +2068,19 @@ gridWeekSelector: document.getElementById('grid-week-selector'),
 gridTableContainer: document.getElementById('grid-table-container'),
 gridTableLoader: document.getElementById('grid-table-loader'),
 gridTableContent: document.getElementById('grid-table-content'),
-gridYearlyLeaderboardLink: document.getElementById('grid-yearly-leaderboard-link')
+gridYearlyLeaderboardLink: document.getElementById('grid-yearly-leaderboard-link'),
+survivorContainer: document.getElementById('survivor-container'),
+survivorLoadingContainer: document.getElementById('survivor-loading-container'),
+survivorErrorContainer: document.getElementById('survivor-error-container'),
+survivorErrorMessage: document.getElementById('survivor-error-message'),
+survivorRetryBtn: document.getElementById('survivor-retry-btn'),
+survivorResultsContainer: document.getElementById('survivor-results-container'),
+survivorNoResults: document.getElementById('survivor-no-results'),
+survivorResultsTbody: document.getElementById('survivor-results-tbody'),
+survivorTotalPlayers: document.getElementById('survivor-total-players'),
+survivorActivePlayers: document.getElementById('survivor-active-players'),
+survivorEliminatedPlayers: document.getElementById('survivor-eliminated-players'),
+survivorCurrentWeek: document.getElementById('survivor-current-week')
  };
 
  // --- APP STATE ---
@@ -2263,6 +2394,7 @@ gridYearlyLeaderboardLink: document.getElementById('grid-yearly-leaderboard-link
   if (allUI.adminContainer && !allUI.adminContainer.classList.contains('hidden')) return 'admin';
   if (allUI.leaderboardContainer && !allUI.leaderboardContainer.classList.contains('hidden')) return 'leaderboard';
   if (allUI.gridContainer && !allUI.gridContainer.classList.contains('hidden')) return 'grid';
+  if (allUI.survivorContainer && !allUI.survivorContainer.classList.contains('hidden')) return 'survivor';
   if (allUI.rulesContainer && !allUI.rulesContainer.classList.contains('hidden')) return 'rules';
   return 'picks';
  }
@@ -4871,6 +5003,9 @@ switch (savedState.currentView) {
    break;
   case 'grid':
    allUI.gridViewBtn.click();
+   break;
+  case 'survivor':
+   SurvivorView.show();
    break;
   case 'rules':
    console.log('💎 Rules view no longer available - redirecting to standalone page');
@@ -8925,6 +9060,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.adminContainer.classList.toggle('hidden', showAdmin);
     allUI.picksContainer.classList.toggle('hidden', !showAdmin);
     allUI.leaderboardContainer.classList.add('hidden'); // Always hide leaderboard when toggling admin/picks
+    allUI.survivorContainer.classList.add('hidden'); // Always hide survivor when toggling admin/picks
 
     allUI.adminViewBtn.classList.toggle('active', showAdmin);
     allUI.picksViewBtn.classList.toggle('active', !showAdmin);
@@ -8938,6 +9074,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.adminContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.add('hidden');
     allUI.gridContainer.classList.add('hidden');
+    allUI.survivorContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.picksViewBtn.classList.add('active');
     allUI.menuPanel.classList.add('hidden');
@@ -8952,6 +9089,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.adminContainer.classList.remove('hidden');
     allUI.leaderboardContainer.classList.add('hidden');
     allUI.gridContainer.classList.add('hidden');
+    allUI.survivorContainer.classList.add('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.adminViewBtn.classList.add('active');
     
@@ -8989,6 +9127,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.picksSummaryContainer.classList.add('hidden');
     allUI.adminContainer.classList.add('hidden');
     allUI.gridContainer.classList.add('hidden');
+    allUI.survivorContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.remove('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.leaderboardViewBtn.classList.add('active');
@@ -9002,6 +9141,7 @@ if (!activePicks.mnfTotalPoints) {
     allUI.picksSummaryContainer.classList.add('hidden');
     allUI.adminContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.add('hidden');
+    allUI.survivorContainer.classList.add('hidden');
     allUI.gridContainer.classList.remove('hidden');
     document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
     allUI.gridViewBtn.classList.add('active');
@@ -9982,6 +10122,375 @@ async function renderSurvivorTeamSelector(currentPick) {
         allUI.survivorTeamSelector.innerHTML = '<div class="text-red-600 text-sm">Error loading teams</div>';
     }
 }
+
+// --- SURVIVOR VIEW OBJECT ---
+const SurvivorView = {
+    // Cache for optimized week results loading
+    cachedWeekResults: null,
+    
+    show: function() {
+        console.log('🏆 Showing Survivor Results view');
+        hideAllViews();
+        allUI.survivorContainer.classList.remove('hidden');
+        this.loadSurvivorResults();
+        updateUrl();
+    },
+    
+    hide: function() {
+        allUI.survivorContainer.classList.add('hidden');
+    },
+    
+    showLoading: function() {
+        allUI.survivorLoadingContainer.classList.remove('hidden');
+        allUI.survivorErrorContainer.classList.add('hidden');
+        allUI.survivorResultsContainer.classList.add('hidden');
+        allUI.survivorNoResults.classList.add('hidden');
+    },
+    
+    showError: function(message) {
+        allUI.survivorErrorMessage.textContent = message;
+        allUI.survivorLoadingContainer.classList.add('hidden');
+        allUI.survivorErrorContainer.classList.remove('hidden');
+        allUI.survivorResultsContainer.classList.add('hidden');
+        allUI.survivorNoResults.classList.add('hidden');
+    },
+    
+    showResults: function() {
+        allUI.survivorLoadingContainer.classList.add('hidden');
+        allUI.survivorErrorContainer.classList.add('hidden');
+        allUI.survivorResultsContainer.classList.remove('hidden');
+        allUI.survivorNoResults.classList.add('hidden');
+    },
+    
+    showNoResults: function() {
+        allUI.survivorLoadingContainer.classList.add('hidden');
+        allUI.survivorErrorContainer.classList.add('hidden');
+        allUI.survivorResultsContainer.classList.add('hidden');
+        allUI.survivorNoResults.classList.remove('hidden');
+    },
+    
+    getCurrentWeek: function() {
+        const now = new Date();
+        const seasonStart = new Date('2025-09-05'); // NFL Season start
+        const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
+        return Math.max(1, Math.min(18, weeksDiff + 1));
+    },
+    
+    // 💎 DIAMOND FIX: Optimized weeks survived calculation with batch loading
+    loadAllWeekResults: async function(currentWeek) {
+        if (this.cachedWeekResults) return this.cachedWeekResults;
+        
+        console.log('🚀 Batch loading results for weeks 1-' + currentWeek);
+        const startTime = performance.now();
+        
+        try {
+            // Load all week results in parallel
+            const resultPromises = [];
+            for (let week = 1; week <= currentWeek; week++) {
+                resultPromises.push(
+                    getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/week${week}`))
+                        .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
+                        .catch(error => {
+                            console.error(`Error loading week ${week} results:`, error);
+                            return { week, data: null };
+                        })
+                );
+            }
+            
+            const allResults = await Promise.all(resultPromises);
+            this.cachedWeekResults = {};
+            allResults.forEach(({ week, data }) => {
+                this.cachedWeekResults[week] = data;
+            });
+            
+            console.log(`📊 Loaded ${allResults.length} week results in ${(performance.now() - startTime).toFixed(0)}ms`);
+            return this.cachedWeekResults;
+        } catch (error) {
+            console.error('Error batch loading week results:', error);
+            return {};
+        }
+    },
+    
+    calculateWeeksSurvived: function(userPicks, currentWeek, allWeekResults) {
+        try {
+            let weeksSurvived = 0;
+            
+            // Check each week from 1 to current week
+            for (let week = 1; week <= currentWeek; week++) {
+                const weekPick = userPicks[week];
+                if (!weekPick || !weekPick.team) {
+                    // No pick for this week - stop counting
+                    break;
+                }
+                
+                const weekResults = allWeekResults[week];
+                if (weekResults) {
+                    // Find if user's team won any game this week
+                    let teamWon = false;
+                    Object.values(weekResults).forEach(gameResult => {
+                        if (gameResult && gameResult.winner === weekPick.team) {
+                            teamWon = true;
+                        }
+                    });
+                    
+                    if (teamWon) {
+                        weeksSurvived = week; // User survived this week
+                    } else {
+                        // Team lost or no result yet
+                        if (week < currentWeek) {
+                            // Past week with no win = eliminated
+                            break;
+                        } else {
+                            // Current week - no result yet, don't count it
+                            break;
+                        }
+                    }
+                } else if (week < currentWeek) {
+                    // Past week with no results = assume eliminated
+                    break;
+                }
+                // Current week with no results yet = don't count it
+            }
+            
+            return weeksSurvived;
+        } catch (error) {
+            console.error('Error calculating weeks survived for user:', error);
+            // Fallback to old logic
+            return Math.max(0, currentWeek - 1);
+        }
+    },
+    
+    loadSurvivorResults: async function() {
+        this.showLoading();
+        
+        // Reset cache for fresh data
+        this.cachedWeekResults = null;
+        
+        try {
+            const currentPool = getCurrentPool();
+            console.log('Loading survivor results for pool:', currentPool);
+            
+            // Get pool members
+            const poolMembersDoc = await getDoc(doc(db, `artifacts/nerdfootball/pools/${currentPool}/metadata/members`));
+            if (!poolMembersDoc.exists()) {
+                console.log('No pool members found');
+                this.showNoResults();
+                return;
+            }
+
+            const poolMembers = poolMembersDoc.data();
+            const memberIds = Object.keys(poolMembers);
+            
+            if (memberIds.length === 0) {
+                this.showNoResults();
+                return;
+            }
+
+            // Hybrid approach: Get essential data for winner/loser status (optimized: 22 reads → 4-6 reads)
+            console.log('Fetching survivor data with winner/loser status...');
+            const startTime = performance.now();
+            
+            const currentWeek = this.getCurrentWeek();
+            
+            // Get status document (contains elimination status and current picks)
+            const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+            const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+            
+            // We need historical picks to show latest pick and results, but only for active users
+            // This is more efficient than the original 22 reads
+            const userResults = [];
+            const activeUsers = memberIds.filter(uid => !allStatuses[uid]?.eliminated);
+            const eliminatedUsers = memberIds.filter(uid => allStatuses[uid]?.eliminated);
+            
+            // For active users, get their individual picks to show latest status
+            console.log(`Fetching detailed picks for ${activeUsers.length} active users (eliminated users use status data only)`);
+            
+            const activeUserPromises = activeUsers.map(async uid => {
+                try {
+                    const userPicksDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`));
+                    const userPicksData = userPicksDoc.exists() ? userPicksDoc.data() : {};
+                    const userPicks = userPicksData.picks || {};
+                    
+                    // Find current week pick first, then latest pick
+                    const currentWeekPickObj = userPicks[currentWeek];
+                    const currentWeekPick = currentWeekPickObj ? currentWeekPickObj.team : null;
+                    
+                    // Find latest pick as fallback
+                    const pickWeeks = Object.keys(userPicks).map(w => parseInt(w)).sort((a, b) => b - a);
+                    const latestWeek = pickWeeks.length > 0 ? pickWeeks[0] : null;
+                    const latestPickObj = latestWeek ? userPicks[latestWeek] : null;
+                    const latestPick = latestPickObj ? latestPickObj.team : null;
+                    
+                    // Show current week pick if available, otherwise latest pick
+                    const displayPick = currentWeekPick || latestPick;
+                    const displayWeek = currentWeekPick ? currentWeek : latestWeek;
+                    
+                    return {
+                        uid,
+                        userPicks,
+                        displayPick,
+                        displayWeek,
+                        currentWeekPick,
+                        totalPicks: Object.keys(userPicks).length
+                    };
+                } catch (error) {
+                    console.error(`Error loading picks for user ${uid}:`, error);
+                    return { uid, userPicks: {}, displayPick: null, displayWeek: null, currentWeekPick: null, totalPicks: 0 };
+                }
+            });
+            
+            const activeUsersData = await Promise.all(activeUserPromises);
+            
+            // 💎 DIAMOND OPTIMIZATION: Batch load all week results once
+            const allWeekResults = await this.loadAllWeekResults(currentWeek);
+            
+            // Process active users with full pick data - Real-time weeks calculation
+            for (const userData of activeUsersData) {
+                const { uid, userPicks, displayPick, displayWeek, currentWeekPick, totalPicks } = userData;
+                const userStatus = allStatuses[uid] || { eliminated: false };
+                
+                // Calculate weeks survived with pre-loaded results (no more Firebase calls!)
+                const weeksSurvived = this.calculateWeeksSurvived(userPicks, currentWeek, allWeekResults);
+                
+                userResults.push({
+                    uid,
+                    displayName: poolMembers[uid].displayName || poolMembers[uid].email || 'Unknown User',
+                    email: poolMembers[uid].email || '',
+                    isEliminated: false,
+                    eliminatedWeek: null,
+                    latestPick: displayPick || 'No picks yet',
+                    latestPickWeek: displayWeek,
+                    currentWeekPick: currentWeekPick,
+                    weeksSurvived: weeksSurvived,
+                    totalPicks: totalPicks
+                });
+            }
+            
+            // Process eliminated users using status data only (no additional reads needed)
+            for (const uid of eliminatedUsers) {
+                const userStatus = allStatuses[uid] || { eliminated: true };
+                
+                userResults.push({
+                    uid,
+                    displayName: poolMembers[uid].displayName || poolMembers[uid].email || 'Unknown User',
+                    email: poolMembers[uid].email || '',
+                    isEliminated: true,
+                    eliminatedWeek: userStatus.eliminatedWeek || 'Unknown',
+                    latestPick: userStatus.currentWeekPick || 'Eliminated',
+                    latestPickWeek: userStatus.eliminatedWeek ? userStatus.eliminatedWeek - 1 : null,
+                    currentWeekPick: null,
+                    weeksSurvived: userStatus.eliminatedWeek ? (userStatus.eliminatedWeek - 1) : 0,
+                    totalPicks: 1 // Approximate for eliminated users
+                });
+            }
+            
+            console.log(`Hybrid data fetch completed in ${(performance.now() - startTime).toFixed(0)}ms`);
+            console.log(`Firebase reads: ${memberIds.length + 2} → ${activeUsers.length + 2} reads (${Math.round((1 - (activeUsers.length + 2)/(memberIds.length + 2)) * 100)}% reduction)`);
+
+            // Sort results: Active users first (by weeks survived DESC), then eliminated users (by elimination week DESC)
+            userResults.sort((a, b) => {
+                if (a.isEliminated !== b.isEliminated) {
+                    return a.isEliminated ? 1 : -1; // Active first
+                }
+                if (a.isEliminated) {
+                    return (b.eliminatedWeek || 0) - (a.eliminatedWeek || 0); // Later elimination first
+                }
+                return b.weeksSurvived - a.weeksSurvived; // More weeks survived first
+            });
+
+            this.renderResults(userResults);
+            
+        } catch (error) {
+            console.error('Error loading survivor results:', error);
+            this.showError('Failed to load survivor results. Please try again.');
+        }
+    },
+    
+    renderResults: function(userResults) {
+        if (userResults.length === 0) {
+            this.showNoResults();
+            return;
+        }
+
+        const currentWeek = this.getCurrentWeek();
+        const activeCount = userResults.filter(u => !u.isEliminated).length;
+        const eliminatedCount = userResults.filter(u => u.isEliminated).length;
+
+        // Update summary stats
+        allUI.survivorTotalPlayers.textContent = userResults.length;
+        allUI.survivorActivePlayers.textContent = activeCount;
+        allUI.survivorEliminatedPlayers.textContent = eliminatedCount;
+        allUI.survivorCurrentWeek.textContent = currentWeek;
+
+        // Render table rows
+        allUI.survivorResultsTbody.innerHTML = userResults.map((user, index) => {
+            const rowClass = user.isEliminated ? 'survivor-eliminated' : 'survivor-active';
+            const statusBadge = user.isEliminated 
+                ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                     <i class="fas fa-skull mr-1"></i> Eliminated
+                   </span>`
+                : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                     <i class="fas fa-heart mr-1"></i> Active
+                   </span>`;
+
+            // Prioritize showing current week pick
+            const currentWeekNum = this.getCurrentWeek();
+            const hasCurrentWeekPick = user.currentWeekPick;
+            
+            const pickDisplay = hasCurrentWeekPick 
+                ? `${user.currentWeekPick} (Current)` 
+                : user.latestPick 
+                    ? `${user.latestPick} (Week ${user.latestPickWeek})` 
+                    : 'No picks yet';
+                    
+            const pickWeekDisplay = hasCurrentWeekPick 
+                ? `Week ${currentWeekNum}` 
+                : user.latestPickWeek 
+                    ? `Week ${user.latestPickWeek}` 
+                    : '-';
+            const eliminatedWeek = user.eliminatedWeek ? `Week ${user.eliminatedWeek}` : '-';
+            const weeksSurvived = user.weeksSurvived >= 0 ? user.weeksSurvived : 0;
+
+            return `
+                <tr class="${rowClass}">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-8 w-8">
+                                <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                                    <span class="text-sm font-medium text-gray-600">${user.displayName.charAt(0).toUpperCase()}</span>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${user.displayName}</div>
+                                <div class="text-sm text-gray-500">${user.email}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        ${statusBadge}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${pickDisplay}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${pickWeekDisplay}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${eliminatedWeek}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm font-medium text-gray-900">${weeksSurvived}</span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        this.showResults();
+    }
+};
+
+// Initialize Survivor View event listeners
+allUI.survivorRetryBtn.addEventListener('click', () => SurvivorView.loadSurvivorResults());
 
  console.log('💎 About to call initializeAppAndAuth');
 initializeAppAndAuth();
