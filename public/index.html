@@ -33,6 +33,7 @@
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
  <script src="./pickAnalyticsIntegration.js"></script>
+ <script src="./espnNerdApi.js"></script>
  <style>
  body {
  font-family: 'Inter', sans-serif;
@@ -664,6 +665,7 @@
  <button id="tab-system-messenger" class="admin-tab">Messaging</button>
  <button id="tab-analytics" class="admin-tab">Analytics</button>
 <button id="tab-pool-settings" class="admin-tab">Pool Settings</button>
+<button id="tab-espn-api" class="admin-tab">ESPN API</button>
  </nav>
  </div>
  <div id="admin-content-game-results" class="admin-content-section">
@@ -1248,6 +1250,148 @@ Role
             <p class="text-sm text-slate-500">
                 Last updated: <span id="analytics-last-updated">Never</span>
             </p>
+        </div>
+    </div>
+</div>
+
+<!-- ESPN API Admin Section -->
+<div id="admin-content-espn-api" class="admin-content-section hidden">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="text-xl font-bold text-slate-800">ESPN API Management</h3>
+            <p class="text-slate-600 text-sm mt-1">Monitor and manage ESPN API integration for automated NFL data</p>
+        </div>
+        <div class="flex space-x-2">
+            <a href="espnDiagnostic.html" target="_blank" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                Full Diagnostic Dashboard
+            </a>
+            <button id="espn-refresh-status-btn" class="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
+                Refresh Status
+            </button>
+        </div>
+    </div>
+
+    <!-- Status Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div id="espn-api-status-indicator" class="w-3 h-3 rounded-full bg-gray-400"></div>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-slate-600">API Status</p>
+                    <p id="espn-api-status-text" class="text-lg font-semibold text-slate-900">Checking...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-slate-600">Current Week</p>
+                    <p id="espn-current-week" class="text-lg font-semibold text-slate-900">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-slate-600">Rate Limit</p>
+                    <p id="espn-rate-limit" class="text-lg font-semibold text-slate-900">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-slate-600">Cache Entries</p>
+                    <p id="espn-cache-count" class="text-lg font-semibold text-slate-900">-</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
+        <h4 class="text-lg font-semibold text-slate-800 mb-4">Quick Actions</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <button id="espn-test-current-week" class="w-full px-4 py-3 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+                Test Current Week
+            </button>
+            <button id="espn-test-teams" class="w-full px-4 py-3 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+                Test NFL Teams
+            </button>
+            <button id="espn-clear-cache" class="w-full px-4 py-3 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors">
+                Clear ESPN Cache
+            </button>
+            <button id="espn-fetch-season" class="w-full px-4 py-3 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
+                Fetch Full Season
+            </button>
+        </div>
+    </div>
+
+    <!-- Test Results -->
+    <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="text-lg font-semibold text-slate-800">Test Results</h4>
+            <span id="espn-tests-status" class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                Ready
+            </span>
+        </div>
+        <div id="espn-test-results" class="space-y-2">
+            <div class="text-slate-500 text-sm">Run tests to see results...</div>
+        </div>
+    </div>
+
+    <!-- Data Integration Status -->
+    <div class="bg-white border border-slate-200 rounded-lg p-6 mb-6">
+        <h4 class="text-lg font-semibold text-slate-800 mb-4">Data Integration Status</h4>
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="font-medium text-slate-700">Schedule Data Source</p>
+                    <p class="text-sm text-slate-600">Current source for NFL game schedules</p>
+                </div>
+                <div class="text-right">
+                    <span id="espn-schedule-source" class="text-sm font-medium text-slate-800">Static File</span>
+                    <p class="text-xs text-slate-500">Last updated: <span id="espn-schedule-updated">-</span></p>
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="font-medium text-slate-700">Live Scores Integration</p>
+                    <p class="text-sm text-slate-600">Real-time game score updates</p>
+                </div>
+                <div class="text-right">
+                    <span id="espn-scores-status" class="text-sm font-medium text-yellow-600">Not Active</span>
+                    <p class="text-xs text-slate-500">Manual entry required</p>
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="font-medium text-slate-700">Team Data</p>
+                    <p class="text-sm text-slate-600">NFL team information and logos</p>
+                </div>
+                <div class="text-right">
+                    <span id="espn-teams-status" class="text-sm font-medium text-slate-800">Available</span>
+                    <p class="text-xs text-slate-500">Via ESPN API</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Logs -->
+    <div class="bg-white border border-slate-200 rounded-lg p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="text-lg font-semibold text-slate-800">ESPN API Activity</h4>
+            <button id="espn-clear-logs" class="text-red-600 hover:text-red-700 text-sm">
+                Clear Logs
+            </button>
+        </div>
+        <div id="espn-activity-logs" class="bg-slate-50 border border-slate-200 rounded p-4 max-h-64 overflow-y-auto font-mono text-sm">
+            <div class="text-slate-500">Activity logs will appear here...</div>
         </div>
     </div>
 </div>
@@ -11761,8 +11905,248 @@ if (allUI.survivorPicksViewBtn) {
     });
 }
 
+// ESPN API Admin Integration
+function initializeEspnApiAdmin() {
+    // ESPN API Status and functionality
+    const espnElements = {
+        refreshStatusBtn: document.getElementById('espn-refresh-status-btn'),
+        apiStatusIndicator: document.getElementById('espn-api-status-indicator'),
+        apiStatusText: document.getElementById('espn-api-status-text'),
+        currentWeek: document.getElementById('espn-current-week'),
+        rateLimit: document.getElementById('espn-rate-limit'),
+        cacheCount: document.getElementById('espn-cache-count'),
+        testCurrentWeekBtn: document.getElementById('espn-test-current-week'),
+        testTeamsBtn: document.getElementById('espn-test-teams'),
+        clearCacheBtn: document.getElementById('espn-clear-cache'),
+        fetchSeasonBtn: document.getElementById('espn-fetch-season'),
+        testsStatus: document.getElementById('espn-tests-status'),
+        testResults: document.getElementById('espn-test-results'),
+        clearLogsBtn: document.getElementById('espn-clear-logs'),
+        activityLogs: document.getElementById('espn-activity-logs')
+    };
+
+    let espnLogs = [];
+
+    // ESPN API logging function
+    function logEspnActivity(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = { timestamp, message, type };
+        espnLogs.push(logEntry);
+        
+        if (espnLogs.length > 100) {
+            espnLogs = espnLogs.slice(-100);
+        }
+        
+        updateEspnLogsDisplay();
+    }
+
+    function updateEspnLogsDisplay() {
+        if (!espnElements.activityLogs) return;
+        
+        const logsHtml = espnLogs.map(log => {
+            const colorClass = log.type === 'error' ? 'text-red-600' : 
+                             log.type === 'success' ? 'text-green-600' : 
+                             'text-slate-800';
+            return `<div class="${colorClass}">[${log.timestamp}] ${log.message}</div>`;
+        }).join('');
+        
+        espnElements.activityLogs.innerHTML = logsHtml || '<div class="text-slate-500">No logs yet...</div>';
+        espnElements.activityLogs.scrollTop = espnElements.activityLogs.scrollHeight;
+    }
+
+    // Update ESPN API status
+    async function updateEspnApiStatus() {
+        try {
+            logEspnActivity('Checking ESPN API status...');
+            
+            const status = await window.espnApi.getApiStatus();
+            
+            if (status.success && status.status === 'online') {
+                espnElements.apiStatusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                espnElements.apiStatusText.textContent = 'Online';
+                logEspnActivity('ESPN API is online', 'success');
+            } else {
+                espnElements.apiStatusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                espnElements.apiStatusText.textContent = 'Offline';
+                logEspnActivity('ESPN API is offline', 'error');
+            }
+            
+            espnElements.currentWeek.textContent = status.currentWeek || window.espnApi.getCurrentWeek();
+            espnElements.rateLimit.textContent = status.rateLimitRemaining ? `${status.rateLimitRemaining} remaining` : 'Unknown';
+            
+            const cacheStats = window.espnApi.getCacheStats();
+            espnElements.cacheCount.textContent = cacheStats.totalEntries;
+            
+        } catch (error) {
+            logEspnActivity('Failed to update ESPN API status: ' + error.message, 'error');
+            espnElements.apiStatusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+            espnElements.apiStatusText.textContent = 'Error';
+        }
+    }
+
+    // Display ESPN test results
+    function displayEspnTestResults(tests) {
+        if (!espnElements.testResults) return;
+        
+        const resultsHtml = tests.map(test => {
+            const statusClass = test.success ? 'text-green-600' : 'text-red-600';
+            const statusIcon = test.success ? '✓' : '✗';
+            
+            return `
+                <div class="flex items-center justify-between p-2 border border-slate-200 rounded">
+                    <div>
+                        <span class="${statusClass} font-medium">${statusIcon} ${test.name}</span>
+                        ${test.error ? `<div class="text-xs text-red-600 mt-1">${test.error}</div>` : ''}
+                        ${test.data && test.name === 'Current Week Games' ? 
+                            `<div class="text-xs text-slate-500 mt-1">Week ${test.data.week}: ${test.data.gameCount} games</div>` : ''}
+                        ${test.data && test.name === 'NFL Teams' ? 
+                            `<div class="text-xs text-slate-500 mt-1">${test.data.teamCount} teams loaded</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        espnElements.testResults.innerHTML = resultsHtml;
+    }
+
+    // Event listeners
+    if (espnElements.refreshStatusBtn) {
+        espnElements.refreshStatusBtn.addEventListener('click', updateEspnApiStatus);
+    }
+
+    if (espnElements.testCurrentWeekBtn) {
+        espnElements.testCurrentWeekBtn.addEventListener('click', async () => {
+            espnElements.testsStatus.textContent = 'Running...';
+            espnElements.testsStatus.className = 'px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800';
+            
+            try {
+                logEspnActivity('Testing current week games...');
+                const games = await window.espnApi.getCurrentWeekGames(true);
+                logEspnActivity(`Current week test successful: ${games.length} games loaded`, 'success');
+                
+                displayEspnTestResults([{
+                    name: 'Current Week Games',
+                    success: true,
+                    data: { week: window.espnApi.getCurrentWeek(), gameCount: games.length }
+                }]);
+                
+                espnElements.testsStatus.textContent = 'Passed';
+                espnElements.testsStatus.className = 'px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800';
+                
+            } catch (error) {
+                logEspnActivity('Current week test failed: ' + error.message, 'error');
+                displayEspnTestResults([{
+                    name: 'Current Week Games',
+                    success: false,
+                    error: error.message
+                }]);
+                
+                espnElements.testsStatus.textContent = 'Failed';
+                espnElements.testsStatus.className = 'px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800';
+            }
+        });
+    }
+
+    if (espnElements.testTeamsBtn) {
+        espnElements.testTeamsBtn.addEventListener('click', async () => {
+            espnElements.testsStatus.textContent = 'Running...';
+            espnElements.testsStatus.className = 'px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800';
+            
+            try {
+                logEspnActivity('Testing NFL teams...');
+                const teams = await window.espnApi.getNflTeams(true);
+                logEspnActivity(`Teams test successful: ${teams.length} teams loaded`, 'success');
+                
+                displayEspnTestResults([{
+                    name: 'NFL Teams',
+                    success: true,
+                    data: { teamCount: teams.length }
+                }]);
+                
+                espnElements.testsStatus.textContent = 'Passed';
+                espnElements.testsStatus.className = 'px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800';
+                
+            } catch (error) {
+                logEspnActivity('Teams test failed: ' + error.message, 'error');
+                displayEspnTestResults([{
+                    name: 'NFL Teams',
+                    success: false,
+                    error: error.message
+                }]);
+                
+                espnElements.testsStatus.textContent = 'Failed';
+                espnElements.testsStatus.className = 'px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800';
+            }
+        });
+    }
+
+    if (espnElements.clearCacheBtn) {
+        espnElements.clearCacheBtn.addEventListener('click', () => {
+            const entriesCleared = window.espnApi.getCacheStats().totalEntries;
+            window.espnApi.invalidateCache();
+            logEspnActivity(`Cleared ${entriesCleared} ESPN API cache entries`, 'success');
+            updateEspnApiStatus();
+        });
+    }
+
+    if (espnElements.fetchSeasonBtn) {
+        espnElements.fetchSeasonBtn.addEventListener('click', async () => {
+            if (!confirm('This will fetch the complete NFL season schedule from ESPN. This is a heavy operation and should only be done by administrators. Continue?')) {
+                return;
+            }
+            
+            espnElements.fetchSeasonBtn.disabled = true;
+            espnElements.fetchSeasonBtn.textContent = 'Fetching...';
+            
+            try {
+                logEspnActivity('Starting full season schedule fetch (Admin operation)...');
+                const result = await window.espnApi.fetchSeasonSchedule();
+                logEspnActivity(`Season schedule fetch complete: ${result.gamesCount} games fetched`, 'success');
+                
+                espnElements.fetchSeasonBtn.textContent = 'Fetch Complete!';
+                setTimeout(() => {
+                    espnElements.fetchSeasonBtn.textContent = 'Fetch Full Season';
+                    espnElements.fetchSeasonBtn.disabled = false;
+                }, 3000);
+                
+            } catch (error) {
+                logEspnActivity('Season schedule fetch failed: ' + error.message, 'error');
+                espnElements.fetchSeasonBtn.textContent = 'Fetch Failed';
+                setTimeout(() => {
+                    espnElements.fetchSeasonBtn.textContent = 'Fetch Full Season';
+                    espnElements.fetchSeasonBtn.disabled = false;
+                }, 3000);
+            }
+        });
+    }
+
+    if (espnElements.clearLogsBtn) {
+        espnElements.clearLogsBtn.addEventListener('click', () => {
+            espnLogs = [];
+            updateEspnLogsDisplay();
+        });
+    }
+
+    // Initialize ESPN API status when admin tab is accessed
+    const espnApiTab = document.getElementById('tab-espn-api');
+    if (espnApiTab) {
+        espnApiTab.addEventListener('click', () => {
+            setTimeout(updateEspnApiStatus, 100); // Small delay to ensure UI is ready
+        });
+    }
+
+    logEspnActivity('ESPN API Admin interface initialized');
+}
+
  console.log('💎 About to call initializeAppAndAuth');
-initializeAppAndAuth();
+initializeAppAndAuth().then(() => {
+    // Initialize ESPN API admin functionality
+    if (typeof window.espnApi !== 'undefined') {
+        initializeEspnApiAdmin();
+    } else {
+        console.warn('ESPN API client not loaded');
+    }
+});
  });
  </script>
 </body>
