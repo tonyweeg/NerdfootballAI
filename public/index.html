@@ -7959,10 +7959,26 @@ function escapeHtml(text) {
  }
  }
 
- // Check if individual game is locked (started)
+ // Get game state using proper validation logic
+function getGameState(game) {
+    const now = new Date();
+    const kickoff = new Date(game.kickoff);
+    
+    if (now < kickoff) {
+        return 'PRE_GAME';
+    } else if (game.winner && game.winner !== 'TBD') {
+        return 'COMPLETED';
+    } else {
+        return 'IN_PROGRESS';
+    }
+}
+
+// Check if individual game is locked (started)
  function isGameLocked(game) {
-  const gameTime = new Date(game.kickoff);
-  return new Date() > gameTime;
+  // SECURITY FIX: Use proper game state validation to prevent picks during IN_PROGRESS games
+  const gameState = getGameState(game);
+  // Only allow picks when games are PRE_GAME
+  return gameState === 'IN_PROGRESS' || gameState === 'COMPLETED';
  }
 
  // Get locked games for a week
@@ -10694,15 +10710,28 @@ const SurvivorPicksView = {
             
             if (!weekData.games || !Array.isArray(weekData.games)) return false;
             
-            // Check if ANY game has started
-            const now = new Date();
+            // SECURITY FIX: Use proper game state validation to prevent picks during IN_PROGRESS games
             return weekData.games.some(game => {
-                const gameTime = new Date(game.kickoff);
-                return now > gameTime;
+                const gameState = this.getGameState(game);
+                // Only allow picks when games are PRE_GAME
+                return gameState === 'IN_PROGRESS' || gameState === 'COMPLETED';
             });
         } catch (error) {
             console.error('Error checking game lock status:', error);
             return false;
+        }
+    },
+    
+    getGameState: function(game) {
+        const now = new Date();
+        const kickoff = new Date(game.kickoff);
+        
+        if (now < kickoff) {
+            return 'PRE_GAME';
+        } else if (game.winner && game.winner !== 'TBD') {
+            return 'COMPLETED';
+        } else {
+            return 'IN_PROGRESS';
         }
     },
     
