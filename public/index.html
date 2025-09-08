@@ -11406,37 +11406,58 @@ const SurvivorView = {
         return Math.max(1, Math.min(18, weeksDiff + 1));
     },
     
-    // 💎 DIAMOND FIX: Optimized weeks survived calculation with batch loading
+    // DIAMOND OPTIMIZATION: Ultra-fast parallel week results loading with intelligent caching
     loadAllWeekResults: async function(currentWeek) {
-        if (this.cachedWeekResults) return this.cachedWeekResults;
+        // DIAMOND OPTIMIZATION: Use gameStateCache if available (fastest path)
+        if (typeof window.gameStateCache === 'object' && window.gameStateCache) {
+            const cachedResults = {};
+            let cacheHits = 0;
+            for (let week = 1; week <= currentWeek; week++) {
+                if (window.gameStateCache[week]) {
+                    cachedResults[week] = window.gameStateCache[week];
+                    cacheHits++;
+                }
+            }
+            if (cacheHits > 0) {
+                console.log(`⚡ DIAMOND CACHE: Using gameStateCache (${cacheHits}/${currentWeek} weeks)`);
+                return cachedResults;
+            }
+        }
         
-        console.log('🚀 Batch loading results for weeks 1-' + currentWeek);
+        // DIAMOND OPTIMIZATION: Instance-level caching for repeated calls
+        if (this.cachedWeekResults && this.cacheTimestamp && (Date.now() - this.cacheTimestamp) < 30000) {
+            console.log('🚀 DIAMOND CACHE HIT: Using fresh cached week results');
+            return this.cachedWeekResults;
+        }
+        
+        console.log(`🚀 DIAMOND BATCH LOAD: Loading results for weeks 1-${currentWeek}`);
         const startTime = performance.now();
         
         try {
-            // Load all week results in parallel
-            const resultPromises = [];
-            for (let week = 1; week <= currentWeek; week++) {
-                resultPromises.push(
-                    getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`))
-                        .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
-                        .catch(error => {
-                            console.error(`Error loading week ${week} results:`, error);
-                            return { week, data: null };
-                        })
-                );
-            }
+            // DIAMOND OPTIMIZATION: Maximum parallel loading with error resilience
+            const resultPromises = Array.from({ length: currentWeek }, (_, i) => {
+                const week = i + 1;
+                return getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`))
+                    .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
+                    .catch(error => {
+                        console.error(`Error loading week ${week} results:`, error);
+                        return { week, data: null };
+                    });
+            });
             
             const allResults = await Promise.all(resultPromises);
             this.cachedWeekResults = {};
             allResults.forEach(({ week, data }) => {
-                this.cachedWeekResults[week] = data;
+                if (data) this.cachedWeekResults[week] = data;
             });
             
-            console.log(`📊 Loaded ${allResults.length} week results in ${(performance.now() - startTime).toFixed(0)}ms`);
+            this.cacheTimestamp = Date.now();
+            
+            const loadTime = (performance.now() - startTime).toFixed(0);
+            console.log(`⚡ DIAMOND WEEK RESULTS: ${Object.keys(this.cachedWeekResults).length}/${currentWeek} weeks loaded in ${loadTime}ms`);
             return this.cachedWeekResults;
         } catch (error) {
-            console.error('Error batch loading week results:', error);
+            console.error('DIAMOND ERROR: Week results loading failed:', error);
             return {};
         }
     },
@@ -11583,6 +11604,50 @@ const SurvivorView = {
         return result;
     },
     
+    // DIAMOND OPTIMIZATION: Helper method for clean pool selection
+    getCurrentPool: function() {
+        if (typeof getCurrentPool === 'function') {
+            return getCurrentPool();
+        }
+        
+        // Fallback: Check URL params, localStorage, or use default
+        if (typeof window !== 'undefined' && window.location) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const poolParam = urlParams.get('pool');
+            
+            if (poolParam) {
+                return poolParam;
+            } else if (typeof localStorage !== 'undefined') {
+                return localStorage.getItem('selectedPoolId') || 'nerduniverse-2025';
+            } else {
+                return 'nerduniverse-2025'; // Browser fallback
+            }
+        } else {
+            // Node.js environment or no window object
+            return 'nerduniverse-2025'; // Ultimate fallback
+        }
+    },
+    
+    // DIAMOND OPTIMIZATION: Non-blocking elimination processing
+    processEliminationsAsync: function(currentWeek, userResults) {
+        // Process eliminations in background without blocking UI
+        setTimeout(async () => {
+            console.log('🔄 Background elimination processing...');
+            if (typeof window.SurvivorAutoElimination !== 'undefined' && typeof db !== 'undefined') {
+                try {
+                    const survivorElimination = new window.SurvivorAutoElimination(db, window.gameStateCache);
+                    const eliminationResult = await survivorElimination.checkEliminationsForWeek(currentWeek);
+                    
+                    if (eliminationResult.eliminatedCount > 0) {
+                        console.log(`🚨 Background: ${eliminationResult.eliminatedCount} users eliminated! UI will update next reload.`);
+                    }
+                } catch (elimError) {
+                    console.warn('Background elimination processing failed:', elimError);
+                }
+            }
+        }, 100); // Small delay to ensure UI renders first
+    },
+    
     loadSurvivorResults: async function() {
         console.log('🔄 Starting loadSurvivorResults...');
         this.showLoading();
@@ -11591,34 +11656,22 @@ const SurvivorView = {
         this.cachedWeekResults = null;
         
         try {
-            // Get current pool with fallback mechanism (same as SurvivorAutoElimination)
-            let currentPool;
+            // DIAMOND OPTIMIZATION: Use helper method for cleaner code
+            const currentPool = this.getCurrentPool();
+            console.log('🎯 Loading survivor results for pool:', currentPool);
             
-            if (typeof getCurrentPool === 'function') {
-                currentPool = getCurrentPool();
-            } else {
-                // Fallback: Check URL params, localStorage, or use default
-                if (typeof window !== 'undefined' && window.location) {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const poolParam = urlParams.get('pool');
-                    
-                    if (poolParam) {
-                        currentPool = poolParam;
-                    } else if (typeof localStorage !== 'undefined') {
-                        currentPool = localStorage.getItem('selectedPoolId') || 'nerduniverse-2025';
-                    } else {
-                        currentPool = 'nerduniverse-2025'; // Browser fallback
-                    }
-                } else {
-                    // Node.js environment or no window object
-                    currentPool = 'nerduniverse-2025'; // Ultimate fallback
-                }
-            }
+            const currentWeek = this.getCurrentWeek();
             
-            console.log('Loading survivor results for pool:', currentPool);
+            // DIAMOND OPTIMIZATION: Parallel batch loading of ALL essential data
+            console.log('🚀 PARALLEL BATCH LOAD: Pool members, status, week results...');
+            const startTime = performance.now();
             
-            // Get pool members
-            const poolMembersDoc = await getDoc(doc(db, `artifacts/nerdfootball/pools/${currentPool}/metadata/members`));
+            const [poolMembersDoc, statusDoc, allWeekResults] = await Promise.all([
+                getDoc(doc(db, `artifacts/nerdfootball/pools/${currentPool}/metadata/members`)),
+                getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`)),
+                this.loadAllWeekResults(currentWeek)
+            ]);
+            
             if (!poolMembersDoc.exists()) {
                 console.log('No pool members found');
                 this.showNoResults();
@@ -11633,16 +11686,12 @@ const SurvivorView = {
                 return;
             }
 
-            // Hybrid approach: Get essential data for winner/loser status (optimized: 22 reads → 4-6 reads)
-            console.log('Fetching survivor data with winner/loser status...');
-            const startTime = performance.now();
-            
-            const currentWeek = this.getCurrentWeek();
-            
-            // Get status document (contains elimination status and current picks)
-            const statusDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`));
             const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
-            console.log('✅ Survivor status loaded:', Object.keys(allStatuses).length, 'entries');
+            console.log('⚡ Core data loaded in parallel:', {
+                poolMembers: Object.keys(poolMembers).length,
+                statuses: Object.keys(allStatuses).length,
+                weekResults: Object.keys(allWeekResults).length
+            });
             
             // We need historical picks to show latest pick and results, but only for active users
             // This is more efficient than the original 22 reads
@@ -11689,36 +11738,34 @@ const SurvivorView = {
             
             const activeUsersData = await Promise.all(activeUserPromises);
             
-            // 💎 DIAMOND OPTIMIZATION: Batch load all week results once
-            const allWeekResults = await this.loadAllWeekResults(currentWeek);
-            
-            // Store allWeekResults for status calculation
+            // Store week results for status calculation (already loaded in parallel above)
             this.currentWeekResults = allWeekResults;
             
-            // Process active users with full pick data - Real-time weeks calculation
-            for (const userData of activeUsersData) {
-                const { uid, userPicks, displayPick, displayWeek, currentWeekPick, totalPicks } = userData;
+            // DIAMOND OPTIMIZATION: Process active users with pre-loaded data
+            activeUsersData.forEach(({ uid, userPicks, displayPick, displayWeek, currentWeekPick, totalPicks }) => {
                 const userStatus = allStatuses[uid] || { eliminated: false };
                 
-                // Calculate weeks survived with pre-loaded results (no more Firebase calls!)
+                // DIAMOND OPTIMIZATION: Use pre-loaded results for weeks calculation
                 const weeksSurvived = this.calculateWeeksSurvived(userPicks, currentWeek, allWeekResults);
                 
                 userResults.push({
                     uid,
                     displayName: poolMembers[uid].displayName || poolMembers[uid].email || 'Unknown User',
                     email: poolMembers[uid].email || '',
-                    isEliminated: false,
-                    eliminatedWeek: null,
+                    isEliminated: userStatus.eliminated || false,
+                    eliminatedWeek: userStatus.eliminatedWeek || null,
+                    eliminationReason: userStatus.eliminationReason || null,
                     latestPick: displayPick || 'No picks yet',
                     latestPickWeek: displayWeek,
                     currentWeekPick: currentWeekPick,
                     weeksSurvived: weeksSurvived,
-                    totalPicks: totalPicks
+                    totalPicks: totalPicks,
+                    allPicks: userPicks // Store for row status calculation
                 });
-            }
+            });
             
-            // Process eliminated users using status data only (no additional reads needed)
-            for (const uid of eliminatedUsers) {
+            // DIAMOND OPTIMIZATION: Process eliminated users using ONLY status data (zero additional reads)
+            eliminatedUsers.forEach(uid => {
                 const userStatus = allStatuses[uid] || { eliminated: true };
                 
                 userResults.push({
@@ -11727,43 +11774,24 @@ const SurvivorView = {
                     email: poolMembers[uid].email || '',
                     isEliminated: true,
                     eliminatedWeek: userStatus.eliminatedWeek || 'Unknown',
+                    eliminationReason: userStatus.eliminationReason || null,
                     latestPick: userStatus.currentWeekPick || 'Eliminated',
                     latestPickWeek: userStatus.eliminatedWeek ? userStatus.eliminatedWeek - 1 : null,
                     currentWeekPick: null,
                     weeksSurvived: userStatus.eliminatedWeek ? (userStatus.eliminatedWeek - 1) : 0,
-                    totalPicks: 1 // Approximate for eliminated users
+                    totalPicks: 1, // Approximate for eliminated users
+                    allPicks: {} // Empty for eliminated users
                 });
-            }
+            });
             
-            console.log(`Hybrid data fetch completed in ${(performance.now() - startTime).toFixed(0)}ms`);
-            console.log(`Firebase reads: ${memberIds.length + 2} → ${activeUsers.length + 2} reads (${Math.round((1 - (activeUsers.length + 2)/(memberIds.length + 2)) * 100)}% reduction)`);
+            const loadTime = performance.now() - startTime;
+            console.log(`🚀 DIAMOND OPTIMIZATION COMPLETE: ${loadTime.toFixed(0)}ms`);
+            console.log(`📊 Firebase reads: 3 base + ${activeUsers.length} picks = ${3 + activeUsers.length} total reads`);
+            console.log(`📈 Performance: ${loadTime < 500 ? '✅ SUB-500MS TARGET MET!' : '⚠️ Still optimizing...'}`);
+            
+            // DIAMOND OPTIMIZATION: Move elimination processing to background (non-blocking)
+            this.processEliminationsAsync(currentWeek, userResults);
 
-            // CRITICAL FIX: Auto-process eliminations when viewing results
-            console.log('🔄 Auto-processing eliminations for current week...');
-            if (typeof window.SurvivorAutoElimination !== 'undefined' && typeof db !== 'undefined') {
-                try {
-                    const survivorElimination = new window.SurvivorAutoElimination(db, window.gameStateCache);
-                    const eliminationResult = await survivorElimination.checkEliminationsForWeek(currentWeek);
-                    
-                    if (eliminationResult.eliminatedCount > 0) {
-                        console.log(`🚨 ${eliminationResult.eliminatedCount} users eliminated this week! Refreshing data...`);
-                        // Reload the status document to get fresh elimination data
-                        const updatedStatusDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`));
-                        const updatedStatuses = updatedStatusDoc.exists() ? updatedStatusDoc.data() : {};
-                        
-                        // Update the eliminated users with new statuses
-                        userResults.forEach(user => {
-                            if (updatedStatuses[user.uid]?.eliminated) {
-                                user.isEliminated = true;
-                                user.eliminatedWeek = updatedStatuses[user.uid].eliminatedWeek;
-                                user.eliminationReason = updatedStatuses[user.uid].eliminationReason;
-                            }
-                        });
-                    }
-                } catch (elimError) {
-                    console.warn('Auto-elimination processing failed:', elimError);
-                }
-            }
 
             // Sort results: Active users first (by weeks survived DESC), then eliminated users (by elimination week DESC)
             userResults.sort((a, b) => {
