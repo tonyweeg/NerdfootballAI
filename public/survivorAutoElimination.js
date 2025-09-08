@@ -7,6 +7,28 @@ class SurvivorAutoElimination {
         this.gameStateCache = gameStateCache;
     }
     
+    // ESPN winner determination logic
+    determineESPNWinner(game) {
+        if (!game.status || game.status === 'Not Started' || game.status.includes('Q') || game.status.includes('Half')) {
+            return 'TBD';
+        }
+        
+        if (game.status === 'Final' || game.status === 'FINAL') {
+            const homeScore = parseInt(game.home_score) || 0;
+            const awayScore = parseInt(game.away_score) || 0;
+            
+            if (homeScore > awayScore) {
+                return game.home_team;
+            } else if (awayScore > homeScore) {
+                return game.away_team;
+            } else {
+                return 'TIE';
+            }
+        }
+        
+        return 'TBD';
+    }
+    
     // Get survivor picks path for user
     survivorPicksPath(uid) {
         return `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`;
@@ -67,9 +89,9 @@ class SurvivorAutoElimination {
         return Object.keys(poolMembers);
     }
     
-    // Check eliminations for a specific week
+    // Check eliminations for a specific week using ESPN API
     async checkEliminationsForWeek(weekNumber) {
-        console.log(`🔍 Checking survivor eliminations for Week ${weekNumber}...`);
+        console.log(`🔍 Checking survivor eliminations for Week ${weekNumber} using ESPN API...`);
         
         try {
             // Make sure setDoc is available for potential database updates
@@ -91,16 +113,43 @@ class SurvivorAutoElimination {
             const statusSnap = await getDoc(statusDocRef);
             const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
             
-            // Get game results for this week
-            const resultsDocRef = doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`);
-            const resultsSnap = await getDoc(resultsDocRef);
-            
-            if (!resultsSnap.exists()) {
-                console.log(`No game results found for Week ${weekNumber}`);
-                return { eliminatedCount: 0, details: [] };
+            // Get game results for this week from ESPN API
+            let gameResults = {};
+            if (typeof window.espnApi !== 'undefined') {
+                console.log(`📡 Using ESPN API for Week ${weekNumber} game results`);
+                const espnGames = await window.espnApi.getWeekGames(weekNumber);
+                
+                if (espnGames && espnGames.length > 0) {
+                    // Convert ESPN games to our format
+                    espnGames.forEach(game => {
+                        gameResults[game.id] = {
+                            id: game.id,
+                            homeTeam: game.home_team,
+                            awayTeam: game.away_team,
+                            homeScore: game.home_score,
+                            awayScore: game.away_score,
+                            status: game.status,
+                            winner: this.determineESPNWinner(game)
+                        };
+                    });
+                    console.log(`✅ ESPN API: Loaded ${Object.keys(gameResults).length} games for Week ${weekNumber}`);
+                } else {
+                    console.log(`⚠️ No ESPN games found for Week ${weekNumber}`);
+                    return { eliminatedCount: 0, details: [] };
+                }
+            } else {
+                // Fallback to Firestore if ESPN API unavailable
+                console.warn(`⚠️ ESPN API unavailable, falling back to Firestore for Week ${weekNumber}`);
+                const resultsDocRef = doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`);
+                const resultsSnap = await getDoc(resultsDocRef);
+                
+                if (!resultsSnap.exists()) {
+                    console.log(`No game results found for Week ${weekNumber}`);
+                    return { eliminatedCount: 0, details: [] };
+                }
+                
+                gameResults = resultsSnap.data();
             }
-            
-            const gameResults = resultsSnap.data();
             
             // Check if ANY games have finished (to determine if picks deadline has passed)
             const hasFinishedGames = Object.values(gameResults).some(game => 
@@ -318,28 +367,48 @@ class SurvivorAutoElimination {
                 if (!weekPick) continue;
                 
                 try {
-                    const resultsDocRef = doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`);
-                    const resultsSnap = await getDoc(resultsDocRef);
+                    let gameResults = {};
                     
-                    if (resultsSnap.exists()) {
-                        const gameResults = resultsSnap.data();
-                        const gameResult = gameResults[weekPick.gameId];
-                        
-                        if (gameResult && gameResult.winner && gameResult.status === 'FINAL') {
-                            const isWinner = gameResult.winner === weekPick.team;
-                            
-                            userResults.push({
-                                week,
-                                pickedTeam: weekPick.team,
-                                winner: gameResult.winner,
-                                result: isWinner ? 'WIN' : 'LOSS',
-                                gameId: weekPick.gameId
+                    // Try ESPN API first
+                    if (typeof window.espnApi !== 'undefined') {
+                        const espnGames = await window.espnApi.getWeekGames(week);
+                        if (espnGames && espnGames.length > 0) {
+                            espnGames.forEach(game => {
+                                gameResults[game.id] = {
+                                    id: game.id,
+                                    homeTeam: game.home_team,
+                                    awayTeam: game.away_team,
+                                    homeScore: game.home_score,
+                                    awayScore: game.away_score,
+                                    status: game.status,
+                                    winner: this.determineESPNWinner(game)
+                                };
                             });
-                            
-                            if (!isWinner && !shouldBeEliminated) {
-                                shouldBeEliminated = true;
-                                eliminationWeek = week;
-                            }
+                        }
+                    } else {
+                        // Fallback to Firestore
+                        const resultsDocRef = doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`);
+                        const resultsSnap = await getDoc(resultsDocRef);
+                        if (resultsSnap.exists()) {
+                            gameResults = resultsSnap.data();
+                        }
+                    }
+                    
+                    const gameResult = gameResults[weekPick.gameId];
+                    if (gameResult && gameResult.winner && (gameResult.status === 'FINAL' || gameResult.status === 'Final')) {
+                        const isWinner = gameResult.winner === weekPick.team;
+                        
+                        userResults.push({
+                            week,
+                            pickedTeam: weekPick.team,
+                            winner: gameResult.winner,
+                            result: isWinner ? 'WIN' : 'LOSS',
+                            gameId: weekPick.gameId
+                        });
+                        
+                        if (!isWinner && !shouldBeEliminated) {
+                            shouldBeEliminated = true;
+                            eliminationWeek = week;
                         }
                     }
                 } catch (e) {

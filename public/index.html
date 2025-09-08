@@ -11406,9 +11406,9 @@ const SurvivorView = {
         return window.currentWeek || 1;
     },
     
-    // DIAMOND OPTIMIZATION: Ultra-fast parallel week results loading with intelligent caching
+    // ESPN API: Ultra-fast parallel week results loading from ESPN data
     loadAllWeekResults: async function(currentWeek) {
-        // DIAMOND OPTIMIZATION: Use gameStateCache if available (fastest path)
+        // ESPN OPTIMIZATION: Use gameStateCache if available (fastest path)
         if (typeof window.gameStateCache === 'object' && window.gameStateCache) {
             const cachedResults = {};
             let cacheHits = 0;
@@ -11419,22 +11419,66 @@ const SurvivorView = {
                 }
             }
             if (cacheHits > 0) {
-                console.log(`⚡ DIAMOND CACHE: Using gameStateCache (${cacheHits}/${currentWeek} weeks)`);
+                console.log(`⚡ ESPN CACHE: Using gameStateCache (${cacheHits}/${currentWeek} weeks)`);
                 return cachedResults;
             }
         }
         
-        // DIAMOND OPTIMIZATION: Instance-level caching for repeated calls
+        // ESPN OPTIMIZATION: Instance-level caching for repeated calls
         if (this.cachedWeekResults && this.cacheTimestamp && (Date.now() - this.cacheTimestamp) < 30000) {
-            console.log('🚀 DIAMOND CACHE HIT: Using fresh cached week results');
+            console.log('🚀 ESPN CACHE HIT: Using fresh cached week results');
             return this.cachedWeekResults;
         }
         
-        console.log(`🚀 DIAMOND BATCH LOAD: Loading results for weeks 1-${currentWeek}`);
+        console.log(`🚀 ESPN BATCH LOAD: Loading results for weeks 1-${currentWeek} from ESPN API`);
         const startTime = performance.now();
         
         try {
-            // DIAMOND OPTIMIZATION: Maximum parallel loading with error resilience
+            // ESPN OPTIMIZATION: Use ESPN API for all week data
+            if (typeof window.espnApi !== 'undefined') {
+                const resultPromises = Array.from({ length: currentWeek }, (_, i) => {
+                    const week = i + 1;
+                    return window.espnApi.getWeekGames(week)
+                        .then(games => {
+                            if (!games || games.length === 0) return { week, data: null };
+                            
+                            // Convert ESPN games to our results format
+                            const weekData = {};
+                            games.forEach(game => {
+                                weekData[game.id] = {
+                                    id: game.id,
+                                    homeTeam: game.home_team,
+                                    awayTeam: game.away_team,
+                                    homeScore: game.home_score,
+                                    awayScore: game.away_score,
+                                    status: game.status,
+                                    winner: this.determineESPNWinner(game)
+                                };
+                            });
+                            
+                            return { week, data: weekData };
+                        })
+                        .catch(error => {
+                            console.error(`Error loading ESPN week ${week} results:`, error);
+                            return { week, data: null };
+                        });
+                });
+                
+                const allResults = await Promise.all(resultPromises);
+                this.cachedWeekResults = {};
+                allResults.forEach(({ week, data }) => {
+                    if (data) this.cachedWeekResults[week] = data;
+                });
+                
+                this.cacheTimestamp = Date.now();
+                
+                const loadTime = (performance.now() - startTime).toFixed(0);
+                console.log(`⚡ ESPN WEEK RESULTS: ${Object.keys(this.cachedWeekResults).length}/${currentWeek} weeks loaded in ${loadTime}ms`);
+                return this.cachedWeekResults;
+            }
+            
+            // Fallback to Firestore if ESPN API unavailable
+            console.warn('⚠️ ESPN API unavailable, falling back to Firestore');
             const resultPromises = Array.from({ length: currentWeek }, (_, i) => {
                 const week = i + 1;
                 return getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`))
@@ -11454,12 +11498,34 @@ const SurvivorView = {
             this.cacheTimestamp = Date.now();
             
             const loadTime = (performance.now() - startTime).toFixed(0);
-            console.log(`⚡ DIAMOND WEEK RESULTS: ${Object.keys(this.cachedWeekResults).length}/${currentWeek} weeks loaded in ${loadTime}ms`);
+            console.log(`⚡ FIRESTORE FALLBACK RESULTS: ${Object.keys(this.cachedWeekResults).length}/${currentWeek} weeks loaded in ${loadTime}ms`);
             return this.cachedWeekResults;
         } catch (error) {
-            console.error('DIAMOND ERROR: Week results loading failed:', error);
+            console.error('ESPN/FIRESTORE ERROR: Week results loading failed:', error);
             return {};
         }
+    },
+    
+    // ESPN winner determination logic
+    determineESPNWinner: function(game) {
+        if (!game.status || game.status === 'Not Started' || game.status.includes('Q') || game.status.includes('Half')) {
+            return 'TBD';
+        }
+        
+        if (game.status === 'Final' || game.status === 'FINAL') {
+            const homeScore = parseInt(game.home_score) || 0;
+            const awayScore = parseInt(game.away_score) || 0;
+            
+            if (homeScore > awayScore) {
+                return game.home_team;
+            } else if (awayScore > homeScore) {
+                return game.away_team;
+            } else {
+                return 'TIE';
+            }
+        }
+        
+        return 'TBD';
     },
     
     calculateWeeksSurvived: function(userPicks, currentWeek, allWeekResults) {
