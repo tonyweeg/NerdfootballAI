@@ -158,20 +158,33 @@ class SurvivorSystem {
 // Global instance
 window.survivorSystem = null;
 
-// Initialize function
-async function initializeSurvivorSystem() {
+// Initialize function with retry logic
+async function initializeSurvivorSystem(retryCount = 0) {
+    const maxRetries = 10;
+    const retryDelay = 500; // 500ms
+    
     if (typeof window.db === 'undefined') {
-        console.error('Firebase db not available for survivor system');
-        return;
+        if (retryCount < maxRetries) {
+            console.log(`🔄 Firebase db not ready yet, retry ${retryCount + 1}/${maxRetries} in ${retryDelay}ms`);
+            setTimeout(() => initializeSurvivorSystem(retryCount + 1), retryDelay);
+            return;
+        } else {
+            console.error('❌ Firebase db not available for survivor system after maximum retries');
+            return;
+        }
     }
 
     window.survivorSystem = new SurvivorSystem(window.db);
     console.log('✅ Clean Survivor System initialized');
 }
 
-// Auto-initialize when DOM is ready
+// Auto-initialize when DOM is ready with delayed start
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeSurvivorSystem);
+    document.addEventListener('DOMContentLoaded', () => {
+        // Add a small delay to allow Firebase to initialize
+        setTimeout(initializeSurvivorSystem, 100);
+    });
 } else {
-    initializeSurvivorSystem();
+    // Add a small delay to allow Firebase to initialize
+    setTimeout(initializeSurvivorSystem, 100);
 }
