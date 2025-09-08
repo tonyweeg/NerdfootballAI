@@ -11541,7 +11541,30 @@ const SurvivorView = {
         this.cachedWeekResults = null;
         
         try {
-            const currentPool = getCurrentPool();
+            // Get current pool with fallback mechanism (same as SurvivorAutoElimination)
+            let currentPool;
+            
+            if (typeof getCurrentPool === 'function') {
+                currentPool = getCurrentPool();
+            } else {
+                // Fallback: Check URL params, localStorage, or use default
+                if (typeof window !== 'undefined' && window.location) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const poolParam = urlParams.get('pool');
+                    
+                    if (poolParam) {
+                        currentPool = poolParam;
+                    } else if (typeof localStorage !== 'undefined') {
+                        currentPool = localStorage.getItem('selectedPoolId') || 'nerduniverse-2025';
+                    } else {
+                        currentPool = 'nerduniverse-2025'; // Browser fallback
+                    }
+                } else {
+                    // Node.js environment or no window object
+                    currentPool = 'nerduniverse-2025'; // Ultimate fallback
+                }
+            }
+            
             console.log('Loading survivor results for pool:', currentPool);
             
             // Get pool members
@@ -11567,8 +11590,9 @@ const SurvivorView = {
             const currentWeek = this.getCurrentWeek();
             
             // Get status document (contains elimination status and current picks)
-            const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+            const statusDoc = await getDoc(doc(db, getSurvivorStatusPath(currentPool)));
             const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+            console.log('✅ Survivor status loaded:', Object.keys(allStatuses).length, 'entries');
             
             // We need historical picks to show latest pick and results, but only for active users
             // This is more efficient than the original 22 reads
@@ -11871,8 +11895,9 @@ const SurvivorPicksView = {
         return `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`;
     },
     
-    survivorStatusPath: function() {
-        return `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`;
+    survivorStatusPath: function(poolId) {
+        const pool = poolId || 'nerduniverse-2025';
+        return getSurvivorStatusPath(pool);
     },
     
     getGamesForWeek: async function(weekNumber) {
