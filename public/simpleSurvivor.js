@@ -7,7 +7,7 @@ class SimpleSurvivorSystem {
         this.currentWeek = 1;
     }
 
-    // Get simple survivor table data - NO CACHING TO AVOID ERRORS
+    // Get simple survivor table data for all pool members - NO CACHING TO AVOID ERRORS
     async getSurvivorTable(poolId) {
         try {
             // Get pool members
@@ -17,21 +17,16 @@ class SimpleSurvivorSystem {
             const poolMembers = poolDoc.data();
             const results = [];
 
-            // Process first 10 users only to avoid spam
-            let count = 0;
+            // Process all users in the pool
             for (const [uid, member] of Object.entries(poolMembers)) {
-                if (count >= 10) break;
-                
                 // Calculate status directly (no caching)
                 const status = await this.calculateUserStatus(uid, member);
                 results.push(status);
-                count++;
             }
 
             return results;
 
         } catch (error) {
-            console.error('Error getting survivor table:', error);
             return [];
         }
     }
@@ -56,8 +51,12 @@ class SimpleSurvivorSystem {
                 };
             }
 
+            // Normalize team name before lookup
+            const normalizedTeamName = this.normalizeTeamName(userPick.team);
+            
             // Get ESPN result for this team
-            const gameResult = await this.getTeamResult(userPick.team);
+            const gameResult = await this.getTeamResult(normalizedTeamName);
+            
             
             let status, reason;
             if (!gameResult) {
@@ -66,12 +65,16 @@ class SimpleSurvivorSystem {
             } else if (gameResult.winner === 'TBD') {
                 status = 'not_started';
                 reason = 'Game in progress';
-            } else if (gameResult.winner === userPick.team) {
-                status = 'won';
-                reason = `${userPick.team} won`;
             } else {
-                status = 'lost';
-                reason = `${userPick.team} lost to ${gameResult.winner}`;
+                // Normalize winner for comparison
+                const normalizedWinner = this.normalizeTeamName(gameResult.winner);
+                if (normalizedWinner === normalizedTeamName) {
+                    status = 'won';
+                    reason = `${userPick.team} won`;
+                } else {
+                    status = 'lost';
+                    reason = `${userPick.team} lost to ${gameResult.winner}`;
+                }
             }
 
             return {
@@ -85,7 +88,6 @@ class SimpleSurvivorSystem {
             };
 
         } catch (error) {
-            console.error(`Error calculating status for ${uid}:`, error);
             return {
                 uid,
                 displayName: member.displayName || member.email,
@@ -105,27 +107,55 @@ class SimpleSurvivorSystem {
             if (typeof window.espnNerdApi !== 'undefined') {
                 const espnData = await window.espnNerdApi.getCurrentWeekScores();
                 if (espnData && espnData.games) {
-                    // Find game where this team won
-                    const game = espnData.games.find(g => g.winner === teamName);
+                    // Find game where this team participated (home or away)
+                    const game = espnData.games.find(g => 
+                        g.home_team === teamName || g.away_team === teamName
+                    );
+                    
                     if (game) {
+                        // Game found - return actual result
                         return {
-                            winner: game.winner,
-                            homeScore: game.home_score,
-                            awayScore: game.away_score
+                            winner: game.winner || 'TBD',
+                            homeScore: game.home_score || 0,
+                            awayScore: game.away_score || 0,
+                            homeTeam: game.home_team,
+                            awayTeam: game.away_team,
+                            status: game.status
                         };
                     }
                     
-                    // If not found as winner, check if game exists but no winner yet
-                    // This is simplified - just return TBD for now
-                    return { winner: 'TBD' };
+                    // Team didn't play this week
+                    return null;
                 }
             }
             
             return null;
         } catch (error) {
-            console.error('Error getting team result:', error);
             return null;
         }
+    }
+
+    // Team name normalization (matches ESPN API style)
+    normalizeTeamName(teamName) {
+        if (!teamName) return null;
+        
+        // Team name mapping for consistency with ESPN data
+        const teamMappings = {
+            'LA Rams': 'Los Angeles Rams',
+            'LA Chargers': 'Los Angeles Chargers', 
+            'LV Raiders': 'Las Vegas Raiders',
+            'Vegas Raiders': 'Las Vegas Raiders',
+            'NY Giants': 'New York Giants',
+            'NY Jets': 'New York Jets',
+            'TB Buccaneers': 'Tampa Bay Buccaneers',
+            'NE Patriots': 'New England Patriots',
+            'GB Packers': 'Green Bay Packers',
+            'NO Saints': 'New Orleans Saints',
+            'KC Chiefs': 'Kansas City Chiefs',
+            'SF 49ers': 'San Francisco 49ers'
+        };
+        
+        return teamMappings[teamName] || teamName;
     }
 
     // Get cached user status - DISABLED due to Firebase path issues
@@ -144,10 +174,9 @@ class SimpleSurvivorSystem {
     async clearWeekCache(week) {
         try {
             // This would delete the entire cache collection for the week
-            console.log(`Clearing cache for week ${week}`);
             // Implementation depends on Firebase batch delete
         } catch (error) {
-            console.error('Error clearing cache:', error);
+            // Silent fail
         }
     }
 
@@ -217,7 +246,6 @@ async function initializeSimpleSurvivor() {
     }
 
     window.simpleSurvivorSystem = new SimpleSurvivorSystem(window.db);
-    console.log('✅ Simple Survivor System initialized');
 }
 
 // Auto-initialize

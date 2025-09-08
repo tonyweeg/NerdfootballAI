@@ -11717,7 +11717,6 @@ const SurvivorView = {
     },
     
     loadSurvivorResults: async function() {
-        console.log('🔄 Starting CLEAN survivor system...');
         this.showLoading();
         
         try {
@@ -11749,19 +11748,23 @@ const SurvivorView = {
             // Render simple table
             const tableHtml = window.simpleSurvivorSystem.generateTable(results);
             
-            // Find survivor container and replace content
-            const survivorContainer = document.querySelector('#survivor-results-container') || allUI.survivorStatusBody?.parentElement;
-            if (survivorContainer) {
-                survivorContainer.innerHTML = tableHtml;
-            } else {
-                console.error('No survivor results container found');
+            // Put table into the survivor results container (replace existing table)
+            if (allUI.survivorResultsContainer) {
+                // Find the table container within the results container and replace it
+                const tableContainer = allUI.survivorResultsContainer.querySelector('.overflow-x-auto') || 
+                                     allUI.survivorResultsContainer.querySelector('table')?.parentElement;
+                if (tableContainer) {
+                    tableContainer.outerHTML = tableHtml;
+                } else {
+                    // If no table container found, append to results container
+                    allUI.survivorResultsContainer.appendChild(document.createElement('div')).innerHTML = tableHtml;
+                }
             }
 
-            console.log('✅ SIMPLE survivor system loaded successfully');
-            console.log(`📊 Stats: Total=${total}, Alive=${alive}, Eliminated=${eliminated}`);
+            // Show the results (hide loading state)
+            this.showResults();
 
         } catch (error) {
-            console.error('Error in simple survivor system:', error);
             this.showError('Failed to load survivor results. Please try again.');
         }
     },
