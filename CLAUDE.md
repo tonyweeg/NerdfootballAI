@@ -263,3 +263,4 @@ After human regression testing passes:
 ---
 
 **Remember: "Diamond Level" means no mistakes, comprehensive testing, and absolute precision in everything we do.**
+- week 1 of the 2025 season is september 4th - 10th, and it goes for 18 weeks, and ends on january 7, 2026
