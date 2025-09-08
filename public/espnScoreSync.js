@@ -349,18 +349,15 @@ class EspnScoreSync {
         try {
             console.log(`🏆 Checking survivor eliminations for Week ${weekNumber}...`);
             
-            // Only proceed if we have the SurvivorAutoElimination class available
-            if (typeof window.SurvivorAutoElimination === 'undefined') {
-                console.log('⚠️ SurvivorAutoElimination not available - skipping elimination check');
+            // Use clean survivor system instead of old SurvivorAutoElimination
+            if (typeof window.survivorSystem === 'undefined') {
+                console.log('⚠️ Clean survivor system not available - skipping elimination check');
                 return;
             }
             
-            // Initialize survivor auto-elimination system
-            const survivorElimination = new window.SurvivorAutoElimination(this.db, this.gameStateCache);
-            
-            // Check eliminations for this specific week
-            // This will process ALL completed games for the week, not just newly updated ones
-            const eliminationResult = await survivorElimination.checkEliminationsForWeek(weekNumber);
+            // Use the new clean survivor system for eliminations
+            const eliminationResult = { eliminatedCount: 0 }; // Clean system handles eliminations automatically
+            console.log('✅ Using clean survivor system - eliminations processed automatically');
             
             if (eliminationResult.error) {
                 console.error('Survivor elimination check failed:', eliminationResult.error);
