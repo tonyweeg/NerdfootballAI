@@ -271,17 +271,11 @@ class SurvivorAutoElimination {
     
     // Get current NFL week
     getCurrentWeek() {
-        // FIXED: 2025 season starts in September 2025
+        // NFL 2024 season
         const now = new Date();
-        const seasonStart = new Date('2025-09-05');
+        const seasonStart = new Date('2024-09-05');
         const weekMs = 7 * 24 * 60 * 60 * 1000;
         const weeksDiff = Math.floor((now - seasonStart) / weekMs) + 1;
-        
-        // Since we're before the 2025 season, default to week 1 for testing
-        if (now < seasonStart) {
-            console.log('🏈 Pre-season: Defaulting to Week 1 for testing');
-            return 1;
-        }
         
         return Math.min(Math.max(weeksDiff, 1), 18);
     }
