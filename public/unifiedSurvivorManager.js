@@ -24,7 +24,7 @@ class UnifiedSurvivorManager {
             weekNumber,
             year: this.currentYear,
             poolId: this.poolId,
-            lastUpdated: serverTimestamp(),
+            lastUpdated: new Date(),
             version: 1,
             
             // All user picks in one place
@@ -49,7 +49,7 @@ class UnifiedSurvivorManager {
                 totalNoPick: 0,
                 pickDistribution: {},
                 mostPopularPick: '',
-                updatedAt: serverTimestamp()
+                updatedAt: new Date()
             }
         };
         
@@ -143,7 +143,7 @@ class UnifiedSurvivorManager {
                 const updatedPick = {
                     teamPicked,
                     displayName: userDisplayName,
-                    pickTimestamp: serverTimestamp(),
+                    pickTimestamp: new Date(),
                     eliminated: false,
                     eliminationWeek: null,
                     eliminationReason: null,
@@ -181,8 +181,8 @@ class UnifiedSurvivorManager {
                     'stats.pickDistribution': pickDistribution,
                     'stats.mostPopularPick': mostPopularPick,
                     'stats.totalActivePlayers': activePlayers,
-                    'stats.updatedAt': serverTimestamp(),
-                    'lastUpdated': serverTimestamp(),
+                    'stats.updatedAt': new Date(),
+                    'lastUpdated': new Date(),
                     'version': (weekData.version || 0) + 1
                 });
             });
@@ -262,8 +262,8 @@ class UnifiedSurvivorManager {
                     'stats.totalEliminated': weekData.stats.totalEliminated + eliminatedCount,
                     'stats.totalNoPick': noPickCount,
                     'stats.totalActivePlayers': weekData.stats.totalActivePlayers - eliminatedCount,
-                    'stats.updatedAt': serverTimestamp(),
-                    'lastUpdated': serverTimestamp(),
+                    'stats.updatedAt': new Date(),
+                    'lastUpdated': new Date(),
                     'version': (weekData.version || 0) + 1
                 });
             });
@@ -323,7 +323,7 @@ class UnifiedSurvivorManager {
                 weekNumber: nextWeek,
                 year: this.currentYear,
                 poolId: this.poolId,
-                lastUpdated: serverTimestamp(),
+                lastUpdated: new Date(),
                 version: 1,
                 picks: nextWeekPicks,
                 gameResults: {},
@@ -340,7 +340,7 @@ class UnifiedSurvivorManager {
                     totalNoPick: 0,
                     pickDistribution: {},
                     mostPopularPick: '',
-                    updatedAt: serverTimestamp()
+                    updatedAt: new Date()
                 }
             }, { merge: true });
             
@@ -528,7 +528,7 @@ class UnifiedSurvivorManager {
                 weekNumber,
                 year: this.currentYear,
                 poolId: this.poolId,
-                lastUpdated: serverTimestamp(),
+                lastUpdated: new Date(),
                 version: 1,
                 picks: unifiedPicks,
                 gameResults: {},
@@ -545,7 +545,7 @@ class UnifiedSurvivorManager {
                     totalNoPick: 0,
                     pickDistribution,
                     mostPopularPick,
-                    updatedAt: serverTimestamp()
+                    updatedAt: new Date()
                 }
             });
             
