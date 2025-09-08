@@ -64,27 +64,28 @@ class UnifiedSurvivorManager {
     }
 
     // Get all survivor data for a week (ONE READ!)
-    async getWeekData(weekNumber) {
+    async getWeekData(weekNumber = null) {
+        const week = weekNumber || this.currentWeek || 1;
         const startTime = performance.now();
         
         // Check cache first
-        if (this.cachedWeekData.has(weekNumber)) {
-            const cached = this.cachedWeekData.get(weekNumber);
+        if (this.cachedWeekData.has(week)) {
+            const cached = this.cachedWeekData.get(week);
             if (Date.now() - cached.timestamp < 5000) { // 5 second cache
-                console.log(`⚡ Cache hit for week ${weekNumber}: ${(performance.now() - startTime).toFixed(0)}ms`);
+                console.log(`⚡ Cache hit for week ${week}: ${(performance.now() - startTime).toFixed(0)}ms`);
                 return cached.data;
             }
         }
         
-        const docRef = this.getWeekDocRef(weekNumber);
+        const docRef = this.getWeekDocRef(week);
         
         try {
             const doc = await getDoc(docRef);
             
             if (!doc.exists()) {
                 // Initialize if doesn't exist
-                const newDoc = await this.initializeWeekDocument(weekNumber);
-                this.cachedWeekData.set(weekNumber, {
+                const newDoc = await this.initializeWeekDocument(week);
+                this.cachedWeekData.set(week, {
                     data: newDoc,
                     timestamp: Date.now()
                 });
@@ -94,12 +95,12 @@ class UnifiedSurvivorManager {
             const data = doc.data();
             
             // Cache the result
-            this.cachedWeekData.set(weekNumber, {
+            this.cachedWeekData.set(week, {
                 data,
                 timestamp: Date.now()
             });
             
-            console.log(`✅ Loaded week ${weekNumber} in ${(performance.now() - startTime).toFixed(0)}ms`);
+            console.log(`✅ Loaded week ${week} in ${(performance.now() - startTime).toFixed(0)}ms`);
             console.log('Week data has users field:', !!data.users, 'User count:', Object.keys(data.users || {}).length);
             return data;
             
