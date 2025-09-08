@@ -131,21 +131,21 @@ class EspnNerdApi {
         return teamMap[espnTeam?.displayName] || espnTeam?.displayName || 'Unknown Team';
     }
 
-    // Transform ESPN game data to NerdFootball format
+    // Transform ESPN game data to comprehensive NerdFootball format with ALL data points
     transformGameData(espnGame, baseId = 0) {
-        const homeTeam = this.normalizeTeamName(espnGame.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team);
-        const awayTeam = this.normalizeTeamName(espnGame.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away')?.team);
+        const homeCompetitor = espnGame.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home');
+        const awayCompetitor = espnGame.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away');
+        const homeTeam = this.normalizeTeamName(homeCompetitor?.team);
+        const awayTeam = this.normalizeTeamName(awayCompetitor?.team);
         
         const competition = espnGame.competitions?.[0];
         const venue = competition?.venue;
-        const stadium = venue ? `${venue.fullName}` : 'TBD';
-        
-        // Game status and scoring
         const status = competition?.status?.type?.name || 'STATUS_SCHEDULED';
         const isCompleted = status === 'STATUS_FINAL';
-        const homeScore = competition?.competitors?.find(c => c.homeAway === 'home')?.score || '0';
-        const awayScore = competition?.competitors?.find(c => c.homeAway === 'away')?.score || '0';
+        const homeScore = homeCompetitor?.score || '0';
+        const awayScore = awayCompetitor?.score || '0';
         
+        // Calculate winner
         let winner = 'TBD';
         if (isCompleted) {
             const homeScoreNum = parseInt(homeScore);
@@ -159,19 +159,139 @@ class EspnNerdApi {
             }
         }
 
-        return {
-            id: baseId + parseInt(espnGame.id.slice(-2)), // Use last 2 digits of ESPN ID
+        // Extract enhanced data points
+        const enhancedData = {
+            // Basic game info
+            id: baseId + parseInt(espnGame.id.slice(-2)),
+            espnId: espnGame.id,
+            name: espnGame.name || `${awayTeam} at ${homeTeam}`,
+            shortName: espnGame.shortName || `${awayTeam} @ ${homeTeam}`,
+            
+            // Teams and scores
             a: awayTeam,
             h: homeTeam,
             dt: espnGame.date,
-            stadium: stadium,
-            espnId: espnGame.id,
-            status: status,
             homeScore: homeScore,
             awayScore: awayScore,
             winner: winner,
-            lastUpdated: new Date().toISOString()
+            status: status,
+            
+            // 🎲 Quarter-by-Quarter Scores (linescores)
+            quarterScores: {
+                home: homeCompetitor?.linescores?.map(ls => ({
+                    quarter: ls.period,
+                    score: ls.value,
+                    displayValue: ls.displayValue
+                })) || [],
+                away: awayCompetitor?.linescores?.map(ls => ({
+                    quarter: ls.period,
+                    score: ls.value,
+                    displayValue: ls.displayValue
+                })) || []
+            },
+            
+            // 🏆 Team Records & Performance
+            teamRecords: {
+                home: homeCompetitor?.records?.map(r => ({
+                    type: r.name || null,
+                    category: r.type || null,
+                    record: r.summary || null,
+                    abbreviation: r.abbreviation || null
+                })).filter(r => r.type || r.record) || [],
+                away: awayCompetitor?.records?.map(r => ({
+                    type: r.name || null,
+                    category: r.type || null,
+                    record: r.summary || null,
+                    abbreviation: r.abbreviation || null
+                })).filter(r => r.type || r.record) || []
+            },
+            
+            // 🏟️ Enhanced Venue Information
+            venue: {
+                id: venue?.id || null,
+                name: venue?.fullName || 'TBD',
+                city: venue?.address?.city || null,
+                state: venue?.address?.state || null,
+                country: venue?.address?.country || 'USA',
+                indoor: venue?.indoor || false,
+                capacity: venue?.capacity || null,
+                grass: venue?.grass || null
+            },
+            stadium: venue?.fullName || 'TBD', // Keep for backward compatibility
+            
+            // ⛈️ Weather Data
+            weather: espnGame.weather ? {
+                temperature: espnGame.weather.temperature || null,
+                highTemperature: espnGame.weather.highTemperature || null,
+                lowTemperature: espnGame.weather.lowTemperature || null,
+                condition: espnGame.weather.conditionId || null,
+                description: espnGame.weather.displayValue || null,
+                humidity: espnGame.weather.humidity || null,
+                windSpeed: espnGame.weather.windSpeed || null,
+                windDirection: espnGame.weather.windDirection || null
+            } : null,
+            
+            // 📺 Broadcast Information
+            broadcasts: competition?.broadcasts?.map(b => ({
+                network: b.names?.[0] || null,
+                type: b.type?.shortName || null,
+                market: b.market || null,
+                lang: b.lang || null
+            })).filter(b => b.network) || [],
+            tv: competition?.broadcast || null, // Primary network
+            
+            // ⚡ Live Game Situation (for in-progress games)
+            situation: competition?.situation ? {
+                possession: competition.situation.possession || null,
+                down: competition.situation.down || null,
+                distance: competition.situation.distance || null,
+                yardLine: competition.situation.yardLine || null,
+                timeRemaining: competition.situation.clock?.displayValue || null,
+                period: competition.situation.period || null,
+                
+                // 🎯 Win Probability (if available)
+                probability: competition.situation.lastPlay?.probability ? {
+                    homeWinPercentage: competition.situation.lastPlay.probability.homeWinPercentage || null,
+                    awayWinPercentage: competition.situation.lastPlay.probability.awayWinPercentage || null,
+                    tiePercentage: competition.situation.lastPlay.probability.tiePercentage || null
+                } : null,
+                
+                lastPlay: competition.situation.lastPlay ? {
+                    id: competition.situation.lastPlay.id || null,
+                    type: competition.situation.lastPlay.type?.text || null,
+                    text: competition.situation.lastPlay.text || null,
+                    scoreValue: competition.situation.lastPlay.scoreValue || null,
+                    yards: competition.situation.lastPlay.statYardage || null,
+                    team: competition.situation.lastPlay.team?.displayName || null
+                } : null
+            } : null,
+            
+            // 📊 Game Format & Timing
+            format: {
+                periods: competition?.format?.regulation?.periods || 4,
+                periodLength: competition?.format?.regulation?.minutesPerPeriod || 15,
+                overtime: competition?.format?.overtime || null
+            },
+            
+            // 🏆 Season Context
+            season: {
+                year: espnGame.season?.year || null,
+                type: espnGame.season?.type || null,
+                week: espnGame.week?.number || null
+            },
+            
+            // 📈 Additional Metadata
+            attendance: competition?.attendance || null,
+            playByPlayAvailable: competition?.playByPlayAvailable || false,
+            neutralSite: competition?.neutralSite || false,
+            conferenceGame: competition?.conferenceCompetition || false,
+            
+            // ⏰ Timestamps
+            lastUpdated: new Date().toISOString(),
+            dataEnhanced: true // Flag to indicate this has full ESPN data
         };
+
+        return enhancedData;
     }
 
     // Fetch games for a specific date or week
@@ -221,7 +341,7 @@ class EspnNerdApi {
         };
     }
 
-    // Fetch all NFL teams
+    // Fetch all NFL teams with enhanced data
     async fetchTeams() {
         try {
             const data = await this.makeRequest('/teams');
@@ -235,14 +355,54 @@ class EspnNerdApi {
                 name: this.normalizeTeamName(teamData.team),
                 displayName: teamData.team.displayName,
                 abbreviation: teamData.team.abbreviation,
+                location: teamData.team.location,
                 color: teamData.team.color,
                 alternateColor: teamData.team.alternateColor,
                 logo: teamData.team.logos?.[0]?.href,
+                logos: teamData.team.logos || [],
+                isActive: teamData.team.isActive,
+                venue: teamData.team.venue,
                 lastUpdated: new Date().toISOString()
             }));
 
         } catch (error) {
             console.error('Error fetching teams from ESPN:', error);
+            throw error;
+        }
+    }
+
+    // Fetch NFL news articles
+    async fetchNews(limit = 20) {
+        try {
+            const data = await this.makeRequest('/news');
+            
+            if (!data.articles) {
+                throw new Error('No news articles found in ESPN response');
+            }
+
+            return data.articles.slice(0, limit).map(article => ({
+                id: article.id,
+                headline: article.headline,
+                description: article.description,
+                byline: article.byline,
+                published: article.published,
+                lastModified: article.lastModified,
+                premium: article.premium || false,
+                images: article.images?.map(img => ({
+                    url: img.url,
+                    width: img.width,
+                    height: img.height,
+                    alt: img.alt,
+                    caption: img.caption
+                })) || [],
+                categories: article.categories || [],
+                keywords: article.keywords || [],
+                links: article.links || [],
+                lastUpdated: new Date().toISOString()
+            }));
+
+        } catch (error) {
+            console.error('Error fetching news from ESPN:', error);
             throw error;
         }
     }
@@ -429,6 +589,25 @@ exports.fetchSeasonSchedule = functions.https.onCall(async (data, context) => {
     }
 });
 
+// Fetch NFL news
+exports.fetchNflNews = functions.https.onCall(async (data, context) => {
+    try {
+        const limit = data.limit || 20;
+        
+        const news = await espnApi.getCachedOrFetch(
+            `nfl_news_${limit}`,
+            () => espnApi.fetchNews(limit),
+            2 * 60 * 60 * 1000 // 2 hours cache for news
+        );
+        
+        return { success: true, data: news, count: news.length };
+        
+    } catch (error) {
+        console.error('fetchNflNews error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
 // Get API status and diagnostics
 exports.espnApiStatus = functions.https.onCall(async (data, context) => {
     return {
@@ -437,7 +616,8 @@ exports.espnApiStatus = functions.https.onCall(async (data, context) => {
         rateLimitRemaining: espnApi.MAX_REQUESTS_PER_HOUR - espnApi.RATE_LIMIT.requests,
         rateLimitResetTime: new Date(espnApi.RATE_LIMIT.resetTime).toISOString(),
         currentWeek: espnApi.getCurrentWeek(),
-        lastCheck: new Date().toISOString()
+        lastCheck: new Date().toISOString(),
+        enhancedDataEnabled: true // Flag for new comprehensive data
     };
 });
 

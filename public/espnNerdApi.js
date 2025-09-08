@@ -336,6 +336,112 @@ class EspnNerdApiClient {
         }
     }
 
+    // Fetch NFL news
+    async getNflNews(limit = 20, forceRefresh = false) {
+        const cacheKey = `nfl_news_${limit}`;
+        
+        if (!forceRefresh && this.isCacheValid(cacheKey, 2 * 60 * 60 * 1000)) {
+            console.log('ESPN: Serving NFL news from cache');
+            return this.getCache(cacheKey);
+        }
+        
+        try {
+            console.log('ESPN: Fetching NFL news from API');
+            const result = await this.callFunction('fetchNflNews', { limit });
+            
+            const news = result.data;
+            this.setCache(cacheKey, news, 2 * 60 * 60 * 1000); // 2 hour cache
+            
+            console.log(`ESPN: Cached ${news.length} news articles`);
+            return news;
+            
+        } catch (error) {
+            console.error('Error fetching NFL news:', error);
+            
+            const cached = this.getCache(cacheKey);
+            if (cached) {
+                console.warn('ESPN: Returning expired news cache as fallback');
+                return cached;
+            }
+            
+            throw error;
+        }
+    }
+
+    // Get enhanced game data with all ESPN features
+    async getEnhancedGameData(weekNumber, forceRefresh = false) {
+        try {
+            const games = await this.getWeekGames(weekNumber, forceRefresh);
+            
+            // Enhanced games should now include all the comprehensive data
+            // from our updated Firebase Functions
+            console.log(`ESPN: Retrieved ${games.length} enhanced games for Week ${weekNumber}`);
+            return games;
+            
+        } catch (error) {
+            console.error(`Error getting enhanced game data for Week ${weekNumber}:`, error);
+            throw error;
+        }
+    }
+
+    // Extract specific data features from enhanced game data
+    extractGameFeatures(game) {
+        return {
+            // Core game info
+            basic: {
+                id: game.id,
+                teams: { away: game.a, home: game.h },
+                scores: { away: game.awayScore, home: game.homeScore },
+                winner: game.winner,
+                status: game.status
+            },
+            
+            // 🎲 Win Probability (if available)
+            probability: game.situation?.probability ? {
+                homeWin: game.situation.probability.homeWinPercentage,
+                awayWin: game.situation.probability.awayWinPercentage,
+                tie: game.situation.probability.tiePercentage
+            } : null,
+            
+            // ⛈️ Weather conditions
+            weather: game.weather ? {
+                temperature: game.weather.temperature,
+                condition: game.weather.condition,
+                description: game.weather.description
+            } : null,
+            
+            // 🏟️ Venue details
+            venue: game.venue ? {
+                name: game.venue.name,
+                location: `${game.venue.city}, ${game.venue.state}`,
+                indoor: game.venue.indoor
+            } : null,
+            
+            // 📺 Broadcast info
+            broadcasts: game.broadcasts || [],
+            primaryNetwork: game.tv,
+            
+            // 🏆 Team records
+            records: game.teamRecords ? {
+                home: game.teamRecords.home,
+                away: game.teamRecords.away
+            } : null,
+            
+            // 📊 Quarter scores
+            quarterScores: game.quarterScores || null,
+            
+            // ⚡ Live game situation
+            situation: game.situation ? {
+                possession: game.situation.possession,
+                down: game.situation.down,
+                distance: game.situation.distance,
+                yardLine: game.situation.yardLine,
+                timeRemaining: game.situation.timeRemaining,
+                lastPlay: game.situation.lastPlay?.text
+            } : null
+        };
+    }
+
     // Get cache statistics
     getCacheStats() {
         const stats = {

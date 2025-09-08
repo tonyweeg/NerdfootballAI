@@ -35,6 +35,7 @@
  <script src="./pickAnalyticsIntegration.js"></script>
  <script src="./espnNerdApi.js"></script>
  <script src="./espnScoreSync.js"></script>
+ <script src="./enhancedGameDataDisplay.js"></script>
  <script src="./liveGameRefresh.js"></script>
  <style>
  body {
@@ -9347,7 +9348,13 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
         status: espnGame.status || (espnGame.winner && espnGame.winner !== 'TBD' ? 'FINAL' : 'LIVE'),
         clock: espnGame.clock || espnGame.timeRemaining,
         quarter: espnGame.quarter || espnGame.period,
-        hasScores: (espnGame.awayScore !== undefined && espnGame.homeScore !== undefined)
+        hasScores: (espnGame.awayScore !== undefined && espnGame.homeScore !== undefined),
+        weather: espnGame.weather || null,
+        venue: espnGame.venue || null,
+        probability: espnGame.probability || null,
+        broadcasts: espnGame.broadcasts || null,
+        quarterScores: espnGame.quarterScores || null,
+        teamRecords: espnGame.teamRecords || null
        };
       }
      });
@@ -9484,6 +9491,17 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
          </div>
          ${pick.liveScore && pick.liveScore.hasScores ? `<div class="text-xs font-medium mt-1 ${pick.liveScore.status === 'FINAL' ? 'text-slate-700' : 'text-emerald-600'}">
           ${pick.liveScore.awayScore} - ${pick.liveScore.homeScore}${pick.liveScore.status === 'FINAL' ? ' (F)' : (pick.liveScore.clock && pick.liveScore.quarter ? ` (${pick.liveScore.clock} Q${pick.liveScore.quarter})` : '')}
+         </div>` : ''}
+         ${pick.liveScore && pick.liveScore.weather ? `<div class="text-xs text-slate-500 mt-0.5 flex items-center">
+          <span class="mr-1">🌡️</span>
+          ${pick.liveScore.weather.temperature}°F ${pick.liveScore.weather.condition || pick.liveScore.weather.description || ''}
+         </div>` : ''}
+         ${pick.liveScore && pick.liveScore.venue ? `<div class="text-xs text-slate-500 mt-0.5 flex items-center">
+          <span class="mr-1">${pick.liveScore.venue.indoor ? '🏟️' : '🌤️'}</span>
+          ${pick.liveScore.venue.name}
+         </div>` : ''}
+         ${pick.liveScore && pick.liveScore.probability ? `<div class="text-xs text-emerald-600 font-medium mt-0.5">
+          Win Prob: ${isHome ? pick.liveScore.probability.homeWinPercentage : pick.liveScore.probability.awayWinPercentage}%
          </div>` : ''}
          <div class="text-xs text-slate-500 mt-0.5 ${isInProgress ? 'text-emerald-600 font-medium' : ''}">
           ${timeDisplay}
@@ -9806,6 +9824,11 @@ function updatePicksButtonStates(weekData) {
      </div>
  </div>
  
+ <!-- Enhanced ESPN Data Section for Picks -->
+ <div id="picks-espn-data-${game.id}" class="mt-2 pt-2 border-t border-slate-200">
+     <!-- ESPN data will be populated here -->
+ </div>
+ 
  ${gameState === 'IN_PROGRESS' ? `
  <div class="mt-2 pt-2 border-t border-slate-200">
      <div class="flex items-center gap-2 text-xs text-emerald-600">
@@ -9823,6 +9846,11 @@ function updatePicksButtonStates(weekData) {
  ` : ''}`;
  
  targetContainer.appendChild(gameRow);
+
+// Add enhanced ESPN data for ALL games in picks area
+if (window.espnApi) {
+    setTimeout(() => addEnhancedGameDataToPicks(game.id, game, gameState), 100);
+}
  });
 
  // Add Monday Night Football total points input

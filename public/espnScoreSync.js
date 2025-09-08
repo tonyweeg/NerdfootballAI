@@ -102,16 +102,38 @@ class EspnScoreSync {
                         existingResult.winner !== espnGame.winner;
                     
                     if (needsUpdate) {
+                        // Store comprehensive ESPN data
                         newResults[gameId] = {
+                            // Basic game results
                             winner: espnGame.winner,
                             awayScore: espnGame.awayScore,
                             homeScore: espnGame.homeScore,
+                            status: espnGame.status,
+                            
+                            // 🎲 Enhanced data from comprehensive ESPN integration
+                            quarterScores: espnGame.quarterScores || null,
+                            teamRecords: espnGame.teamRecords || null,
+                            weather: espnGame.weather || null,
+                            venue: espnGame.venue || null,
+                            broadcasts: espnGame.broadcasts || null,
+                            tv: espnGame.tv || null,
+                            
+                            // ⚡ Live game situation (for in-progress games)
+                            situation: espnGame.situation || null,
+                            
+                            // 🎯 Win probability (huge value!)
+                            probability: espnGame.situation?.probability || null,
+                            
+                            // 📊 Metadata
+                            attendance: espnGame.attendance,
+                            season: espnGame.season,
                             lastUpdated: new Date().toISOString(),
-                            source: 'ESPN_API'
+                            source: 'ESPN_API_ENHANCED',
+                            dataEnhanced: true
                         };
                         updatedCount++;
                         
-                        console.log(`✅ Updated game ${gameId}: ${espnGame.awayTeam} ${espnGame.awayScore} - ${espnGame.homeTeam} ${espnGame.homeScore} (Winner: ${espnGame.winner})`);
+                        console.log(`✅ Enhanced update game ${gameId}: ${espnGame.a} ${espnGame.awayScore} - ${espnGame.h} ${espnGame.homeScore} (Winner: ${espnGame.winner})${espnGame.weather ? ` [${espnGame.weather.temperature}°F]` : ''}`);
                     }
                 }
             }
