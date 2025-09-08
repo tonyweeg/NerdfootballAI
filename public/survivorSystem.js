@@ -7,39 +7,39 @@ class SurvivorSystem {
         this.currentWeek = 1; // Simple, clear week management
     }
 
-    // Simple game matching: user pick -> find their game -> check winner
+    // DIAMOND LEVEL: Use internal schedule + ESPN results  
     async checkUserSurvival(userPick, weekResults) {
         if (!userPick || !userPick.team) {
             return { status: 'eliminated', reason: 'No pick made' };
         }
 
-        // Find the game the user picked
-        let gameId = userPick.gameId;
-        
-        // CRITICAL FIX: If no gameId, find it by team name
-        if (!gameId && userPick.team) {
-            gameId = this.findGameIdByTeam(userPick.team, weekResults);
-            console.log(`🔧 FIXED: Found gameId ${gameId} for team ${userPick.team}`);
-        }
-        
-        if (!gameId) {
-            return { status: 'eliminated', reason: 'Invalid pick - no game found for team' };
+        console.log(`🔍 CHECKING: User picked ${userPick.team} in internal game ${userPick.gameId}`);
+
+        // Step 1: Get the actual game matchup from internal schedule
+        const gameInfo = await this.getGameInfoFromSchedule(userPick.gameId);
+        if (!gameInfo) {
+            return { status: 'eliminated', reason: `Invalid game ID: ${userPick.gameId}` };
         }
 
-        const game = weekResults[gameId];
-        if (!game) {
-            return { status: 'pending', reason: 'Game not found in results' };
+        console.log(`🎯 GAME INFO: ${gameInfo.away} @ ${gameInfo.home}`);
+
+        // Step 2: Find the ESPN result that matches this game's participants
+        const espnResult = this.findESPNResultByTeams(gameInfo.home, gameInfo.away, weekResults);
+        if (!espnResult) {
+            return { status: 'pending', reason: 'ESPN result not available yet' };
         }
 
-        if (!game.winner || game.winner === 'TBD') {
+        console.log(`📊 ESPN RESULT:`, espnResult);
+
+        if (!espnResult.winner || espnResult.winner === 'TBD') {
             return { status: 'pending', reason: 'Game not finished' };
         }
 
-        // Simple comparison: did user's team win?
-        if (game.winner === userPick.team) {
+        // Step 3: Check if user's picked team won
+        if (espnResult.winner === userPick.team) {
             return { status: 'survived', reason: `${userPick.team} won` };
         } else {
-            return { status: 'eliminated', reason: `${userPick.team} lost to ${game.winner}` };
+            return { status: 'eliminated', reason: `${userPick.team} lost to ${espnResult.winner}` };
         }
     }
 
@@ -148,25 +148,48 @@ class SurvivorSystem {
         return null;
     }
 
-    // Find game ID by team name (for picks missing gameId)
-    findGameIdByTeam(teamName, weekResults) {
-        console.log(`🔍 SEARCHING for team: ${teamName}`);
+    // Get game info from internal schedule using gameId
+    async getGameInfoFromSchedule(gameId) {
+        try {
+            // Load internal schedule data
+            const response = await fetch('/nfl_2025_schedule_raw.json');
+            const scheduleData = await response.json();
+            
+            // Find the game by ID in Week 1 (current week)
+            const week1 = scheduleData.weeks.find(w => w.week === 1);
+            if (!week1) return null;
+            
+            const game = week1.games.find(g => g.id == gameId);
+            if (!game) return null;
+            
+            return {
+                id: game.id,
+                home: game.h,
+                away: game.a,
+                datetime: game.dt,
+                stadium: game.stadium
+            };
+        } catch (error) {
+            console.error('Error loading schedule:', error);
+            return null;
+        }
+    }
+
+    // Find ESPN result that matches the home/away team participants 
+    findESPNResultByTeams(homeTeam, awayTeam, espnResults) {
+        console.log(`🔍 SEARCHING ESPN results for: ${awayTeam} @ ${homeTeam}`);
         
-        for (const [gameId, game] of Object.entries(weekResults)) {
-            console.log(`🔍 GAME ${gameId}:`, game);
+        for (const [espnGameId, result] of Object.entries(espnResults)) {
+            console.log(`🔍 ESPN GAME ${espnGameId}:`, result);
             
-            // Check all possible team name fields from ESPN data, including winner
-            const possibleFields = ['homeTeam', 'awayTeam', 'home_team', 'away_team', 'home', 'away', 'winner'];
-            
-            for (const field of possibleFields) {
-                if (game[field] === teamName) {
-                    console.log(`✅ FOUND ${teamName} in game ${gameId} field ${field}`);
-                    return gameId;
-                }
+            // Check if this ESPN result is for a game where one of our teams won
+            if (result.winner === homeTeam || result.winner === awayTeam) {
+                console.log(`✅ FOUND ESPN result: ${result.winner} won this game`);
+                return result;
             }
         }
         
-        console.log(`❌ NOT FOUND: ${teamName} in any game`);
+        console.log(`❌ NOT FOUND: No ESPN result for ${awayTeam} @ ${homeTeam}`);
         return null;
     }
 
