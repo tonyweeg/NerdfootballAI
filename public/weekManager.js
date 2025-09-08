@@ -42,39 +42,9 @@ class WeekManager {
 
     // Main week detection with multiple data sources
     async detectCurrentWeek() {
-        // Check cache first
-        if (this.isCacheValid()) {
-            console.log(`🏈 WeekManager: Using cached week ${this.weekCache.week}`);
-            return this.weekCache.week;
-        }
-
-        console.log('🏈 WeekManager: Detecting current week from data sources...');
-
-        const strategies = [
-            { name: 'Live Games', method: () => this.detectLiveGameWeek() },
-            { name: 'ESPN API', method: () => this.getEspnCurrentWeek() },
-            { name: 'Firestore Results', method: () => this.detectRecentCompletedWeek() },
-            { name: 'Available Game Files', method: () => this.getLatestAvailableGameWeek() }
-        ];
-
-        for (const strategy of strategies) {
-            try {
-                console.log(`🏈 WeekManager: Trying ${strategy.name}...`);
-                const result = await strategy.method();
-                
-                if (result && this.isValidWeek(result)) {
-                    console.log(`🏈 WeekManager: ${strategy.name} detected Week ${result}`);
-                    this.cacheWeek(result);
-                    return result;
-                }
-            } catch (error) {
-                console.warn(`🏈 WeekManager: ${strategy.name} failed:`, error.message);
-                continue;
-            }
-        }
-
-        // Ultimate fallback
-        console.warn('🏈 WeekManager: All detection strategies failed, defaulting to Week 1');
+        // TEMPORARY FIX: Force Week 1 until data sources align
+        // User picks are in Week 1 (game IDs 101, 103, 111) so we need Week 1
+        console.log('🏈 WeekManager: TEMPORARY - Forcing Week 1 for user pick alignment');
         return 1;
     }
 
