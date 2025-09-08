@@ -100,6 +100,7 @@ class UnifiedSurvivorManager {
             });
             
             console.log(`✅ Loaded week ${weekNumber} in ${(performance.now() - startTime).toFixed(0)}ms`);
+            console.log('Week data has users field:', !!data.users, 'User count:', Object.keys(data.users || {}).length);
             return data;
             
         } catch (error) {
@@ -387,12 +388,15 @@ class UnifiedSurvivorManager {
 
     // Get formatted display data (filters out no-picks)
     async getDisplayData(weekNumber = null) {
+        console.log('getDisplayData called for week:', weekNumber || this.currentWeek);
         try {
             // Get the week data first
             const weekData = await this.getWeekData(weekNumber);
             
+            console.log('Got week data:', !!weekData, 'Has users:', !!weekData?.users);
+            
             if (!weekData || !weekData.users) {
-                console.log('No week data found');
+                console.log('No week data found or no users field');
                 return [];
             }
             
