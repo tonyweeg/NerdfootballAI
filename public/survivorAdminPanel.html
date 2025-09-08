@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor Pool Admin - ESPN Integration</title>
+    <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-7xl mx-auto py-8 px-4">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">
+                        <i class="fas fa-skull mr-2 text-red-500"></i>
+                        Survivor Pool Admin
+                    </h1>
+                    <p class="text-gray-600 mt-1">ESPN-Integrated Elimination Processing</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="sync-status" class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                        <i class="fas fa-check-circle mr-1"></i> ESPN Connected
+                    </span>
+                    <button onclick="location.href='index.html?view=survivor'" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-arrow-left mr-2"></i> Back to Survivor View
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- Week Selector -->
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-calendar-week mr-1 text-blue-500"></i> Week
+                </label>
+                <select id="week-selector" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <!-- Will be populated -->
+                </select>
+            </div>
+
+            <!-- Actions -->
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-sync mr-1 text-green-500"></i> ESPN Sync
+                </label>
+                <button id="fetch-espn-btn" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    <i class="fas fa-download mr-2"></i> Fetch ESPN Results
+                </button>
+            </div>
+
+            <!-- Process Eliminations -->
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-gavel mr-1 text-red-500"></i> Process
+                </label>
+                <button id="process-eliminations-btn" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    <i class="fas fa-skull mr-2"></i> Process Eliminations
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Dashboard -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div class="text-sm text-gray-600">Total Players</div>
+                <div class="text-2xl font-bold text-gray-900" id="stat-total">0</div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div class="text-sm text-gray-600">Active</div>
+                <div class="text-2xl font-bold text-green-600" id="stat-active">0</div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div class="text-sm text-gray-600">Eliminated</div>
+                <div class="text-2xl font-bold text-red-600" id="stat-eliminated">0</div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm p-4">
+                <div class="text-sm text-gray-600">Games Pending</div>
+                <div class="text-2xl font-bold text-yellow-600" id="stat-pending">0</div>
+            </div>
+        </div>
+
+        <!-- Main Content Tabs -->
+        <div class="bg-white rounded-lg shadow-sm">
+            <div class="border-b border-gray-200">
+                <nav class="flex -mb-px">
+                    <button class="tab-btn active px-6 py-3 border-b-2 border-blue-500 text-blue-600 font-medium" data-tab="users">
+                        <i class="fas fa-users mr-2"></i> User Status
+                    </button>
+                    <button class="tab-btn px-6 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="games">
+                        <i class="fas fa-football-ball mr-2"></i> ESPN Games
+                    </button>
+                    <button class="tab-btn px-6 py-3 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="logs">
+                        <i class="fas fa-list mr-2"></i> Activity Log
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="tab-users" class="tab-content p-6">
+                <div class="mb-4">
+                    <input type="text" id="user-search" placeholder="Search users..." 
+                           class="px-4 py-2 border border-gray-300 rounded-lg w-full md:w-64">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Player</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pick</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Game Status</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Result</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody" class="bg-white divide-y divide-gray-200">
+                            <!-- Will be populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Games Tab -->
+            <div id="tab-games" class="tab-content hidden p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="games-grid">
+                    <!-- Will be populated -->
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="tab-logs" class="tab-content hidden p-6">
+                <div class="flex justify-between mb-4">
+                    <h3 class="font-medium text-gray-900">Activity Log</h3>
+                    <button id="clear-logs-btn" class="text-sm text-red-600 hover:text-red-800">
+                        <i class="fas fa-trash mr-1"></i> Clear Logs
+                    </button>
+                </div>
+                <div id="activity-log" class="bg-gray-50 rounded-lg p-4 font-mono text-sm space-y-2 max-h-96 overflow-y-auto">
+                    <!-- Will be populated -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+
+    <!-- App Scripts -->
+    <script src="./weekManager.js"></script>
+    <script src="./espnNerdApi.js"></script>
+    <script src="./espnSurvivorIntegration.js"></script>
+
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAGaZY43IxoxMKgCp6xKazLWGZTHbIQnc",
+            authDomain: "theweegmen.firebaseapp.com",
+            projectId: "theweegmen",
+            storageBucket: "theweegmen.appspot.com",
+            messagingSenderId: "752644664395",
+            appId: "1:752644664395:web:65b3b7ae5c30b1e4284e31"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const functions = firebase.functions();
+        
+        window.db = db;
+        window.auth = auth;
+        window.functions = functions;
+        window.httpsCallable = firebase.functions().httpsCallable;
+
+        // Admin Panel Logic
+        class SurvivorAdminPanel {
+            constructor() {
+                this.currentWeek = 1;
+                this.logs = [];
+                this.userData = [];
+                this.gameData = {};
+                this.init();
+            }
+
+            async init() {
+                // Wait for dependencies
+                await this.waitForDependencies();
+                
+                // Initialize UI
+                this.populateWeekSelector();
+                this.attachEventListeners();
+                
+                // Load initial data
+                await this.loadData();
+                
+                this.log('Admin panel initialized', 'success');
+            }
+
+            async waitForDependencies() {
+                const maxAttempts = 20;
+                for (let i = 0; i < maxAttempts; i++) {
+                    if (window.espnSurvivorIntegration && window.espnNerdApi) {
+                        await window.espnSurvivorIntegration.initialize();
+                        return;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                }
+                throw new Error('Failed to initialize dependencies');
+            }
+
+            populateWeekSelector() {
+                const selector = document.getElementById('week-selector');
+                for (let i = 1; i <= 18; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `Week ${i}`;
+                    if (i === (window.currentWeek || 1)) {
+                        option.selected = true;
+                    }
+                    selector.appendChild(option);
+                }
+                this.currentWeek = window.currentWeek || 1;
+            }
+
+            attachEventListeners() {
+                // Week selector
+                document.getElementById('week-selector').addEventListener('change', (e) => {
+                    this.currentWeek = parseInt(e.target.value);
+                    this.loadData();
+                });
+
+                // Fetch ESPN button
+                document.getElementById('fetch-espn-btn').addEventListener('click', () => {
+                    this.fetchESPNData();
+                });
+
+                // Process eliminations button
+                document.getElementById('process-eliminations-btn').addEventListener('click', () => {
+                    this.processEliminations();
+                });
+
+                // Tab buttons
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.switchTab(e.target.dataset.tab);
+                    });
+                });
+
+                // Clear logs
+                document.getElementById('clear-logs-btn').addEventListener('click', () => {
+                    this.logs = [];
+                    this.renderLogs();
+                });
+
+                // User search
+                document.getElementById('user-search').addEventListener('input', (e) => {
+                    this.filterUsers(e.target.value);
+                });
+            }
+
+            switchTab(tabName) {
+                // Update buttons
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    if (btn.dataset.tab === tabName) {
+                        btn.classList.add('active', 'border-blue-500', 'text-blue-600');
+                        btn.classList.remove('border-transparent', 'text-gray-500');
+                    } else {
+                        btn.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                        btn.classList.add('border-transparent', 'text-gray-500');
+                    }
+                });
+
+                // Update content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            }
+
+            async loadData() {
+                this.log(`Loading data for Week ${this.currentWeek}...`, 'info');
+                
+                try {
+                    const data = await window.espnSurvivorIntegration.getDisplayData(this.currentWeek);
+                    this.userData = data.data;
+                    this.gameData = data.gameResults;
+                    
+                    // Update stats
+                    this.updateStats(data.stats);
+                    
+                    // Render tables
+                    this.renderUsers();
+                    this.renderGames();
+                    
+                    this.log(`Loaded ${this.userData.length} users, ${Object.keys(this.gameData).length} games`, 'success');
+                } catch (error) {
+                    this.log(`Error loading data: ${error.message}`, 'error');
+                }
+            }
+
+            updateStats(stats) {
+                document.getElementById('stat-total').textContent = stats.totalPlayers || 0;
+                document.getElementById('stat-active').textContent = stats.activePlayers || 0;
+                document.getElementById('stat-eliminated').textContent = stats.eliminatedPlayers || 0;
+                document.getElementById('stat-pending').textContent = stats.pendingPlayers || 0;
+            }
+
+            renderUsers() {
+                const tbody = document.getElementById('users-tbody');
+                
+                if (!this.userData.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">No users found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = this.userData.map(user => {
+                    const statusColor = user.eliminated ? 'text-red-600' : 
+                                      user.status === 'pending' ? 'text-yellow-600' : 
+                                      'text-green-600';
+                    
+                    const statusIcon = user.eliminated ? 'fa-skull' : 
+                                     user.status === 'pending' ? 'fa-clock' : 
+                                     'fa-check-circle';
+
+                    return `
+                        <tr class="${user.eliminated ? 'bg-red-50' : ''}">
+                            <td class="px-4 py-3 font-medium">${user.displayName}</td>
+                            <td class="px-4 py-3">${user.teamPicked || 'No pick'}</td>
+                            <td class="px-4 py-3">${user.gameStatus || '-'}</td>
+                            <td class="px-4 py-3">
+                                ${user.eliminationReason || '-'}
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="${statusColor}">
+                                    <i class="fas ${statusIcon} mr-1"></i>
+                                    ${user.status}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <button onclick="adminPanel.toggleElimination('${user.userId}')" 
+                                        class="text-sm text-blue-600 hover:text-blue-800">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            renderGames() {
+                const grid = document.getElementById('games-grid');
+                
+                const games = Object.values(this.gameData).filter(g => g.homeTeam);
+                
+                if (!games.length) {
+                    grid.innerHTML = '<div class="col-span-2 text-center py-8 text-gray-500">No games available</div>';
+                    return;
+                }
+
+                grid.innerHTML = games.map(game => {
+                    const statusColor = game.completed ? 'bg-green-100' : 'bg-yellow-100';
+                    const statusText = game.completed ? 'Final' : game.status || 'Pending';
+                    
+                    return `
+                        <div class="border border-gray-200 rounded-lg p-4 ${statusColor}">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-medium text-gray-600">${statusText}</span>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="${game.winner === game.awayTeam ? 'font-bold' : ''}">${game.awayTeam}</span>
+                                    <span class="text-lg font-bold">${game.awayScore || 0}</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="${game.winner === game.homeTeam ? 'font-bold' : ''}">${game.homeTeam}</span>
+                                    <span class="text-lg font-bold">${game.homeScore || 0}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            async fetchESPNData() {
+                this.log('Fetching ESPN data...', 'info');
+                
+                try {
+                    const scores = await window.espnNerdApi.getCurrentWeekScores();
+                    this.log(`Fetched ${scores.games.length} games from ESPN`, 'success');
+                    await this.loadData();
+                } catch (error) {
+                    this.log(`ESPN fetch error: ${error.message}`, 'error');
+                }
+            }
+
+            async processEliminations() {
+                if (!confirm('Process eliminations for Week ' + this.currentWeek + '? This will update the database.')) {
+                    return;
+                }
+
+                this.log('Processing eliminations...', 'info');
+                
+                try {
+                    const result = await window.espnSurvivorIntegration.persistEliminations(this.currentWeek);
+                    this.log(`Eliminations processed: ${result.stats.eliminatedPlayers} eliminated`, 'success');
+                    await this.loadData();
+                } catch (error) {
+                    this.log(`Processing error: ${error.message}`, 'error');
+                }
+            }
+
+            async toggleElimination(userId) {
+                // Implementation for manual elimination toggle
+                alert('Manual elimination toggle not yet implemented');
+            }
+
+            filterUsers(searchTerm) {
+                const rows = document.querySelectorAll('#users-tbody tr');
+                const term = searchTerm.toLowerCase();
+                
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(term) ? '' : 'none';
+                });
+            }
+
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                this.logs.push({ timestamp, message, type });
+                
+                // Keep only last 100 logs
+                if (this.logs.length > 100) {
+                    this.logs = this.logs.slice(-100);
+                }
+                
+                this.renderLogs();
+                console.log(`[${type.toUpperCase()}] ${message}`);
+            }
+
+            renderLogs() {
+                const logContainer = document.getElementById('activity-log');
+                
+                if (!this.logs.length) {
+                    logContainer.innerHTML = '<div class="text-gray-500">No activity yet</div>';
+                    return;
+                }
+
+                logContainer.innerHTML = this.logs.reverse().map(log => {
+                    const colorClass = log.type === 'error' ? 'text-red-600' : 
+                                      log.type === 'success' ? 'text-green-600' : 
+                                      'text-gray-700';
+                    
+                    return `
+                        <div class="${colorClass}">
+                            <span class="text-gray-500">${log.timestamp}</span> - ${log.message}
+                        </div>
+                    `;
+                }).join('');
+                
+                // Auto-scroll to bottom
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        // Initialize admin panel
+        let adminPanel;
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                adminPanel = new SurvivorAdminPanel();
+                window.adminPanel = adminPanel;
+            } else {
+                alert('Please log in to access the admin panel');
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+</body>
+</html>

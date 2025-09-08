@@ -39,13 +39,14 @@
  <script src="./survivorCacheManager.js"></script>
  <script src="./optimizedSurvivorLoader.js"></script>
  <script src="./unifiedSurvivorManager.js"></script>
+ <script src="./espnSurvivorIntegration.js"></script>
  <script src="./survivorMigration.js"></script>
  <script src="./pickAnalyticsIntegration.js"></script>
  <script src="./espnScoreSync.js"></script>
 <!-- DISABLED: survivorAutoElimination.js - replaced with clean ESPN-powered survivorSystem.js -->
  <script src="./enhancedGameDataDisplay.js"></script>
  <script src="./liveGameRefresh.js"></script>
- <script src="./test-survivor-diamond-architecture.js"></script>
+<!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
  font-family: 'Inter', sans-serif;
@@ -1599,6 +1600,9 @@ Role
                         <div class="flex justify-between items-center">
                             <h2 class="text-lg font-semibold text-gray-900">Survivor Pool Status</h2>
                             <div class="flex items-center space-x-4">
+                                <button onclick="window.open('survivorAdminPanel.html', '_blank')" class="px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors">
+                                    <i class="fas fa-cog mr-1"></i> Admin Panel
+                                </button>
                                 <div class="flex items-center text-sm">
                                     <div class="w-4 h-4 bg-green-200 rounded mr-2"></div>
                                     <span class="text-gray-600">Active</span>
@@ -11960,11 +11964,22 @@ const SurvivorView = {
         const loadStartTime = performance.now();
         
         try {
-            // DIAMOND PERFORMANCE: Use unified manager with SINGLE DOCUMENT READ
+            // DIAMOND PERFORMANCE: Use ESPN-integrated survivor data
             let loadResult = null;
             
-            if (window.unifiedSurvivorManager) {
-                console.log('💎 Using UNIFIED survivor manager (1 read!)');
+            
+            if (window.espnSurvivorIntegration) {
+                console.log('💎 Using ESPN-integrated survivor data with real-time eliminations');
+                const enhancedData = await window.espnSurvivorIntegration.getDisplayData();
+                
+                loadResult = {
+                    results: enhancedData.data,
+                    stats: enhancedData.stats,
+                    loadTime: enhancedData.loadTimeMs,
+                    source: 'espn-integrated'
+                };
+            } else if (window.unifiedSurvivorManager) {
+                console.log('⚡ Fallback to unified survivor manager');
                 const displayData = await window.unifiedSurvivorManager.getDisplayData();
                 const stats = {
                     totalPlayers: displayData.length,
