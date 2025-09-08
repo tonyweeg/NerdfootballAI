@@ -168,16 +168,23 @@ class SurvivorAutoElimination {
                         continue;
                     }
                     
-                    // Check if their pick lost
-                    const gameResult = gameResults[weekPick.gameId];
+                    // Check ONLY the specific game the user picked
+                    const specificGame = gameResults[weekPick.gameId];
                     
-                    if (gameResult && gameResult.winner && gameResult.status === 'FINAL') {
+                    if (!specificGame) {
+                        console.log(`⚠️ User ${userId} picked game ${weekPick.gameId} but game not found in results`);
+                        continue;
+                    }
+                    
+                    if (specificGame.status === 'FINAL' && specificGame.winner && specificGame.winner !== 'TBD') {
                         const userTeam = weekPick.team;
-                        const winner = gameResult.winner;
+                        const winner = specificGame.winner;
                         
-                        if (winner !== userTeam && winner !== 'TBD') {
+                        console.log(`👤 User ${userId} pick: ${userTeam} | 🏆 Winner: ${winner} | 🎮 Game: ${weekPick.gameId}`);
+                        
+                        if (winner !== userTeam) {
                             // User picked losing team - eliminate them
-                            console.log(`❌ ELIMINATING USER ${userId}: Picked ${userTeam}, Winner was ${winner}`);
+                            console.log(`❌ ELIMINATING USER ${userId}: Picked ${userTeam}, Winner was ${winner} (Game: ${weekPick.gameId})`);
                             
                             eliminationUpdates[`${userId}.eliminated`] = true;
                             eliminationUpdates[`${userId}.eliminatedWeek`] = weekNumber;
@@ -192,8 +199,10 @@ class SurvivorAutoElimination {
                                 gameId: weekPick.gameId
                             });
                         } else {
-                            console.log(`✅ User ${userId} survived Week ${weekNumber}: Picked ${userTeam}, Winner was ${winner}`);
+                            console.log(`✅ User ${userId} survived Week ${weekNumber}: Picked ${userTeam}, Winner was ${winner} (Game: ${weekPick.gameId})`);
                         }
+                    } else {
+                        console.log(`⏳ Game ${weekPick.gameId} not final yet (Status: ${specificGame.status})`);
                     }
                 } catch (error) {
                     console.error(`Error checking user ${userId} for Week ${weekNumber}:`, error);
