@@ -11703,6 +11703,33 @@ const SurvivorView = {
             console.log(`Hybrid data fetch completed in ${(performance.now() - startTime).toFixed(0)}ms`);
             console.log(`Firebase reads: ${memberIds.length + 2} → ${activeUsers.length + 2} reads (${Math.round((1 - (activeUsers.length + 2)/(memberIds.length + 2)) * 100)}% reduction)`);
 
+            // CRITICAL FIX: Auto-process eliminations when viewing results
+            console.log('🔄 Auto-processing eliminations for current week...');
+            if (typeof window.SurvivorAutoElimination !== 'undefined' && typeof db !== 'undefined') {
+                try {
+                    const survivorElimination = new window.SurvivorAutoElimination(db, window.gameStateCache);
+                    const eliminationResult = await survivorElimination.checkEliminationsForWeek(currentWeek);
+                    
+                    if (eliminationResult.eliminatedCount > 0) {
+                        console.log(`🚨 ${eliminationResult.eliminatedCount} users eliminated this week! Refreshing data...`);
+                        // Reload the status document to get fresh elimination data
+                        const updatedStatusDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`));
+                        const updatedStatuses = updatedStatusDoc.exists() ? updatedStatusDoc.data() : {};
+                        
+                        // Update the eliminated users with new statuses
+                        userResults.forEach(user => {
+                            if (updatedStatuses[user.uid]?.eliminated) {
+                                user.isEliminated = true;
+                                user.eliminatedWeek = updatedStatuses[user.uid].eliminatedWeek;
+                                user.eliminationReason = updatedStatuses[user.uid].eliminationReason;
+                            }
+                        });
+                    }
+                } catch (elimError) {
+                    console.warn('Auto-elimination processing failed:', elimError);
+                }
+            }
+
             // Sort results: Active users first (by weeks survived DESC), then eliminated users (by elimination week DESC)
             userResults.sort((a, b) => {
                 if (a.isEliminated !== b.isEliminated) {
@@ -11731,6 +11758,8 @@ const SurvivorView = {
         const currentWeek = this.getCurrentWeek();
         const activeCount = userResults.filter(u => !u.isEliminated).length;
         const eliminatedCount = userResults.filter(u => u.isEliminated).length;
+        
+        console.log(`📊 Survivor Stats: Total=${userResults.length}, Active=${activeCount}, Eliminated=${eliminatedCount}`);
 
         // Update summary stats
         allUI.survivorTotalPlayers.textContent = userResults.length;
