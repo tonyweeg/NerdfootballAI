@@ -19,23 +19,35 @@ class SurvivorAutoElimination {
     
     // Get current pool members
     async getPoolMembers() {
-        // Make sure getCurrentPool is available
-        if (typeof getCurrentPool === 'undefined') {
-            console.error('getCurrentPool function not available');
-            throw new Error('getCurrentPool function not available');
+        // Get current pool with fallback mechanism
+        let currentPool;
+        
+        if (typeof getCurrentPool === 'function') {
+            currentPool = getCurrentPool();
+        } else {
+            // Fallback: Check URL params, localStorage, or use default
+            const urlParams = new URLSearchParams(window.location.search);
+            const poolParam = urlParams.get('pool');
+            
+            if (poolParam) {
+                currentPool = poolParam;
+            } else if (typeof localStorage !== 'undefined') {
+                currentPool = localStorage.getItem('selectedPoolId') || 'nerduniverse-2025';
+            } else {
+                currentPool = 'nerduniverse-2025'; // Ultimate fallback
+            }
         }
         
-        const currentPool = getCurrentPool();
         console.log('🏊 Using pool:', currentPool);
         
-        // Make sure doc and getDoc are available  
+        // Make sure Firestore functions are available  
         if (typeof doc === 'undefined') {
-            console.error('doc function not available');
+            console.error('❌ Firestore doc function not available - make sure Firebase is initialized');
             throw new Error('Firestore doc function not available');
         }
         
         if (typeof getDoc === 'undefined') {
-            console.error('getDoc function not available');  
+            console.error('❌ Firestore getDoc function not available - make sure Firebase is initialized');  
             throw new Error('Firestore getDoc function not available');
         }
         
@@ -57,9 +69,11 @@ class SurvivorAutoElimination {
         try {
             // Make sure setDoc is available for potential database updates
             if (typeof setDoc === 'undefined') {
-                console.error('setDoc function not available');
+                console.error('❌ Firestore setDoc function not available - make sure Firebase is initialized');
                 throw new Error('Firestore setDoc function not available');
             }
+            
+            console.log(`✅ Firebase functions available: doc=${typeof doc}, getDoc=${typeof getDoc}, setDoc=${typeof setDoc}`);
             // Get pool members
             const memberIds = await this.getPoolMembers();
             if (memberIds.length === 0) {
