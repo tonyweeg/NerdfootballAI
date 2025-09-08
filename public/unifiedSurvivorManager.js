@@ -386,34 +386,55 @@ class UnifiedSurvivorManager {
     }
 
     // Get formatted display data (filters out no-picks)
-    getDisplayData(weekData) {
-        if (!weekData || !weekData.picks) return [];
-        
-        // Filter out users who never made a pick
-        const displayPicks = Object.entries(weekData.picks)
-            .filter(([userId, pick]) => {
-                // Only show users who made a pick at some point
-                return pick.teamPicked || pick.previousPicks?.length > 0;
-            })
-            .map(([userId, pick]) => ({
-                userId,
-                displayName: pick.displayName,
-                teamPicked: pick.teamPicked || 'No pick',
-                status: this.getPickStatus(pick),
-                eliminated: pick.eliminated,
-                eliminationWeek: pick.eliminationWeek,
-                eliminationReason: pick.eliminationReason
-            }));
-        
-        // Sort: active first, then eliminated
-        displayPicks.sort((a, b) => {
-            if (a.eliminated !== b.eliminated) {
-                return a.eliminated ? 1 : -1;
+    async getDisplayData(weekNumber = null) {
+        try {
+            // Get the week data first
+            const weekData = await this.getWeekData(weekNumber);
+            
+            if (!weekData || !weekData.users) {
+                console.log('No week data found');
+                return [];
             }
-            return a.displayName.localeCompare(b.displayName);
-        });
+            
+            // Get pool members for display names
+            const membersPath = `artifacts/nerdfootball/pools/${this.poolId}/metadata/members`;
+            const membersDoc = await getDoc(doc(db, membersPath));
+            const poolMembers = membersDoc.exists() ? membersDoc.data() : {};
+            
+            // Filter out users who never made a pick
+            const displayPicks = Object.entries(weekData.users)
+                .filter(([userId, pick]) => {
+                    // Only show users who made a pick at some point
+                    return pick.team || pick.hasPicked;
+                })
+                .map(([userId, pick]) => {
+                    const member = poolMembers[userId] || {};
+                    return {
+                        userId,
+                        displayName: member.displayName || member.email || userId,
+                        teamPicked: pick.team || 'No pick',
+                        status: pick.eliminated ? 'eliminated' : 'active',
+                        eliminated: pick.eliminated || false,
+                        eliminatedWeek: pick.eliminatedWeek || null,
+                        eliminationReason: null
+                    };
+                });
         
-        return displayPicks;
+            // Sort: active first, then eliminated
+            displayPicks.sort((a, b) => {
+                if (a.eliminated !== b.eliminated) {
+                    return a.eliminated ? 1 : -1;
+                }
+                return a.displayName.localeCompare(b.displayName);
+            });
+            
+            console.log(`Returning ${displayPicks.length} users for display`);
+            return displayPicks;
+            
+        } catch (error) {
+            console.error('Error getting display data:', error);
+            return [];
+        }
     }
 
     // Get status for display
