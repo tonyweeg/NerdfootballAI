@@ -96,7 +96,8 @@ global.setDoc = async (docRef, data, options) => {
     return Promise.resolve();
 };
 
-global.getCurrentPool = () => 'nerduniverse-2025';
+// Don't define getCurrentPool to test the fallback mechanism
+// global.getCurrentPool = () => 'nerduniverse-2025';
 
 // Test the elimination system
 async function testSurvivorElimination() {

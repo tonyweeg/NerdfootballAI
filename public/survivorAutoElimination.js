@@ -26,14 +26,19 @@ class SurvivorAutoElimination {
             currentPool = getCurrentPool();
         } else {
             // Fallback: Check URL params, localStorage, or use default
-            const urlParams = new URLSearchParams(window.location.search);
-            const poolParam = urlParams.get('pool');
-            
-            if (poolParam) {
-                currentPool = poolParam;
-            } else if (typeof localStorage !== 'undefined') {
-                currentPool = localStorage.getItem('selectedPoolId') || 'nerduniverse-2025';
+            if (typeof window !== 'undefined' && window.location) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const poolParam = urlParams.get('pool');
+                
+                if (poolParam) {
+                    currentPool = poolParam;
+                } else if (typeof localStorage !== 'undefined') {
+                    currentPool = localStorage.getItem('selectedPoolId') || 'nerduniverse-2025';
+                } else {
+                    currentPool = 'nerduniverse-2025'; // Browser fallback
+                }
             } else {
+                // Node.js environment or no window object
                 currentPool = 'nerduniverse-2025'; // Ultimate fallback
             }
         }
