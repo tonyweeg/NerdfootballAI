@@ -131,6 +131,25 @@ service cloud.firestore {
       allow write: if isPoolAdmin(poolId);
     }
     
+    // UNIFIED SURVIVOR DOCUMENTS - Sub-500ms performance architecture
+    // Single document stores all user picks for a week
+    match /artifacts/nerdfootball/pools/{poolId}/survivor/{year}/weeks/{week} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isPoolMember(poolId) || isGlobalAdmin());
+    }
+    
+    // Survivor migration log
+    match /artifacts/nerdfootball/pools/{poolId}/survivor/migration_log {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isPoolMember(poolId) || isGlobalAdmin());
+    }
+    
+    // Survivor cache documents for performance
+    match /survivor-cache/{poolId}/results/{week} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isPoolMember(poolId) || isGlobalAdmin());
+    }
+    
     // ============================================
     // POOL CONFIGS
     // ============================================
