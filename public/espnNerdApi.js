@@ -82,21 +82,29 @@ class EspnNerdApiClient {
         }
     }
 
-    // Get current NFL week
+    // Get current NFL week using global week management
     getCurrentWeek() {
+        // Use global week management system
+        if (typeof window !== 'undefined' && window.currentWeek) {
+            return window.currentWeek;
+        }
+        
+        // Fallback implementation with 2025 season dates
         const now = new Date();
-        const seasonStart = new Date('2024-09-05'); // NFL 2024 Season start (Week 1)
+        const seasonStart = new Date('2025-09-04'); // NFL 2025 Season start (Week 1)
         const weekMs = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
         
+        // Before season starts - return Week 1 for pre-season testing
         if (now < seasonStart) return 1;
         
-        const weeksDiff = Math.floor((now - seasonStart) / weekMs) + 1;
+        const timeDiff = now.getTime() - seasonStart.getTime();
+        const weeksDiff = Math.floor(timeDiff / weekMs) + 1;
         return Math.min(Math.max(weeksDiff, 1), 18); // Clamp between 1 and 18
     }
 
     // Fetch games for current week with caching
     async getCurrentWeekGames(forceRefresh = false) {
-        const currentWeek = this.getCurrentWeek();
+        const currentWeek = window.currentWeek || this.getCurrentWeek();
         const cacheKey = `games_week_${currentWeek}`;
         
         // Check cache first unless forcing refresh

@@ -265,24 +265,35 @@ class SurvivorAutoElimination {
     
     // Check eliminations for current week
     async checkCurrentWeekEliminations() {
-        const currentWeek = this.getCurrentWeek();
+        const currentWeek = window.currentWeek || this.getCurrentWeek();
         return await this.checkEliminationsForWeek(currentWeek);
     }
     
-    // Get current NFL week
+    // Get current NFL week (fallback only)
     getCurrentWeek() {
-        // NFL 2024 season started, we're currently in 2025
-        const now = new Date();
-        const seasonStart = new Date('2024-09-05');
-        const weekMs = 7 * 24 * 60 * 60 * 1000;
+        // Use global week management system
+        if (typeof window !== 'undefined' && window.currentWeek) {
+            return window.currentWeek;
+        }
         
-        const weeksDiff = Math.floor((now - seasonStart) / weekMs) + 1;
-        return Math.min(Math.max(weeksDiff, 1), 18);
+        // Fallback for Node.js environments - implement same logic locally
+        const now = new Date();
+        const seasonStart = new Date('2025-09-04'); // Week 1 starts September 4, 2025
+        const weekMs = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
+        
+        // Before season starts - return Week 1 for pre-season testing
+        if (now < seasonStart) {
+            return 1;
+        }
+        
+        const timeDiff = now.getTime() - seasonStart.getTime();
+        const weeksDiff = Math.floor(timeDiff / weekMs) + 1;
+        return Math.min(Math.max(weeksDiff, 1), 18); // Clamp between 1 and 18
     }
     
     // Manual trigger for specific user elimination check
     async checkSpecificUser(userId, weekNumber = null) {
-        const targetWeek = weekNumber || this.getCurrentWeek();
+        const targetWeek = weekNumber || window.currentWeek || this.getCurrentWeek();
         console.log(`🔍 Checking specific user ${userId} for Week ${targetWeek}...`);
         
         try {

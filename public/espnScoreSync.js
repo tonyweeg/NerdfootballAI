@@ -266,13 +266,18 @@ class EspnScoreSync {
 
     // Sync current week's scores
     async syncCurrentWeek() {
-        const currentWeek = this.getCurrentWeek();
+        const currentWeek = window.currentWeek || this.getCurrentWeek();
         return await this.syncWeekScores(currentWeek);
     }
 
-    // Get current NFL week
+    // Get current NFL week (fallback only)
     getCurrentWeek() {
-        // FIXED: 2025 season starts in September 2025
+        // Use global week management system
+        if (typeof window !== 'undefined' && window.currentWeek) {
+            return window.currentWeek;
+        }
+        
+        // FALLBACK: 2025 season starts in September 2025
         const now = new Date();
         const seasonStart = new Date('2025-09-05');
         const weekMs = 7 * 24 * 60 * 60 * 1000;
@@ -334,7 +339,7 @@ class EspnScoreSync {
         
         // Listen for manual sync requests
         window.addEventListener('requestEspnSync', (event) => {
-            const weekNumber = event.detail?.weekNumber || this.getCurrentWeek();
+            const weekNumber = event.detail?.weekNumber || window.currentWeek || this.getCurrentWeek();
             this.handleManualSync(weekNumber);
         });
     }
@@ -403,7 +408,7 @@ class EspnScoreSync {
             syncButton.className = 'bg-blue-700 text-white text-sm font-medium py-1 px-3 rounded hover:bg-blue-800';
             syncButton.innerHTML = '🔄 Sync ESPN Scores';
             syncButton.addEventListener('click', () => {
-                const weekNumber = document.getElementById('admin-week-selector')?.value || this.getCurrentWeek();
+                const weekNumber = document.getElementById('admin-week-selector')?.value || window.currentWeek || this.getCurrentWeek();
                 this.handleManualSync(weekNumber);
             });
             

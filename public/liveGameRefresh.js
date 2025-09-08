@@ -13,7 +13,7 @@ class LiveGameRefresh {
     // Check if there are any live games currently in progress
     async hasLiveGames(weekNumber = null) {
         try {
-            const currentWeek = weekNumber || this.getCurrentWeek();
+            const currentWeek = weekNumber || window.currentWeek || this.getCurrentWeek();
             
             // Get games from cache or fetch fresh
             let games = [];
@@ -55,10 +55,16 @@ class LiveGameRefresh {
         }
     }
 
-    // Get current NFL week (use same logic as ESPN API)
+    // Get current NFL week (fallback only)
     getCurrentWeek() {
+        // Use global week management system
+        if (typeof window !== 'undefined' && window.currentWeek) {
+            return window.currentWeek;
+        }
+        
+        // Fallback calculation for 2025 season
         const now = new Date();
-        const seasonStart = new Date('2024-09-05');
+        const seasonStart = new Date('2025-09-04');
         const weekMs = 7 * 24 * 60 * 60 * 1000;
         const weeksDiff = Math.floor((now - seasonStart) / weekMs) + 1;
         return Math.min(Math.max(weeksDiff, 1), 18);
@@ -71,7 +77,7 @@ class LiveGameRefresh {
             return;
         }
 
-        const currentWeek = weekNumber || this.getCurrentWeek();
+        const currentWeek = weekNumber || window.currentWeek || this.getCurrentWeek();
         const hasLive = await this.hasLiveGames(currentWeek);
 
         if (!hasLive) {
@@ -298,7 +304,7 @@ class LiveGameRefresh {
             isRefreshing: this.isRefreshing,
             lastRefresh: this.lastRefreshTime,
             intervalMs: this.refreshIntervalMs,
-            currentWeek: this.getCurrentWeek()
+            currentWeek: window.currentWeek || this.getCurrentWeek()
         };
     }
 }

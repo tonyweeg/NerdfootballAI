@@ -32,6 +32,7 @@
  
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+ <script src="./weekManager.js"></script>
  <script src="./pickAnalyticsIntegration.js"></script>
  <script src="./espnNerdApi.js"></script>
  <script src="./espnScoreSync.js"></script>
@@ -11400,10 +11401,8 @@ const SurvivorView = {
     },
     
     getCurrentWeek: function() {
-        const now = new Date();
-        const seasonStart = new Date('2024-09-05'); // NFL 2024 Season started, we're currently in 2025
-        const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
-        return Math.max(1, Math.min(18, weeksDiff + 1));
+        // Use global week management system
+        return window.currentWeek || 1;
     },
     
     // DIAMOND OPTIMIZATION: Ultra-fast parallel week results loading with intelligent caching
@@ -11660,7 +11659,7 @@ const SurvivorView = {
             const currentPool = this.getCurrentPool();
             console.log('🎯 Loading survivor results for pool:', currentPool);
             
-            const currentWeek = this.getCurrentWeek();
+            const currentWeek = window.currentWeek || 1;
             
             // DIAMOND OPTIMIZATION: Parallel batch loading of ALL essential data
             console.log('🚀 PARALLEL BATCH LOAD: Pool members, status, week results...');
@@ -11818,7 +11817,7 @@ const SurvivorView = {
             return;
         }
 
-        const currentWeek = this.getCurrentWeek();
+        const currentWeek = window.currentWeek || 1;
         const activeCount = userResults.filter(u => !u.isEliminated).length;
         const eliminatedCount = userResults.filter(u => u.isEliminated).length;
         
@@ -11855,7 +11854,7 @@ const SurvivorView = {
                    </span>`;
 
             // Prioritize showing current week pick
-            const currentWeekNum = this.getCurrentWeek();
+            const currentWeekNum = window.currentWeek || 1;
             const hasCurrentWeekPick = user.currentWeekPick;
             
             const pickDisplay = hasCurrentWeekPick 
@@ -12368,7 +12367,7 @@ function initializeEspnApiAdmin() {
                 logEspnActivity('ESPN API is offline', 'error');
             }
             
-            espnElements.currentWeek.textContent = status.currentWeek || window.espnApi.getCurrentWeek();
+            espnElements.currentWeek.textContent = status.currentWeek || window.currentWeek || 1;
             espnElements.rateLimit.textContent = status.rateLimitRemaining ? `${status.rateLimitRemaining} remaining` : 'Unknown';
             
             const cacheStats = window.espnApi.getCacheStats();
@@ -12424,7 +12423,7 @@ function initializeEspnApiAdmin() {
                 displayEspnTestResults([{
                     name: 'Current Week Games',
                     success: true,
-                    data: { week: window.espnApi.getCurrentWeek(), gameCount: games.length }
+                    data: { week: window.currentWeek || 1, gameCount: games.length }
                 }]);
                 
                 espnElements.testsStatus.textContent = 'Passed';
