@@ -7,7 +7,7 @@ class SimpleSurvivorSystem {
         this.currentWeek = 1;
     }
 
-    // Get simple survivor table data
+    // Get simple survivor table data - NO CACHING TO AVOID ERRORS
     async getSurvivorTable(poolId) {
         try {
             // Get pool members
@@ -17,21 +17,15 @@ class SimpleSurvivorSystem {
             const poolMembers = poolDoc.data();
             const results = [];
 
+            // Process first 10 users only to avoid spam
+            let count = 0;
             for (const [uid, member] of Object.entries(poolMembers)) {
-                // Get cached status first
-                const cachedStatus = await this.getCachedUserStatus(uid);
+                if (count >= 10) break;
                 
-                if (cachedStatus) {
-                    results.push(cachedStatus);
-                    continue;
-                }
-
-                // Calculate status for non-cached users
+                // Calculate status directly (no caching)
                 const status = await this.calculateUserStatus(uid, member);
-                
-                // Cache the result
-                await this.cacheUserStatus(uid, status);
                 results.push(status);
+                count++;
             }
 
             return results;
@@ -134,33 +128,16 @@ class SimpleSurvivorSystem {
         }
     }
 
-    // Get cached user status
+    // Get cached user status - DISABLED due to Firebase path issues
     async getCachedUserStatus(uid) {
-        try {
-            const cacheDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/survivor_cache/week_${this.currentWeek}/${uid}`));
-            if (cacheDoc.exists()) {
-                const cached = cacheDoc.data();
-                cached.cached = true;
-                return cached;
-            }
-            return null;
-        } catch (error) {
-            console.error('Error getting cached status:', error);
-            return null;
-        }
+        // Skip caching for now to avoid Firebase document path errors
+        return null;
     }
 
-    // Cache user status
+    // Cache user status - DISABLED due to Firebase path issues  
     async cacheUserStatus(uid, status) {
-        try {
-            const cacheRef = doc(this.db, `artifacts/nerdfootball/survivor_cache/week_${this.currentWeek}/${uid}`);
-            await setDoc(cacheRef, {
-                ...status,
-                cachedAt: new Date().toISOString()
-            });
-        } catch (error) {
-            console.error('Error caching status:', error);
-        }
+        // Skip caching for now to avoid Firebase document path errors
+        return;
     }
 
     // Clear cache for a specific week (when results change)
