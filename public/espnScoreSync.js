@@ -164,6 +164,9 @@ class EspnScoreSync {
                 
                 console.log(`💎 ESPN Sync Complete: Updated ${updatedCount} games for Week ${weekNumber}`);
                 
+                // 🏆 TRIGGER SURVIVOR AUTO-ELIMINATION CHECK
+                await this.checkSurvivorEliminations(weekNumber, updatedCount);
+                
                 // Trigger UI update if on admin page
                 this.notifyUIUpdate(weekNumber, updatedCount);
             } else {
@@ -327,6 +330,61 @@ class EspnScoreSync {
             const weekNumber = event.detail?.weekNumber || this.getCurrentWeek();
             this.handleManualSync(weekNumber);
         });
+    }
+
+    // Check survivor eliminations after game results update
+    async checkSurvivorEliminations(weekNumber, updatedGamesCount) {
+        try {
+            console.log(`🏆 Checking survivor eliminations for Week ${weekNumber}...`);
+            
+            // Only proceed if we have the SurvivorAutoElimination class available
+            if (typeof window.SurvivorAutoElimination === 'undefined') {
+                console.log('⚠️ SurvivorAutoElimination not available - skipping elimination check');
+                return;
+            }
+            
+            // Initialize survivor auto-elimination system
+            const survivorElimination = new window.SurvivorAutoElimination(this.db, this.gameStateCache);
+            
+            // Check eliminations for this specific week
+            // This will process ALL completed games for the week, not just newly updated ones
+            const eliminationResult = await survivorElimination.checkEliminationsForWeek(weekNumber);
+            
+            if (eliminationResult.error) {
+                console.error('Survivor elimination check failed:', eliminationResult.error);
+                return;
+            }
+            
+            if (eliminationResult.eliminatedCount > 0) {
+                console.log(`🚨 SURVIVOR ELIMINATIONS: ${eliminationResult.eliminatedCount} users eliminated in Week ${weekNumber}`);
+                
+                // Show notification about eliminations
+                this.showSyncNotification(
+                    `ESPN Sync + Survivor Eliminations: ${updatedGamesCount} games updated, ${eliminationResult.eliminatedCount} users eliminated`,
+                    'success'
+                );
+                
+                // Log elimination details
+                eliminationResult.details.forEach(elimination => {
+                    console.log(`   ❌ ${elimination.userId}: Picked ${elimination.pickedTeam}, ${elimination.winningTeam} won (Game ${elimination.gameId})`);
+                });
+                
+                // Trigger survivor UI updates if survivor page is visible
+                window.dispatchEvent(new CustomEvent('survivorEliminationsUpdated', {
+                    detail: {
+                        weekNumber,
+                        eliminatedCount: eliminationResult.eliminatedCount,
+                        eliminatedUsers: eliminationResult.details
+                    }
+                }));
+                
+            } else {
+                console.log(`✅ No new survivor eliminations found for Week ${weekNumber}`);
+            }
+            
+        } catch (error) {
+            console.error('Error during survivor elimination check:', error);
+        }
     }
 
     // Add ESPN sync button to admin panel

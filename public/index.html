@@ -35,6 +35,7 @@
  <script src="./pickAnalyticsIntegration.js"></script>
  <script src="./espnNerdApi.js"></script>
  <script src="./espnScoreSync.js"></script>
+<script src="./survivorAutoElimination.js"></script>
  <script src="./enhancedGameDataDisplay.js"></script>
  <script src="./liveGameRefresh.js"></script>
  <style>
@@ -748,6 +749,18 @@ Status
  </div>
  <div id="admin-content-survivor-status" class="admin-content-section hidden">
     <h3 class="text-xl font-bold mb-4">Survivor Pool Status & Management</h3>
+    
+    <!-- Survivor Auto-Elimination Controls -->
+    <div class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h4 class="text-lg font-semibold text-yellow-800 mb-3">🏆 Auto-Elimination System</h4>
+        <p class="text-sm text-yellow-700 mb-3">Automatically eliminate users who pick losing teams based on completed game results.</p>
+        <div class="flex gap-3">
+            <button id="check-current-week-eliminations-btn" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Check Current Week</button>
+            <button id="check-all-weeks-eliminations-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">Check All Weeks (Historical)</button>
+            <button id="check-specific-user-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Check Specific User</button>
+        </div>
+        <div id="elimination-results" class="mt-3 text-sm"></div>
+    </div>
     
     <!-- Survivor Pick Editor -->
     <div id="survivor-pick-editor" class="mb-6 hidden">
@@ -5463,6 +5476,108 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (error) {
                 console.error('Error exporting analytics:', error);
+            }
+        });
+    }
+    
+    // 🏆 Survivor Auto-Elimination Button Handlers
+    const checkCurrentWeekBtn = document.getElementById('check-current-week-eliminations-btn');
+    const checkAllWeeksBtn = document.getElementById('check-all-weeks-eliminations-btn');
+    const checkSpecificUserBtn = document.getElementById('check-specific-user-btn');
+    const eliminationResults = document.getElementById('elimination-results');
+    
+    if (checkCurrentWeekBtn && window.SurvivorAutoElimination) {
+        checkCurrentWeekBtn.addEventListener('click', async () => {
+            try {
+                eliminationResults.innerHTML = '<span class="text-blue-600">🔄 Checking current week eliminations...</span>';
+                
+                const survivorElimination = new window.SurvivorAutoElimination(db, window.gameStateCache);
+                const result = await survivorElimination.checkCurrentWeekEliminations();
+                
+                if (result.error) {
+                    eliminationResults.innerHTML = `<span class="text-red-600">❌ Error: ${result.error}</span>`;
+                } else if (result.eliminatedCount > 0) {
+                    eliminationResults.innerHTML = `<span class="text-red-600">🚨 ${result.eliminatedCount} users eliminated this week!</span>
+                        <div class="mt-2 text-xs">
+                            ${result.details.map(e => `• ${e.userId}: Picked ${e.pickedTeam}, ${e.winningTeam} won`).join('<br>')}
+                        </div>`;
+                    // Refresh survivor status display
+                    const weekNumber = parseInt(document.getElementById('admin-week-selector')?.value) || getCurrentNflWeek();
+                    await renderSurvivorStatus(weekNumber);
+                } else {
+                    eliminationResults.innerHTML = `<span class="text-green-600">✅ No new eliminations found for current week</span>`;
+                }
+            } catch (error) {
+                eliminationResults.innerHTML = `<span class="text-red-600">❌ Error: ${error.message}</span>`;
+                console.error('Error checking current week eliminations:', error);
+            }
+        });
+    }
+    
+    if (checkAllWeeksBtn && window.SurvivorAutoElimination) {
+        checkAllWeeksBtn.addEventListener('click', async () => {
+            if (!confirm('This will check ALL weeks for eliminations. This may take a while and could eliminate multiple users. Continue?')) {
+                return;
+            }
+            
+            try {
+                eliminationResults.innerHTML = '<span class="text-blue-600">🔄 Checking ALL weeks for eliminations (this may take a while)...</span>';
+                
+                const survivorElimination = new window.SurvivorAutoElimination(db, window.gameStateCache);
+                const result = await survivorElimination.checkAllWeeksEliminations();
+                
+                if (result.totalEliminations > 0) {
+                    eliminationResults.innerHTML = `<span class="text-red-600">🚨 TOTAL: ${result.totalEliminations} users eliminated across all weeks!</span>
+                        <div class="mt-2 text-xs max-h-40 overflow-y-auto">
+                            ${result.eliminatedUsers.map(e => `• Week ${e.week}: ${e.userId} picked ${e.pickedTeam}, ${e.winningTeam} won`).join('<br>')}
+                        </div>`;
+                    // Refresh survivor status display  
+                    const weekNumber = parseInt(document.getElementById('admin-week-selector')?.value) || getCurrentNflWeek();
+                    await renderSurvivorStatus(weekNumber);
+                } else {
+                    eliminationResults.innerHTML = `<span class="text-green-600">✅ No eliminations found across all weeks</span>`;
+                }
+            } catch (error) {
+                eliminationResults.innerHTML = `<span class="text-red-600">❌ Error: ${error.message}</span>`;
+                console.error('Error checking all weeks eliminations:', error);
+            }
+        });
+    }
+    
+    if (checkSpecificUserBtn && window.SurvivorAutoElimination) {
+        checkSpecificUserBtn.addEventListener('click', async () => {
+            const userId = prompt('Enter User ID to check:');
+            if (!userId) return;
+            
+            try {
+                eliminationResults.innerHTML = `<span class="text-blue-600">🔄 Checking user ${userId}...</span>`;
+                
+                const survivorElimination = new window.SurvivorAutoElimination(db, window.gameStateCache);
+                const result = await survivorElimination.checkSpecificUser(userId);
+                
+                if (result.error) {
+                    eliminationResults.innerHTML = `<span class="text-red-600">❌ Error: ${result.error}</span>`;
+                } else {
+                    const statusText = result.needsFix ? 
+                        (result.shouldBeEliminated ? 'Should be eliminated but is marked as active' : 'Marked as eliminated but should be active') :
+                        (result.shouldBeEliminated ? 'Correctly marked as eliminated' : 'Correctly marked as active');
+                    
+                    const statusColor = result.needsFix ? 'text-red-600' : 'text-green-600';
+                    const statusIcon = result.needsFix ? '🚨' : '✅';
+                    
+                    eliminationResults.innerHTML = `
+                        <div class="${statusColor}">${statusIcon} ${statusText}</div>
+                        <div class="mt-2 text-xs">
+                            <strong>Current Status:</strong> ${result.currentStatus?.eliminated ? `Eliminated (Week ${result.currentStatus.eliminatedWeek})` : 'Active'}<br>
+                            <strong>Should Be:</strong> ${result.shouldBeEliminated ? `Eliminated (Week ${result.eliminationWeek})` : 'Active'}<br>
+                            <strong>Pick History:</strong> ${result.userResults.length} weeks with results<br>
+                            ${result.userResults.map(r => `Week ${r.week}: ${r.result} (${r.pickedTeam} vs ${r.winner})`).join('<br>')}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                eliminationResults.innerHTML = `<span class="text-red-600">❌ Error: ${error.message}</span>`;
+                console.error('Error checking specific user:', error);
             }
         });
     }
