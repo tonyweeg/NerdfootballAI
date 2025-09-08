@@ -11455,13 +11455,23 @@ const SurvivorView = {
                 
                 const weekResults = allWeekResults[week];
                 if (weekResults) {
-                    // Find if user's team won any game this week
+                    // Check ONLY the specific game the user picked
                     let teamWon = false;
-                    Object.values(weekResults).forEach(gameResult => {
-                        if (gameResult && gameResult.winner === weekPick.team) {
+                    
+                    if (weekPick.gameId && weekResults[weekPick.gameId]) {
+                        // Use specific game lookup (matches survivorAutoElimination.js pattern)
+                        const specificGame = weekResults[weekPick.gameId];
+                        if (specificGame && specificGame.winner === weekPick.team) {
                             teamWon = true;
                         }
-                    });
+                    } else {
+                        // Backward compatibility: fallback to checking all games
+                        Object.values(weekResults).forEach(gameResult => {
+                            if (gameResult && gameResult.winner === weekPick.team) {
+                                teamWon = true;
+                            }
+                        });
+                    }
                     
                     if (teamWon) {
                         weeksSurvived = week; // User survived this week
@@ -11517,26 +11527,51 @@ const SurvivorView = {
             return 'pending'; // No results yet, games haven't started
         }
         
-        // Find if user's current week pick won
+        // Find if user's current week pick won - using SPECIFIC GAME LOOKUP
         let teamWon = false;
         let gameStarted = false;
         
-        Object.values(currentWeekResults).forEach(gameResult => {
-            console.log('🏈 Checking game result:', gameResult);
-            console.log('🏆 Winner:', gameResult?.winner);
+        // Get user's pick with gameId for current week
+        const currentWeekPick = user.allPicks?.[currentWeek];
+        console.log('👤 Current week pick object:', currentWeekPick);
+        
+        if (currentWeekPick?.gameId && currentWeekResults[currentWeekPick.gameId]) {
+            // Use specific game lookup (matches survivorAutoElimination.js pattern)
+            const specificGame = currentWeekResults[currentWeekPick.gameId];
+            console.log('🏈 Checking SPECIFIC game result:', specificGame);
+            console.log('🏆 Winner:', specificGame?.winner);
             console.log('👤 User pick:', user.currentWeekPick);
-            console.log('🔍 Winner matches user pick?', gameResult?.winner === user.currentWeekPick);
+            console.log('🔍 Winner matches user pick?', specificGame?.winner === user.currentWeekPick);
             
-            if (gameResult && gameResult.winner) {
+            if (specificGame && specificGame.winner) {
                 gameStarted = true;
-                if (gameResult.winner === user.currentWeekPick) {
+                if (specificGame.winner === user.currentWeekPick) {
                     teamWon = true;
-                    console.log('🎉 USER WON! User picked:', user.currentWeekPick, 'Winner:', gameResult.winner);
+                    console.log('🎉 USER WON! User picked:', user.currentWeekPick, 'Winner:', specificGame.winner);
                 } else {
-                    console.log('💔 User lost. User picked:', user.currentWeekPick, 'Winner was:', gameResult.winner);
+                    console.log('💔 User lost. User picked:', user.currentWeekPick, 'Winner was:', specificGame.winner);
                 }
             }
-        });
+        } else {
+            // Backward compatibility: fallback to checking all games
+            console.log('⚠️ No gameId found, using backward compatibility mode');
+            Object.values(currentWeekResults).forEach(gameResult => {
+                console.log('🏈 Checking game result:', gameResult);
+                console.log('🏆 Winner:', gameResult?.winner);
+                console.log('👤 User pick:', user.currentWeekPick);
+                console.log('🔍 Winner matches user pick?', gameResult?.winner === user.currentWeekPick);
+                
+                if (gameResult && gameResult.winner) {
+                    gameStarted = true;
+                    if (gameResult.winner === user.currentWeekPick) {
+                        teamWon = true;
+                        console.log('🎉 USER WON! User picked:', user.currentWeekPick, 'Winner:', gameResult.winner);
+                    } else {
+                        console.log('💔 User lost. User picked:', user.currentWeekPick, 'Winner was:', gameResult.winner);
+                    }
+                }
+            });
+        }
         
         if (!gameStarted) {
             console.log('⏳ RESULT: pending (game not started)');
