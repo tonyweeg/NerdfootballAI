@@ -98,10 +98,10 @@ class SurvivorMigration {
                         if (pick) {
                             weekData.users[uid] = {
                                 team: pick.team,
-                                gameId: pick.gameId,
+                                gameId: pick.gameId || null,  // Handle undefined gameId
                                 timestamp: pick.timestamp || new Date(),
                                 eliminated: eliminated || false,
-                                eliminatedWeek: eliminatedWeek,
+                                eliminatedWeek: eliminatedWeek || null,  // Handle undefined eliminatedWeek
                                 hasPicked: true
                             };
                             
