@@ -24,7 +24,7 @@ class UnifiedSurvivorManager {
             weekNumber,
             year: this.currentYear,
             poolId: this.poolId,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+            lastUpdated: serverTimestamp(),
             version: 1,
             
             // All user picks in one place
@@ -49,7 +49,7 @@ class UnifiedSurvivorManager {
                 totalNoPick: 0,
                 pickDistribution: {},
                 mostPopularPick: '',
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                updatedAt: serverTimestamp()
             }
         };
         
@@ -143,7 +143,7 @@ class UnifiedSurvivorManager {
                 const updatedPick = {
                     teamPicked,
                     displayName: userDisplayName,
-                    pickTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    pickTimestamp: serverTimestamp(),
                     eliminated: false,
                     eliminationWeek: null,
                     eliminationReason: null,
@@ -181,9 +181,9 @@ class UnifiedSurvivorManager {
                     'stats.pickDistribution': pickDistribution,
                     'stats.mostPopularPick': mostPopularPick,
                     'stats.totalActivePlayers': activePlayers,
-                    'stats.updatedAt': firebase.firestore.FieldValue.serverTimestamp(),
-                    'lastUpdated': firebase.firestore.FieldValue.serverTimestamp(),
-                    'version': firebase.firestore.FieldValue.increment(1)
+                    'stats.updatedAt': serverTimestamp(),
+                    'lastUpdated': serverTimestamp(),
+                    'version': (weekData.version || 0) + 1
                 });
             });
             
@@ -262,9 +262,9 @@ class UnifiedSurvivorManager {
                     'stats.totalEliminated': weekData.stats.totalEliminated + eliminatedCount,
                     'stats.totalNoPick': noPickCount,
                     'stats.totalActivePlayers': weekData.stats.totalActivePlayers - eliminatedCount,
-                    'stats.updatedAt': firebase.firestore.FieldValue.serverTimestamp(),
-                    'lastUpdated': firebase.firestore.FieldValue.serverTimestamp(),
-                    'version': firebase.firestore.FieldValue.increment(1)
+                    'stats.updatedAt': serverTimestamp(),
+                    'lastUpdated': serverTimestamp(),
+                    'version': (weekData.version || 0) + 1
                 });
             });
             
@@ -323,7 +323,7 @@ class UnifiedSurvivorManager {
                 weekNumber: nextWeek,
                 year: this.currentYear,
                 poolId: this.poolId,
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUpdated: serverTimestamp(),
                 version: 1,
                 picks: nextWeekPicks,
                 gameResults: {},
@@ -340,7 +340,7 @@ class UnifiedSurvivorManager {
                     totalNoPick: 0,
                     pickDistribution: {},
                     mostPopularPick: '',
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    updatedAt: serverTimestamp()
                 }
             }, { merge: true });
             
@@ -528,7 +528,7 @@ class UnifiedSurvivorManager {
                 weekNumber,
                 year: this.currentYear,
                 poolId: this.poolId,
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUpdated: serverTimestamp(),
                 version: 1,
                 picks: unifiedPicks,
                 gameResults: {},
@@ -545,7 +545,7 @@ class UnifiedSurvivorManager {
                     totalNoPick: 0,
                     pickDistribution,
                     mostPopularPick,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    updatedAt: serverTimestamp()
                 }
             });
             
