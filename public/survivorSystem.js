@@ -36,6 +36,69 @@ class SurvivorSystem {
         }
     }
 
+    // Get week results from ESPN sync data (single source of truth)
+    async getESPNWeekResults(week) {
+        try {
+            // Use ESPN API if available
+            if (typeof window.espnNerdApi !== 'undefined') {
+                const espnData = await window.espnNerdApi.getCurrentWeekScores();
+                if (espnData && espnData.games) {
+                    const weekResults = {};
+                    
+                    // Convert ESPN data to our format
+                    espnData.games.forEach(game => {
+                        if (game.id) {
+                            weekResults[game.id] = {
+                                id: game.id,
+                                homeTeam: game.home_team,
+                                awayTeam: game.away_team,
+                                homeScore: game.home_score,
+                                awayScore: game.away_score,
+                                status: game.status,
+                                winner: this.determineWinner(game)
+                            };
+                        }
+                    });
+                    
+                    console.log(`✅ ESPN data loaded: ${Object.keys(weekResults).length} games`);
+                    return weekResults;
+                }
+            }
+
+            // Fallback: Try to get from Firestore if ESPN fails
+            const weekResultsDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`));
+            const firebaseResults = weekResultsDoc.exists() ? weekResultsDoc.data() : {};
+            console.log(`⚠️ Fallback to Firestore: ${Object.keys(firebaseResults).length} games`);
+            return firebaseResults;
+
+        } catch (error) {
+            console.error('Error getting ESPN week results:', error);
+            return {};
+        }
+    }
+
+    // Determine winner from ESPN game data
+    determineWinner(game) {
+        if (!game.status || game.status === 'Not Started' || game.status.includes('Q') || game.status.includes('Half')) {
+            return 'TBD';
+        }
+        
+        if (game.status === 'Final' || game.status === 'FINAL') {
+            const homeScore = parseInt(game.home_score) || 0;
+            const awayScore = parseInt(game.away_score) || 0;
+            
+            if (homeScore > awayScore) {
+                return game.home_team;
+            } else if (awayScore > homeScore) {
+                return game.away_team;
+            } else {
+                return 'TIE';
+            }
+        }
+        
+        return 'TBD';
+    }
+
     // Get pool members and their survival status
     async getPoolSurvivalStatus(poolId) {
         try {
@@ -46,9 +109,11 @@ class SurvivorSystem {
             }
             const poolMembers = poolDoc.data();
 
-            // Get week results
-            const weekResultsDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${this.currentWeek}`));
-            const weekResults = weekResultsDoc.exists() ? weekResultsDoc.data() : {};
+            // Use ESPN sync data as single source of truth
+            const weekResults = await this.getESPNWeekResults(this.currentWeek);
+            console.log('🏈 Using ESPN sync data for Week', this.currentWeek);
+            console.log('🔍 Available ESPN games:', Object.keys(weekResults));
+            console.log('🔍 Sample ESPN game:', Object.values(weekResults)[0]);
 
             // Get elimination status
             const statusDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`));
@@ -75,6 +140,11 @@ class SurvivorSystem {
                 const picksDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`));
                 const picks = picksDoc.exists() ? picksDoc.data().picks || {} : {};
                 const userPick = picks[this.currentWeek];
+                
+                // DEBUG: Log user pick details
+                if (userPick) {
+                    console.log(`🔍 DEBUG: User ${member.displayName} picked game ${userPick.gameId}, team: ${userPick.team}`);
+                }
 
                 // Check survival for this week
                 const survival = await this.checkUserSurvival(userPick, weekResults);
