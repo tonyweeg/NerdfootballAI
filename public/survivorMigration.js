@@ -15,12 +15,10 @@ class SurvivorMigration {
         try {
             // 1. Get all pool members
             console.log('📥 Loading pool members...');
-            const membersRef = window.db.collection('artifacts').doc('nerdfootball')
-                .collection('pools').doc(this.poolId)
-                .collection('metadata').doc('members');
-            const membersDoc = await membersRef.get();
+            const membersPath = `artifacts/nerdfootball/pools/${this.poolId}/metadata/members`;
+            const membersDoc = await getDoc(doc(db, membersPath));
             
-            if (!membersDoc.exists) {
+            if (!membersDoc.exists()) {
                 throw new Error('Pool members not found');
             }
             
@@ -30,11 +28,9 @@ class SurvivorMigration {
             
             // 2. Load all existing elimination statuses
             console.log('📊 Loading elimination statuses...');
-            const statusRef = window.db.collection('artifacts').doc('nerdfootball')
-                .collection('public').doc('data')
-                .collection('nerdSurvivor_status').doc('status');
-            const statusDoc = await statusRef.get();
-            const eliminationStatuses = statusDoc.exists ? statusDoc.data() : {};
+            const statusPath = 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status';
+            const statusDoc = await getDoc(doc(db, statusPath));
+            const eliminationStatuses = statusDoc.exists() ? statusDoc.data() : {};
             
             // 3. Process each week
             const migrationResults = {};
@@ -52,12 +48,10 @@ class SurvivorMigration {
                 // 4. Load all user picks for this week
                 const pickPromises = userIds.map(async (uid) => {
                     try {
-                        const pickRef = window.db.collection('artifacts').doc('nerdfootball')
-                            .collection('public').doc('data')
-                            .collection('nerdSurvivor_picks').doc(uid);
-                        const pickDoc = await pickRef.get();
+                        const pickPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`;
+                        const pickDoc = await getDoc(doc(db, pickPath));
                         
-                        if (pickDoc.exists) {
+                        if (pickDoc.exists()) {
                             const userData = pickDoc.data();
                             const weekPick = userData.picks?.[week];
                             
@@ -134,11 +128,8 @@ class SurvivorMigration {
                 console.log(`Week ${week}: ${activePicks} active picks, ${eliminatedUsers} eliminated`);
                 
                 // 6. Save week data to unified document
-                const weekDocRef = window.db.collection('artifacts').doc('nerdfootball')
-                    .collection('pools').doc(this.poolId)
-                    .collection('survivor').doc(this.currentYear.toString())
-                    .collection('weeks').doc(week.toString());
-                await weekDocRef.set(weekData);
+                const weekDocPath = `artifacts/nerdfootball/pools/${this.poolId}/survivor/${this.currentYear}/weeks/${week}`;
+                await setDoc(doc(db, weekDocPath), weekData);
                 
                 migrationResults[week] = {
                     totalUsers: Object.keys(weekData.users).length,
@@ -158,10 +149,8 @@ class SurvivorMigration {
             };
             
             // Save migration summary
-            const migrationLogRef = window.db.collection('artifacts').doc('nerdfootball')
-                .collection('pools').doc(this.poolId)
-                .collection('survivor').doc('migration_log');
-            await migrationLogRef.set(migrationSummary);
+            const migrationLogPath = `artifacts/nerdfootball/pools/${this.poolId}/survivor/migration_log`;
+            await setDoc(doc(db, migrationLogPath), migrationSummary);
             
             console.log('\n✅ MIGRATION COMPLETE!');
             console.log(`Total time: ${migrationSummary.duration.toFixed(0)}ms`);
@@ -181,13 +170,10 @@ class SurvivorMigration {
         
         try {
             for (let week = 1; week <= this.currentWeek; week++) {
-                const weekDocRef = window.db.collection('artifacts').doc('nerdfootball')
-                    .collection('pools').doc(this.poolId)
-                    .collection('survivor').doc(this.currentYear.toString())
-                    .collection('weeks').doc(week.toString());
-                const weekDoc = await weekDocRef.get();
+                const weekDocPath = `artifacts/nerdfootball/pools/${this.poolId}/survivor/${this.currentYear}/weeks/${week}`;
+                const weekDoc = await getDoc(doc(db, weekDocPath));
                 
-                if (!weekDoc.exists) {
+                if (!weekDoc.exists()) {
                     console.error(`❌ Week ${week} document missing!`);
                     return false;
                 }
@@ -245,12 +231,10 @@ window.survivorMigration = new SurvivorMigration();
 async function checkMigrationStatus() {
     try {
         // Check if migration has been done
-        const migrationLogRef = window.db.collection('artifacts').doc('nerdfootball')
-            .collection('pools').doc('nerduniverse-2025')
-            .collection('survivor').doc('migration_log');
-        const migrationLog = await migrationLogRef.get();
+        const migrationLogPath = `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/migration_log`;
+        const migrationLog = await getDoc(doc(db, migrationLogPath));
         
-        if (!migrationLog.exists) {
+        if (!migrationLog.exists()) {
             console.log('⚠️ Unified survivor document not found. Run migration:');
             console.log('survivorMigration.runFullMigration()');
         } else {

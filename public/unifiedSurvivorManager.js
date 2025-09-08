@@ -12,10 +12,8 @@ class UnifiedSurvivorManager {
 
     // Get the unified document path for a week
     getWeekDocRef(weekNumber) {
-        return window.db.collection('artifacts').doc('nerdfootball')
-            .collection('pools').doc(this.poolId)
-            .collection('survivor').doc(this.currentYear.toString())
-            .collection('weeks').doc(weekNumber.toString());
+        const path = `artifacts/nerdfootball/pools/${this.poolId}/survivor/${this.currentYear}/weeks/${weekNumber}`;
+        return doc(db, path);
     }
 
     // Initialize week document structure
@@ -56,7 +54,7 @@ class UnifiedSurvivorManager {
         };
         
         try {
-            await docRef.set(initialDoc, { merge: true });
+            await setDoc(docRef, initialDoc, { merge: true });
             console.log(`✅ Initialized week ${weekNumber} unified document`);
             return initialDoc;
         } catch (error) {
@@ -81,9 +79,9 @@ class UnifiedSurvivorManager {
         const docRef = this.getWeekDocRef(weekNumber);
         
         try {
-            const doc = await docRef.get();
+            const doc = await getDoc(docRef);
             
-            if (!doc.exists) {
+            if (!doc.exists()) {
                 // Initialize if doesn't exist
                 const newDoc = await this.initializeWeekDocument(weekNumber);
                 this.cachedWeekData.set(weekNumber, {
@@ -115,10 +113,10 @@ class UnifiedSurvivorManager {
         const docRef = this.getWeekDocRef(weekNumber);
         
         try {
-            await this.db.runTransaction(async (transaction) => {
+            await runTransaction(this.db(async (transaction) => {
                 const doc = await transaction.get(docRef);
                 
-                if (!doc.exists) {
+                if (!doc.exists()) {
                     throw new Error('Week document not found');
                 }
                 
@@ -204,10 +202,10 @@ class UnifiedSurvivorManager {
         const docRef = this.getWeekDocRef(weekNumber);
         
         try {
-            await this.db.runTransaction(async (transaction) => {
+            await runTransaction(this.db(async (transaction) => {
                 const doc = await transaction.get(docRef);
                 
-                if (!doc.exists) {
+                if (!doc.exists()) {
                     throw new Error('Week document not found');
                 }
                 
@@ -290,8 +288,8 @@ class UnifiedSurvivorManager {
         const nextDocRef = this.getWeekDocRef(nextWeek);
         
         try {
-            const currentDoc = await currentDocRef.get();
-            if (!currentDoc.exists) {
+            const currentDoc = await getDoc(currentDocRef);
+            if (!currentDoc.exists()) {
                 throw new Error('Current week document not found');
             }
             
@@ -320,7 +318,7 @@ class UnifiedSurvivorManager {
             }
             
             // Create or update next week document
-            await nextDocRef.set({
+            await setDoc(nextDocRef, {
                 weekNumber: nextWeek,
                 year: this.currentYear,
                 poolId: this.poolId,
@@ -365,7 +363,7 @@ class UnifiedSurvivorManager {
         const unsubscribe = docRef.onSnapshot(
             { includeMetadataChanges: false },
             (snapshot) => {
-                if (snapshot.exists) {
+                if (snapshot.exists()) {
                     const data = snapshot.data();
                     
                     // Update cache
@@ -442,10 +440,11 @@ class UnifiedSurvivorManager {
         
         try {
             // Get pool members
-            const poolMembersRef = this.db.doc(`artifacts/nerdfootball/pools/${this.poolId}/metadata/members`);
-            const poolMembersDoc = await poolMembersRef.get();
+            const poolMembersPath = `artifacts/nerdfootball/pools/${this.poolId}/metadata/members`;
+            const poolMembersRef = doc(db, poolMembersPath);
+            const poolMembersDoc = await getDoc(poolMembersRef);
             
-            if (!poolMembersDoc.exists) {
+            if (!poolMembersDoc.exists()) {
                 throw new Error('Pool members not found');
             }
             
@@ -454,10 +453,11 @@ class UnifiedSurvivorManager {
             
             // Read all individual picks in parallel
             const pickPromises = Object.keys(poolMembers).map(async (userId) => {
-                const pickRef = this.db.doc(`artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`);
-                const pickDoc = await pickRef.get();
+                const pickPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
+                const pickRef = doc(db, pickPath);
+                const pickDoc = await getDoc(pickRef);
                 
-                if (pickDoc.exists) {
+                if (pickDoc.exists()) {
                     const userData = pickDoc.data();
                     const weekPick = userData.picks?.[weekNumber];
                     
@@ -499,7 +499,7 @@ class UnifiedSurvivorManager {
                 .sort(([,a], [,b]) => b - a)[0]?.[0] || '';
             
             // Create unified document
-            await docRef.set({
+            await setDoc(docRef, {
                 weekNumber,
                 year: this.currentYear,
                 poolId: this.poolId,
@@ -542,7 +542,7 @@ async function initializeUnifiedSurvivor() {
         return;
     }
     
-    window.unifiedSurvivorManager = new UnifiedSurvivorManager(window.db);
+    window.unifiedSurvivorManager = new UnifiedSurvivorManager(db);
     console.log('⚡ Unified Survivor Manager initialized');
 }
 
