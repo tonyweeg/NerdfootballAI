@@ -113,7 +113,7 @@ class UnifiedSurvivorManager {
         const docRef = this.getWeekDocRef(weekNumber);
         
         try {
-            await runTransaction(this.db(async (transaction) => {
+            await runTransaction(this.db, async (transaction) => {
                 const doc = await transaction.get(docRef);
                 
                 if (!doc.exists()) {
@@ -202,7 +202,7 @@ class UnifiedSurvivorManager {
         const docRef = this.getWeekDocRef(weekNumber);
         
         try {
-            await runTransaction(this.db(async (transaction) => {
+            await runTransaction(this.db, async (transaction) => {
                 const doc = await transaction.get(docRef);
                 
                 if (!doc.exists()) {
