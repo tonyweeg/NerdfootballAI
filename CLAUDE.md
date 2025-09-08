@@ -3,8 +3,26 @@
 ## Core Philosophy
 **"Diamond Level" means absolute precision, no mistakes, and comprehensive verification at every step.**
 
+## 🏆 SURVIVOR SYSTEM BENCHMARK - v2.0
+**CURRENT PRODUCTION STANDARD - OPTIMIZED SURVIVOR SYSTEM**
+
+### 📌 Current Benchmark Details:
+- **Branch**: `survivor-system-benchmark-v2` (protected in GitHub)
+- **Tag**: `v2.0-survivor-benchmark` (permanent reference point)
+- **Features**: All pool members, correct Win/Lost status, fast loading
+- **Performance**: Debug logs removed, ESPN integration optimized
+- **Commit**: `acd5067` (optimized survivor system)
+
+### ✅ Survivor System v2.0 Features (MUST ALL WORK):
+- Show all pool members in survivor table (no 10-user limit)
+- Correct Win/Lost/Not Started status for all games
+- Fast loading with no debug log spam
+- Proper ESPN team name normalization (NE Patriots <-> New England Patriots)
+- Simple table format: User | Team Picked | Status
+- No Firebase caching errors or document path issues
+
 ## 🏆 GOLDEN BENCHMARK STANDARD - v1.0
-**THIS IS THE PRODUCTION STANDARD - NEVER GO BELOW THIS**
+**FALLBACK STANDARD IF SURVIVOR SYSTEM BREAKS**
 
 ### 📌 Benchmark Details:
 - **Branch**: `golden-benchmark-v1` (protected in GitHub)
@@ -17,30 +35,35 @@
 
 #### Before ANY new development:
 ```bash
-git checkout golden-benchmark-v1
+git checkout survivor-system-benchmark-v2
 git checkout -b feature/new-feature
 ```
 
 #### Before ANY deployment:
 ```bash
-# Run the golden benchmark test
-node test-golden-benchmark.js
-
-# Only deploy if ALL tests pass
+# Test survivor system functionality
+# Verify all pool members show with correct Win/Lost status
 firebase deploy --only hosting
 ```
 
 #### If ANYTHING breaks:
 ```bash
-# Instant recovery to golden standard
-git checkout golden-benchmark-v1
+# Instant recovery to current benchmark
+git checkout survivor-system-benchmark-v2
 firebase deploy --only hosting
 ```
 
 #### To compare changes:
 ```bash
-# See what's different from golden standard
-git diff golden-benchmark-v1
+# See what's different from current benchmark
+git diff survivor-system-benchmark-v2
+```
+
+#### If survivor system completely fails:
+```bash
+# Fallback to golden standard
+git checkout golden-benchmark-v1
+firebase deploy --only hosting
 ```
 
 ### ✅ Golden Standard Features (MUST ALL WORK):
