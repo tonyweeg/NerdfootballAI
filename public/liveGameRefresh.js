@@ -18,7 +18,15 @@ class LiveGameRefresh {
             // Get games from cache or fetch fresh
             let games = [];
             if (window.gameStateCache) {
-                games = await window.gameStateCache.cacheSchedule(currentWeek);
+                const fetchFunction = async () => {
+                    const response = await fetch(`nfl_2024_week_${currentWeek}.json`);
+                    if (response.ok) {
+                        const weekData = await response.json();
+                        return weekData.games || [];
+                    }
+                    return [];
+                };
+                games = await window.gameStateCache.cacheSchedule(currentWeek, fetchFunction);
             } else {
                 // Fallback to direct fetch
                 const response = await fetch(`nfl_2024_week_${currentWeek}.json`);

@@ -9339,9 +9339,14 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
       });
       if (matchedGame) {
        liveScores[matchedGame.id] = {
+        awayTeam: espnGame.a || espnGame.awayTeam || matchedGame.away,
+        homeTeam: espnGame.h || espnGame.homeTeam || matchedGame.home,
         awayScore: espnGame.awayScore || 0,
         homeScore: espnGame.homeScore || 0,
         winner: espnGame.winner,
+        status: espnGame.status || (espnGame.winner && espnGame.winner !== 'TBD' ? 'FINAL' : 'LIVE'),
+        clock: espnGame.clock || espnGame.timeRemaining,
+        quarter: espnGame.quarter || espnGame.period,
         hasScores: (espnGame.awayScore !== undefined && espnGame.homeScore !== undefined)
        };
       }
@@ -9477,8 +9482,8 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
          <div class="text-xs text-slate-600 mt-1">
           ${homeAwayIndicator} ${opponent}
          </div>
-         ${pick.liveScore ? `<div class="text-xs font-medium mt-1 ${pick.liveScore.status === 'FINAL' ? 'text-slate-700' : 'text-emerald-600'}">
-          ${pick.liveScore.awayTeam} ${pick.liveScore.awayScore} - ${pick.liveScore.homeTeam} ${pick.liveScore.homeScore}
+         ${pick.liveScore && pick.liveScore.hasScores ? `<div class="text-xs font-medium mt-1 ${pick.liveScore.status === 'FINAL' ? 'text-slate-700' : 'text-emerald-600'}">
+          ${pick.liveScore.awayScore} - ${pick.liveScore.homeScore}${pick.liveScore.status === 'FINAL' ? ' (F)' : (pick.liveScore.clock && pick.liveScore.quarter ? ` (${pick.liveScore.clock} Q${pick.liveScore.quarter})` : '')}
          </div>` : ''}
          <div class="text-xs text-slate-500 mt-0.5 ${isInProgress ? 'text-emerald-600 font-medium' : ''}">
           ${timeDisplay}
