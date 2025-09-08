@@ -1,7 +1,9 @@
 class EspnNerdApiClient {
     constructor() {
         // Use the global functions instance if available (from main app)
-        if (typeof functions !== 'undefined' && functions) {
+        if (typeof window !== 'undefined' && window.functions) {
+            this.functions = window.functions;
+        } else if (typeof functions !== 'undefined' && functions) {
             this.functions = functions;
         } else if (typeof firebase !== 'undefined' && firebase.functions) {
             // Fallback for standalone usage
@@ -83,7 +85,7 @@ class EspnNerdApiClient {
     // Get current NFL week
     getCurrentWeek() {
         const now = new Date();
-        const seasonStart = new Date('2025-09-04'); // NFL Season start
+        const seasonStart = new Date('2024-09-05'); // NFL 2024 Season start (Week 1)
         const weekMs = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
         
         if (now < seasonStart) return 1;

@@ -34,6 +34,8 @@
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
  <script src="./pickAnalyticsIntegration.js"></script>
  <script src="./espnNerdApi.js"></script>
+ <script src="./espnScoreSync.js"></script>
+ <script src="./liveGameRefresh.js"></script>
  <style>
  body {
  font-family: 'Inter', sans-serif;
@@ -5519,9 +5521,14 @@ function downloadAnalyticsCSV(data, weekNumber) {
  window.firebaseApp = app; // Make Firebase app globally available for FCM
  db = getFirestore(app);
  window.db = db; // Make Firestore globally available for FCM
+ // Make Firestore functions globally available for ESPN Score Sync
+ window.getDoc = getDoc;
+ window.setDoc = setDoc;
+ window.doc = doc;
  auth = getAuth(app);
  window.auth = auth; // Make Auth globally available for FCM
  functions = getFunctions(app, 'us-central1'); // Initialize global functions variable with region
+ window.functions = functions; // Make Functions globally available
  window.httpsCallable = httpsCallable; // Make httpsCallable globally available for analytics
  
  // Initialize Firebase Messaging - Diamond Level
@@ -9319,6 +9326,31 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
    const resultsSnap = await getDoc(resultsDocRef);
    const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
 
+   // Get live scores from ESPN API if available
+   let liveScores = {};
+   try {
+    if (window.espnApi) {
+     const espnGames = await window.espnApi.getWeekGames(currentWeek);
+     espnGames.forEach(espnGame => {
+      // Map ESPN game to our game ID (simple mapping for now)
+      const matchedGame = weekData.games.find(game => {
+       return (game.away === espnGame.a || game.away === espnGame.awayTeam) && 
+              (game.home === espnGame.h || game.home === espnGame.homeTeam);
+      });
+      if (matchedGame) {
+       liveScores[matchedGame.id] = {
+        awayScore: espnGame.awayScore || 0,
+        homeScore: espnGame.homeScore || 0,
+        winner: espnGame.winner,
+        hasScores: (espnGame.awayScore !== undefined && espnGame.homeScore !== undefined)
+       };
+      }
+     });
+    }
+   } catch (error) {
+    console.warn('Could not fetch live scores from ESPN:', error);
+   }
+
    // Filter picks that have winners selected
    const activePicks = [];
    weekData.games.forEach(game => {
@@ -9344,7 +9376,8 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
       gameHasStarted: gameHasStarted,
       userWon: userWon,
       userLost: userLost,
-      gameResult: gameResult
+      gameResult: gameResult,
+      liveScore: liveScores[game.id] || null
      });
     }
    });
@@ -9385,7 +9418,10 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      
      
      let timeDisplay = '';
-     if (isInProgress) {
+     if (gameWinner && hasActuallyStarted) {
+      // Game is completed (has a winner and has started)
+      timeDisplay = 'Final';
+     } else if (isInProgress) {
       timeDisplay = 'In Progress';
      } else if (isToday) {
       timeDisplay = gameTime.toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
@@ -9441,6 +9477,9 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
          <div class="text-xs text-slate-600 mt-1">
           ${homeAwayIndicator} ${opponent}
          </div>
+         ${pick.liveScore ? `<div class="text-xs font-medium mt-1 ${pick.liveScore.status === 'FINAL' ? 'text-slate-700' : 'text-emerald-600'}">
+          ${pick.liveScore.awayTeam} ${pick.liveScore.awayScore} - ${pick.liveScore.homeTeam} ${pick.liveScore.homeScore}
+         </div>` : ''}
          <div class="text-xs text-slate-500 mt-0.5 ${isInProgress ? 'text-emerald-600 font-medium' : ''}">
           ${timeDisplay}
          </div>
@@ -12140,12 +12179,36 @@ function initializeEspnApiAdmin() {
 
  console.log('💎 About to call initializeAppAndAuth');
 initializeAppAndAuth().then(() => {
-    // Initialize ESPN API admin functionality
-    if (typeof window.espnApi !== 'undefined') {
-        initializeEspnApiAdmin();
-    } else {
-        console.warn('ESPN API client not loaded');
-    }
+    // Wait a moment to ensure all Firebase globals are set
+    setTimeout(() => {
+        // Initialize ESPN API client
+        if (typeof EspnNerdApiClient !== 'undefined') {
+            window.espnApi = new EspnNerdApiClient();
+            console.log('✅ ESPN API client initialized');
+            
+            // Initialize ESPN API admin functionality (moved inside setTimeout)
+            setTimeout(() => {
+                if (typeof window.espnApi !== 'undefined') {
+                    initializeEspnApiAdmin();
+                } else {
+                    console.warn('ESPN API client not loaded');
+                }
+            }, 200);
+            
+            // Initialize ESPN Score Sync system (moved inside setTimeout with more delay)
+            setTimeout(() => {
+                if (typeof EspnScoreSync !== 'undefined' && window.espnApi && window.gameStateCache) {
+                    window.espnScoreSync = new EspnScoreSync(
+                        db, // Pass the Firestore database directly
+                        window.espnApi,
+                        window.gameStateCache
+                    );
+                    window.espnScoreSync.initialize();
+                    console.log('💎 ESPN Score Sync system initialized');
+                }
+            }, 300);
+        }
+    }, 100);
 });
  });
  </script>
