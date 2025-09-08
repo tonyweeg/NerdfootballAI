@@ -206,10 +206,9 @@ class SurvivorMigration {
                 console.log('The unified survivor system is now ready to use.');
                 console.log('Refresh the page to see sub-500ms load times!');
                 
-                // Initialize the unified manager if available
+                // Unified manager is already initialized automatically
                 if (window.unifiedSurvivorManager) {
-                    await window.unifiedSurvivorManager.initialize();
-                    console.log('✅ Unified manager initialized');
+                    console.log('✅ Unified manager ready');
                 }
             } else {
                 console.error('⚠️ Migration completed but verification failed');
