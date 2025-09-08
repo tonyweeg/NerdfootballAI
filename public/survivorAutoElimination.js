@@ -19,7 +19,26 @@ class SurvivorAutoElimination {
     
     // Get current pool members
     async getPoolMembers() {
+        // Make sure getCurrentPool is available
+        if (typeof getCurrentPool === 'undefined') {
+            console.error('getCurrentPool function not available');
+            throw new Error('getCurrentPool function not available');
+        }
+        
         const currentPool = getCurrentPool();
+        console.log('🏊 Using pool:', currentPool);
+        
+        // Make sure doc and getDoc are available  
+        if (typeof doc === 'undefined') {
+            console.error('doc function not available');
+            throw new Error('Firestore doc function not available');
+        }
+        
+        if (typeof getDoc === 'undefined') {
+            console.error('getDoc function not available');  
+            throw new Error('Firestore getDoc function not available');
+        }
+        
         const poolMembersDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/pools/${currentPool}/metadata/members`));
         
         if (!poolMembersDoc.exists()) {
@@ -36,6 +55,11 @@ class SurvivorAutoElimination {
         console.log(`🔍 Checking survivor eliminations for Week ${weekNumber}...`);
         
         try {
+            // Make sure setDoc is available for potential database updates
+            if (typeof setDoc === 'undefined') {
+                console.error('setDoc function not available');
+                throw new Error('Firestore setDoc function not available');
+            }
             // Get pool members
             const memberIds = await this.getPoolMembers();
             if (memberIds.length === 0) {
@@ -59,6 +83,11 @@ class SurvivorAutoElimination {
             
             const gameResults = resultsSnap.data();
             
+            // Check if ANY games have finished (to determine if picks deadline has passed)
+            const hasFinishedGames = Object.values(gameResults).some(game => 
+                game.status === 'FINAL' || game.status === 'IN_PROGRESS'
+            );
+            
             // Check each active user's picks
             const eliminationUpdates = {};
             const eliminatedUsers = [];
@@ -75,7 +104,24 @@ class SurvivorAutoElimination {
                     const userPicksSnap = await getDoc(userPicksDocRef);
                     
                     if (!userPicksSnap.exists()) {
-                        continue; // User has no picks
+                        // If games have started and user has no picks document at all, eliminate them
+                        if (hasFinishedGames) {
+                            console.log(`❌ ELIMINATING USER ${userId}: No survivor picks document and games have started`);
+                            
+                            eliminationUpdates[`${userId}.eliminated`] = true;
+                            eliminationUpdates[`${userId}.eliminatedWeek`] = weekNumber;
+                            eliminationUpdates[`${userId}.eliminatedDate`] = new Date().toISOString();
+                            eliminationUpdates[`${userId}.eliminationReason`] = `No pick made for Week ${weekNumber}`;
+                            
+                            eliminatedUsers.push({
+                                userId,
+                                week: weekNumber,
+                                pickedTeam: 'NO PICK',
+                                winningTeam: 'N/A',
+                                gameId: 'no-pick'
+                            });
+                        }
+                        continue;
                     }
                     
                     const userPicksData = userPicksSnap.data();
@@ -83,7 +129,23 @@ class SurvivorAutoElimination {
                     const weekPick = userPicks[weekNumber];
                     
                     if (!weekPick) {
-                        console.log(`User ${userId} has no pick for Week ${weekNumber}`);
+                        // If games have started and user didn't make a pick for this week, eliminate them
+                        if (hasFinishedGames) {
+                            console.log(`❌ ELIMINATING USER ${userId}: No pick for Week ${weekNumber} and games have started`);
+                            
+                            eliminationUpdates[`${userId}.eliminated`] = true;
+                            eliminationUpdates[`${userId}.eliminatedWeek`] = weekNumber;
+                            eliminationUpdates[`${userId}.eliminatedDate`] = new Date().toISOString();
+                            eliminationUpdates[`${userId}.eliminationReason`] = `No pick made for Week ${weekNumber}`;
+                            
+                            eliminatedUsers.push({
+                                userId,
+                                week: weekNumber,
+                                pickedTeam: 'NO PICK',
+                                winningTeam: 'N/A',
+                                gameId: 'no-pick'
+                            });
+                        }
                         continue;
                     }
                     
@@ -181,10 +243,18 @@ class SurvivorAutoElimination {
     
     // Get current NFL week
     getCurrentWeek() {
+        // FIXED: 2025 season starts in September 2025
         const now = new Date();
-        const seasonStart = new Date('2024-09-05');
+        const seasonStart = new Date('2025-09-05');
         const weekMs = 7 * 24 * 60 * 60 * 1000;
         const weeksDiff = Math.floor((now - seasonStart) / weekMs) + 1;
+        
+        // Since we're before the 2025 season, default to week 1 for testing
+        if (now < seasonStart) {
+            console.log('🏈 Pre-season: Defaulting to Week 1 for testing');
+            return 1;
+        }
+        
         return Math.min(Math.max(weeksDiff, 1), 18);
     }
     

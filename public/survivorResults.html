@@ -12,6 +12,23 @@
         }
         .survivor-eliminated {
             background-color: #fce7e7; /* Light rose */
+            position: relative;
+        }
+        .survivor-eliminated::after {
+            content: '💀';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 24px;
+            opacity: 0.5;
+        }
+        .survivor-eliminated td {
+            opacity: 0.7;
+        }
+        .survivor-eliminated .text-gray-900 {
+            text-decoration: line-through;
+            color: #991b1b;
         }
         .survivor-won {
             background-color: #dcfce7; /* Light green - weekly winner */
@@ -122,23 +139,30 @@
         <div id="results-container" class="hidden">
             <!-- Stats Summary -->
             <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">Pool Summary</h2>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">🏆 Survivor Pool Battle Stats</h2>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="text-center">
                         <div class="text-2xl font-bold text-gray-900" id="total-players">0</div>
-                        <div class="text-sm text-gray-600">Total Players</div>
+                        <div class="text-sm text-gray-600">Total Warriors</div>
                     </div>
                     <div class="text-center">
                         <div class="text-2xl font-bold text-green-600" id="active-players">0</div>
-                        <div class="text-sm text-gray-600">Still Alive</div>
+                        <div class="text-sm text-gray-600">🛡️ Still Fighting</div>
                     </div>
                     <div class="text-center">
                         <div class="text-2xl font-bold text-red-600" id="eliminated-players">0</div>
-                        <div class="text-sm text-gray-600">Eliminated</div>
+                        <div class="text-sm text-gray-600">💀 Fallen Heroes</div>
                     </div>
                     <div class="text-center">
                         <div class="text-2xl font-bold text-blue-600" id="current-week">1</div>
-                        <div class="text-sm text-gray-600">Current Week</div>
+                        <div class="text-sm text-gray-600">Week of Battle</div>
+                    </div>
+                </div>
+                <div id="elimination-breakdown" class="hidden mt-4 pt-4 border-t border-gray-200">
+                    <div class="text-sm text-gray-600">
+                        <span class="font-medium">Elimination Causes:</span>
+                        <span id="lost-picks-count" class="ml-4">0 picked losing teams</span>
+                        <span id="no-picks-count" class="ml-4">0 didn't make picks</span>
                     </div>
                 </div>
             </div>
@@ -645,17 +669,22 @@
                 for (const uid of eliminatedUsers) {
                     const userStatus = allStatuses[uid] || { eliminated: true };
                     
+                    // Check if user was eliminated for not making a pick
+                    const eliminationReason = userStatus.eliminationReason || '';
+                    const noPick = eliminationReason.includes('No pick made');
+                    
                     userResults.push({
                         uid,
                         displayName: poolMembers[uid].displayName || poolMembers[uid].email || 'Unknown User',
                         email: poolMembers[uid].email || '',
                         isEliminated: true,
                         eliminatedWeek: userStatus.eliminatedWeek || 'Unknown',
-                        latestPick: userStatus.currentWeekPick || 'Eliminated',
+                        latestPick: noPick ? 'NO PICK' : (userStatus.currentWeekPick || 'Eliminated'),
                         latestPickWeek: userStatus.eliminatedWeek ? userStatus.eliminatedWeek - 1 : null,
                         currentWeekPick: null,
                         weeksSurvived: userStatus.eliminatedWeek ? (userStatus.eliminatedWeek - 1) : 0,
-                        totalPicks: 1 // Approximate for eliminated users
+                        totalPicks: 1, // Approximate for eliminated users
+                        eliminationReason: userStatus.eliminationReason
                     });
                 }
                 
@@ -691,20 +720,49 @@
             const currentWeek = getCurrentWeek();
             const activeCount = userResults.filter(u => !u.isEliminated).length;
             const eliminatedCount = userResults.filter(u => u.isEliminated).length;
+            
+            // Count elimination types
+            const lostPicksCount = userResults.filter(u => 
+                u.isEliminated && u.eliminationReason && u.eliminationReason.includes('Lost in Week')
+            ).length;
+            const noPicksCount = userResults.filter(u => 
+                u.isEliminated && u.eliminationReason && u.eliminationReason.includes('No pick made')
+            ).length;
 
             // Update summary stats
             elements.totalPlayers.textContent = userResults.length;
             elements.activePlayers.textContent = activeCount;
             elements.eliminatedPlayers.textContent = eliminatedCount;
             elements.currentWeek.textContent = currentWeek;
+            
+            // Update elimination breakdown if there are eliminations
+            if (eliminatedCount > 0) {
+                const breakdownDiv = document.getElementById('elimination-breakdown');
+                const lostPicksSpan = document.getElementById('lost-picks-count');
+                const noPicksSpan = document.getElementById('no-picks-count');
+                
+                if (breakdownDiv && lostPicksSpan && noPicksSpan) {
+                    breakdownDiv.classList.remove('hidden');
+                    lostPicksSpan.textContent = `${lostPicksCount} picked losing teams`;
+                    noPicksSpan.textContent = `${noPicksCount} didn't make picks`;
+                }
+            }
 
             // Render table rows
             elements.resultsTbody.innerHTML = userResults.map((user, index) => {
                 const rowClass = getPlayerRowStatus(user, currentWeek, cachedWeekResults || {});
+                
+                // Check if eliminated for no pick
+                const isNoPick = user.eliminationReason && user.eliminationReason.includes('No pick made');
+                
                 const statusBadge = user.isEliminated 
-                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                         <i class="fas fa-skull mr-1"></i> Eliminated
-                       </span>`
+                    ? isNoPick 
+                        ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                             <i class="fas fa-ban mr-1"></i> No Pick
+                           </span>`
+                        : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                             <i class="fas fa-skull mr-1"></i> Eliminated
+                           </span>`
                     : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                          <i class="fas fa-heart mr-1"></i> Active
                        </span>`;
@@ -713,11 +771,26 @@
                 const currentWeekNum = getCurrentWeek();
                 const hasCurrentWeekPick = user.currentWeekPick;
                 
-                const pickDisplay = hasCurrentWeekPick 
-                    ? `${user.currentWeekPick} (Current)` 
-                    : user.latestPick 
-                        ? `${user.latestPick} (Week ${user.latestPickWeek})` 
-                        : 'No picks yet';
+                // For eliminated users, show what caused their elimination
+                let pickDisplay;
+                if (user.isEliminated && user.eliminationReason) {
+                    if (user.eliminationReason.includes('No pick made')) {
+                        pickDisplay = '<span class="text-orange-600 font-medium">❌ NO PICK</span>';
+                    } else if (user.eliminationReason.includes('Lost in Week')) {
+                        // Extract the team they picked from elimination reason
+                        const match = user.eliminationReason.match(/Picked (\w+),/);
+                        const lostTeam = match ? match[1] : user.latestPick;
+                        pickDisplay = `<span class="text-red-600 font-medium">💀 ${lostTeam} (LOST)</span>`;
+                    } else {
+                        pickDisplay = `<span class="text-red-600">${user.latestPick}</span>`;
+                    }
+                } else {
+                    pickDisplay = hasCurrentWeekPick 
+                        ? `${user.currentWeekPick} (Current)` 
+                        : user.latestPick 
+                            ? `${user.latestPick} (Week ${user.latestPickWeek})` 
+                            : 'No picks yet';
+                }
                         
                 const pickWeekDisplay = hasCurrentWeekPick 
                     ? `Week ${currentWeekNum}` 
@@ -728,12 +801,12 @@
                 const weeksSurvived = user.weeksSurvived >= 0 ? user.weeksSurvived : 0;
 
                 return `
-                    <tr class="${rowClass}">
+                    <tr class="${rowClass}" ${user.isEliminated && user.eliminationReason ? `title="${user.eliminationReason}"` : ''}>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center">
                                 <div class="flex-shrink-0 h-8 w-8">
-                                    <div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                        <span class="text-sm font-medium text-gray-600">${user.displayName.charAt(0).toUpperCase()}</span>
+                                    <div class="h-8 w-8 rounded-full ${user.isEliminated ? 'bg-red-200' : 'bg-gray-200'} flex items-center justify-center">
+                                        <span class="text-sm font-medium ${user.isEliminated ? 'text-red-800' : 'text-gray-600'}">${user.isEliminated ? '💀' : user.displayName.charAt(0).toUpperCase()}</span>
                                     </div>
                                 </div>
                                 <div class="ml-4">
