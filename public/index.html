@@ -12030,8 +12030,14 @@ const SurvivorView = {
             allUI.survivorCurrentWeek.textContent = 1; // Current week
             
             // Generate and display table
-            const tableHtml = this.generateOptimizedTable ? this.generateOptimizedTable(results) : 
-                             (window.simpleSurvivorSystem ? window.simpleSurvivorSystem.generateTable(results) : this.generateFallbackTable(results));
+            let tableHtml;
+            if (loadResult.source === 'unified') {
+                tableHtml = this.generateUnifiedTable(results);
+            } else if (window.simpleSurvivorSystem) {
+                tableHtml = window.simpleSurvivorSystem.generateTable(results);
+            } else {
+                tableHtml = this.generateFallbackTable(results);
+            }
             
             // Put table into the survivor results container
             if (allUI.survivorResultsContainer) {
@@ -12082,6 +12088,45 @@ const SurvivorView = {
         return stats;
     },
     
+    // Generate table for unified manager data
+    generateUnifiedTable: function(results) {
+        if (!results || results.length === 0) {
+            return '<p class="text-gray-500 text-center py-8">No users found.</p>';
+        }
+
+        const tableRows = results.map(user => {
+            const statusClass = user.eliminated ? 
+                'bg-red-50 text-red-900' : 'bg-green-50 text-green-900';
+            const statusText = user.eliminated ? 'Eliminated' : 'Active';
+            const pickText = user.teamPicked || 'No pick';
+            
+            return `
+                <tr class="${statusClass}">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${user.displayName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${pickText}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${statusText}</td>
+                </tr>
+            `;
+        }).join('');
+
+        return `
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team Picked</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${tableRows}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    },
+
     // Fallback table generator
     generateFallbackTable: function(results) {
         const tableRows = results.map(user => {
