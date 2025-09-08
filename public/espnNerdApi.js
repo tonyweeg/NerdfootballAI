@@ -1,16 +1,12 @@
 class EspnNerdApiClient {
     constructor() {
-        // Use the global functions instance if available (from main app)
-        if (typeof window !== 'undefined' && window.functions) {
-            this.functions = window.functions;
-        } else if (typeof functions !== 'undefined' && functions) {
-            this.functions = functions;
-        } else if (typeof firebase !== 'undefined' && firebase.functions) {
-            // Fallback for standalone usage
-            this.functions = firebase.functions();
-        } else {
-            console.error('Firebase Functions not initialized');
-        }
+        // DIAMOND LEVEL: Deferred initialization pattern
+        this.functions = null;
+        this.isReady = false;
+        this.initPromise = null;
+        
+        // Start initialization but don't require it immediately
+        this.initializeFirebase();
         
         this.cache = new Map();
         this.CACHE_DURATION = {
@@ -19,6 +15,61 @@ class EspnNerdApiClient {
             COMPLETED: Infinity,       // Never expire completed games
             TEAMS: 24 * 60 * 60 * 1000 // 24 hours for teams
         };
+    }
+
+    // DIAMOND LEVEL: Firebase initialization with retry logic
+    async initializeFirebase() {
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+
+        this.initPromise = new Promise(async (resolve, reject) => {
+            const maxRetries = 20;
+            const retryDelay = 250;
+            
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    // Check multiple Firebase access patterns
+                    if (typeof window !== 'undefined' && window.functions) {
+                        this.functions = window.functions;
+                    } else if (typeof functions !== 'undefined' && functions) {
+                        this.functions = functions;
+                    } else if (typeof firebase !== 'undefined' && firebase.functions) {
+                        this.functions = firebase.functions();
+                    } else {
+                        throw new Error('Firebase Functions not available');
+                    }
+                    
+                    // Test function call to verify it works
+                    if (typeof window !== 'undefined' && window.httpsCallable) {
+                        const testCall = window.httpsCallable(this.functions, 'espnApiStatus');
+                        // Don't actually call it, just verify callable works
+                        this.isReady = true;
+                        console.log('✅ ESPN API Firebase Functions initialized successfully');
+                        resolve();
+                        return;
+                    } else {
+                        throw new Error('httpsCallable not available');
+                    }
+                } catch (error) {
+                    if (attempt < maxRetries - 1) {
+                        console.log(`⏳ ESPN API Firebase retry ${attempt + 1}/${maxRetries} in ${retryDelay}ms`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    } else {
+                        console.error('❌ ESPN API Firebase initialization failed after all retries:', error);
+                        reject(error);
+                    }
+                }
+            }
+        });
+        
+        return this.initPromise;
+    }
+
+    // Ensure Firebase is ready before any API calls
+    async ensureReady() {
+        if (this.isReady) return;
+        await this.initializeFirebase();
     }
 
     // Check if cache is valid
@@ -47,9 +98,12 @@ class EspnNerdApiClient {
         return cached ? cached.data : null;
     }
 
-    // Call Firebase Function with error handling
+    // DIAMOND LEVEL: Call Firebase Function with initialization check and error handling
     async callFunction(functionName, data = {}) {
         try {
+            // Ensure Firebase is ready before any calls
+            await this.ensureReady();
+            
             // Use global httpsCallable if available, otherwise use legacy API
             let callable;
             if (typeof window !== 'undefined' && window.httpsCallable) {
@@ -57,7 +111,7 @@ class EspnNerdApiClient {
             } else if (this.functions && this.functions.httpsCallable) {
                 callable = this.functions.httpsCallable(functionName);
             } else {
-                throw new Error('httpsCallable not available');
+                throw new Error('httpsCallable not available after initialization');
             }
             
             const result = await callable(data);
@@ -296,21 +350,116 @@ class EspnNerdApiClient {
         }
     }
 
-    // Transform ESPN data to NerdFootball format for compatibility
+    // DIAMOND LEVEL: Enhanced ESPN data transformation with comprehensive team mapping
     transformToNerdFootballFormat(espnGames, weekNumber) {
         return espnGames.map((game, index) => ({
             id: (weekNumber * 100) + (index + 1),
-            a: game.a, // Away team
-            h: game.h, // Home team
+            a: this.normalizeTeamName(game.a || game.away_team || game.awayTeam), // Away team
+            h: this.normalizeTeamName(game.h || game.home_team || game.homeTeam), // Home team
             dt: game.dt, // DateTime
             stadium: game.stadium,
-            winner: game.winner || 'TBD',
-            homeScore: game.homeScore || 0,
-            awayScore: game.awayScore || 0,
+            winner: game.winner ? this.normalizeTeamName(game.winner) : 'TBD',
+            homeScore: game.homeScore || game.home_score || 0,
+            awayScore: game.awayScore || game.away_score || 0,
             kickoff: game.dt, // For compatibility with existing cache system
-            espnId: game.espnId,
-            lastUpdated: game.lastUpdated
+            espnId: game.espnId || game.id,
+            lastUpdated: game.lastUpdated,
+            // Add comprehensive team info for survivor matching
+            home_team: this.normalizeTeamName(game.h || game.home_team || game.homeTeam),
+            away_team: this.normalizeTeamName(game.a || game.away_team || game.awayTeam),
+            home_score: game.homeScore || game.home_score || 0,
+            away_score: game.awayScore || game.away_score || 0,
+            status: game.status || (game.winner && game.winner !== 'TBD' ? 'Final' : 'Not Started')
         }));
+    }
+
+    // DIAMOND LEVEL: Comprehensive team name normalization
+    normalizeTeamName(teamName) {
+        if (!teamName) return null;
+        
+        // Team name mapping for consistency
+        const teamMappings = {
+            // Handle common variations
+            'LA Rams': 'Los Angeles Rams',
+            'LA Chargers': 'Los Angeles Chargers',
+            'LV Raiders': 'Las Vegas Raiders',
+            'Vegas Raiders': 'Las Vegas Raiders',
+            'NY Giants': 'New York Giants',
+            'NY Jets': 'New York Jets',
+            'TB Buccaneers': 'Tampa Bay Buccaneers',
+            'NE Patriots': 'New England Patriots',
+            'GB Packers': 'Green Bay Packers',
+            'NO Saints': 'New Orleans Saints',
+            'KC Chiefs': 'Kansas City Chiefs',
+            'SF 49ers': 'San Francisco 49ers',
+            
+            // Handle ESPN abbreviations to full names
+            'ARI': 'Arizona Cardinals',
+            'ATL': 'Atlanta Falcons', 
+            'BAL': 'Baltimore Ravens',
+            'BUF': 'Buffalo Bills',
+            'CAR': 'Carolina Panthers',
+            'CHI': 'Chicago Bears',
+            'CIN': 'Cincinnati Bengals',
+            'CLE': 'Cleveland Browns',
+            'DAL': 'Dallas Cowboys',
+            'DEN': 'Denver Broncos',
+            'DET': 'Detroit Lions',
+            'GB': 'Green Bay Packers',
+            'HOU': 'Houston Texans',
+            'IND': 'Indianapolis Colts',
+            'JAX': 'Jacksonville Jaguars',
+            'KC': 'Kansas City Chiefs',
+            'LV': 'Las Vegas Raiders',
+            'LAC': 'Los Angeles Chargers',
+            'LAR': 'Los Angeles Rams',
+            'MIA': 'Miami Dolphins',
+            'MIN': 'Minnesota Vikings',
+            'NE': 'New England Patriots',
+            'NO': 'New Orleans Saints',
+            'NYG': 'New York Giants',
+            'NYJ': 'New York Jets',
+            'PHI': 'Philadelphia Eagles',
+            'PIT': 'Pittsburgh Steelers',
+            'SEA': 'Seattle Seahawks',
+            'SF': 'San Francisco 49ers',
+            'TB': 'Tampa Bay Buccaneers',
+            'TEN': 'Tennessee Titans',
+            'WSH': 'Washington Commanders'
+        };
+        
+        // Direct mapping if exists
+        if (teamMappings[teamName]) {
+            return teamMappings[teamName];
+        }
+        
+        // Return as-is if already in full form
+        return teamName;
+    }
+
+    // DIAMOND LEVEL: Enhanced current week scores with comprehensive team info
+    async getCurrentWeekScores() {
+        try {
+            await this.ensureReady();
+            const games = await this.getCurrentWeekGames();
+            
+            // Transform to comprehensive format for survivor system
+            return {
+                games: games.map(game => ({
+                    id: game.espnId || game.id,
+                    home_team: this.normalizeTeamName(game.h || game.home_team || game.homeTeam),
+                    away_team: this.normalizeTeamName(game.a || game.away_team || game.awayTeam),
+                    home_score: game.homeScore || game.home_score || 0,
+                    away_score: game.awayScore || game.away_score || 0,
+                    winner: game.winner ? this.normalizeTeamName(game.winner) : 'TBD',
+                    status: game.status || (game.winner && game.winner !== 'TBD' ? 'Final' : 'Not Started'),
+                    dt: game.dt
+                }))
+            };
+        } catch (error) {
+            console.error('Error getting current week scores:', error);
+            throw error;
+        }
     }
 
     // Get games in the format expected by existing NerdFootball components
@@ -546,8 +695,16 @@ class EspnNerdApiClient {
     }
 }
 
-// Global instance
-window.espnApi = window.espnApi || new EspnNerdApiClient();
+// DIAMOND LEVEL: Safe global instance initialization
+if (typeof window !== 'undefined') {
+    // Initialize ESPN API with proper error handling
+    if (!window.espnApi || !window.espnApi.isReady) {
+        window.espnApi = new EspnNerdApiClient();
+    }
+    
+    // Also create espnNerdApi alias for survivor system compatibility
+    window.espnNerdApi = window.espnApi;
+}
 
 // Export for use across pages
 if (typeof module !== 'undefined' && module.exports) {

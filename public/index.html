@@ -33,13 +33,15 @@
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
  <script src="./weekManager.js"></script>
- <script src="./survivorSystem.js"></script>
- <script src="./pickAnalyticsIntegration.js"></script>
  <script src="./espnNerdApi.js"></script>
+ <script src="./survivorSystem.js"></script>
+ <script src="./simpleSurvivor.js"></script>
+ <script src="./pickAnalyticsIntegration.js"></script>
  <script src="./espnScoreSync.js"></script>
 <!-- DISABLED: survivorAutoElimination.js - replaced with clean ESPN-powered survivorSystem.js -->
  <script src="./enhancedGameDataDisplay.js"></script>
  <script src="./liveGameRefresh.js"></script>
+ <script src="./test-survivor-diamond-architecture.js"></script>
  <style>
  body {
  font-family: 'Inter', sans-serif;
@@ -11719,9 +11721,9 @@ const SurvivorView = {
         this.showLoading();
         
         try {
-            // Use clean survivor system
-            if (!window.survivorSystem) {
-                throw new Error('Clean survivor system not initialized');
+            // Use simple survivor system (FAST!)
+            if (!window.simpleSurvivorSystem) {
+                throw new Error('Simple survivor system not initialized');
             }
 
             // Get pool ID
@@ -11730,24 +11732,29 @@ const SurvivorView = {
                 currentPool = getCurrentPool();
             }
 
-            // Get survival status for all pool members
-            const results = await window.survivorSystem.getPoolSurvivalStatus(currentPool);
-            const stats = window.survivorSystem.getSummaryStats(results);
+            // Get cached survivor table data (fast!)
+            const results = await window.simpleSurvivorSystem.getSurvivorTable(currentPool);
+            
+            // Simple stats
+            const total = results.length;
+            const eliminated = results.filter(r => r.status === 'lost' || r.status === 'eliminated').length;
+            const alive = total - eliminated;
 
             // Update summary stats
-            allUI.survivorTotalPlayers.textContent = stats.total;
-            allUI.survivorActivePlayers.textContent = stats.alive;
-            allUI.survivorEliminatedPlayers.textContent = stats.eliminated;
-            allUI.survivorCurrentWeek.textContent = stats.currentWeek;
+            allUI.survivorTotalPlayers.textContent = total;
+            allUI.survivorActivePlayers.textContent = alive;
+            allUI.survivorEliminatedPlayers.textContent = eliminated;
+            allUI.survivorCurrentWeek.textContent = window.simpleSurvivorSystem.currentWeek;
 
-            // Render results table
-            this.renderCleanResults(results);
+            // Render simple table
+            const tableHtml = window.simpleSurvivorSystem.generateTable(results);
+            allUI.survivorResultsTable.innerHTML = tableHtml;
 
-            console.log('✅ CLEAN survivor system loaded successfully');
-            console.log(`📊 Stats: Total=${stats.total}, Alive=${stats.alive}, Eliminated=${stats.eliminated}`);
+            console.log('✅ SIMPLE survivor system loaded successfully');
+            console.log(`📊 Stats: Total=${total}, Alive=${alive}, Eliminated=${eliminated}`);
 
         } catch (error) {
-            console.error('Error in clean survivor system:', error);
+            console.error('Error in simple survivor system:', error);
             this.showError('Failed to load survivor results. Please try again.');
         }
     },
