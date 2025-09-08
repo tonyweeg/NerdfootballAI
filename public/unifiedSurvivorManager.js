@@ -11,14 +11,16 @@ class UnifiedSurvivorManager {
     }
 
     // Get the unified document path for a week
-    getWeekDocPath(weekNumber) {
-        return `artifacts/nerdfootball/pools/${this.poolId}/survivor/${this.currentYear}/weeks/${weekNumber}`;
+    getWeekDocRef(weekNumber) {
+        return window.db.collection('artifacts').doc('nerdfootball')
+            .collection('pools').doc(this.poolId)
+            .collection('survivor').doc(this.currentYear.toString())
+            .collection('weeks').doc(weekNumber.toString());
     }
 
     // Initialize week document structure
     async initializeWeekDocument(weekNumber) {
-        const docPath = this.getWeekDocPath(weekNumber);
-        const docRef = this.db.doc(docPath);
+        const docRef = this.getWeekDocRef(weekNumber);
         
         const initialDoc = {
             weekNumber,
@@ -76,8 +78,7 @@ class UnifiedSurvivorManager {
             }
         }
         
-        const docPath = this.getWeekDocPath(weekNumber);
-        const docRef = this.db.doc(docPath);
+        const docRef = this.getWeekDocRef(weekNumber);
         
         try {
             const doc = await docRef.get();
@@ -111,8 +112,7 @@ class UnifiedSurvivorManager {
 
     // Update user pick (atomic transaction)
     async updateUserPick(weekNumber, userId, userDisplayName, teamPicked) {
-        const docPath = this.getWeekDocPath(weekNumber);
-        const docRef = this.db.doc(docPath);
+        const docRef = this.getWeekDocRef(weekNumber);
         
         try {
             await this.db.runTransaction(async (transaction) => {
@@ -201,8 +201,7 @@ class UnifiedSurvivorManager {
 
     // Process eliminations after games complete
     async processEliminations(weekNumber, gameResults) {
-        const docPath = this.getWeekDocPath(weekNumber);
-        const docRef = this.db.doc(docPath);
+        const docRef = this.getWeekDocRef(weekNumber);
         
         try {
             await this.db.runTransaction(async (transaction) => {
@@ -286,11 +285,9 @@ class UnifiedSurvivorManager {
 
     // Progress surviving players to next week
     async progressToNextWeek(currentWeek, nextWeek) {
-        const currentDocPath = this.getWeekDocPath(currentWeek);
-        const currentDocRef = this.db.doc(currentDocPath);
+        const currentDocRef = this.getWeekDocRef(currentWeek);
         
-        const nextDocPath = this.getWeekDocPath(nextWeek);
-        const nextDocRef = this.db.doc(nextDocPath);
+        const nextDocRef = this.getWeekDocRef(nextWeek);
         
         try {
             const currentDoc = await currentDocRef.get();
@@ -358,8 +355,7 @@ class UnifiedSurvivorManager {
 
     // Subscribe to real-time updates for a week
     subscribeToWeek(weekNumber, callback) {
-        const docPath = this.getWeekDocPath(weekNumber);
-        const docRef = this.db.doc(docPath);
+        const docRef = this.getWeekDocRef(weekNumber);
         
         // Unsubscribe from previous listener if exists
         if (this.listeners.has(weekNumber)) {
@@ -442,8 +438,7 @@ class UnifiedSurvivorManager {
     async migrateToUnifiedStructure(weekNumber) {
         console.log(`🔄 Starting migration to unified structure for week ${weekNumber}...`);
         
-        const docPath = this.getWeekDocPath(weekNumber);
-        const docRef = this.db.doc(docPath);
+        const docRef = this.getWeekDocRef(weekNumber);
         
         try {
             // Get pool members
