@@ -14,9 +14,16 @@ class SurvivorSystem {
         }
 
         // Find the game the user picked
-        const gameId = userPick.gameId;
+        let gameId = userPick.gameId;
+        
+        // CRITICAL FIX: If no gameId, find it by team name
+        if (!gameId && userPick.team) {
+            gameId = this.findGameIdByTeam(userPick.team, weekResults);
+            console.log(`🔧 FIXED: Found gameId ${gameId} for team ${userPick.team}`);
+        }
+        
         if (!gameId) {
-            return { status: 'eliminated', reason: 'Invalid pick - no game ID' };
+            return { status: 'eliminated', reason: 'Invalid pick - no game found for team' };
         }
 
         const game = weekResults[gameId];
@@ -45,18 +52,26 @@ class SurvivorSystem {
                 if (espnData && espnData.games) {
                     const weekResults = {};
                     
-                    // Convert ESPN data to our format
+                    // Convert ESPN data to our format AND map to old game IDs
                     espnData.games.forEach(game => {
                         if (game.id) {
+                            // Use ESPN game ID and add team info from game data
                             weekResults[game.id] = {
                                 id: game.id,
-                                homeTeam: game.home_team,
-                                awayTeam: game.away_team,
+                                homeTeam: game.home_team || this.extractTeamFromGame(game, 'home'),
+                                awayTeam: game.away_team || this.extractTeamFromGame(game, 'away'), 
                                 homeScore: game.home_score,
                                 awayScore: game.away_score,
                                 status: game.status,
                                 winner: this.determineWinner(game)
                             };
+                            
+                            // CRITICAL FIX: Also map by old gameId system for backward compatibility
+                            const oldGameId = this.mapToOldGameId(game);
+                            if (oldGameId) {
+                                weekResults[oldGameId] = weekResults[game.id];
+                                console.log(`🔧 MAPPED: ESPN game ${game.id} -> old ID ${oldGameId}`);
+                            }
                         }
                     });
                     
@@ -99,6 +114,62 @@ class SurvivorSystem {
         return 'TBD';
     }
 
+    // Map ESPN game ID to old internal game ID system
+    mapToOldGameId(espnGame) {
+        // ESPN IDs like 2210, 2214, 2218, etc. map to our 101, 102, 103, etc.
+        // Based on Week 1 mapping from user debug output
+        const espnToOldIdMap = {
+            '2210': '101',
+            '2214': '102', 
+            '2218': '103',
+            '2219': '104',
+            '2220': '105',
+            '2221': '106',
+            '2222': '107',
+            '2223': '108',
+            '2227': '109',
+            '2228': '110',
+            '2229': '111',
+            '2230': '112',
+            '2231': '113',
+            '2232': '114'
+        };
+        
+        return espnToOldIdMap[espnGame.id] || null;
+    }
+
+    // Extract team name from ESPN game data
+    extractTeamFromGame(game, homeOrAway) {
+        if (homeOrAway === 'home') {
+            return game.home_team || game.homeTeam || game.home || null;
+        } else if (homeOrAway === 'away') {
+            return game.away_team || game.awayTeam || game.away || null;
+        }
+        return null;
+    }
+
+    // Find game ID by team name (for picks missing gameId)
+    findGameIdByTeam(teamName, weekResults) {
+        console.log(`🔍 SEARCHING for team: ${teamName}`);
+        
+        for (const [gameId, game] of Object.entries(weekResults)) {
+            console.log(`🔍 GAME ${gameId}:`, game);
+            
+            // Check all possible team name fields from ESPN data, including winner
+            const possibleFields = ['homeTeam', 'awayTeam', 'home_team', 'away_team', 'home', 'away', 'winner'];
+            
+            for (const field of possibleFields) {
+                if (game[field] === teamName) {
+                    console.log(`✅ FOUND ${teamName} in game ${gameId} field ${field}`);
+                    return gameId;
+                }
+            }
+        }
+        
+        console.log(`❌ NOT FOUND: ${teamName} in any game`);
+        return null;
+    }
+
     // Get pool members and their survival status
     async getPoolSurvivalStatus(poolId) {
         try {
@@ -114,6 +185,7 @@ class SurvivorSystem {
             console.log('🏈 Using ESPN sync data for Week', this.currentWeek);
             console.log('🔍 Available ESPN games:', Object.keys(weekResults));
             console.log('🔍 Sample ESPN game:', Object.values(weekResults)[0]);
+            console.log('🔍 DEBUG: All game data structure:', weekResults);
 
             // Get elimination status
             const statusDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`));
@@ -208,18 +280,31 @@ class SurvivorSystem {
     // Simple display formatting
     formatUserForDisplay(user) {
         const rowClass = user.isEliminated ? 'survivor-eliminated bg-red-50' : 'survivor-active bg-white';
+        
+        // Add icons to player names
+        const playerNameWithIcon = user.isEliminated 
+            ? `<i class="fas fa-skull text-red-500 mr-2"></i>${user.displayName}`
+            : `<i class="fas fa-heart text-green-500 mr-2"></i>${user.displayName}`;
+            
         const statusBadge = user.isEliminated 
             ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                 <i class="fas fa-skull mr-1"></i> Eliminated Week ${user.eliminatedWeek}
+                 Eliminated
                </span>`
             : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                 <i class="fas fa-heart mr-1"></i> Active
+                 Active
                </span>`;
+
+        // Show eliminated week data
+        const eliminatedWeek = user.isEliminated && user.eliminatedWeek 
+            ? `Week ${user.eliminatedWeek}` 
+            : '-';
 
         return {
             rowClass,
             statusBadge,
+            playerNameWithIcon,
             currentPick: user.currentPick || 'No pick',
+            eliminatedWeek,
             reason: user.reason || ''
         };
     }
@@ -233,13 +318,16 @@ async function initializeSurvivorSystem(retryCount = 0) {
     const maxRetries = 10;
     const retryDelay = 500; // 500ms
     
-    if (typeof window.db === 'undefined') {
+    if (typeof window.db === 'undefined' || typeof window.functions === 'undefined') {
         if (retryCount < maxRetries) {
-            console.log(`🔄 Firebase db not ready yet, retry ${retryCount + 1}/${maxRetries} in ${retryDelay}ms`);
+            const missing = [];
+            if (typeof window.db === 'undefined') missing.push('db');
+            if (typeof window.functions === 'undefined') missing.push('functions');
+            console.log(`🔄 Firebase ${missing.join(', ')} not ready yet, retry ${retryCount + 1}/${maxRetries} in ${retryDelay}ms`);
             setTimeout(() => initializeSurvivorSystem(retryCount + 1), retryDelay);
             return;
         } else {
-            console.error('❌ Firebase db not available for survivor system after maximum retries');
+            console.error('❌ Firebase db/functions not available for survivor system after maximum retries');
             return;
         }
     }
