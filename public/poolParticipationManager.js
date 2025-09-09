@@ -93,17 +93,52 @@ class PoolParticipationManager {
     }
 
     /**
-     * Update user's participation status
+     * Update user's participation status WITH cascading removal
      * @param {string} userId - User ID to update
      * @param {Object} updates - Participation updates
      * @param {string} adminId - Admin making the change
      */
     async updateUserParticipation(userId, updates, adminId) {
         try {
-            // Get the members document reference
-            const membersPath = this.getPoolMembersPath();
+            // Determine what type of removal this is
+            let removalType = null;
+            if (updates.confidence === false && updates.survivor === false) {
+                removalType = 'both';
+            } else if (updates.confidence === false) {
+                removalType = 'confidence';
+            } else if (updates.survivor === false) {
+                removalType = 'survivor';
+            }
             
-            // Build update data - need to ensure metadata object exists
+            // If removing from any pool, trigger cascading removal
+            if (removalType) {
+                console.log(`🔄 Triggering cascading removal for ${userId} from ${removalType}`);
+                
+                // Initialize removal service if needed
+                if (typeof poolRemovalService !== 'undefined' && !poolRemovalService.initialized) {
+                    await poolRemovalService.initialize(this.db);
+                }
+                
+                // Perform cascading removal
+                if (typeof poolRemovalService !== 'undefined') {
+                    const removalResult = await poolRemovalService.removeUserFromPool(
+                        userId,
+                        removalType,
+                        adminId,
+                        { skipArchive: false }
+                    );
+                    
+                    if (!removalResult.success) {
+                        console.error('Cascading removal failed:', removalResult.error);
+                        // Continue with flag update anyway
+                    } else {
+                        console.log(`✅ Cascading removal complete: ${removalResult.removalId}`);
+                    }
+                }
+            }
+            
+            // Update participation flags
+            const membersPath = this.getPoolMembersPath();
             const updateData = {};
             
             // Initialize participation structure if needed
@@ -134,15 +169,19 @@ class PoolParticipationManager {
             updateData[`${userId}.lastModified`] = new Date().toISOString();
             updateData[`${userId}.lastModifiedBy`] = adminId;
             
-            console.log('Updating participation with data:', updateData);
+            console.log('Updating participation flags:', updateData);
             
-            // Use the global Firebase functions that are available in index.html
-            // These are made available through the module imports in index.html
+            // Update the flags in Firestore
             const docRef = window.doc(this.db, membersPath);
             await window.updateDoc(docRef, updateData);
             
+            // If re-enabling, offer to restore from archive
+            if (updates.confidence === true || updates.survivor === true) {
+                console.log('ℹ️ User re-enabled - restoration available via admin panel');
+            }
+            
             console.log(`✅ Updated participation for user ${userId}:`, updates);
-            return { success: true };
+            return { success: true, removalType };
             
         } catch (error) {
             console.error('Error updating user participation:', error);
