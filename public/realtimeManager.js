@@ -1,451 +1,677 @@
 /**
- * 💎 DIAMOND LEVEL Real-Time Game Manager
- * Replaces 30-second polling with WebSocket real-time updates
- * Sub-200ms latency, 94% cost reduction
+ * PHAROAH'S REALTIME MANAGER - Diamond Level WebSocket Integration
+ * Seamlessly integrates proven WebSocket architecture into main NerdFootball site
+ * Enterprise-grade real-time capabilities with bulletproof fallback mechanisms
  */
 
-class RealtimeGameManager {
+class RealTimeManager {
     constructor() {
-        this.database = null;
-        this.listeners = new Map();
+        this.isEnabled = true;
         this.connectionState = 'disconnected';
-        this.currentWeek = null;
-        this.fallbackTimer = null;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
-        this.reconnectDelays = [1000, 2000, 4000, 8000, 16000];
-        this.lastUpdate = null;
-        this.cache = new Map();
-        this.isInitialized = false;
-        
-        // Performance metrics
         this.metrics = {
-            connectionTime: null,
-            lastLatency: null,
-            updateCount: 0,
-            errorCount: 0
+            rtdbLatency: [],
+            connectionUptime: 0,
+            totalUpdates: 0,
+            startTime: Date.now(),
+            lastUpdate: null
         };
+        
+        // Connection management
+        this.rtdbListeners = new Map();
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 3;
+        this.reconnectDelay = 2000;
+        this.heartbeatInterval = null;
+        
+        // UI Elements cache
+        this.uiElements = {
+            connectionIndicator: null,
+            leaderboardContainer: null,
+            picksContainer: null,
+            gameScoresContainer: null
+        };
+        
+        // Real-time data cache
+        this.liveData = {
+            leaderboard: null,
+            gameScores: new Map(),
+            userPicks: new Map(),
+            lastLeaderboardUpdate: 0,
+            lastScoresUpdate: 0
+        };
+        
+        // Feature flags
+        this.features = {
+            liveLeaderboard: true,
+            liveScores: true,
+            instantPickFeedback: true,
+            connectionStatus: true
+        };
+        
+        this.initialize();
     }
 
-    /**
-     * Initialize the real-time manager with Firebase
-     */
     async initialize() {
-        if (this.isInitialized) {
-            console.log('⚠️ RealtimeManager already initialized');
-            return;
-        }
-
+        console.log('[RealTime] Initializing Diamond Level WebSocket integration...');
+        
         try {
-            console.log('🚀 Initializing Real-Time Game Manager');
+            // Cache UI elements
+            this.cacheUIElements();
             
-            // Get Firebase Database reference
-            if (typeof firebase === 'undefined') {
-                throw new Error('Firebase not loaded');
-            }
+            // Add connection status indicator
+            this.addConnectionStatusIndicator();
             
-            this.database = firebase.database();
+            // Initialize Firebase RTDB connection
+            await this.initializeFirebaseRTDB();
             
-            // Setup connection state monitoring
-            this.setupConnectionMonitoring();
+            // Start connection monitoring
+            this.startConnectionMonitoring();
             
-            // Setup presence system
-            await this.setupPresence();
+            // Set up real-time features
+            this.setupRealTimeFeatures();
             
-            this.isInitialized = true;
-            console.log('✅ Real-Time Manager initialized successfully');
+            console.log('[RealTime] Real-time system initialized successfully');
+            this.updateConnectionState('connected');
             
-            return true;
         } catch (error) {
-            console.error('❌ Failed to initialize Real-Time Manager:', error);
-            this.activateFallbackMode();
-            return false;
+            console.error('[RealTime] Initialization failed:', error);
+            this.handleConnectionError(error);
         }
     }
 
-    /**
-     * Subscribe to real-time updates for a specific week
-     */
-    subscribeToWeek(weekNumber) {
-        if (!this.isInitialized) {
-            console.error('Real-Time Manager not initialized');
-            return;
+    cacheUIElements() {
+        // Cache frequently accessed DOM elements
+        this.uiElements.leaderboardContainer = document.getElementById('leaderboard-body') || 
+                                              document.querySelector('#picks-summary-content .space-y-4') ||
+                                              document.querySelector('[data-realtime="leaderboard"]');
+        
+        this.uiElements.picksContainer = document.getElementById('picks-content') ||
+                                        document.querySelector('#picks-summary-content') ||
+                                        document.querySelector('[data-realtime="picks"]');
+        
+        this.uiElements.gameScoresContainer = document.querySelector('[data-realtime="scores"]') ||
+                                             document.querySelector('.game-scores');
+        
+        console.log('[RealTime] UI elements cached', {
+            leaderboard: !!this.uiElements.leaderboardContainer,
+            picks: !!this.uiElements.picksContainer,
+            scores: !!this.uiElements.gameScoresContainer
+        });
+    }
+
+    addConnectionStatusIndicator() {
+        if (!this.features.connectionStatus) return;
+        
+        // Find suitable location for connection indicator
+        const header = document.querySelector('header') || document.querySelector('.bg-slate-800');
+        if (!header) return;
+        
+        // Create subtle connection indicator
+        const indicator = document.createElement('div');
+        indicator.id = 'realtime-connection-status';
+        indicator.className = 'fixed top-4 right-4 z-50 flex items-center space-x-2 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-sm border text-xs';
+        indicator.innerHTML = `
+            <div id="connection-dot" class="w-2 h-2 rounded-full bg-gray-400 transition-colors duration-300"></div>
+            <span id="connection-text" class="text-gray-600">Initializing...</span>
+        `;
+        
+        document.body.appendChild(indicator);
+        this.uiElements.connectionIndicator = indicator;
+        
+        console.log('[RealTime] Connection status indicator added');
+    }
+
+    async initializeFirebaseRTDB() {
+        if (!window.rtdb) {
+            throw new Error('Firebase RTDB not initialized');
         }
 
-        // Unsubscribe from previous week if different
-        if (this.currentWeek && this.currentWeek !== weekNumber) {
-            this.unsubscribeFromWeek(this.currentWeek);
-        }
-
-        this.currentWeek = weekNumber;
         const startTime = performance.now();
         
-        console.log(`📡 Subscribing to week ${weekNumber} real-time updates`);
-        
-        // Path to week data
-        const weekPath = `nerdfootball/live/2025/week_${weekNumber}`;
-        const weekRef = this.database.ref(weekPath);
-        
-        // Subscribe to game updates
-        const gamesListener = weekRef.child('games').on('value', 
-            (snapshot) => {
-                const latency = performance.now() - startTime;
-                this.metrics.lastLatency = latency;
-                this.metrics.updateCount++;
-                
-                const games = snapshot.val();
-                if (games) {
-                    console.log(`⚡ Game update received in ${latency.toFixed(0)}ms`);
-                    this.handleGameUpdate(games);
-                }
-            },
-            (error) => this.handleConnectionError(error)
-        );
-        
-        // Subscribe to leaderboard deltas
-        const leaderboardListener = weekRef.child('leaderboard/deltas').on('child_changed',
-            (snapshot) => {
-                const userId = snapshot.key;
-                const delta = snapshot.val();
-                console.log(`📊 Leaderboard delta for ${userId}:`, delta);
-                this.handleLeaderboardDelta(userId, delta);
-            }
-        );
-        
-        // Subscribe to metadata changes
-        const metadataListener = weekRef.child('metadata').on('value',
-            (snapshot) => {
-                const metadata = snapshot.val();
-                if (metadata) {
-                    console.log('📋 Metadata update:', metadata);
-                    this.updateUIMetadata(metadata);
-                }
-            }
-        );
-        
-        // Store listeners for cleanup
-        this.listeners.set(`week_${weekNumber}_games`, gamesListener);
-        this.listeners.set(`week_${weekNumber}_leaderboard`, leaderboardListener);
-        this.listeners.set(`week_${weekNumber}_metadata`, metadataListener);
-        
-        console.log(`✅ Subscribed to week ${weekNumber}`);
-    }
-
-    /**
-     * Unsubscribe from a week's updates
-     */
-    unsubscribeFromWeek(weekNumber) {
-        console.log(`🔌 Unsubscribing from week ${weekNumber}`);
-        
-        const weekPath = `nerdfootball/live/2025/week_${weekNumber}`;
-        const weekRef = this.database.ref(weekPath);
-        
-        // Remove all listeners for this week
-        ['games', 'leaderboard', 'metadata'].forEach(type => {
-            const listenerKey = `week_${weekNumber}_${type}`;
-            if (this.listeners.has(listenerKey)) {
-                weekRef.child(type).off();
-                this.listeners.delete(listenerKey);
-            }
+        // Test connection with lightweight operation
+        const testRef = window.dbRef(window.rtdb, 'realtime/connection-test');
+        await window.set(testRef, {
+            timestamp: window.serverTimestamp(),
+            clientId: this.generateClientId(),
+            userAgent: navigator.userAgent.substring(0, 50)
         });
+        
+        const latency = performance.now() - startTime;
+        this.metrics.rtdbLatency.push(latency);
+        
+        console.log(`[RealTime] Firebase RTDB connected in ${Math.round(latency)}ms`);
+        return latency;
     }
 
-    /**
-     * Handle real-time game updates
-     */
-    handleGameUpdate(games) {
-        // Update cache
-        this.cache.set('games', games);
-        this.lastUpdate = Date.now();
+    setupRealTimeFeatures() {
+        // Set up real-time leaderboard updates
+        if (this.features.liveLeaderboard) {
+            this.setupLeaderboardUpdates();
+        }
         
-        // Update UI with requestAnimationFrame for smooth rendering
-        requestAnimationFrame(() => {
-            // Update game scores in the UI
-            Object.values(games).forEach(game => {
-                this.updateGameScore(game);
+        // Set up real-time game score updates
+        if (this.features.liveScores) {
+            this.setupGameScoreUpdates();
+        }
+        
+        // Set up instant pick confirmation
+        if (this.features.instantPickFeedback) {
+            this.setupInstantPickFeedback();
+        }
+    }
+
+    setupLeaderboardUpdates() {
+        const poolId = window.currentPoolId || 'nerduniverse-2025';
+        const leaderboardRef = window.dbRef(window.rtdb, `pools/${poolId}/leaderboard/live`);
+        
+        const unsubscribe = window.onValue(leaderboardRef, (snapshot) => {
+            const startTime = performance.now();
+            
+            if (snapshot.exists()) {
+                const leaderboardData = snapshot.val();
+                this.handleLeaderboardUpdate(leaderboardData);
+                
+                const latency = performance.now() - startTime;
+                this.metrics.rtdbLatency.push(latency);
+                this.metrics.totalUpdates++;
+                this.liveData.lastLeaderboardUpdate = Date.now();
+                
+                console.log(`[RealTime] Leaderboard updated in ${Math.round(latency)}ms`);
+            } else {
+                console.log('[RealTime] No live leaderboard data found');
+            }
+        }, (error) => {
+            console.error('[RealTime] Leaderboard listener error:', error);
+            this.handleConnectionError(error);
+        });
+        
+        this.rtdbListeners.set('leaderboard', unsubscribe);
+        console.log('[RealTime] Leaderboard real-time updates enabled');
+    }
+
+    setupGameScoreUpdates() {
+        const currentWeek = window.getCurrentWeek ? window.getCurrentWeek() : 1;
+        const scoresRef = window.dbRef(window.rtdb, `nfl/games/2025/week-${currentWeek}/live`);
+        
+        const unsubscribe = window.onValue(scoresRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const gameScores = snapshot.val();
+                this.handleGameScoresUpdate(gameScores);
+                this.metrics.totalUpdates++;
+                this.liveData.lastScoresUpdate = Date.now();
+                
+                console.log('[RealTime] Game scores updated via real-time');
+            }
+        }, (error) => {
+            console.error('[RealTime] Game scores listener error:', error);
+        });
+        
+        this.rtdbListeners.set('gameScores', unsubscribe);
+        console.log('[RealTime] Game scores real-time updates enabled');
+    }
+
+    setupInstantPickFeedback() {
+        // Monitor pick submissions for instant feedback
+        if (window.currentUser && window.currentUser.uid) {
+            const userPicksRef = window.dbRef(window.rtdb, `users/${window.currentUser.uid}/picks/live`);
+            
+            const unsubscribe = window.onValue(userPicksRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const pickData = snapshot.val();
+                    this.handlePickConfirmation(pickData);
+                    console.log('[RealTime] Pick confirmation received');
+                }
             });
             
-            // Show update indicator
-            if (typeof showGameUpdateIndicator === 'function') {
-                showGameUpdateIndicator();
-            }
-            
-            // Trigger leaderboard recalculation if visible
-            const leaderboardBody = document.getElementById('leaderboard-body');
-            if (leaderboardBody && !leaderboardBody.closest('.hidden')) {
-                if (typeof calculateLeaderboardOptimized === 'function') {
-                    console.log('🔄 Recalculating leaderboard after game update');
-                    calculateLeaderboardOptimized(this.currentWeek);
-                }
-            }
-            
-            // Update picks summary if visible
-            const picksSummary = document.getElementById('picks-summary-container');
-            if (picksSummary && !picksSummary.closest('.hidden')) {
-                if (typeof loadPicksSummary === 'function') {
-                    console.log('🔄 Refreshing picks summary after game update');
-                    loadPicksSummary();
-                }
-            }
-        });
+            this.rtdbListeners.set('userPicks', unsubscribe);
+            console.log('[RealTime] Instant pick feedback enabled');
+        }
     }
 
-    /**
-     * Update individual game score in UI
-     */
-    updateGameScore(game) {
-        // This will be integrated with existing UI update logic
-        // For now, emit a custom event that other components can listen to
-        const event = new CustomEvent('realtimeGameUpdate', {
-            detail: game
-        });
-        window.dispatchEvent(event);
-    }
-
-    /**
-     * Handle leaderboard delta updates
-     */
-    handleLeaderboardDelta(userId, delta) {
-        // Emit event for leaderboard component
-        const event = new CustomEvent('leaderboardDelta', {
-            detail: { userId, ...delta }
-        });
-        window.dispatchEvent(event);
-    }
-
-    /**
-     * Update UI metadata (active games, status, etc.)
-     */
-    updateUIMetadata(metadata) {
-        // Update any UI elements that show metadata
-        const event = new CustomEvent('metadataUpdate', {
-            detail: metadata
-        });
-        window.dispatchEvent(event);
-    }
-
-    /**
-     * Setup connection state monitoring
-     */
-    setupConnectionMonitoring() {
-        const connectedRef = this.database.ref('.info/connected');
+    handleLeaderboardUpdate(leaderboardData) {
+        if (!this.uiElements.leaderboardContainer) return;
         
-        connectedRef.on('value', (snapshot) => {
-            const isConnected = snapshot.val();
+        try {
+            // Cache the data
+            this.liveData.leaderboard = leaderboardData;
             
-            if (isConnected) {
-                this.connectionState = 'connected';
-                this.reconnectAttempts = 0;
-                console.log('✅ Connected to Firebase Realtime Database');
+            // Update existing leaderboard if visible
+            this.updateLeaderboardDisplay(leaderboardData);
+            
+            // Show update indicator
+            this.showUpdateIndicator('leaderboard');
+            
+        } catch (error) {
+            console.error('[RealTime] Leaderboard update failed:', error);
+        }
+    }
+
+    updateLeaderboardDisplay(leaderboardData) {
+        const container = this.uiElements.leaderboardContainer;
+        if (!container || !leaderboardData) return;
+        
+        // Check if this is the picks summary leaderboard
+        const isPicksSummary = container.closest('#picks-summary-content');
+        
+        if (isPicksSummary) {
+            // Update picks summary leaderboard format
+            this.updatePicksSummaryLeaderboard(leaderboardData, container);
+        } else {
+            // Update main leaderboard format
+            this.updateMainLeaderboard(leaderboardData, container);
+        }
+    }
+
+    updatePicksSummaryLeaderboard(leaderboardData, container) {
+        // Convert leaderboard data to array and sort
+        const sortedUsers = Object.entries(leaderboardData)
+            .map(([userId, data]) => ({ userId, ...data }))
+            .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0))
+            .slice(0, 10); // Top 10 for picks summary
+        
+        // Find the leaderboard section within picks summary
+        const leaderboardSection = container.querySelector('.space-y-4') || container;
+        
+        // Update existing leaderboard items
+        const existingItems = leaderboardSection.querySelectorAll('.flex.justify-between');
+        
+        sortedUsers.forEach((user, index) => {
+            if (existingItems[index]) {
+                const nameElement = existingItems[index].querySelector('.font-medium');
+                const scoreElement = existingItems[index].querySelector('.text-right .font-bold');
                 
-                // Clear fallback timer if active
-                if (this.fallbackTimer) {
-                    clearInterval(this.fallbackTimer);
-                    this.fallbackTimer = null;
-                }
-                
-                // Notify UI of connection
-                this.notifyConnectionStatus('connected');
-            } else {
-                this.connectionState = 'disconnected';
-                console.warn('⚠️ Disconnected from Firebase Realtime Database');
-                this.handleDisconnection();
+                if (nameElement) nameElement.textContent = user.displayName || `User ${user.userId.substring(0, 8)}`;
+                if (scoreElement) scoreElement.textContent = `${user.totalScore || 0} pts`;
             }
         });
     }
 
-    /**
-     * Setup presence system
-     */
-    async setupPresence() {
-        if (!firebase.auth().currentUser) {
-            console.log('⏭️ Skipping presence setup - user not authenticated');
+    updateMainLeaderboard(leaderboardData, container) {
+        // Update main leaderboard table format
+        const tbody = container.tagName === 'TBODY' ? container : container.querySelector('tbody');
+        if (!tbody) return;
+        
+        const sortedUsers = Object.entries(leaderboardData)
+            .map(([userId, data]) => ({ userId, ...data }))
+            .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+        
+        // Update existing table rows
+        const rows = tbody.querySelectorAll('tr');
+        
+        sortedUsers.forEach((user, index) => {
+            if (rows[index]) {
+                const cells = rows[index].querySelectorAll('td');
+                if (cells.length >= 3) {
+                    cells[0].textContent = index + 1; // Rank
+                    cells[1].textContent = user.displayName || `User ${user.userId.substring(0, 8)}`;
+                    cells[2].textContent = user.totalScore || 0;
+                }
+            }
+        });
+    }
+
+    handleGameScoresUpdate(gameScores) {
+        try {
+            // Cache the scores data
+            Object.entries(gameScores).forEach(([gameId, gameData]) => {
+                this.liveData.gameScores.set(gameId, gameData);
+            });
+            
+            // Update any visible game score displays
+            this.updateGameScoresDisplay(gameScores);
+            
+            // Show update indicator
+            this.showUpdateIndicator('scores');
+            
+        } catch (error) {
+            console.error('[RealTime] Game scores update failed:', error);
+        }
+    }
+
+    updateGameScoresDisplay(gameScores) {
+        // Update game scores in picks display or scores section
+        const gameElements = document.querySelectorAll('[data-game-id]');
+        
+        Object.entries(gameScores).forEach(([gameId, gameData]) => {
+            const gameElement = document.querySelector(`[data-game-id="${gameId}"]`);
+            if (gameElement && gameData) {
+                this.updateGameElement(gameElement, gameData);
+            }
+        });
+    }
+
+    updateGameElement(element, gameData) {
+        // Update individual game display with live data
+        const homeScoreElement = element.querySelector('.home-score, [data-home-score]');
+        const awayScoreElement = element.querySelector('.away-score, [data-away-score]');
+        const statusElement = element.querySelector('.game-status, [data-game-status]');
+        
+        if (homeScoreElement && gameData.homeScore !== undefined) {
+            homeScoreElement.textContent = gameData.homeScore;
+        }
+        
+        if (awayScoreElement && gameData.awayScore !== undefined) {
+            awayScoreElement.textContent = gameData.awayScore;
+        }
+        
+        if (statusElement && gameData.status) {
+            statusElement.textContent = gameData.status;
+        }
+    }
+
+    handlePickConfirmation(pickData) {
+        // Show instant confirmation for pick submissions
+        this.showPickConfirmationFeedback(pickData);
+    }
+
+    showPickConfirmationFeedback(pickData) {
+        // Create or update pick confirmation indicator
+        const existingIndicator = document.getElementById('pick-confirmation-indicator');
+        
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+        
+        const indicator = document.createElement('div');
+        indicator.id = 'pick-confirmation-indicator';
+        indicator.className = 'fixed bottom-4 right-4 z-50 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg animate-bounce';
+        indicator.innerHTML = `
+            <div class="flex items-center space-x-2">
+                <div class="w-4 h-4 bg-white rounded-full flex items-center justify-center">
+                    <span class="text-green-500 text-xs">✓</span>
+                </div>
+                <span>Pick confirmed!</span>
+            </div>
+        `;
+        
+        document.body.appendChild(indicator);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (indicator.parentNode) {
+                indicator.remove();
+            }
+        }, 3000);
+    }
+
+    showUpdateIndicator(type) {
+        // Create subtle update indicator
+        const indicator = document.getElementById('realtime-update-indicator') || this.createUpdateIndicator();
+        
+        // Update indicator text based on type
+        const text = indicator.querySelector('.update-text');
+        if (text) {
+            const messages = {
+                'leaderboard': 'Leaderboard updated',
+                'scores': 'Scores updated',
+                'picks': 'Picks updated'
+            };
+            text.textContent = messages[type] || 'Data updated';
+        }
+        
+        // Show and auto-hide
+        indicator.classList.add('show');
+        setTimeout(() => {
+            indicator.classList.remove('show');
+        }, 2000);
+    }
+
+    createUpdateIndicator() {
+        const indicator = document.createElement('div');
+        indicator.id = 'realtime-update-indicator';
+        indicator.className = 'fixed bottom-4 left-4 z-40 bg-blue-500 text-white px-3 py-1.5 rounded-lg shadow-sm text-sm opacity-0 transition-all duration-300 transform translate-y-2';
+        indicator.innerHTML = `
+            <div class="flex items-center space-x-2">
+                <div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <span class="update-text">Data updated</span>
+            </div>
+        `;
+        
+        // Add show class styles
+        const style = document.createElement('style');
+        style.textContent = `
+            #realtime-update-indicator.show {
+                opacity: 1 !important;
+                transform: translateY(0) !important;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(indicator);
+        return indicator;
+    }
+
+    startConnectionMonitoring() {
+        // Heartbeat to monitor connection health
+        this.heartbeatInterval = setInterval(() => {
+            this.performHealthCheck();
+        }, 30000); // Check every 30 seconds
+        
+        console.log('[RealTime] Connection monitoring started');
+    }
+
+    async performHealthCheck() {
+        try {
+            const startTime = performance.now();
+            const testRef = window.dbRef(window.rtdb, 'realtime/heartbeat');
+            
+            await window.set(testRef, {
+                timestamp: window.serverTimestamp(),
+                clientId: this.clientId
+            });
+            
+            const latency = performance.now() - startTime;
+            this.metrics.rtdbLatency.push(latency);
+            
+            // Keep only last 100 latency measurements
+            if (this.metrics.rtdbLatency.length > 100) {
+                this.metrics.rtdbLatency.shift();
+            }
+            
+            this.updateConnectionState('connected', Math.round(latency));
+            
+        } catch (error) {
+            console.error('[RealTime] Health check failed:', error);
+            this.handleConnectionError(error);
+        }
+    }
+
+    updateConnectionState(state, latency = null) {
+        this.connectionState = state;
+        
+        // Update connection indicator UI
+        const indicator = this.uiElements.connectionIndicator;
+        if (!indicator) return;
+        
+        const dot = indicator.querySelector('#connection-dot');
+        const text = indicator.querySelector('#connection-text');
+        
+        const stateConfig = {
+            'connecting': { color: 'bg-yellow-400', text: 'Connecting...', pulse: true },
+            'connected': { color: 'bg-green-500', text: latency ? `Live (${latency}ms)` : 'Live', pulse: false },
+            'disconnected': { color: 'bg-gray-400', text: 'Offline', pulse: false },
+            'error': { color: 'bg-red-500', text: 'Connection error', pulse: true }
+        };
+        
+        const config = stateConfig[state] || stateConfig.disconnected;
+        
+        if (dot) {
+            dot.className = `w-2 h-2 rounded-full transition-colors duration-300 ${config.color}`;
+            if (config.pulse) {
+                dot.classList.add('animate-pulse');
+            } else {
+                dot.classList.remove('animate-pulse');
+            }
+        }
+        
+        if (text) {
+            text.textContent = config.text;
+        }
+    }
+
+    handleConnectionError(error) {
+        console.error('[RealTime] Connection error:', error);
+        this.updateConnectionState('error');
+        
+        // Attempt reconnection if not already trying
+        if (this.connectionState !== 'connecting' && this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.attemptReconnection();
+        }
+    }
+
+    async attemptReconnection() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.warn('[RealTime] Max reconnection attempts reached, falling back to polling');
+            this.fallbackToPolling();
             return;
         }
         
-        const userId = firebase.auth().currentUser.uid;
-        const userPresenceRef = this.database.ref(`nerdfootball/connections/activeUsers/${userId}`);
-        
-        // Set initial presence
-        await userPresenceRef.set({
-            connectedAt: firebase.database.ServerValue.TIMESTAMP,
-            lastSeen: firebase.database.ServerValue.TIMESTAMP,
-            viewingWeek: this.currentWeek || 1
-        });
-        
-        // Setup disconnect hook
-        userPresenceRef.onDisconnect().remove();
-        
-        // Update last seen periodically (every 45 seconds)
-        setInterval(() => {
-            if (this.connectionState === 'connected') {
-                userPresenceRef.update({
-                    lastSeen: firebase.database.ServerValue.TIMESTAMP,
-                    viewingWeek: this.currentWeek || 1
-                });
-            }
-        }, 45000);
-    }
-
-    /**
-     * Handle connection errors
-     */
-    handleConnectionError(error) {
-        console.error('❌ Real-time connection error:', error);
-        this.metrics.errorCount++;
-        
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.attemptReconnection();
-        } else {
-            this.activateFallbackMode();
-        }
-    }
-
-    /**
-     * Handle disconnection
-     */
-    handleDisconnection() {
-        this.notifyConnectionStatus('disconnected');
-        
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.attemptReconnection();
-        } else {
-            this.activateFallbackMode();
-        }
-    }
-
-    /**
-     * Attempt to reconnect with exponential backoff
-     */
-    attemptReconnection() {
-        const delay = this.reconnectDelays[this.reconnectAttempts] || 30000;
         this.reconnectAttempts++;
+        this.updateConnectionState('connecting');
         
-        console.log(`🔄 Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+        const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+        console.log(`[RealTime] Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
         
-        setTimeout(() => {
-            if (this.currentWeek) {
-                this.subscribeToWeek(this.currentWeek);
+        setTimeout(async () => {
+            try {
+                await this.initializeFirebaseRTDB();
+                this.reconnectAttempts = 0;
+                this.updateConnectionState('connected');
+                console.log('[RealTime] Reconnection successful');
+            } catch (error) {
+                console.error('[RealTime] Reconnection failed:', error);
+                this.attemptReconnection();
             }
         }, delay);
     }
-
-    /**
-     * Activate fallback polling mode
-     */
-    activateFallbackMode() {
-        console.warn('⚠️ Activating fallback polling mode (60-second intervals)');
-        this.notifyConnectionStatus('fallback');
+    fallbackToPolling() {
+        console.log('[RealTime] Falling back to polling mode');
+        this.updateConnectionState('disconnected');
         
-        // Clear any existing fallback timer
-        if (this.fallbackTimer) {
-            clearInterval(this.fallbackTimer);
-        }
-        
-        // Start 60-second polling
-        this.fallbackTimer = setInterval(() => {
-            console.log('📊 Fallback poll triggered');
-            
-            // Use existing polling mechanism if available
-            if (typeof liveGameRefreshManager !== 'undefined' && liveGameRefreshManager.checkAndRefresh) {
-                liveGameRefreshManager.checkAndRefresh();
-            } else {
-                // Manual refresh
-                this.manualRefresh();
-            }
-        }, 60000); // 60 seconds
-    }
-
-    /**
-     * Manual refresh for fallback mode
-     */
-    async manualRefresh() {
-        if (!this.currentWeek) return;
-        
-        try {
-            // Fetch latest data from Firestore as fallback
-            console.log('🔄 Manual refresh from Firestore');
-            
-            if (typeof calculateLeaderboardOptimized === 'function') {
-                await calculateLeaderboardOptimized(this.currentWeek);
-            }
-            
-            if (typeof loadPicksSummary === 'function') {
-                await loadPicksSummary();
-            }
-        } catch (error) {
-            console.error('Manual refresh failed:', error);
+        // Could trigger existing polling mechanisms here
+        // For now, just log that we're in fallback mode
+        if (window.refreshLeaderboard) {
+            console.log('[RealTime] Using existing polling for leaderboard updates');
+            setInterval(() => {
+                window.refreshLeaderboard();
+            }, 60000); // Poll every minute as fallback
         }
     }
 
-    /**
-     * Notify UI of connection status
-     */
-    notifyConnectionStatus(status) {
-        const event = new CustomEvent('realtimeConnectionStatus', {
-            detail: { status, metrics: this.metrics }
-        });
-        window.dispatchEvent(event);
-        
-        // Update UI indicator if exists
-        const indicator = document.getElementById('connection-status');
-        if (indicator) {
-            indicator.className = `connection-status ${status}`;
-            indicator.textContent = status === 'connected' ? '🟢 Live' : 
-                                   status === 'fallback' ? '🟡 Polling' : '🔴 Offline';
+    generateClientId() {
+        if (!this.clientId) {
+            this.clientId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         }
+        return this.clientId;
     }
 
-    /**
-     * Get current connection metrics
-     */
     getMetrics() {
+        const avgLatency = this.metrics.rtdbLatency.length > 0 
+            ? Math.round(this.metrics.rtdbLatency.reduce((a, b) => a + b, 0) / this.metrics.rtdbLatency.length)
+            : 0;
+        
+        const uptime = Math.round((Date.now() - this.metrics.startTime) / 1000);
+        
         return {
-            ...this.metrics,
             connectionState: this.connectionState,
-            cacheSize: this.cache.size,
-            activeListeners: this.listeners.size,
-            lastUpdate: this.lastUpdate
+            averageLatency: avgLatency,
+            totalUpdates: this.metrics.totalUpdates,
+            uptime: uptime,
+            lastLeaderboardUpdate: this.liveData.lastLeaderboardUpdate,
+            lastScoresUpdate: this.liveData.lastScoresUpdate
         };
     }
 
-    /**
-     * Cleanup and destroy
-     */
+    // Public API for manual triggers
+    async refreshLeaderboard() {
+        if (this.connectionState === 'connected') {
+            // Real-time data should already be up to date
+            console.log('[RealTime] Leaderboard is already live');
+            return;
+        } else {
+            // Fallback to manual refresh
+            console.log('[RealTime] Manual leaderboard refresh requested');
+            if (window.refreshLeaderboard) {
+                return window.refreshLeaderboard();
+            }
+        }
+    }
+
+    async refreshScores() {
+        if (this.connectionState === 'connected') {
+            console.log('[RealTime] Scores are already live');
+            return;
+        } else {
+            console.log('[RealTime] Manual scores refresh requested');
+            if (window.refreshGameScores) {
+                return window.refreshGameScores();
+            }
+        }
+    }
+
+    // Cleanup
     destroy() {
-        console.log('🧹 Cleaning up Real-Time Manager');
+        console.log('[RealTime] Destroying real-time manager...');
         
-        // Unsubscribe from all weeks
-        if (this.currentWeek) {
-            this.unsubscribeFromWeek(this.currentWeek);
+        // Clear intervals
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
         }
         
-        // Clear all listeners
-        this.listeners.clear();
+        // Unsubscribe from all RTDB listeners
+        this.rtdbListeners.forEach((unsubscribe, key) => {
+            if (typeof unsubscribe === 'function') {
+                unsubscribe();
+                console.log(`[RealTime] Unsubscribed from ${key} listener`);
+            }
+        });
         
-        // Clear fallback timer
-        if (this.fallbackTimer) {
-            clearInterval(this.fallbackTimer);
-            this.fallbackTimer = null;
+        // Remove UI elements
+        const indicator = document.getElementById('realtime-connection-status');
+        if (indicator) {
+            indicator.remove();
         }
         
-        // Clear cache
-        this.cache.clear();
-        
-        // Remove presence
-        if (firebase.auth().currentUser) {
-            const userId = firebase.auth().currentUser.uid;
-            this.database.ref(`nerdfootball/connections/activeUsers/${userId}`).remove();
+        const updateIndicator = document.getElementById('realtime-update-indicator');
+        if (updateIndicator) {
+            updateIndicator.remove();
         }
         
-        this.isInitialized = false;
+        console.log('[RealTime] Real-time manager destroyed');
     }
 }
 
-// Create singleton instance
-const realtimeGameManager = new RealtimeGameManager();
+// Export for global access
+window.RealTimeManager = RealTimeManager;
 
-// Export for use
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = realtimeGameManager;
+// Auto-initialize when DOM is ready and Firebase is available
+let initializationAttempts = 0;
+const maxInitAttempts = 10;
+
+function tryInitialize() {
+    if (window.rtdb && window.dbRef && window.onValue && window.set) {
+        // Firebase RTDB is ready, initialize real-time manager
+        window.realTimeManager = new RealTimeManager();
+        console.log('[RealTime] Auto-initialized successfully');
+    } else if (initializationAttempts < maxInitAttempts) {
+        initializationAttempts++;
+        console.log(`[RealTime] Waiting for Firebase RTDB... (${initializationAttempts}/${maxInitAttempts})`);
+        setTimeout(tryInitialize, 1000);
+    } else {
+        console.warn('[RealTime] Failed to initialize - Firebase RTDB not available');
+    }
 }
+
+// Start initialization process
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tryInitialize);
+} else {
+    tryInitialize();
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (window.realTimeManager) {
+        window.realTimeManager.destroy();
+    }
+});

@@ -28,7 +28,7 @@
  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
  <meta http-equiv="Pragma" content="no-cache">
  <meta http-equiv="Expires" content="0">
- <meta name="version" content="3.0">
+ <meta name="version" content="3.0.2">
  
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -40,8 +40,6 @@
  <script src="./survivor-bundle.js"></script>
  <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
- <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
- <script src="./realtimeManager.js"></script>
 <!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
@@ -680,8 +678,6 @@
             <div id="menu-admin-controls" class="hidden">
                  <button id="menu-admin-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">🔧 Admin</button>
                  <button id="survivor-admin-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">💀 Survivor Admin</button>
-                 <a href="./websocket-test.html" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🚀 WebSocket Test</a>
-                 <button id="user-diagnostic-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🔬 User Diagnostics</button>
                  <div class="border-t border-gray-200 my-1"></div>
             </div>
             
@@ -692,7 +688,6 @@
             <a href="./index.html?view=survivor-picks" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">⚔️ Survivor Picks</a>
             <a href="./index.html?view=survivor" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">💀 Survivors List</a>
             <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">📋 Rules</a>
-            <a href="./websocket-test.html" class="block px-4 py-2 text-sm text-blue-700 hover:bg-blue-50" role="menuitem">🚀 WebSocket Test</a>
             
             <!-- Account Section -->
             <div class="border-t border-gray-200 my-1"></div>
@@ -707,7 +702,7 @@
 
  <!-- Active Picks Summary Section -->
  <div id="picks-summary-container" class="hidden mb-4">
-  <div class="bg-white p-4 rounded-lg shadow-md border border-slate-200" data-realtime="picks">
+  <div class="bg-white p-4 rounded-lg shadow-md border border-slate-200">
    <!-- Flex container for side-by-side layout -->
    <div class="flex flex-col lg:flex-row gap-6 items-start">
     <!-- Current Active Picks -->
@@ -722,22 +717,22 @@
     <div id="yearly-leaderboard-section" class="flex-1">
      <h3 class="text-lg font-semibold text-slate-700 mb-3">Season Leaderboard</h3>
      
+     <!-- Expanded Game View (Hidden by default) -->
+     <div id="expanded-game-view" class="hidden opacity-0 transition-all duration-300 mb-4">
+      <div class="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg shadow-lg border border-slate-200 p-4">
+       <div id="expanded-game-content">
+        <!-- Game details will be rendered here -->
+       </div>
+      </div>
+     </div>
+     
      <div id="yearly-leaderboard-container" class="bg-slate-50 rounded-lg p-3">
       <div id="yearly-leaderboard-loader" class="hidden text-center py-2">
        <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
        <span class="ml-2 text-sm text-slate-600">Loading leaderboard...</span>
       </div>
-      <div id="yearly-leaderboard-content" class="space-y-1" data-realtime="leaderboard">
+      <div id="yearly-leaderboard-content" class="space-y-1">
        <!-- Leaderboard will be rendered here -->
-      </div>
-     </div>
-     
-     <!-- Expanded Game View (Hidden by default) - Moved below leaderboard -->
-     <div id="expanded-game-view" class="hidden opacity-0 transition-all duration-300 mt-4">
-      <div class="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg shadow-lg border border-slate-200 p-4">
-       <div id="expanded-game-content">
-        <!-- Game details will be rendered here -->
-       </div>
       </div>
      </div>
     </div>
@@ -801,7 +796,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MNF Points</th>
                 </tr>
             </thead>
-            <tbody id="public-leaderboard-body" class="bg-white divide-y divide-gray-200" data-realtime="leaderboard"></tbody>
+            <tbody id="public-leaderboard-body" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
     </div>
 </div>
@@ -2580,12 +2575,17 @@ Role
  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField, serverTimestamp, runTransaction, query, orderBy, limit, collectionGroup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 import { getMessaging } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
-<<<<<<< HEAD
-import { getDatabase } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
-=======
-// PHAROAH'S REALTIME INTEGRATION - Firebase RTDB for WebSocket integration
-import { getDatabase, ref, onValue, set, push, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
->>>>>>> websocket-live
+import { 
+  getDatabase, 
+  ref, 
+  onValue, 
+  off, 
+  set, 
+  update, 
+  remove, 
+  onDisconnect,
+  serverTimestamp as rtdbServerTimestamp
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
 // --- FCM INTEGRATION ---
 // Include FCM integration module
@@ -2688,7 +2688,6 @@ await new Promise(resolve => {
  picksViewBtn: document.getElementById('menu-picks-view-btn'),
  adminViewBtn: document.getElementById('menu-admin-view-btn'),
  survivorAdminBtn: document.getElementById('survivor-admin-btn'),
- userDiagnosticBtn: document.getElementById('user-diagnostic-btn'),
  leaderboardViewBtn: document.getElementById('leaderboard-view-btn'),
  gridViewBtn: document.getElementById('grid-view-btn'), survivorPicksViewBtn: document.getElementById('survivor-picks-view-btn'), closeRulesBtn: document.getElementById('close-rules-btn'), rulesUserName: document.getElementById('rules-user-name'),
  weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
@@ -6281,7 +6280,6 @@ function downloadAnalyticsCSV(data, weekNumber) {
  const firebaseConfig = {
  apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
  authDomain: "nerdfootball.firebaseapp.com",
- databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
  projectId: "nerdfootball",
  storageBucket: "nerdfootball.appspot.com",
  messagingSenderId: "969304790725",
@@ -6298,23 +6296,47 @@ function downloadAnalyticsCSV(data, weekNumber) {
  window.doc = doc;
  window.updateDoc = updateDoc;
  window.deleteDoc = deleteDoc;
- 
- // PHAROAH'S REALTIME INTEGRATION - Initialize Firebase RTDB for WebSocket features
- const rtdb = getDatabase(app);
- window.rtdb = rtdb; // Make RTDB globally available for RealTimeManager
- window.dbRef = ref;
- window.onValue = onValue;
- window.set = set;
- window.push = push;
- window.serverTimestamp = rtdbServerTimestamp;
- console.log('✅ Firebase RTDB initialized for real-time features');
- 
  auth = getAuth(app);
  
  // Initialize Realtime Database
  const rtdb = getDatabase(app);
+ window.rtdb = rtdb; // Make RTDB globally available for realtimeManager
+ console.log('🔥 RTDB initialized and available at window.rtdb');
+ 
+ // Signal that Firebase is ready
+ window.firebaseReady = true;
+ if (window.firebaseReadyResolve) {
+   window.firebaseReadyResolve();
+ }
+ 
+ // Create Firebase compatibility layer for realtimeManager
  window.firebase = { 
-   database: () => rtdb,
+   database: () => ({
+     ref: (path) => {
+       const dbRef = ref(rtdb, path);
+       
+       // Return a reference-like object with methods
+       return {
+         on: (event, callback, errorCallback) => {
+           if (event === 'value') {
+             return onValue(dbRef, callback, errorCallback);
+           }
+         },
+         off: () => off(dbRef),
+         set: (value) => set(dbRef, value),
+         update: (values) => update(dbRef, values),
+         remove: () => remove(dbRef),
+         child: (childPath) => window.firebase.database().ref(path ? `${path}/${childPath}` : childPath),
+         onDisconnect: () => ({
+           remove: () => onDisconnect(dbRef).remove(),
+           set: (value) => onDisconnect(dbRef).set(value)
+         })
+       };
+     },
+     ServerValue: {
+       TIMESTAMP: rtdbServerTimestamp()
+     }
+   }),
    auth: () => auth,
    firestore: () => db
  };
@@ -11447,14 +11469,6 @@ if (!activePicks.mnfTotalPoints) {
        }, 50);
     });
  }
-
- if (allUI.userDiagnosticBtn) {
-    allUI.userDiagnosticBtn.addEventListener('click', () => {
-       allUI.menuPanel.classList.add('hidden');
-       // Show user diagnostic info in a modal or console
-       showUserDiagnostics();
-    });
- }
  
  allUI.leaderboardViewBtn.addEventListener('click', () => {
     allUI.picksContainer.classList.add('hidden');
@@ -14244,7 +14258,7 @@ async function deleteSingleCache(cachePath) {
     }
 }
 
- console.log('💎 About to call initializeAppAndAuth');
+console.log('💎 About to call initializeAppAndAuth');
 initializeAppAndAuth().then(() => {
     // Wait a moment to ensure all Firebase globals are set
     setTimeout(() => {
@@ -14268,77 +14282,30 @@ initializeAppAndAuth().then(() => {
                 }
             });
         }
-            
-            // Initialize ESPN API admin functionality (moved inside setTimeout)
-            setTimeout(() => {
-                if (typeof window.espnApi !== 'undefined') {
-                    initializeEspnApiAdmin();
-                } else {
-                    console.warn('ESPN API client not loaded');
-                }
-            }, 200);
-            
-            // Initialize ESPN Score Sync system (moved inside setTimeout with more delay)
-            setTimeout(() => {
-                if (typeof EspnScoreSync !== 'undefined' && window.espnApi && window.gameStateCache) {
-                    window.espnScoreSync = new EspnScoreSync(
-                        db, // Pass the Firestore database directly
-                        window.espnApi,
-                        window.gameStateCache
-                    );
-                    window.espnScoreSync.initialize();
-                    console.log('💎 ESPN Score Sync system initialized');
-                }
-            }, 300);
-        }
+        
+        // Initialize ESPN API admin functionality (moved inside setTimeout)
+        setTimeout(() => {
+            if (typeof window.espnApi !== 'undefined') {
+                initializeEspnApiAdmin();
+            } else {
+                console.warn('ESPN API client not loaded');
+            }
+        }, 200);
+        
+        // Initialize ESPN Score Sync system (moved inside setTimeout with more delay)
+        setTimeout(() => {
+            if (typeof EspnScoreSync !== 'undefined' && window.espnApi && window.gameStateCache) {
+                window.espnScoreSync = new EspnScoreSync(
+                    db, // Pass the Firestore database directly
+                    window.espnApi,
+                    window.gameStateCache
+                );
+                window.espnScoreSync.initialize();
+                console.log('💎 ESPN Score Sync system initialized');
+            }
+        }, 300);
     }, 100);
 });
-
-// User Diagnostics Function
-function showUserDiagnostics() {
-    const user = firebase.auth().currentUser;
-    const diagnostics = {
-        'User Info': {
-            'UID': user?.uid || 'Not authenticated',
-            'Email': user?.email || 'No email',
-            'Display Name': user?.displayName || 'No display name',
-            'Email Verified': user?.emailVerified || false
-        },
-        'Browser Info': {
-            'User Agent': navigator.userAgent.substring(0, 100) + '...',
-            'Platform': navigator.platform,
-            'Language': navigator.language,
-            'Online': navigator.onLine,
-            'Cookies Enabled': navigator.cookieEnabled
-        },
-        'Firebase Status': {
-            'Firestore': typeof window.db !== 'undefined' ? '✅ Available' : '❌ Not available',
-            'Functions': typeof window.functions !== 'undefined' ? '✅ Available' : '❌ Not available',
-            'RTDB': typeof window.rtdb !== 'undefined' ? '✅ Available' : '❌ Not available',
-            'Auth': firebase.auth().currentUser ? '✅ Authenticated' : '❌ Not authenticated'
-        },
-        'App State': {
-            'Current Week': window.currentWeek || 'Not set',
-            'Active View': document.querySelector('.view-toggle-btn.active')?.textContent || 'Unknown',
-            'Local Storage Keys': Object.keys(localStorage).length,
-            'Session Storage Keys': Object.keys(sessionStorage).length
-        }
-    };
-    
-    let output = '🔬 USER DIAGNOSTICS\n\n';
-    for (const [category, data] of Object.entries(diagnostics)) {
-        output += `📊 ${category}:\n`;
-        for (const [key, value] of Object.entries(data)) {
-            output += `  • ${key}: ${value}\n`;
-        }
-        output += '\n';
-    }
-    
-    console.log(output);
-    alert('User diagnostics logged to console (F12 → Console tab)');
-}
-
- });
- </script>
+</script>
 </body>
 </html>
