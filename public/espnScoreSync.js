@@ -204,37 +204,24 @@ class EspnScoreSync {
             }
         }));
         
-        // If on admin results tab, show notification
+        // If on admin results tab, show football indicator
         const adminSection = document.getElementById('admin-content-game-results');
         if (adminSection && !adminSection.classList.contains('hidden')) {
-            this.showSyncNotification(`ESPN Sync: Updated ${updatedCount} games`, 'success');
+            // Use the football indicator instead of notification
+            if (typeof window.showGameUpdateIndicator === 'function') {
+                window.showGameUpdateIndicator();
+            }
         }
     }
 
-    // Show sync notification in UI
+    // Show sync notification in UI - replaced with football indicator
     showSyncNotification(message, type = 'info') {
-        // Find or create notification container
-        let notificationContainer = document.getElementById('espn-sync-notification');
-        if (!notificationContainer) {
-            notificationContainer = document.createElement('div');
-            notificationContainer.id = 'espn-sync-notification';
-            notificationContainer.className = 'fixed top-4 right-4 z-50';
-            document.body.appendChild(notificationContainer);
+        // Use the football indicator instead of popup notification
+        if (typeof window.showGameUpdateIndicator === 'function') {
+            window.showGameUpdateIndicator();
         }
-        
-        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
-        
-        notificationContainer.innerHTML = `
-            <div class="${bgColor} text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2">
-                <span>🔄</span>
-                <span>${message}</span>
-            </div>
-        `;
-        
-        // Auto-hide after 5 seconds
-        setTimeout(() => {
-            notificationContainer.innerHTML = '';
-        }, 5000);
+        // Log to console for debugging
+        console.log(`ESPN Sync: ${message}`);
     }
 
     // Start automatic syncing for live games

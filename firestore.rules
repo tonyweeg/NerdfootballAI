@@ -151,6 +151,29 @@ service cloud.firestore {
     }
     
     // ============================================
+    // UNIFIED CONFIDENCE SYSTEM - Enterprise Performance
+    // ============================================
+    
+    // Unified confidence documents - Single document per week with all picks
+    // Reduces reads from 500-900 to 1-2 per leaderboard load
+    match /artifacts/nerdfootball/pools/{poolId}/confidence/{year}/weeks/{week} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isPoolMember(poolId) || isGlobalAdmin());
+    }
+    
+    // Season confidence summary - Pre-computed season totals
+    match /artifacts/nerdfootball/pools/{poolId}/confidence/{year}/summary {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (isPoolMember(poolId) || isGlobalAdmin());
+    }
+    
+    // Legacy confidence picks (for dual-write compatibility)
+    match /artifacts/nerdfootball/pools/{poolId}/picks/{year}/weeks/{week}/users/{userId} {
+      allow read: if isAuthenticated() && (isPoolMember(poolId) || isGlobalAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isPoolAdmin(poolId) || isGlobalAdmin());
+    }
+    
+    // ============================================
     // POOL CONFIGS
     // ============================================
     

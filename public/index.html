@@ -45,11 +45,90 @@
  <script src="./espnScoreSync.js"></script>
 <!-- DISABLED: survivorAutoElimination.js - replaced with clean ESPN-powered survivorSystem.js -->
  <script src="./enhancedGameDataDisplay.js"></script>
- <script src="./liveGameRefresh.js"></script>
+ <script src="./liveGameRefresh.js?v=2"></script>
+ <!-- CONFIDENCE-ON-CRACK: Enterprise Performance System -->
+ <script src="./ConfidenceErrorHandler.js"></script>
+ <script src="./ConfidencePerformanceMonitor.js"></script>
+ <script src="./UnifiedConfidenceManager.js"></script>
+ <script src="./ConfidenceIntegrationLayer.js"></script>
 <!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
  font-family: 'Inter', sans-serif;
+ }
+ 
+ /* Cache Status Indicator Styles */
+ #cache-status-glyph {
+   transition: background-color 0.3s ease;
+ }
+ 
+ #cache-status-glyph.current {
+   background-color: rgb(34 197 94); /* green-500 */
+   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+ }
+ 
+ #cache-status-glyph.stale {
+   background-color: rgb(250 204 21); /* yellow-400 */
+   animation: pulse-subtle 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+ }
+ 
+ #cache-status-glyph.refreshing {
+   background-color: rgb(59 130 246); /* blue-500 */
+   animation: pulse-fast 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+ }
+ 
+ #cache-status-glyph.outdated {
+   background-color: rgb(156 163 175); /* gray-400 */
+   animation: none;
+ }
+ 
+ @keyframes pulse-subtle {
+   0%, 100% {
+     opacity: 1;
+   }
+   50% {
+     opacity: 0.7;
+   }
+ }
+ 
+ @keyframes pulse-fast {
+   0%, 100% {
+     opacity: 1;
+     transform: scale(1);
+   }
+   50% {
+     opacity: 0.5;
+     transform: scale(1.1);
+   }
+ }
+ 
+ /* Game Update Indicator Animation */
+ #game-update-indicator {
+   animation: bounce-in 0.5s ease-out;
+ }
+ 
+ #game-update-indicator.show {
+   display: block !important;
+   opacity: 1 !important;
+ }
+ 
+ #game-update-indicator.fade-out {
+   opacity: 0 !important;
+   transition: opacity 1s ease-out;
+ }
+ 
+ @keyframes bounce-in {
+   0% {
+     transform: scale(0) rotate(0deg);
+     opacity: 0;
+   }
+   50% {
+     transform: scale(1.2) rotate(180deg);
+   }
+   100% {
+     transform: scale(1) rotate(360deg);
+     opacity: 1;
+   }
  }
  
  /* NFL Team Helmet Icons - Cached CSS backgrounds */
@@ -325,6 +404,53 @@
     background-position: center;
     display: inline-block;
   }
+  
+  /* Game update glow effect */
+  .game-updated-glow {
+    animation: game-glow 3s ease-out !important;
+    position: relative !important;
+  }
+  
+  @keyframes game-glow {
+    0% {
+      box-shadow: 0 0 10px 2px rgba(59, 130, 246, 1), 
+                  0 0 20px 4px rgba(59, 130, 246, 0.8),
+                  inset 0 0 10px rgba(59, 130, 246, 0.3) !important;
+      border-color: rgb(59, 130, 246) !important;
+      background-color: rgba(59, 130, 246, 0.05) !important;
+    }
+    50% {
+      box-shadow: 0 0 15px 5px rgba(59, 130, 246, 0.6), 
+                  0 0 30px 10px rgba(59, 130, 246, 0.4),
+                  inset 0 0 15px rgba(59, 130, 246, 0.2) !important;
+      border-color: rgb(96, 165, 250) !important;
+      background-color: rgba(96, 165, 250, 0.08) !important;
+    }
+    100% {
+      box-shadow: none;
+      border-color: initial;
+      background-color: initial;
+    }
+  }
+  
+  /* Make glow work on buttons too */
+  button.game-updated-glow,
+  .winner-btn.game-updated-glow,
+  .result-btn.game-updated-glow {
+    animation: button-glow 3s ease-out !important;
+  }
+  
+  @keyframes button-glow {
+    0%, 100% {
+      transform: scale(1);
+    }
+    25% {
+      transform: scale(1.05);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+  }
  </style>
 </head>
 <body class="bg-slate-200 text-slate-800">
@@ -495,6 +621,20 @@
  </a>
  <!-- Right side elements -->
  <div class="flex items-center space-x-4">
+ <!-- Status Indicators -->
+ <div class="flex items-center space-x-2">
+    <!-- Game Update Indicator -->
+    <div id="game-update-indicator" class="hidden opacity-0 transition-opacity duration-500" title="Game Updated">
+        <span class="text-lg">🏈</span>
+    </div>
+    <!-- Cache Status Indicator -->
+    <div id="cache-status-indicator" class="relative group" title="Cache Status">
+        <div id="cache-status-glyph" class="w-3 h-3 rounded-full bg-green-500 animate-pulse cursor-pointer"></div>
+        <div class="absolute right-0 mt-2 w-48 bg-slate-800 text-white text-xs rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <div id="cache-status-tooltip">Cache is current</div>
+        </div>
+    </div>
+ </div>
  <span class="text-sm font-medium text-slate-600">v3.0</span>
  <div class="flex items-center space-x-2 relative">
     <span id="user-display" class="text-sm font-medium text-slate-700"></span>
@@ -2850,8 +2990,8 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
 
  // --- FIREBASE OPTIMIZATION ---
  const firebaseCache = {
-  users: { data: null, timestamp: 0, ttl: 300000 }, // 5 minutes
-  leaderboard: { data: null, timestamp: 0, ttl: 60000 }, // 1 minute
+  users: { data: null, timestamp: 0, ttl: 900000 }, // 15 minutes (was 5)
+  leaderboard: { data: null, timestamp: 0, ttl: 300000 }, // 5 minutes (was 1)
   gameResults: new Map(), // Cache by week
   userPicks: new Map() // Cache by week-userId
  };
@@ -2864,6 +3004,8 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
  function setCacheData(cache, data) {
   cache.data = data;
   cache.timestamp = Date.now();
+  // Update indicator when new data is cached
+  updateCacheStatusIndicator('current');
  }
 
  // Optimized user fetching with cache
@@ -2993,6 +3135,8 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
    firebaseCache[cacheKey].data = null;
    firebaseCache[cacheKey].timestamp = 0;
   }
+  // Update visual indicator when cache is invalidated
+  updateCacheStatusIndicator('stale');
  }
 
  // Invalidate all caches
@@ -3004,6 +3148,147 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
    }
   });
  }
+
+// Cache Status Indicator Management
+function updateCacheStatusIndicator(status) {
+  const glyph = document.getElementById('cache-status-glyph');
+  const tooltip = document.getElementById('cache-status-tooltip');
+  
+  if (!glyph || !tooltip) return;
+  
+  // Remove all status classes
+  glyph.classList.remove('current', 'stale', 'refreshing', 'outdated');
+  
+  // Apply new status
+  switch(status) {
+    case 'current':
+      glyph.classList.add('current');
+      tooltip.textContent = 'Cache is current';
+      break;
+    case 'stale':
+      glyph.classList.add('stale');
+      tooltip.textContent = 'Cache is stale - refresh recommended';
+      break;
+    case 'refreshing':
+      glyph.classList.add('refreshing');
+      tooltip.textContent = 'Refreshing cache...';
+      break;
+    case 'outdated':
+      glyph.classList.add('outdated');
+      tooltip.textContent = 'Cache is outdated - refresh required';
+      break;
+    default:
+      glyph.classList.add('current');
+      tooltip.textContent = 'Cache status unknown';
+  }
+}
+
+// Track if we're already auto-fetching to prevent loops
+let isAutoFetching = false;
+
+// Monitor cache state and auto-update indicator
+async function monitorCacheStatus() {
+  // Check if any cache is valid
+  const hasValidCache = Object.keys(firebaseCache).some(key => {
+    const cache = firebaseCache[key];
+    return cache && cache.data !== null && (Date.now() - cache.timestamp) < cache.ttl;
+  });
+  
+  // Check if any cache is stale (data exists but TTL expired)
+  const hasStaleCache = Object.keys(firebaseCache).some(key => {
+    const cache = firebaseCache[key];
+    return cache && cache.data !== null && (Date.now() - cache.timestamp) >= cache.ttl;
+  });
+  
+  // Check if we have no data at all
+  const hasNoData = !hasValidCache && !hasStaleCache;
+  
+  if (hasValidCache) {
+    updateCacheStatusIndicator('current');
+    isAutoFetching = false;
+  } else if (hasStaleCache) {
+    // Data exists but is old - show yellow
+    updateCacheStatusIndicator('stale');
+    
+    // Auto-refresh stale data in background (non-blocking)
+    if (!isAutoFetching) {
+      isAutoFetching = true;
+      updateCacheStatusIndicator('refreshing');
+      // Don't await - let it run in background
+      refreshDataInBackground().then(() => {
+        isAutoFetching = false;
+      });
+    }
+  } else if (hasNoData) {
+    // No data at all - only go gray if we're not already fetching
+    if (!isAutoFetching) {
+      // Instead of just showing gray, auto-fetch the data
+      isAutoFetching = true;
+      updateCacheStatusIndicator('refreshing');
+      
+      // Fetch current view's data
+      refreshDataInBackground().then(() => {
+        isAutoFetching = false;
+      });
+    }
+  }
+}
+
+// Background data refresh without blocking UI
+async function refreshDataInBackground() {
+  try {
+    // Get current view to know what data to refresh
+    const params = getUrlParams();
+    const view = params.view || 'picks';
+    
+    // Refresh appropriate data based on current view
+    if (view === 'leaderboard') {
+      // Just trigger a background leaderboard calculation
+      const weekNumber = params.week || null;
+      calculateLeaderboardOptimized(weekNumber).catch(console.error);
+    } else if (view === 'survivor') {
+      // Refresh survivor cache if available
+      if (window.survivorCacheManager) {
+        const currentPool = getCurrentPool();
+        const currentWeek = window.currentWeek || 1;
+        window.survivorCacheManager.warmCache(currentPool, currentWeek).catch(console.error);
+      }
+    }
+    // For other views, the data will be fetched when needed
+    
+    console.log('📊 Background cache refresh initiated');
+  } catch (error) {
+    console.error('Background refresh error:', error);
+  }
+}
+
+// Set up periodic cache monitoring - check more frequently
+setInterval(monitorCacheStatus, 10000); // Check every 10 seconds instead of 5
+
+// Initial check on page load
+setTimeout(monitorCacheStatus, 2000); // Check 2 seconds after page load
+
+// Game Update Indicator Management
+function showGameUpdateIndicator() {
+  const indicator = document.getElementById('game-update-indicator');
+  if (!indicator) return;
+  
+  // Remove hidden and make visible
+  indicator.classList.remove('hidden', 'opacity-0');
+  
+  // After 3 seconds, start fading out
+  setTimeout(() => {
+    indicator.classList.add('opacity-0');
+    
+    // After fade completes, hide it
+    setTimeout(() => {
+      indicator.classList.add('hidden');
+    }, 500); // Match transition duration
+  }, 3000); // Show for 3 seconds before fading
+}
+
+// Make it globally accessible for other modules
+window.showGameUpdateIndicator = showGameUpdateIndicator;
 
  // --- VIEW MANAGEMENT UTILITIES ---
  function hideAllViews() {
@@ -3064,8 +3349,16 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
   const result = {
    view: params.get('view') || 'picks',
    week: parseInt(params.get('week')) || getCurrentNflWeek(),
-   lb: params.get('lb') || 'weekly'
+   lb: params.get('lb') || 'weekly',
+   confidence: params.get('confidence') // 🚀 CONFIDENCE-ON-CRACK parameter
   };
+  
+  // 🚀 CONFIDENCE-ON-CRACK: Activate optimized system
+  if (result.confidence === 'crack') {
+    window.confidenceOnCrack = true;
+    console.log('🚀 CONFIDENCE-ON-CRACK MODE ACTIVATED: Ultra-high performance confidence system enabled');
+  }
+  
   console.log('💎 getUrlParams result:', result, 'from URL:', window.location.search);
   return result;
  }
@@ -4283,6 +4576,9 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
         const gameButtons = allUI.resultsGameList.querySelectorAll(`.result-btn[data-game-id="${gameId}"]`);
         gameButtons.forEach(b => b.classList.remove('selected'));
         e.target.classList.add('selected');
+        
+        // Show football indicator for individual game updates
+        showGameUpdateIndicator();
     }));
 
     // Add event listeners for auto-winner buttons
@@ -4313,6 +4609,15 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
         } else {
             alert('Tie game! Please manually select the winner.');
         }
+        
+        // Show football indicator for auto-winner selection
+        showGameUpdateIndicator();
+    }));
+    
+    // Add event listeners for score inputs
+    allUI.resultsGameList.querySelectorAll('.score-input').forEach(input => input.addEventListener('change', () => {
+        // Show football indicator when scores are updated
+        showGameUpdateIndicator();
     }));
 
     // Live leaderboard removed from Games tab per user request
@@ -9489,6 +9794,23 @@ function getTeamHelmetClass(teamName) {
         console.log(`📊 Loading leaderboard for ${weekNumber ? `week ${weekNumber}` : 'season'}...`);
         const startTime = performance.now();
         
+        // 🚀 CONFIDENCE-ON-CRACK: Use optimized system when activated
+        if (window.confidenceOnCrack && window.unifiedConfidenceManager) {
+            console.log('🚀 Using CONFIDENCE-ON-CRACK optimized leaderboard system');
+            const optimizedData = await window.unifiedConfidenceManager.getDisplayLeaderboard(weekNumber);
+            
+            if (optimizedData && optimizedData.success) {
+                const loadTime = performance.now() - startTime;
+                console.log(`⚡ CONFIDENCE-ON-CRACK: Leaderboard loaded in ${loadTime.toFixed(0)}ms with ${optimizedData.readCount} reads`);
+                
+                targetBody.innerHTML = optimizedData.html;
+                loader.classList.add('hidden');
+                return;
+            } else {
+                console.warn('🔄 CONFIDENCE-ON-CRACK failed, falling back to legacy system');
+            }
+        }
+        
         // Use the optimized function that checks for summary first
         const standings = await calculateLeaderboardOptimized(weekNumber);
         
@@ -10673,6 +10995,9 @@ if (!activePicks.mnfTotalPoints) {
  // 💎 CRITICAL: Invalidate all cache affected by game results changes
  window.gameStateCache.invalidateAfterDataUpdate('game_results_updated', weekNumber);
  
+ // Show football indicator for game update
+ showGameUpdateIndicator();
+ 
  // Update the leaderboard summary for optimization
  try {
      await updateLeaderboardSummary();
@@ -10700,13 +11025,16 @@ allUI.refreshSummaryBtn.addEventListener('click', async () => {
         // Force update leaderboard summary after cache clear
         await updateLeaderboardSummary();
         
-        alert(`✅ Complete cache refresh successful!\n\n🔥 Cleared ${clearedEntries} cache entries\n💎 All data will be fresh on next load`);
+        // Visual feedback only - no alert
+        updateCacheStatusIndicator('current');
+        console.log(`✅ Complete cache refresh successful! Cleared ${clearedEntries} cache entries`);
         allUI.refreshSummaryBtn.textContent = '💎 Refresh Cache';
         
         // Cache refreshed - no leaderboard to refresh on Games tab
     } catch (error) {
         console.error('Failed to refresh cache:', error);
-        alert('❌ Failed to refresh cache: ' + error.message);
+        updateCacheStatusIndicator('outdated');
+        console.error('❌ Failed to refresh cache:', error.message);
         allUI.refreshSummaryBtn.textContent = '💎 Refresh Cache';
     } finally {
         allUI.refreshSummaryBtn.disabled = false;
@@ -13090,11 +13418,13 @@ async function warmCache() {
         if (window.survivorCacheManager) {
             await window.survivorCacheManager.warmCache(currentPool, currentWeek);
         }
-        alert('Cache warmed successfully!');
+        updateCacheStatusIndicator('current');
+        console.log('✅ Cache warmed successfully!');
         updateCacheStatus();
     } catch (error) {
         console.error('❌ Cache warming error:', error);
-        alert(`Cache warming failed: ${error.message}`);
+        updateCacheStatusIndicator('outdated');
+        console.error(`Cache warming failed: ${error.message}`);
     }
 }
 
@@ -13107,11 +13437,14 @@ async function invalidateCache() {
         if (window.survivorCacheManager) {
             await window.survivorCacheManager.invalidateCache(currentPool, currentWeek);
         }
-        alert('Cache invalidated successfully!');
+        // No more alert - just update the visual indicator
+        updateCacheStatusIndicator('refreshing');
+        setTimeout(() => updateCacheStatusIndicator('current'), 2000);
         updateCacheStatus();
     } catch (error) {
         console.error('❌ Cache invalidation error:', error);
-        alert(`Cache invalidation failed: ${error.message}`);
+        updateCacheStatusIndicator('outdated');
+        console.error(`Cache invalidation failed: ${error.message}`);
     }
 }
 
@@ -13121,11 +13454,13 @@ async function refreshAllCaches() {
         if (window.optimizedSurvivorLoader) {
             await window.optimizedSurvivorLoader.refreshResults();
         }
-        alert('All caches refreshed successfully!');
+        updateCacheStatusIndicator('current');
+        console.log('✅ All caches refreshed successfully!');
         updateCacheStatus();
     } catch (error) {
         console.error('❌ Cache refresh error:', error);
-        alert(`Cache refresh failed: ${error.message}`);
+        updateCacheStatusIndicator('outdated');
+        console.error(`Cache refresh failed: ${error.message}`);
     }
 }
 
@@ -13141,12 +13476,14 @@ async function clearAllCaches() {
             });
             
             await batch.commit();
-            alert(`Cleared ${cacheQuery.size} cache entries!`);
+            updateCacheStatusIndicator('current');
+            console.log(`✅ Cleared ${cacheQuery.size} cache entries!`);
         }
         updateCacheStatus();
     } catch (error) {
         console.error('❌ Cache clearing error:', error);
-        alert(`Cache clearing failed: ${error.message}`);
+        updateCacheStatusIndicator('outdated');
+        console.error(`Cache clearing failed: ${error.message}`);
     }
 }
 
@@ -13260,7 +13597,8 @@ async function deleteSingleCache(cachePath) {
         }
     } catch (error) {
         console.error('❌ Cache deletion error:', error);
-        alert(`Failed to delete cache: ${error.message}`);
+        updateCacheStatusIndicator('outdated');
+        console.error(`Failed to delete cache: ${error.message}`);
     }
 }
 

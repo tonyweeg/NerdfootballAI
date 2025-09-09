@@ -177,11 +177,10 @@ class LiveGameRefresh {
             return;
         }
 
-        const message = updatedCount > 0 
-            ? `🔄 Live update: ${updatedCount} game${updatedCount > 1 ? 's' : ''} updated`
-            : `🔄 Live refresh complete`;
-
-        this.createToast(message, 'info', 3000);
+        // Instead of toast, make updated games glow
+        if (updatedCount > 0) {
+            this.glowUpdatedGames();
+        }
     }
 
     // Get current view/page the user is on
@@ -199,7 +198,68 @@ class LiveGameRefresh {
         return 'unknown';
     }
 
-    // Create toast notification
+    // Make updated games glow
+    glowUpdatedGames() {
+        console.log('🌟 DEBUG: glowUpdatedGames called (v2 - targeted)');
+        
+        // Track unique game containers to avoid duplicates
+        const glowedElements = new Set();
+        
+        // Strategy 1: Find game row containers (most reliable)
+        const gameContainers = document.querySelectorAll('.pick-game-row, .game-row, div[id^="game-row-"]');
+        console.log(`🌟 DEBUG: Found ${gameContainers.length} game containers`);
+        
+        gameContainers.forEach(container => {
+            if (!glowedElements.has(container)) {
+                container.classList.add('game-updated-glow');
+                glowedElements.add(container);
+                
+                setTimeout(() => {
+                    container.classList.remove('game-updated-glow');
+                }, 3000);
+            }
+        });
+        
+        // Strategy 2: Find parent containers of game buttons (fallback)
+        if (glowedElements.size === 0) {
+            console.log('🌟 DEBUG: No game containers found, trying button parents');
+            
+            const gameButtons = document.querySelectorAll('.winner-btn[data-game-id]');
+            const uniqueParents = new Map();
+            
+            gameButtons.forEach(button => {
+                const gameId = button.dataset.gameId;
+                if (!uniqueParents.has(gameId)) {
+                    // Find the container that holds both team buttons
+                    const parent = button.closest('div[class*="border"], .pick-game-row, .game-container');
+                    if (parent) {
+                        uniqueParents.set(gameId, parent);
+                    }
+                }
+            });
+            
+            console.log(`🌟 DEBUG: Found ${uniqueParents.size} unique game containers from buttons`);
+            
+            uniqueParents.forEach(parent => {
+                parent.classList.add('game-updated-glow');
+                glowedElements.add(parent);
+                
+                setTimeout(() => {
+                    parent.classList.remove('game-updated-glow');
+                }, 3000);
+            });
+        }
+        
+        console.log(`🌟 DEBUG: Applied glow to ${glowedElements.size} unique game containers`);
+
+        // Also use the football indicator for consistency
+        if (typeof window.showGameUpdateIndicator === 'function') {
+            window.showGameUpdateIndicator();
+            console.log('🌟 DEBUG: Football indicator shown');
+        }
+    }
+
+    // Create toast notification (keeping for other uses if needed)
     createToast(message, type = 'info', duration = 5000) {
         const toast = document.createElement('div');
         toast.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-white text-sm font-medium transition-all duration-300 ${
@@ -314,6 +374,21 @@ if (typeof window !== 'undefined') {
     window.LiveGameRefresh = LiveGameRefresh;
 }
 
+// Add test function for debugging
+if (typeof window !== 'undefined') {
+    window.testGameGlow = function() {
+        console.log('🧪 TEST: Triggering game glow effect manually');
+        if (window.liveGameRefresh) {
+            window.liveGameRefresh.glowUpdatedGames();
+        } else {
+            console.error('🧪 TEST: liveGameRefresh not initialized yet, creating instance');
+            window.liveGameRefresh = new LiveGameRefresh();
+            window.liveGameRefresh.glowUpdatedGames();
+        }
+        return 'Test triggered - check console for debug output';
+    };
+}
+
 // Auto-initialize if in browser
 if (typeof window !== 'undefined' && document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -324,6 +399,7 @@ if (typeof window !== 'undefined' && document.readyState === 'loading') {
                 window.liveGameRefresh.initialize();
             }
         }, 2000);
+        console.log('🧪 TEST: You can now run testGameGlow() in console to test the glow effect');
     });
 } else if (typeof window !== 'undefined') {
     // DOM already loaded
@@ -333,4 +409,5 @@ if (typeof window !== 'undefined' && document.readyState === 'loading') {
             window.liveGameRefresh.initialize();
         }
     }, 1000);
+    console.log('🧪 TEST: You can now run testGameGlow() in console to test the glow effect');
 }
