@@ -1,16 +1,138 @@
 {
   "rules": {
+    "nerdfootball": {
+      "live": {
+        ".read": "auth != null",
+        "2025": {
+          "$week": {
+            ".read": "auth != null",
+            ".write": false,
+            ".indexOn": ["metadata/lastUpdate", "metadata/version"],
+            "metadata": {
+              "lastUpdate": {
+                ".validate": "newData.isNumber()"
+              },
+              "status": {
+                ".validate": "newData.isString() && (newData.val() == 'live' || newData.val() == 'pregame' || newData.val() == 'final')"
+              },
+              "activeGames": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "version": {
+                ".validate": "newData.isNumber()"
+              }
+            },
+            "games": {
+              "$gameId": {
+                ".validate": "newData.hasChildren(['gameId', 'status', 'updateTimestamp'])",
+                "gameId": {
+                  ".validate": "newData.isString()"
+                },
+                "status": {
+                  ".validate": "newData.isString()"
+                },
+                "quarter": {
+                  ".validate": "newData.isString() || !newData.exists()"
+                },
+                "timeRemaining": {
+                  ".validate": "newData.isString() || !newData.exists()"
+                },
+                "homeTeam": {
+                  ".validate": "newData.isString()"
+                },
+                "awayTeam": {
+                  ".validate": "newData.isString()"
+                },
+                "homeScore": {
+                  ".validate": "newData.isNumber()"
+                },
+                "awayScore": {
+                  ".validate": "newData.isNumber()"
+                },
+                "possession": {
+                  ".validate": "newData.isString() || !newData.exists()"
+                },
+                "redzone": {
+                  ".validate": "newData.isBoolean() || !newData.exists()"
+                },
+                "updateTimestamp": {
+                  ".validate": "newData.isNumber()"
+                }
+              }
+            },
+            "leaderboard": {
+              "snapshot": {
+                "lastCalculated": {
+                  ".validate": "newData.isNumber()"
+                },
+                "leaders": {
+                  ".validate": "newData.hasChildren()"
+                }
+              },
+              "deltas": {
+                "$userId": {
+                  "previousPoints": {
+                    ".validate": "newData.isNumber()"
+                  },
+                  "currentPoints": {
+                    ".validate": "newData.isNumber()"
+                  },
+                  "change": {
+                    ".validate": "newData.isNumber()"
+                  },
+                  "timestamp": {
+                    ".validate": "newData.isNumber()"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "connections": {
+        "activeUsers": {
+          "$userId": {
+            ".read": "auth != null",
+            ".write": "$userId === auth.uid",
+            "connectedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "lastSeen": {
+              ".validate": "newData.isNumber()"
+            },
+            "viewingWeek": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 18"
+            }
+          }
+        }
+      }
+    },
     "liveScores": {
       "2025": {
         ".read": true,
         "$week": {
           ".read": true,
           ".write": "auth != null && auth.token.admin === true",
-          "games": {
-            "$gameId": {
-              ".read": true,
-              ".write": "auth != null && auth.token.admin === true"
-            }
+          ".indexOn": ["timestamp"],
+          "data": {
+            ".validate": "newData.isString() && newData.val().length < 2000"
+          },
+          "timestamp": {
+            ".validate": "newData.isNumber()"
+          }
+        }
+      },
+      "2026": {
+        ".read": true,
+        "$week": {
+          ".read": true,
+          ".write": "auth != null && auth.token.admin === true",
+          ".indexOn": ["timestamp"],
+          "data": {
+            ".validate": "newData.isString() && newData.val().length < 2000"
+          },
+          "timestamp": {
+            ".validate": "newData.isNumber()"
           }
         }
       }
@@ -18,7 +140,23 @@
     "presence": {
       "$uid": {
         ".read": true,
-        ".write": "$uid === auth.uid"
+        ".write": "$uid === auth.uid",
+        "online": {
+          ".validate": "newData.isBoolean()"
+        },
+        "lastSeen": {
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "usage": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": false,
+      "bandwidth": {
+        ".read": "auth != null && auth.token.admin === true"
+      },
+      "connections": {
+        ".read": "auth != null && auth.token.admin === true"
       }
     }
   }
