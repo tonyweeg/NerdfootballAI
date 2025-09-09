@@ -1128,8 +1128,11 @@ Role
                    <table class="min-w-full divide-y divide-slate-200">
                        <thead class="bg-slate-50">
                            <tr>
-                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Member</th>
+                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                   Member <span class="text-slate-400 ml-1" title="Sorted by last name">↓</span>
+                               </th>
                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
+                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Participation</th>
                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Joined</th>
                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
@@ -8112,9 +8115,28 @@ async function loadPoolMembers() {
       
       console.log('💎 Pool Members - Using deduplicated user data to eliminate ghost users');
       
+      // Sort members alphabetically by display name
+      const sortedMembers = memberEntries.sort(([uidA, memberA], [uidB, memberB]) => {
+        const userDataA = userMap.get(uidA);
+        const userDataB = userMap.get(uidB);
+        
+        const nameA = (userDataA?.displayName || memberA.displayName || memberA.email || 'Unknown').toLowerCase();
+        const nameB = (userDataB?.displayName || memberB.displayName || memberB.email || 'Unknown').toLowerCase();
+        
+        // Sort by last name if we can detect it (assumes "First Last" format)
+        const lastNameA = nameA.split(' ').slice(-1)[0];
+        const lastNameB = nameB.split(' ').slice(-1)[0];
+        
+        // First sort by last name, then by full name if last names are equal
+        if (lastNameA !== lastNameB) {
+          return lastNameA.localeCompare(lastNameB);
+        }
+        return nameA.localeCompare(nameB);
+      });
+      
       let displayedMemberCount = 0;
       
-      memberEntries.forEach(([uid, member]) => {
+      sortedMembers.forEach(([uid, member]) => {
         // 💎 Get deduplicated user data and check if this is a ghost user
         const userData = userMap.get(uid);
         
