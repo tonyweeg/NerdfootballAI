@@ -790,6 +790,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MNF Points</th>
                 </tr>
             </thead>
             <tbody id="public-leaderboard-body" class="bg-white divide-y divide-gray-200"></tbody>
@@ -10071,7 +10072,7 @@ function getTeamHelmetClass(teamName) {
         console.log(`✅ Leaderboard loaded in ${timeTaken}ms`);
         
         if (!standings || standings.length === 0) {
-            targetBody.innerHTML = '<tr><td colspan="3" class="text-center text-slate-500">No leaderboard data available</td></tr>';
+            targetBody.innerHTML = '<tr><td colspan="4" class="text-center text-slate-500">No leaderboard data available</td></tr>';
             loader.classList.add('hidden');
             return;
         }
@@ -10091,17 +10092,21 @@ function getTeamHelmetClass(teamName) {
                 prevRow.querySelector('td').textContent = rankDisplay;
             }
             
+            // Get MNF points for this user (will be populated in weekly view)
+            const mnfPoints = user.mnfTotalPoints || '-';
+            
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${rankDisplay}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700">${user.displayName || 'Unknown'}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-semibold">${user.totalScore || 0}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">${mnfPoints}</td>
             `;
             targetBody.appendChild(row);
         });
         
     } catch (error) {
         console.error('Error loading leaderboard:', error);
-        targetBody.innerHTML = '<tr><td colspan="3" class="text-center text-red-500">Error loading leaderboard. Please try again.</td></tr>';
+        targetBody.innerHTML = '<tr><td colspan="4" class="text-center text-red-500">Error loading leaderboard. Please try again.</td></tr>';
     } finally {
         loader.classList.add('hidden');
     }
@@ -10127,10 +10132,17 @@ async function calculateLeaderboard(weekNumber = null) {
                 const userPicks = pickDoc.data();
                 let userScore = 0;
                 Object.keys(userPicks).forEach(gameId => {
-                    const pick = userPicks[gameId];
-                    const gameWinner = getGameWinner(gameResults[gameId]);
-                    if (gameWinner && pick.winner === gameWinner) {
-                        userScore += pick.confidence;
+                    if (gameId === 'mnfTotalPoints') {
+                        // Store MNF points separately
+                        scores[userId].mnfTotalPoints = userPicks.mnfTotalPoints;
+                    } else {
+                        const pick = userPicks[gameId];
+                        if (pick && pick.winner) {
+                            const gameWinner = getGameWinner(gameResults[gameId]);
+                            if (gameWinner && pick.winner === gameWinner) {
+                                userScore += pick.confidence;
+                            }
+                        }
                     }
                 });
                 scores[userId].totalScore = userScore;
