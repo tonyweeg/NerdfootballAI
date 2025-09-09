@@ -727,6 +727,16 @@
     <!-- Yearly Leaderboard -->
     <div id="yearly-leaderboard-section" class="flex-1">
      <h3 class="text-lg font-semibold text-slate-700 mb-3">Season Leaderboard</h3>
+     
+     <!-- Expanded Game View (Hidden by default) -->
+     <div id="expanded-game-view" class="hidden opacity-0 transition-all duration-300 mb-4">
+      <div class="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg shadow-lg border border-slate-200 p-4">
+       <div id="expanded-game-content">
+        <!-- Game details will be rendered here -->
+       </div>
+      </div>
+     </div>
+     
      <div id="yearly-leaderboard-container" class="bg-slate-50 rounded-lg p-3">
       <div id="yearly-leaderboard-loader" class="hidden text-center py-2">
        <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
@@ -9441,6 +9451,259 @@ function getTeamHelmetClass(teamName) {
    return null;
  }
 
+ // Expanded Game View functionality
+ let currentExpandedGame = null;
+
+ window.expandGameView = async function(gameId, element) {
+   const expandedView = document.getElementById('expanded-game-view');
+   const expandedContent = document.getElementById('expanded-game-content');
+   
+   // If clicking the same game, collapse it
+   if (currentExpandedGame === gameId) {
+     collapseGameView();
+     return;
+   }
+   
+   // If another game is expanded, fade it out first
+   if (currentExpandedGame) {
+     expandedView.classList.add('opacity-0');
+     await new Promise(resolve => setTimeout(resolve, 300));
+   }
+   
+   currentExpandedGame = gameId;
+   expandedView.dataset.gameId = gameId; // Store the game ID for ESPN updates
+   
+   // Get game data
+   const weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
+   const game = weekData.games.find(g => g.id == gameId);
+   if (!game) return;
+   
+   // Get user pick for this game
+   const docRef = doc(db, picksPath(currentWeek, currentUser.uid));
+   const docSnap = await getDoc(docRef);
+   const userPicks = docSnap.exists() ? docSnap.data() : {};
+   const userPick = userPicks[gameId];
+   
+   // Get live data if available
+   let liveData = null;
+   try {
+     if (window.espnApi) {
+       const espnGames = await window.espnApi.getWeekGames(currentWeek);
+       const espnGame = espnGames.find(g => 
+         (g.a === game.away || g.awayTeam === game.away) && 
+         (g.h === game.home || g.homeTeam === game.home)
+       );
+       if (espnGame) {
+         liveData = espnGame;
+       }
+     }
+   } catch (error) {
+     console.warn('Could not fetch live data for expanded view');
+   }
+   
+   // Render expanded content
+   const awayAbbr = teamNameToAbbr[game.away] || game.away;
+   const homeAbbr = teamNameToAbbr[game.home] || game.home;
+   const awayLogo = nflTeamLogos[awayAbbr] || '';
+   const homeLogo = nflTeamLogos[homeAbbr] || '';
+   
+   const gameTime = new Date(game.kickoff);
+   const formattedTime = gameTime.toLocaleString('en-US', {
+     weekday: 'short',
+     month: 'short',
+     day: 'numeric',
+     hour: 'numeric',
+     minute: '2-digit'
+   });
+   
+   expandedContent.innerHTML = `
+     <div class="flex justify-between items-start mb-4">
+       <h4 class="text-lg font-bold text-slate-800">Game Details</h4>
+       <button onclick="collapseGameView()" class="text-slate-500 hover:text-slate-700">
+         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+         </svg>
+       </button>
+     </div>
+     
+     <div class="grid grid-cols-2 gap-4 mb-4">
+       <!-- Away Team -->
+       <div class="text-center p-3 bg-white rounded-lg border ${userPick?.winner === game.away ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'}">
+         <img src="${awayLogo}" alt="${game.away}" class="w-12 h-12 mx-auto mb-2">
+         <div class="font-semibold text-slate-800">${game.away}</div>
+          ${liveData?.awayScore !== undefined ? `<div class="text-2xl font-bold mt-2">${liveData.awayScore}</div>` : ''}
+       </div>
+       
+       <!-- Home Team -->
+       <div class="text-center p-3 bg-white rounded-lg border ${userPick?.winner === game.home ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'}">
+         <img src="${homeLogo}" alt="${game.home}" class="w-12 h-12 mx-auto mb-2">
+         <div class="font-semibold text-slate-800">${game.home}</div>
+          ${liveData?.homeScore !== undefined ? `<div class="text-2xl font-bold mt-2">${liveData.homeScore}</div>` : ''}
+       </div>
+     </div>
+     
+     
+     <!-- Game Info -->
+     <div class="bg-white rounded-lg p-3 space-y-2 text-sm">
+       <div class="flex justify-between">
+         <span class="text-slate-600">Kickoff:</span>
+         <span class="font-medium">${formattedTime}</span>
+       </div>
+       
+       ${userPick ? `
+       <div class="flex justify-between">
+         <span class="text-slate-600">Your Pick:</span>
+         <span class="font-medium text-blue-600">${userPick.winner} (${userPick.confidence} pts)</span>
+       </div>
+       ` : ''}
+       
+       ${liveData?.venue ? `
+       <div class="flex justify-between">
+         <span class="text-slate-600">Venue:</span>
+         <span class="font-medium">${liveData.venue.name}</span>
+       </div>
+       ` : ''}
+       
+       ${liveData?.weather ? `
+       <div class="flex justify-between">
+         <span class="text-slate-600">Weather:</span>
+         <span class="font-medium">${liveData.weather.temperature}°F, ${liveData.weather.condition || liveData.weather.description || 'Clear'}</span>
+       </div>
+       ` : ''}
+       
+       ${liveData?.broadcasts && liveData.broadcasts.length > 0 ? `
+       <div class="flex justify-between">
+         <span class="text-slate-600">TV:</span>
+         <span class="font-medium">${liveData.broadcasts.map(b => typeof b === 'string' ? b : b.name || b.market || 'TV').join(', ')}</span>
+       </div>
+       ` : ''}
+       
+       ${liveData?.status ? `
+       <div class="flex justify-between">
+         <span class="text-slate-600">Status:</span>
+         <span class="font-medium ${liveData.status === 'FINAL' ? 'text-slate-700' : 'text-emerald-600'}">${liveData.status}${liveData.clock && liveData.quarter ? ` (${liveData.clock} Q${liveData.quarter})` : ''}</span>
+       </div>
+       ` : ''}
+       
+       ${liveData?.probability ? `
+       <div class="mt-3 pt-3 border-t">
+         <div class="text-xs text-slate-600 mb-2">Win Probability</div>
+         <div class="flex justify-between text-sm">
+           <span>${game.away}: ${liveData.probability.awayWinPercentage}%</span>
+           <span>${game.home}: ${liveData.probability.homeWinPercentage}%</span>
+         </div>
+         <div class="w-full bg-slate-200 rounded-full h-2 mt-1">
+           <div class="bg-blue-600 h-2 rounded-full" style="width: ${liveData.probability.awayWinPercentage}%"></div>
+         </div>
+       </div>
+       ` : ''}
+     </div>
+     
+     <!-- News Links Section -->
+     <div class="mt-4 bg-white rounded-lg p-3">
+       <h5 class="text-sm font-semibold text-slate-700 mb-3">Latest News & Analysis</h5>
+       <div class="space-y-2">
+         <a href="https://www.espn.com/nfl/teams/roster/_/name/\${awayAbbr.toLowerCase()}" 
+            target="_blank" 
+            class="flex items-center justify-between p-2 hover:bg-blue-50 rounded transition-colors">
+           <span class="text-sm text-blue-600 hover:text-blue-800">\${game.away} Roster & Injuries</span>
+           <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+           </svg>
+         </a>
+         
+         <a href="https://www.espn.com/nfl/teams/roster/_/name/\${homeAbbr.toLowerCase()}" 
+            target="_blank" 
+            class="flex items-center justify-between p-2 hover:bg-blue-50 rounded transition-colors">
+           <span class="text-sm text-blue-600 hover:text-blue-800">\${game.home} Roster & Injuries</span>
+           <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+           </svg>
+         </a>
+         
+         <a href="https://www.pro-football-reference.com/years/2025/week_\${currentWeek}.htm" 
+            target="_blank" 
+            class="flex items-center justify-between p-2 hover:bg-blue-50 rounded transition-colors">
+           <span class="text-sm text-blue-600 hover:text-blue-800">Week \${currentWeek} Game Stats</span>
+           <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+           </svg>
+         </a>
+         
+         <a href="https://www.theringer.com/nfl" 
+            target="_blank" 
+            class="flex items-center justify-between p-2 hover:bg-blue-50 rounded transition-colors">
+           <span class="text-sm text-blue-600 hover:text-blue-800">The Ringer NFL Analysis</span>
+           <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+           </svg>
+         </a>
+         
+         <a href="https://www.fantasypros.com/nfl/matchups/\${awayAbbr.toLowerCase()}-\${homeAbbr.toLowerCase()}.php" 
+            target="_blank" 
+            class="flex items-center justify-between p-2 hover:bg-blue-50 rounded transition-colors">
+           <span class="text-sm text-blue-600 hover:text-blue-800">Fantasy Matchup Analysis</span>
+           <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+           </svg>
+         </a>
+         
+         \${liveData?.id ? \`
+         <a href="https://www.espn.com/nfl/game/_/gameId/\${liveData.id}" 
+            target="_blank" 
+            class="flex items-center justify-between p-2 hover:bg-emerald-50 rounded transition-colors border border-emerald-200">
+           <span class="text-sm text-emerald-600 font-semibold">Live ESPN Gamecast</span>
+           <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+           </svg>
+         </a>
+         \` : ''}
+       </div>
+     </div>
+     
+     <div class="mt-4 text-xs text-slate-500 text-center">
+       Click any link above for detailed analysis and real-time updates
+     </div>
+   `;
+   
+   // Show the expanded view with fade-in
+   expandedView.classList.remove('hidden');
+   setTimeout(() => {
+     expandedView.classList.remove('opacity-0');
+   }, 10);
+ }
+
+ window.collapseGameView = function() {
+   const expandedView = document.getElementById('expanded-game-view');
+   expandedView.classList.add('opacity-0');
+   setTimeout(() => {
+     expandedView.classList.add('hidden');
+     expandedView.dataset.gameId = ''; // Clear the stored game ID
+     currentExpandedGame = null;
+   }, 300);
+ }
+
+ // Listen for ESPN score updates and refresh expanded view if needed
+ window.addEventListener('espnScoresUpdated', async (event) => {
+   const expandedView = document.getElementById('expanded-game-view');
+   
+   // Check if expanded view is visible and has a game ID
+   if (expandedView && !expandedView.classList.contains('hidden') && expandedView.dataset.gameId) {
+     const expandedGameId = expandedView.dataset.gameId;
+     const weekNumber = event.detail.weekNumber;
+     
+     // Check if the update is for the current week
+     if (weekNumber == currentWeek) {
+       // Simply re-expand the game to get the latest data
+       const gameCard = document.querySelector(`[data-game-id="${expandedGameId}"]`);
+       if (gameCard) {
+         console.log(`🔄 Refreshing expanded view for game ${expandedGameId} with ESPN updates`);
+         window.expandGameView(expandedGameId, gameCard);
+       }
+     }
+   }
+ });
+
  // Helper function to calculate total points scored in a game
  function calculateGameTotalPoints(gameResult) {
    if (!gameResult) return null;
@@ -10156,6 +10419,26 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
    if (activePicks.length === 0) {
     allUI.activePicksList.innerHTML = '<p class="text-center text-slate-500 text-sm">No picks made yet</p>';
    } else {
+    // Find any in-progress games or the highest confidence pick for auto-expansion
+    let autoExpandGameId = null;
+    
+    // First check for in-progress games
+    const inProgressGames = activePicks.filter(pick => {
+     const currentTime = new Date();
+     const gameKickoff = new Date(pick.game.kickoff);
+     const gameWinner = getGameWinner(pick.gameResult);
+     const hasActuallyStarted = currentTime > gameKickoff;
+     return hasActuallyStarted && !gameWinner;
+    });
+    
+    if (inProgressGames.length === 1) {
+     // Only one in-progress game, auto-expand it
+     autoExpandGameId = inProgressGames[0].gameId;
+    } else if (inProgressGames.length === 0 && activePicks.length > 0) {
+     // No in-progress games, expand the highest confidence pick
+     autoExpandGameId = activePicks[0].gameId; // Already sorted by confidence
+    }
+    
     allUI.activePicksList.innerHTML = activePicks.map(pick => {
      const teamAbbr = teamNameToAbbr[pick.team] || pick.team;
      const logoUrl = nflTeamLogos[teamAbbr] || '';
@@ -10234,7 +10517,11 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      // All other games (not started, or started but finished) get ocean breeze theme
      
      return `
-      <div class="relative flex items-center ${bgClass} rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 ${glowClass}">
+      <div class="game-pick-card relative flex items-center ${bgClass} rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 ${glowClass}" 
+           data-game-id="${pick.gameId}"
+           data-team="${pick.team}"
+           data-confidence="${pick.confidence}"
+           onclick="expandGameView('${pick.gameId}', this)">
        ${gradientOverlay}
        <!-- Content layer -->
        <div class="relative z-10 flex items-center w-full">
@@ -10266,6 +10553,17 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
       </div>
      `;
     }).join('');
+    
+    // Auto-expand the selected game after a short delay to ensure DOM is ready
+    if (autoExpandGameId) {
+     setTimeout(() => {
+      const gameCard = document.querySelector(`[data-game-id="${autoExpandGameId}"]`);
+      if (gameCard) {
+       console.log(`🎯 Auto-expanding game ${autoExpandGameId}`);
+       window.expandGameView(autoExpandGameId, gameCard);
+      }
+     }, 100);
+    }
    }
   } catch (error) {
    console.error('Error loading active picks:', error);
@@ -12683,7 +12981,11 @@ const SurvivorPicksView = {
     initializeSurvivorPicksApp: async function(container) {
         // Initialize survivor-specific variables
         this.currentUser = auth.currentUser;
-        this.currentWeek = this.getCurrentNflWeek();
+        
+        // Get week from URL params or use current week
+        const urlParams = getUrlParams();
+        this.selectedWeek = urlParams.week || this.getCurrentNflWeek();
+        this.currentWeek = this.getCurrentNflWeek(); // Keep track of actual current week
         this.ADMIN_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
         
         // Check if user is eliminated first
@@ -12712,17 +13014,17 @@ const SurvivorPicksView = {
         const picksSnap = await getDoc(picksDocRef);
         const userPicks = picksSnap.exists() ? picksSnap.data() : { picks: {} };
         
-        // Get weekly games
-        const weeklyGames = await this.getGamesForWeek(this.currentWeek);
+        // Get weekly games for selected week
+        const weeklyGames = await this.getGamesForWeek(this.selectedWeek);
         if (!weeklyGames || weeklyGames.length === 0) {
-            container.innerHTML = `<p class="text-center text-red-600 py-12">Could not load games for Week ${this.currentWeek}. Please check back later.</p>`;
+            container.innerHTML = `<p class="text-center text-red-600 py-12">Could not load games for Week ${this.selectedWeek}. Please check back later.</p>`;
             return;
         }
         
-        // Check if week is locked
-        const isLocked = await this.checkSurvivorPickLocked();
+        // Check if selected week is locked (only lock past weeks and current week if games started)
+        const isLocked = await this.checkSurvivorPickLocked(this.selectedWeek);
         
-        // Render the survivor picks interface
+        // Render the survivor picks interface with week selector
         this.renderSurvivorPicksHTML(container, userPicks, weeklyGames, isLocked);
     },
     
@@ -12778,9 +13080,22 @@ const SurvivorPicksView = {
         }
     },
     
-    checkSurvivorPickLocked: async function() {
+    checkSurvivorPickLocked: async function(weekToCheck = null) {
         try {
-            const response = await fetch(`nfl_2025_week_${this.currentWeek}.json`);
+            const week = weekToCheck || this.selectedWeek;
+            
+            // Future weeks are never locked
+            if (week > this.currentWeek) {
+                return false;
+            }
+            
+            // Past weeks are always locked
+            if (week < this.currentWeek) {
+                return true;
+            }
+            
+            // For current week, check if any games have started
+            const response = await fetch(`nfl_2025_week_${week}.json`);
             if (!response.ok) return false;
             const weekData = await response.json();
             
@@ -12850,13 +13165,27 @@ const SurvivorPicksView = {
     },
     
     renderSurvivorPicksHTML: function(container, userPicks, weeklyGames, isLocked) {
-        const myPickThisWeek = userPicks.picks[this.currentWeek];
+        const myPickThisWeek = userPicks.picks[this.selectedWeek];
         
         let html = `<div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
-            <h2 class="text-2xl font-bold text-center mb-4">Survivor Pool Week ${this.currentWeek}</h2>`;
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Survivor Pool</h2>
+                <div class="flex items-center gap-2">
+                    <button id="survivor-prev-week" class="px-3 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors ${this.selectedWeek <= 1 ? 'opacity-50 cursor-not-allowed' : ''}" ${this.selectedWeek <= 1 ? 'disabled' : ''}>
+                        ← Prev
+                    </button>
+                    <div class="px-4 py-2 bg-white border-2 ${this.selectedWeek === this.currentWeek ? 'border-blue-500 bg-blue-50' : 'border-slate-300'} rounded-lg min-w-[100px] text-center">
+                        <div class="font-semibold text-lg">Week ${this.selectedWeek}</div>
+                        ${this.selectedWeek === this.currentWeek ? '<div class="text-xs text-blue-600">Current Week</div>' : ''}
+                    </div>
+                    <button id="survivor-next-week" class="px-3 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors ${this.selectedWeek >= 18 ? 'opacity-50 cursor-not-allowed' : ''}" ${this.selectedWeek >= 18 ? 'disabled' : ''}>
+                        Next →
+                    </button>
+                </div>
+            </div>`;
             
         if(isLocked) {
-             html += `<div class="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6" role="alert"><p class="font-bold">Picks are locked for Week ${this.currentWeek}.</p></div>`;
+             html += `<div class="bg-red-100 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6" role="alert"><p class="font-bold">Picks are locked for Week ${this.selectedWeek}.</p></div>`;
         }
 
         // Show current pick if user has made one
@@ -12882,7 +13211,7 @@ const SurvivorPicksView = {
                 html += `
                     <div class="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-6">
                         <div class="flex justify-between items-center mb-2">
-                            <h3 class="text-lg font-bold text-green-800">Your Week ${this.currentWeek} Pick</h3>
+                            <h3 class="text-lg font-bold text-green-800">Your Week ${this.selectedWeek} Pick</h3>
                         </div>
                         <p class="text-xs text-slate-600 italic mb-3">Pick one winner each week. Lose once and you're out.</p>
                         <div class="flex items-center space-x-3">
@@ -12960,6 +13289,28 @@ const SurvivorPicksView = {
     },
     
     attachSurvivorEventListeners: function(container, userPicks, isLocked) {
+        // Add previous week button event listener
+        const prevButton = document.getElementById('survivor-prev-week');
+        if (prevButton) {
+            prevButton.addEventListener('click', () => {
+                if (this.selectedWeek > 1) {
+                    this.selectedWeek--;
+                    this.updateWeekAndRerender();
+                }
+            });
+        }
+        
+        // Add next week button event listener
+        const nextButton = document.getElementById('survivor-next-week');
+        if (nextButton) {
+            nextButton.addEventListener('click', () => {
+                if (this.selectedWeek < 18) {
+                    this.selectedWeek++;
+                    this.updateWeekAndRerender();
+                }
+            });
+        }
+        
         container.querySelectorAll('.team-btn').forEach(btn => {
             if (!btn.disabled && !isLocked) {
                 btn.addEventListener('click', async (e) => {
@@ -12990,7 +13341,7 @@ const SurvivorPicksView = {
                         team: team,
                         gameId: gameId,
                     };
-                    userPicks.picks[this.currentWeek] = newPick;
+                    userPicks.picks[this.selectedWeek] = newPick;
                     
                     // Store last survivor pick timestamp
                     localStorage.setItem('lastSurvivorPick', new Date().toISOString());
@@ -13010,12 +13361,21 @@ const SurvivorPicksView = {
                     ]);
                     
                     // 💎 CRITICAL: Invalidate all cache affected by survivor picks changes
-                    window.gameStateCache.invalidateAfterDataUpdate('survivor_picks_saved', this.currentWeek);
+                    window.gameStateCache.invalidateAfterDataUpdate('survivor_picks_saved', this.selectedWeek);
                     
                     this.show(); // Re-render to show selection
                 });
             }
         });
+    },
+    
+    updateWeekAndRerender: function() {
+        // Update URL with new week
+        const params = new URLSearchParams(window.location.search);
+        params.set('week', this.selectedWeek);
+        window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+        // Re-render with new week
+        this.show();
     }
 };
 
