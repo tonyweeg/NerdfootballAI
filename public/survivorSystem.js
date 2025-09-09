@@ -469,12 +469,22 @@ async function initializeSurvivorSystem(retryCount = 0) {
 }
 
 // DIAMOND LEVEL: Smart initialization that coordinates with Firebase and ESPN API
+function waitForFirebaseAndInitialize() {
+    // Check if Firebase is ready
+    if (window.db && window.functions) {
+        initializeSurvivorSystem();
+    } else {
+        // Wait longer for Firebase to initialize
+        setTimeout(waitForFirebaseAndInitialize, 500);
+    }
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        // Increased delay to allow Firebase and ESPN API to initialize
-        setTimeout(initializeSurvivorSystem, 200);
+        // Wait for Firebase to be fully ready
+        setTimeout(waitForFirebaseAndInitialize, 1000);
     });
 } else {
-    // Increased delay to allow Firebase and ESPN API to initialize
-    setTimeout(initializeSurvivorSystem, 200);
+    // Wait for Firebase to be fully ready
+    setTimeout(waitForFirebaseAndInitialize, 1000);
 }
