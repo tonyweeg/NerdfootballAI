@@ -679,6 +679,8 @@
             <div id="menu-admin-controls" class="hidden">
                  <button id="menu-admin-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">🔧 Admin</button>
                  <button id="survivor-admin-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">💀 Survivor Admin</button>
+                 <a href="./websocket-test.html" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🚀 WebSocket Test</a>
+                 <button id="user-diagnostic-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🔬 User Diagnostics</button>
                  <div class="border-t border-gray-200 my-1"></div>
             </div>
             
@@ -2681,6 +2683,7 @@ await new Promise(resolve => {
  picksViewBtn: document.getElementById('menu-picks-view-btn'),
  adminViewBtn: document.getElementById('menu-admin-view-btn'),
  survivorAdminBtn: document.getElementById('survivor-admin-btn'),
+ userDiagnosticBtn: document.getElementById('user-diagnostic-btn'),
  leaderboardViewBtn: document.getElementById('leaderboard-view-btn'),
  gridViewBtn: document.getElementById('grid-view-btn'), survivorPicksViewBtn: document.getElementById('survivor-picks-view-btn'), closeRulesBtn: document.getElementById('close-rules-btn'), rulesUserName: document.getElementById('rules-user-name'),
  weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
@@ -11425,6 +11428,14 @@ if (!activePicks.mnfTotalPoints) {
        }, 50);
     });
  }
+
+ if (allUI.userDiagnosticBtn) {
+    allUI.userDiagnosticBtn.addEventListener('click', () => {
+       allUI.menuPanel.classList.add('hidden');
+       // Show user diagnostic info in a modal or console
+       showUserDiagnostics();
+    });
+ }
  
  allUI.leaderboardViewBtn.addEventListener('click', () => {
     allUI.picksContainer.classList.add('hidden');
@@ -14247,6 +14258,51 @@ initializeAppAndAuth().then(() => {
         }
     }, 100);
 });
+
+// User Diagnostics Function
+function showUserDiagnostics() {
+    const user = firebase.auth().currentUser;
+    const diagnostics = {
+        'User Info': {
+            'UID': user?.uid || 'Not authenticated',
+            'Email': user?.email || 'No email',
+            'Display Name': user?.displayName || 'No display name',
+            'Email Verified': user?.emailVerified || false
+        },
+        'Browser Info': {
+            'User Agent': navigator.userAgent.substring(0, 100) + '...',
+            'Platform': navigator.platform,
+            'Language': navigator.language,
+            'Online': navigator.onLine,
+            'Cookies Enabled': navigator.cookieEnabled
+        },
+        'Firebase Status': {
+            'Firestore': typeof window.db !== 'undefined' ? '✅ Available' : '❌ Not available',
+            'Functions': typeof window.functions !== 'undefined' ? '✅ Available' : '❌ Not available',
+            'RTDB': typeof window.rtdb !== 'undefined' ? '✅ Available' : '❌ Not available',
+            'Auth': firebase.auth().currentUser ? '✅ Authenticated' : '❌ Not authenticated'
+        },
+        'App State': {
+            'Current Week': window.currentWeek || 'Not set',
+            'Active View': document.querySelector('.view-toggle-btn.active')?.textContent || 'Unknown',
+            'Local Storage Keys': Object.keys(localStorage).length,
+            'Session Storage Keys': Object.keys(sessionStorage).length
+        }
+    };
+    
+    let output = '🔬 USER DIAGNOSTICS\n\n';
+    for (const [category, data] of Object.entries(diagnostics)) {
+        output += `📊 ${category}:\n`;
+        for (const [key, value] of Object.entries(data)) {
+            output += `  • ${key}: ${value}\n`;
+        }
+        output += '\n';
+    }
+    
+    console.log(output);
+    alert('User diagnostics logged to console (F12 → Console tab)');
+}
+
  });
  </script>
 </body>
