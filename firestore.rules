@@ -60,9 +60,15 @@ service cloud.firestore {
     }
     
     // Pool members - all authenticated users can read (needed for Grid)
+    // Only admins can modify participation flags
     match /artifacts/nerdfootball/pools/{poolId}/metadata/members {
       allow read: if isAuthenticated();
-      allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
+      allow create: if isPoolAdmin(poolId) || isGlobalAdmin();
+      allow update: if (isPoolAdmin(poolId) || isGlobalAdmin()) && 
+        // If modifying participation, must be admin
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['participation']) || 
+         isPoolAdmin(poolId));
+      allow delete: if isGlobalAdmin();
     }
     
     // Legacy survivor picks - all authenticated users can read/write their own, admins can write any
@@ -95,11 +101,6 @@ service cloud.firestore {
       allow delete: if isGlobalAdmin();
     }
     
-    // Pool members - all authenticated users can read, admins can write
-    match /artifacts/nerdfootball/pools/{poolId}/metadata/members {
-      allow read: if isAuthenticated();
-      allow write: if isGlobalAdmin() || isPoolAdmin(poolId);
-    }
     
     // Pool invites - pool members can read, admins can write
     match /artifacts/nerdfootball/pools/{poolId}/metadata/invites {

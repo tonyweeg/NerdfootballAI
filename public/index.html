@@ -33,6 +33,7 @@
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
  <!-- BUNDLED JavaScript Files - Reduced from 18 to 4 files for 75% faster load -->
+ <script src="./poolParticipationManager.js"></script>
  <script src="./core-bundle.js"></script>
  <script src="./survivor-bundle.js"></script>
  <script src="./confidence-bundle.js"></script>
@@ -6368,6 +6369,18 @@ async function handleAuthStateChange(user) {
 
  // Load user pool memberships
  await loadUserPoolMemberships();
+ 
+ // Initialize Pool Participation Manager and run migration
+ if (typeof poolParticipationManager !== 'undefined') {
+   await poolParticipationManager.initialize(db);
+   
+   // Run migration for existing users (one-time)
+   const migrationResult = await poolParticipationManager.migrateExistingMembers();
+   if (migrationResult.migrated > 0) {
+     console.log(`✅ Migrated ${migrationResult.migrated} users to participation structure`);
+   }
+ }
+ 
  await initializePoolSwitcher();
  
  allUI.loadingView.classList.add('hidden');
@@ -8136,6 +8149,15 @@ async function loadPoolMembers() {
           '<span class="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>' :
           '<span class="inline-flex px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Inactive</span>';
         
+        // Participation badges (new)
+        const participation = member.participation || { confidence: { enabled: true }, survivor: { enabled: true } };
+        const confidenceBadge = participation.confidence?.enabled ? 
+          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">Confidence</span>' :
+          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-400 line-through rounded">Confidence</span>';
+        const survivorBadge = participation.survivor?.enabled ?
+          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded">Survivor</span>' :
+          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-400 line-through rounded">Survivor</span>';
+        
         // Actions (only show for non-admin members and if current user is admin)
         const isCurrentUserAdmin = userPoolMemberships[getCurrentPool()]?.role === 'admin';
         const isTargetAdmin = member.role === 'admin';
@@ -8163,6 +8185,27 @@ async function loadPoolMembers() {
           `;
         }
         
+        // Add participation toggle buttons for admins
+        let participationControls = '';
+        if (isCurrentUserAdmin && !isCurrentUser) {
+          participationControls = `
+            <div class="flex gap-2">
+              ${confidenceBadge}
+              ${survivorBadge}
+              <button class="text-xs text-blue-600 hover:text-blue-800 underline" onclick="toggleParticipation('${uid}')">
+                Edit
+              </button>
+            </div>
+          `;
+        } else {
+          participationControls = `
+            <div class="flex gap-2">
+              ${confidenceBadge}
+              ${survivorBadge}
+            </div>
+          `;
+        }
+        
         row.innerHTML = `
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
@@ -8180,6 +8223,7 @@ async function loadPoolMembers() {
             </div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">${roleBadge}</td>
+          <td class="px-6 py-4 whitespace-nowrap">${participationControls}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${joinedDate}</td>
           <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">${actions}</td>
@@ -8309,6 +8353,107 @@ window.removeMember = async function(uid) {
   } catch (error) {
     console.error('Error removing member:', error);
     showPoolSwitchFeedback('Failed to remove member', 'error');
+  }
+}
+
+window.toggleParticipation = async function(uid) {
+  try {
+    // Get current member data
+    const poolMembersRef = doc(db, getPoolMembersPath(getCurrentPool()));
+    const poolMembersSnap = await getDoc(poolMembersRef);
+    
+    if (!poolMembersSnap.exists()) {
+      showPoolSwitchFeedback('Member data not found', 'error');
+      return;
+    }
+    
+    const members = poolMembersSnap.data();
+    const member = members[uid];
+    
+    if (!member) {
+      showPoolSwitchFeedback('Member not found', 'error');
+      return;
+    }
+    
+    // Get current participation status
+    const participation = member.participation || { 
+      confidence: { enabled: true, status: 'active' }, 
+      survivor: { enabled: true, status: 'active' } 
+    };
+    
+    // Create modal for editing participation
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-semibold mb-4">Edit Pool Participation</h3>
+        <p class="text-sm text-gray-600 mb-4">User: ${member.displayName || member.email}</p>
+        
+        <div class="space-y-4">
+          <label class="flex items-center space-x-3">
+            <input type="checkbox" id="confidence-toggle" ${participation.confidence?.enabled ? 'checked' : ''} 
+              class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+            <span>Confidence Pool</span>
+          </label>
+          
+          <label class="flex items-center space-x-3">
+            <input type="checkbox" id="survivor-toggle" ${participation.survivor?.enabled ? 'checked' : ''} 
+              class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+            <span>Survivor Pool</span>
+          </label>
+        </div>
+        
+        <div class="mt-6 flex justify-end space-x-3">
+          <button onclick="this.closest('.fixed').remove()" 
+            class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+          <button id="save-participation" 
+            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save Changes</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Handle save button
+    document.getElementById('save-participation').onclick = async function() {
+      const confidenceEnabled = document.getElementById('confidence-toggle').checked;
+      const survivorEnabled = document.getElementById('survivor-toggle').checked;
+      
+      // Ensure at least one pool is selected
+      if (!confidenceEnabled && !survivorEnabled) {
+        alert('User must participate in at least one pool');
+        return;
+      }
+      
+      try {
+        // Initialize participation manager if needed
+        if (!poolParticipationManager.initialized) {
+          await poolParticipationManager.initialize(db);
+        }
+        
+        // Update participation
+        await poolParticipationManager.updateUserParticipation(
+          uid,
+          {
+            confidence: confidenceEnabled,
+            survivor: survivorEnabled
+          },
+          currentUser.uid
+        );
+        
+        modal.remove();
+        showPoolSwitchFeedback('Participation updated successfully', 'success');
+        await loadPoolMembers();
+        
+      } catch (error) {
+        console.error('Error updating participation:', error);
+        showPoolSwitchFeedback('Failed to update participation', 'error');
+      }
+    };
+    
+  } catch (error) {
+    console.error('Error toggling participation:', error);
+    showPoolSwitchFeedback('Failed to toggle participation', 'error');
   }
 }
 
