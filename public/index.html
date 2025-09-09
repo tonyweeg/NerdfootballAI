@@ -3042,7 +3042,15 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
     const users = {};
     
     // Convert pool members format to standard users format
+    // ONLY include users who are in the confidence pool
     for (const [uid, memberData] of Object.entries(members)) {
+     // Check participation - only include users in confidence pool
+     const participation = memberData.participation || { confidence: { enabled: true } };
+     if (!participation.confidence?.enabled) {
+      console.log(`⏭️ Filtering out ${memberData.displayName} - not in confidence pool`);
+      continue;
+     }
+     
      users[uid] = {
       uid: uid,
       id: uid,
@@ -3428,6 +3436,14 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
                     console.log('🚫 GHOST USER BLOCKED FROM GRID:', uid);
                     continue;
                 }
+                
+                // Check participation - only include users in confidence pool
+                const participation = memberData.participation || { confidence: { enabled: true } };
+                if (!participation.confidence?.enabled) {
+                    console.log(`⏭️ Skipping ${memberData.displayName} - not in confidence pool`);
+                    continue;
+                }
+                
                 userMap.set(uid, {
                     id: uid,
                     uid: uid,
