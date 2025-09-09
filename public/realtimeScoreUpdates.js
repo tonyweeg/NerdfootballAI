@@ -31,7 +31,15 @@ class RealtimeScoreUpdates {
     async initialize() {
         try {
             // Get Firebase app instance (already initialized in main app)
-            const app = window.firebaseApp || initializeApp(window.firebaseConfig);
+            const app = window.firebaseApp || initializeApp({
+                apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+                authDomain: "nerdfootball.firebaseapp.com",
+                databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+                projectId: "nerdfootball",
+                storageBucket: "nerdfootball.appspot.com",
+                messagingSenderId: "969304790725",
+                appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+            });
             this.db = getDatabase(app);
             
             // Monitor connection state
