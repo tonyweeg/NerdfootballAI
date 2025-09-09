@@ -406,9 +406,18 @@ class UnifiedSurvivorManager {
             const membersDoc = await getDoc(doc(db, membersPath));
             const poolMembers = membersDoc.exists() ? membersDoc.data() : {};
             
-            // Filter out users who never made a pick
+            // Filter out users who never made a pick or not in survivor pool
             const displayPicks = Object.entries(weekData.users)
                 .filter(([userId, pick]) => {
+                    // Check if user is in survivor pool
+                    const member = poolMembers[userId];
+                    if (!member) return false;
+                    
+                    const participation = member.participation || { survivor: { enabled: true } };
+                    if (!participation.survivor?.enabled) {
+                        return false; // Skip users not in survivor pool
+                    }
+                    
                     // Only show users who made a pick at some point
                     return pick.team || pick.hasPicked;
                 })
@@ -477,8 +486,14 @@ class UnifiedSurvivorManager {
             const poolMembers = poolMembersDoc.data();
             const unifiedPicks = {};
             
+            // Filter to only survivor participants
+            const survivorMembers = Object.entries(poolMembers).filter(([userId, member]) => {
+                const participation = member.participation || { survivor: { enabled: true } };
+                return participation.survivor?.enabled;
+            });
+            
             // Read all individual picks in parallel
-            const pickPromises = Object.keys(poolMembers).map(async (userId) => {
+            const pickPromises = survivorMembers.map(async ([userId, member]) => {
                 const pickPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
                 const pickRef = doc(db, pickPath);
                 const pickDoc = await getDoc(pickRef);
@@ -490,7 +505,7 @@ class UnifiedSurvivorManager {
                     if (weekPick) {
                         return {
                             userId,
-                            displayName: poolMembers[userId].displayName || poolMembers[userId].email,
+                            displayName: member.displayName || member.email,
                             teamPicked: weekPick.team,
                             pickTimestamp: weekPick.timestamp || null,
                             eliminated: false,

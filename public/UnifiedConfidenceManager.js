@@ -126,6 +126,36 @@ class UnifiedConfidenceManager {
     }
 
     /**
+     * Filter leaderboard by participation
+     */
+    async filterLeaderboardByParticipation(leaderboard) {
+        try {
+            // Get pool members with participation data
+            const membersRef = window.doc(this.db, this.getPoolMembersPath());
+            const membersDoc = await window.getDoc(membersRef);
+            
+            if (!membersDoc.exists()) {
+                return leaderboard; // Return unfiltered if no member data
+            }
+            
+            const members = membersDoc.data();
+            
+            // Filter leaderboard to only include confidence participants
+            return leaderboard.filter(entry => {
+                const memberData = members[entry.userId];
+                if (!memberData) return false; // Exclude if not a member
+                
+                const participation = memberData.participation || { confidence: { enabled: true } };
+                return participation.confidence?.enabled;
+            });
+            
+        } catch (error) {
+            console.error('Error filtering leaderboard by participation:', error);
+            return leaderboard; // Return unfiltered on error
+        }
+    }
+
+    /**
      * Get weekly leaderboard data (1 read)
      */
     async getWeeklyDisplayData(weekNumber, startTime, cacheKey) {
@@ -150,7 +180,10 @@ class UnifiedConfidenceManager {
             }
             
             // Extract leaderboard data
-            const leaderboard = weekData.leaderboards?.weekly || [];
+            let leaderboard = weekData.leaderboards?.weekly || [];
+            
+            // Filter by participation
+            leaderboard = await this.filterLeaderboardByParticipation(leaderboard);
             
             // Cache the result
             this.cache.set(cacheKey, {
@@ -168,7 +201,7 @@ class UnifiedConfidenceManager {
                     weekNumber,
                     lastUpdated: weekData.cache?.lastUpdated,
                     gamesComplete: weekData.cache?.gamesComplete,
-                    totalUsers: weekData.stats?.totalUsers
+                    totalUsers: leaderboard.length // Updated to reflect filtered count
                 },
                 loadTime
             };
@@ -208,7 +241,10 @@ class UnifiedConfidenceManager {
             const loadTime = performance.now() - startTime;
             
             // Build season leaderboard
-            const leaderboard = this.buildSeasonLeaderboard(seasonData);
+            let leaderboard = this.buildSeasonLeaderboard(seasonData);
+            
+            // Filter by participation
+            leaderboard = await this.filterLeaderboardByParticipation(leaderboard);
             
             // Cache the result
             this.cache.set(cacheKey, {
@@ -549,8 +585,15 @@ class UnifiedConfidenceManager {
             const members = membersDoc.data();
             const legacyPicks = {};
             
-            // Read each user's picks
-            for (const userId of Object.keys(members)) {
+            // Read each user's picks - ONLY for confidence participants
+            for (const [userId, memberData] of Object.entries(members)) {
+                // Skip users not in confidence pool
+                const participation = memberData.participation || { confidence: { enabled: true } };
+                if (!participation.confidence?.enabled) {
+                    console.log(`⏭️ Skipping ${memberData.displayName} - not in confidence pool`);
+                    continue;
+                }
+                
                 try {
                     const userPicksRef = window.doc(this.db, this.getLegacyPicksPath(weekNumber, userId));
                     const userPicksDoc = await window.getDoc(userPicksRef);
@@ -561,7 +604,7 @@ class UnifiedConfidenceManager {
                         legacyPicks[userId] = {
                             ...userPicks.picks,
                             meta: {
-                                displayName: members[userId].displayName,
+                                displayName: memberData.displayName,
                                 userId,
                                 submissionTime: userPicks.submissionTime
                             }
@@ -572,7 +615,7 @@ class UnifiedConfidenceManager {
                 }
             }
             
-            console.log(`📊 Migrated ${Object.keys(legacyPicks).length} users' picks for week ${weekNumber}`);
+            console.log(`📊 Migrated ${Object.keys(legacyPicks).length} confidence users' picks for week ${weekNumber}`);
             return legacyPicks;
             
         } catch (error) {

@@ -32,13 +32,25 @@
  
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
- <!-- BUNDLED JavaScript Files - Reduced from 18 to 4 files for 75% faster load -->
- <script src="./poolParticipationManager.js"></script>
- <script src="./poolRemovalService.js"></script>
- <script src="./core-bundle.js"></script>
- <script src="./survivor-bundle.js"></script>
- <script src="./confidence-bundle.js"></script>
- <script src="./features-bundle.js"></script>
+ <script src="./weekManager.js"></script>
+ <script src="./espnNerdApi.js"></script>
+ <script src="./survivorSystem.js"></script>
+ <script src="./simpleSurvivor.js"></script>
+ <script src="./survivorCacheManager.js"></script>
+ <script src="./optimizedSurvivorLoader.js"></script>
+ <script src="./unifiedSurvivorManager.js"></script>
+ <script src="./espnSurvivorIntegration.js"></script>
+ <script src="./survivorMigration.js"></script>
+ <script src="./pickAnalyticsIntegration.js"></script>
+ <script src="./espnScoreSync.js"></script>
+<!-- DISABLED: survivorAutoElimination.js - replaced with clean ESPN-powered survivorSystem.js -->
+ <script src="./enhancedGameDataDisplay.js"></script>
+ <script src="./liveGameRefresh.js?v=2"></script>
+ <!-- CONFIDENCE-ON-CRACK: Enterprise Performance System -->
+ <script src="./ConfidenceErrorHandler.js"></script>
+ <script src="./ConfidencePerformanceMonitor.js"></script>
+ <script src="./UnifiedConfidenceManager.js"></script>
+ <script src="./ConfidenceIntegrationLayer.js"></script>
 <!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
@@ -792,7 +804,6 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MNF Points</th>
                 </tr>
             </thead>
             <tbody id="public-leaderboard-body" class="bg-white divide-y divide-gray-200"></tbody>
@@ -1129,11 +1140,8 @@ Role
                    <table class="min-w-full divide-y divide-slate-200">
                        <thead class="bg-slate-50">
                            <tr>
-                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                                   Member <span class="text-slate-400 ml-1" title="Sorted by last name">↓</span>
-                               </th>
+                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Member</th>
                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
-                               <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Participation</th>
                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Joined</th>
                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
@@ -3042,15 +3050,7 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
     const users = {};
     
     // Convert pool members format to standard users format
-    // ONLY include users who are in the confidence pool
     for (const [uid, memberData] of Object.entries(members)) {
-     // Check participation - only include users in confidence pool
-     const participation = memberData.participation || { confidence: { enabled: true } };
-     if (!participation.confidence?.enabled) {
-      console.log(`⏭️ Filtering out ${memberData.displayName} - not in confidence pool`);
-      continue;
-     }
-     
      users[uid] = {
       uid: uid,
       id: uid,
@@ -3436,14 +3436,6 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
                     console.log('🚫 GHOST USER BLOCKED FROM GRID:', uid);
                     continue;
                 }
-                
-                // Check participation - only include users in confidence pool
-                const participation = memberData.participation || { confidence: { enabled: true } };
-                if (!participation.confidence?.enabled) {
-                    console.log(`⏭️ Skipping ${memberData.displayName} - not in confidence pool`);
-                    continue;
-                }
-                
                 userMap.set(uid, {
                     id: uid,
                     uid: uid,
@@ -6282,8 +6274,6 @@ function downloadAnalyticsCSV(data, weekNumber) {
  window.getDoc = getDoc;
  window.setDoc = setDoc;
  window.doc = doc;
- window.updateDoc = updateDoc;
- window.deleteDoc = deleteDoc;
  auth = getAuth(app);
  window.auth = auth; // Make Auth globally available for FCM
  functions = getFunctions(app, 'us-central1'); // Initialize global functions variable with region
@@ -6391,24 +6381,6 @@ async function handleAuthStateChange(user) {
 
  // Load user pool memberships
  await loadUserPoolMemberships();
- 
- // Initialize Pool Participation Manager and run migration
- if (typeof poolParticipationManager !== 'undefined') {
-   await poolParticipationManager.initialize(db);
-   
-   // Run migration for existing users (one-time)
-   const migrationResult = await poolParticipationManager.migrateExistingMembers();
-   if (migrationResult.migrated > 0) {
-     console.log(`✅ Migrated ${migrationResult.migrated} users to participation structure`);
-   }
- }
- 
- // Initialize Pool Removal Service for cascading operations
- if (typeof poolRemovalService !== 'undefined') {
-   await poolRemovalService.initialize(db);
-   console.log('✅ Pool Removal Service ready for cascading operations');
- }
- 
  await initializePoolSwitcher();
  
  allUI.loadingView.classList.add('hidden');
@@ -8139,28 +8111,9 @@ async function loadPoolMembers() {
       
       console.log('💎 Pool Members - Using deduplicated user data to eliminate ghost users');
       
-      // Sort members alphabetically by display name
-      const sortedMembers = memberEntries.sort(([uidA, memberA], [uidB, memberB]) => {
-        const userDataA = userMap.get(uidA);
-        const userDataB = userMap.get(uidB);
-        
-        const nameA = (userDataA?.displayName || memberA.displayName || memberA.email || 'Unknown').toLowerCase();
-        const nameB = (userDataB?.displayName || memberB.displayName || memberB.email || 'Unknown').toLowerCase();
-        
-        // Sort by last name if we can detect it (assumes "First Last" format)
-        const lastNameA = nameA.split(' ').slice(-1)[0];
-        const lastNameB = nameB.split(' ').slice(-1)[0];
-        
-        // First sort by last name, then by full name if last names are equal
-        if (lastNameA !== lastNameB) {
-          return lastNameA.localeCompare(lastNameB);
-        }
-        return nameA.localeCompare(nameB);
-      });
-      
       let displayedMemberCount = 0;
       
-      sortedMembers.forEach(([uid, member]) => {
+      memberEntries.forEach(([uid, member]) => {
         // 💎 Get deduplicated user data and check if this is a ghost user
         const userData = userMap.get(uid);
         
@@ -8196,15 +8149,6 @@ async function loadPoolMembers() {
           '<span class="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Active</span>' :
           '<span class="inline-flex px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Inactive</span>';
         
-        // Participation badges (new)
-        const participation = member.participation || { confidence: { enabled: true }, survivor: { enabled: true } };
-        const confidenceBadge = participation.confidence?.enabled ? 
-          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">Confidence</span>' :
-          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-400 line-through rounded">Confidence</span>';
-        const survivorBadge = participation.survivor?.enabled ?
-          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded">Survivor</span>' :
-          '<span class="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-400 line-through rounded">Survivor</span>';
-        
         // Actions (only show for non-admin members and if current user is admin)
         const isCurrentUserAdmin = userPoolMemberships[getCurrentPool()]?.role === 'admin';
         const isTargetAdmin = member.role === 'admin';
@@ -8232,27 +8176,6 @@ async function loadPoolMembers() {
           `;
         }
         
-        // Add participation toggle buttons for admins
-        let participationControls = '';
-        if (isCurrentUserAdmin && !isCurrentUser) {
-          participationControls = `
-            <div class="flex gap-2">
-              ${confidenceBadge}
-              ${survivorBadge}
-              <button class="text-xs text-blue-600 hover:text-blue-800 underline" onclick="toggleParticipation('${uid}')">
-                Edit
-              </button>
-            </div>
-          `;
-        } else {
-          participationControls = `
-            <div class="flex gap-2">
-              ${confidenceBadge}
-              ${survivorBadge}
-            </div>
-          `;
-        }
-        
         row.innerHTML = `
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
@@ -8270,7 +8193,6 @@ async function loadPoolMembers() {
             </div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">${roleBadge}</td>
-          <td class="px-6 py-4 whitespace-nowrap">${participationControls}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${joinedDate}</td>
           <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">${actions}</td>
@@ -8400,107 +8322,6 @@ window.removeMember = async function(uid) {
   } catch (error) {
     console.error('Error removing member:', error);
     showPoolSwitchFeedback('Failed to remove member', 'error');
-  }
-}
-
-window.toggleParticipation = async function(uid) {
-  try {
-    // Get current member data
-    const poolMembersRef = doc(db, getPoolMembersPath(getCurrentPool()));
-    const poolMembersSnap = await getDoc(poolMembersRef);
-    
-    if (!poolMembersSnap.exists()) {
-      showPoolSwitchFeedback('Member data not found', 'error');
-      return;
-    }
-    
-    const members = poolMembersSnap.data();
-    const member = members[uid];
-    
-    if (!member) {
-      showPoolSwitchFeedback('Member not found', 'error');
-      return;
-    }
-    
-    // Get current participation status
-    const participation = member.participation || { 
-      confidence: { enabled: true, status: 'active' }, 
-      survivor: { enabled: true, status: 'active' } 
-    };
-    
-    // Create modal for editing participation
-    const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
-    modal.innerHTML = `
-      <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 class="text-lg font-semibold mb-4">Edit Pool Participation</h3>
-        <p class="text-sm text-gray-600 mb-4">User: ${member.displayName || member.email}</p>
-        
-        <div class="space-y-4">
-          <label class="flex items-center space-x-3">
-            <input type="checkbox" id="confidence-toggle" ${participation.confidence?.enabled ? 'checked' : ''} 
-              class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-            <span>Confidence Pool</span>
-          </label>
-          
-          <label class="flex items-center space-x-3">
-            <input type="checkbox" id="survivor-toggle" ${participation.survivor?.enabled ? 'checked' : ''} 
-              class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-            <span>Survivor Pool</span>
-          </label>
-        </div>
-        
-        <div class="mt-6 flex justify-end space-x-3">
-          <button onclick="this.closest('.fixed').remove()" 
-            class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
-          <button id="save-participation" 
-            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save Changes</button>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Handle save button
-    document.getElementById('save-participation').onclick = async function() {
-      const confidenceEnabled = document.getElementById('confidence-toggle').checked;
-      const survivorEnabled = document.getElementById('survivor-toggle').checked;
-      
-      // Ensure at least one pool is selected
-      if (!confidenceEnabled && !survivorEnabled) {
-        alert('User must participate in at least one pool');
-        return;
-      }
-      
-      try {
-        // Initialize participation manager if needed
-        if (!poolParticipationManager.initialized) {
-          await poolParticipationManager.initialize(db);
-        }
-        
-        // Update participation
-        await poolParticipationManager.updateUserParticipation(
-          uid,
-          {
-            confidence: confidenceEnabled,
-            survivor: survivorEnabled
-          },
-          currentUser.uid
-        );
-        
-        modal.remove();
-        showPoolSwitchFeedback('Participation updated successfully', 'success');
-        await loadPoolMembers();
-        
-      } catch (error) {
-        console.error('Error updating participation:', error);
-        showPoolSwitchFeedback('Failed to update participation', 'error');
-      }
-    };
-    
-  } catch (error) {
-    console.error('Error toggling participation:', error);
-    showPoolSwitchFeedback('Failed to toggle participation', 'error');
   }
 }
 
@@ -9937,16 +9758,8 @@ function getTeamHelmetClass(teamName) {
    const userMnfGuesses = {};
    picksSnap.forEach(pickDoc => {
      const userPicks = pickDoc.data();
-     if (userPicks.mnfTotalPoints !== undefined) {
-       userMnfGuesses[pickDoc.id] = parseInt(userPicks.mnfTotalPoints, 10) || 0;
-     }
-   });
-   
-   // Add MNF points to each score object for display
-   scores.forEach(score => {
-     const userId = score.uid || score.userId;
-     if (userMnfGuesses[userId] !== undefined) {
-       score.mnfTotalPoints = userMnfGuesses[userId];
+     if (userPicks.mnfTotalPoints) {
+       userMnfGuesses[pickDoc.id] = parseInt(userPicks.mnfTotalPoints, 10);
      }
    });
    
@@ -10272,7 +10085,7 @@ function getTeamHelmetClass(teamName) {
         console.log(`✅ Leaderboard loaded in ${timeTaken}ms`);
         
         if (!standings || standings.length === 0) {
-            targetBody.innerHTML = '<tr><td colspan="4" class="text-center text-slate-500">No leaderboard data available</td></tr>';
+            targetBody.innerHTML = '<tr><td colspan="3" class="text-center text-slate-500">No leaderboard data available</td></tr>';
             loader.classList.add('hidden');
             return;
         }
@@ -10292,21 +10105,17 @@ function getTeamHelmetClass(teamName) {
                 prevRow.querySelector('td').textContent = rankDisplay;
             }
             
-            // Get MNF points for this user (will be populated in weekly view)
-            const mnfPoints = user.mnfTotalPoints || '-';
-            
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${rankDisplay}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700">${user.displayName || 'Unknown'}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-semibold">${user.totalScore || 0}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">${mnfPoints}</td>
             `;
             targetBody.appendChild(row);
         });
         
     } catch (error) {
         console.error('Error loading leaderboard:', error);
-        targetBody.innerHTML = '<tr><td colspan="4" class="text-center text-red-500">Error loading leaderboard. Please try again.</td></tr>';
+        targetBody.innerHTML = '<tr><td colspan="3" class="text-center text-red-500">Error loading leaderboard. Please try again.</td></tr>';
     } finally {
         loader.classList.add('hidden');
     }
@@ -10328,22 +10137,14 @@ async function calculateLeaderboard(weekNumber = null) {
         
         picksSnap.forEach(pickDoc => {
             const userId = pickDoc.id;
-            // CRITICAL: Only process picks for users who are in the confidence pool
             if (scores[userId]) {
                 const userPicks = pickDoc.data();
                 let userScore = 0;
                 Object.keys(userPicks).forEach(gameId => {
-                    if (gameId === 'mnfTotalPoints') {
-                        // Store MNF points separately
-                        scores[userId].mnfTotalPoints = userPicks.mnfTotalPoints;
-                    } else {
-                        const pick = userPicks[gameId];
-                        if (pick && pick.winner) {
-                            const gameWinner = getGameWinner(gameResults[gameId]);
-                            if (gameWinner && pick.winner === gameWinner) {
-                                userScore += pick.confidence;
-                            }
-                        }
+                    const pick = userPicks[gameId];
+                    const gameWinner = getGameWinner(gameResults[gameId]);
+                    if (gameWinner && pick.winner === gameWinner) {
+                        userScore += pick.confidence;
                     }
                 });
                 scores[userId].totalScore = userScore;
@@ -10502,44 +10303,12 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
             console.log('✅ Using cached leaderboard summary (1 read instead of 36+)');
             
             if (weekNumber && summary.weeklyLeaderboards[weekNumber]) {
-                // Get cached leaderboard but need to add MNF points
-                const cachedLeaderboard = summary.weeklyLeaderboards[weekNumber];
-                
-                // Filter out users not in confidence pool
-                const activeUsers = await getCleanUsers();
-                const filteredLeaderboard = cachedLeaderboard.filter(user => {
-                    const userId = user.uid || user.userId;
-                    return activeUsers[userId] !== undefined;
-                });
-                
-                // Fetch MNF points for this week
-                const picksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
-                const userMnfPoints = {};
-                picksSnap.forEach(pickDoc => {
-                    const userPicks = pickDoc.data();
-                    if (userPicks.mnfTotalPoints !== undefined) {
-                        userMnfPoints[pickDoc.id] = parseInt(userPicks.mnfTotalPoints, 10) || 0;
-                    }
-                });
-                
-                // Add MNF points to filtered leaderboard
-                filteredLeaderboard.forEach(user => {
-                    const userId = user.uid || user.userId;
-                    if (userMnfPoints[userId] !== undefined) {
-                        user.mnfTotalPoints = userMnfPoints[userId];
-                    }
-                });
-                
-                return filteredLeaderboard;
+                // Return weekly leaderboard from summary
+                return summary.weeklyLeaderboards[weekNumber];
             } else if (!weekNumber) {
-                // Convert season standings to array format and filter
+                // Convert season standings to array format
                 const standings = Object.values(summary.seasonStandings);
-                const activeUsers = await getCleanUsers();
-                const filteredStandings = standings.filter(user => {
-                    const userId = user.uid || user.userId;
-                    return activeUsers[userId] !== undefined;
-                });
-                return await sortLeaderboardWithTiebreaker(filteredStandings, null, 'totalScore');
+                return await sortLeaderboardWithTiebreaker(standings, null, 'totalScore');
             }
         }
         
