@@ -10309,8 +10309,28 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
             console.log('✅ Using cached leaderboard summary (1 read instead of 36+)');
             
             if (weekNumber && summary.weeklyLeaderboards[weekNumber]) {
-                // Return weekly leaderboard from summary
-                return summary.weeklyLeaderboards[weekNumber];
+                // Get cached leaderboard but need to add MNF points
+                const cachedLeaderboard = summary.weeklyLeaderboards[weekNumber];
+                
+                // Fetch MNF points for this week
+                const picksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
+                const userMnfPoints = {};
+                picksSnap.forEach(pickDoc => {
+                    const userPicks = pickDoc.data();
+                    if (userPicks.mnfTotalPoints !== undefined) {
+                        userMnfPoints[pickDoc.id] = parseInt(userPicks.mnfTotalPoints, 10) || 0;
+                    }
+                });
+                
+                // Add MNF points to cached leaderboard
+                cachedLeaderboard.forEach(user => {
+                    const userId = user.uid || user.userId;
+                    if (userMnfPoints[userId] !== undefined) {
+                        user.mnfTotalPoints = userMnfPoints[userId];
+                    }
+                });
+                
+                return cachedLeaderboard;
             } else if (!weekNumber) {
                 // Convert season standings to array format
                 const standings = Object.values(summary.seasonStandings);
