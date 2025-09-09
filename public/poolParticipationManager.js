@@ -100,46 +100,46 @@ class PoolParticipationManager {
      */
     async updateUserParticipation(userId, updates, adminId) {
         try {
-            const membersRef = window.doc(this.db, this.getPoolMembersPath());
+            // Get the members document reference
+            const membersPath = this.getPoolMembersPath();
+            
+            // Build update data - need to ensure metadata object exists
             const updateData = {};
             
-            // Build update object with proper paths
-            if (updates.confidence !== undefined) {
-                updateData[`${userId}.participation.confidence`] = {
-                    enabled: updates.confidence,
-                    status: updates.confidence ? 'active' : 'removed',
-                    ...(updates.confidence === false && {
-                        endWeek: this.getCurrentNflWeek()
-                    })
-                };
-                
-                if (!updates.confidence) {
-                    updateData[`${userId}.participation.metadata.confidenceRemovedAt`] = new Date().toISOString();
-                    updateData[`${userId}.participation.metadata.confidenceRemovedBy`] = adminId;
-                }
+            // Initialize participation structure if needed
+            updateData[`${userId}.participation`] = {
+                confidence: {
+                    enabled: updates.confidence !== undefined ? updates.confidence : true,
+                    status: updates.confidence ? 'active' : 'removed'
+                },
+                survivor: {
+                    enabled: updates.survivor !== undefined ? updates.survivor : true,
+                    status: updates.survivor ? 'active' : 'removed'
+                },
+                metadata: {}
+            };
+            
+            // Add metadata for tracking changes
+            if (updates.confidence === false) {
+                updateData[`${userId}.participation.metadata.confidenceRemovedAt`] = new Date().toISOString();
+                updateData[`${userId}.participation.metadata.confidenceRemovedBy`] = adminId;
             }
             
-            if (updates.survivor !== undefined) {
-                updateData[`${userId}.participation.survivor`] = {
-                    enabled: updates.survivor,
-                    status: updates.survivor ? 'active' : 'removed',
-                    ...(updates.survivor === false && {
-                        endWeek: this.getCurrentNflWeek()
-                    })
-                };
-                
-                if (!updates.survivor) {
-                    updateData[`${userId}.participation.metadata.survivorRemovedAt`] = new Date().toISOString();
-                    updateData[`${userId}.participation.metadata.survivorRemovedBy`] = adminId;
-                }
+            if (updates.survivor === false) {
+                updateData[`${userId}.participation.metadata.survivorRemovedAt`] = new Date().toISOString();
+                updateData[`${userId}.participation.metadata.survivorRemovedBy`] = adminId;
             }
             
             // Add last modified timestamp
             updateData[`${userId}.lastModified`] = new Date().toISOString();
             updateData[`${userId}.lastModifiedBy`] = adminId;
             
-            // Update Firestore
-            await window.updateDoc(membersRef, updateData);
+            console.log('Updating participation with data:', updateData);
+            
+            // Use the global Firebase functions that are available in index.html
+            // These are made available through the module imports in index.html
+            const docRef = window.doc(this.db, membersPath);
+            await window.updateDoc(docRef, updateData);
             
             console.log(`✅ Updated participation for user ${userId}:`, updates);
             return { success: true };
