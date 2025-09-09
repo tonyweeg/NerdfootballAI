@@ -813,7 +813,6 @@
     </div>
 </div>
 
-
  <!-- Admin View -->
  <div id="admin-container" class="hidden">
  <div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
@@ -2596,10 +2595,7 @@ document.head.appendChild(fcmScript);
 let saveTimeout;
 let functions; // Declare functions globally
 
- document.addEventListener('DOMContentLoaded', async () => {
-console.log('💎 DOMContentLoaded fired - starting app initialization');
-
-// 💎 Load Diamond-Level Cache System
+ document.addEventListener('DOMContentLoaded', async () => {// 💎 Load Diamond-Level Cache System
 const cacheScript = document.createElement('script');
 cacheScript.src = 'gameStateCache.js';
 document.head.appendChild(cacheScript);
@@ -2612,9 +2608,7 @@ await new Promise(resolve => {
  async function getGamesForWeek(weekNumber) {
  // 🚀 Use diamond-level caching for schedule data!
  return await window.gameStateCache.cacheSchedule(weekNumber, async () => {
- try {
- console.log(`🔥 Fetching schedule for week ${weekNumber} (cache miss)`);
- const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+ try {const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
  if (!response.ok) {
  throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
  }
@@ -2637,13 +2631,11 @@ await new Promise(resolve => {
        winner: results[game.id]?.winner || results[game.id] || undefined
      }));
    }
- } catch (error) {
-   console.warn(`Failed to load results for Week ${weekNumber}:`, error);
- }
+ } catch (error) {}
  
  return games;
  } catch (error) {
- console.error(`Error fetching games for week ${weekNumber}:`, error);
+ //console.error(`Error fetching games for week ${weekNumber}:`, error);
  return [];
  }
  });
@@ -3024,13 +3016,8 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
  async function getCachedUsers() {
   // 💎 Diamond-level user caching with fallback to existing cache
   return await window.gameStateCache.cacheUsers(async () => {
-    if (isCacheValid(firebaseCache.users)) {
-     console.log('💎 Using existing Firebase user cache');
-     return firebaseCache.users.data;
-    }
-    
-    console.log('🔥 Fetching users from Firestore (cache miss)');
-    const usersSnap = await getDocs(collection(db, usersPath()));
+    if (isCacheValid(firebaseCache.users)) {return firebaseCache.users.data;
+    }const usersSnap = await getDocs(collection(db, usersPath()));
     const users = {};
     usersSnap.forEach(doc => users[doc.id] = doc.data());
     
@@ -3062,32 +3049,17 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
       joinedAt: memberData.joinedAt,
       ...memberData
      };
-    }
-    
-    console.log(`💎 DIAMOND: Loaded ${Object.keys(users).length} users from pool members`);
-    return users;
-   } else {
-    console.warn('⚠️ Pool members document does not exist, falling back to legacy users');
-    throw new Error('Pool members not found - triggering fallback');
+    }return users;
+   } else {throw new Error('Pool members not found - triggering fallback');
    }
-  } catch (error) {
-   console.warn('⚠️ Pool members not found, falling back to legacy users with ghost blocking:', error.message);
-   
-   // 🔥 FALLBACK: Use same logic as Grid (lines 586-603 in nerdfootballTheGrid.html)
+  } catch (error) {// 🔥 FALLBACK: Use same logic as Grid (lines 586-603 in nerdfootballTheGrid.html)
    try {
-    const usersCollectionPath = `artifacts/${appId()}/public/data/nerdfootball_users`;
-    console.log('🚨 Leaderboard: Fetching users from LEGACY path:', usersCollectionPath);
-    const usersSnap = await getDocs(collection(db, usersCollectionPath));
-    console.log('🚨 Leaderboard: Users snapshot size:', usersSnap.size);
-    
-    const users = {};
+    const usersCollectionPath = `artifacts/${appId()}/public/data/nerdfootball_users`;const usersSnap = await getDocs(collection(db, usersCollectionPath));const users = {};
     const seenNames = new Set(); // Track display names to prevent ghosts
     
     usersSnap.forEach(doc => {
      // IMMEDIATE GHOST BLOCKING - same as Grid
-     if (doc.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
-      console.log('🚫 GHOST USER BLOCKED FROM LEADERBOARD LEGACY:', doc.id);
-      return;
+     if (doc.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {return;
      }
      
      const userData = { id: doc.id, uid: doc.id, ...doc.data() };
@@ -3095,15 +3067,10 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
      const displayName = userData.displayName || userData.email || doc.id;
      if (!users[doc.id] && !seenNames.has(displayName)) {
       users[doc.id] = userData;
-      seenNames.add(displayName);
-      console.log('✅ Leaderboard: Added legacy user:', userData.displayName || userData.email, doc.id);
-     }
-    });
-    
-    console.log(`⚠️ FALLBACK SUCCESS: Leaderboard using legacy users (${Object.keys(users).length} users)`);
-    return users;
+      seenNames.add(displayName);}
+    });return users;
    } catch (fallbackError) {
-    console.error('❌ Both pool members and legacy users failed:', fallbackError);
+    //console.error('❌ Both pool members and legacy users failed:', fallbackError);
     return {};
    }
   }
@@ -3257,20 +3224,17 @@ async function refreshDataInBackground() {
     if (view === 'leaderboard') {
       // Just trigger a background leaderboard calculation
       const weekNumber = params.week || null;
-      calculateLeaderboardOptimized(weekNumber).catch(console.error);
+      calculateLeaderboardOptimized(weekNumber).catch(//console.error);
     } else if (view === 'survivor') {
       // Refresh survivor cache if available
       if (window.survivorCacheManager) {
         const currentPool = getCurrentPool();
         const currentWeek = window.currentWeek || 1;
-        window.survivorCacheManager.warmCache(currentPool, currentWeek).catch(console.error);
+        window.survivorCacheManager.warmCache(currentPool, currentWeek).catch(//console.error);
       }
     }
-    // For other views, the data will be fetched when needed
-    
-    console.log('📊 Background cache refresh initiated');
-  } catch (error) {
-    console.error('Background refresh error:', error);
+    // For other views, the data will be fetched when needed} catch (error) {
+    //console.error('Background refresh error:', error);
   }
 }
 
@@ -3331,9 +3295,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
   }
  }
 
- function loadAppState() {
-  console.log('💎 loadAppState called');
-  // Prioritize URL params over localStorage
+ function loadAppState() {// Prioritize URL params over localStorage
   const urlParams = getUrlParams();
   const saved = localStorage.getItem('nerdfootballState');
   const savedState = saved ? JSON.parse(saved) : {};
@@ -3367,20 +3329,11 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
   
   // 🚀 CONFIDENCE-ON-CRACK: Activate optimized system
   if (result.confidence === 'crack') {
-    window.confidenceOnCrack = true;
-    console.log('🚀 CONFIDENCE-ON-CRACK MODE ACTIVATED: Ultra-high performance confidence system enabled');
-  }
-  
-  console.log('💎 getUrlParams result:', result, 'from URL:', window.location.search);
-  return result;
+    window.confidenceOnCrack = true;}return result;
  }
 
  function updateUrl() {
-  // CRITICAL FIX: Don't update URL during initial page load
-  console.log('💎 updateUrl called, isInitialLoad:', isInitialLoad, 'current URL:', window.location.search);
-  if (isInitialLoad) {
-   console.log('💎 Skipping URL update during initial load');
-   return;
+  // CRITICAL FIX: Don't update URL during initial page loadif (isInitialLoad) {return;
   }
   
   const currentView = getCurrentView();
@@ -3399,44 +3352,25 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
 
  // --- GRID VIEW FUNCTIONS ---
  async function renderGrid() {
-  try {
-    console.log('🚨 Grid renderGrid STARTED');
-    
-    if (!currentUser) {
-        console.log('🚨 No current user');
-        allUI.gridTableContent.innerHTML = `<p class="text-center text-slate-600">Please log in to view The Grid.</p>`;
+  try {if (!currentUser) {allUI.gridTableContent.innerHTML = `<p class="text-center text-slate-600">Please log in to view The Grid.</p>`;
         return;
     }
     
     allUI.gridTableLoader.style.display = 'block';
     allUI.gridTableContent.innerHTML = '';
     
-    const selectedWeek = allUI.gridWeekSelector.value || currentWeek;
-    console.log('🚨 Getting games for week', selectedWeek);
-    
-    const games = await getGamesForWeek(selectedWeek);
-    console.log('🚨 Got games:', games.length);
-
-    const now = new Date();
+    const selectedWeek = allUI.gridWeekSelector.value || currentWeek;const games = await getGamesForWeek(selectedWeek);const now = new Date();
 
     // Fetch all necessary data using existing cache system
     let gridData;
-    try {
-        console.log(`🔥 Grid: Fetching data for week ${selectedWeek}`);
-        
-        // Use pool members path (same as admin) instead of legacy users path
+    try {// Use pool members path (same as admin) instead of legacy users path
         const poolMembersDoc = await getDoc(doc(db, getPoolMembersPath(getCurrentPool())));
         let userMap = new Map();
         
         if (poolMembersDoc.exists()) {
-            const members = poolMembersDoc.data();
-            console.log('✅ Pool members found:', Object.keys(members).length);
-            
-            for (const [uid, memberData] of Object.entries(members)) {
+            const members = poolMembersDoc.data();for (const [uid, memberData] of Object.entries(members)) {
                 // Block ghost user
-                if (uid === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
-                    console.log('🚫 GHOST USER BLOCKED FROM GRID:', uid);
-                    continue;
+                if (uid === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {continue;
                 }
                 userMap.set(uid, {
                     id: uid,
@@ -3451,9 +3385,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
             // Fallback to users collection with ghost blocking
             const usersSnap = await getDocs(collection(db, usersPath()));
             usersSnap.forEach(doc => {
-                if (doc.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
-                    console.log('🚫 GHOST USER BLOCKED FROM GRID FALLBACK:', doc.id);
-                    return;
+                if (doc.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {return;
                 }
                 const userData = { id: doc.id, uid: doc.id, ...doc.data() };
                 userMap.set(doc.id, userData);
@@ -3477,15 +3409,12 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         
         gridData = { allUsers: allUsersForGrid, gameResults, allPicks };
     } catch (error) {
-        console.error('❌ Grid data error:', error);
+        //console.error('❌ Grid data error:', error);
         allUI.gridTableContent.innerHTML = `<p class="text-red-600">Error loading grid: ${error.message}</p>`;
         return;
     }
     
-    const { allUsers: allUsersForGrid, gameResults, allPicks } = gridData;
-    
-    console.log('🚨 Grid users count:', allUsersForGrid.length);
-    const userScores = allUsersForGrid.map(user => {
+    const { allUsers: allUsersForGrid, gameResults, allPicks } = gridData;const userScores = allUsersForGrid.map(user => {
         let totalPoints = 0;
         let pointsLeft = 0;
         const userPicks = allPicks[user.id] || {};
@@ -3635,11 +3564,8 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
             const allCellsInColumn = allUI.gridTableContent.querySelectorAll(`.game-cell[data-game="${gameIndex}"]`);
             allCellsInColumn.forEach(c => c.classList.remove('highlight-column'));
         });
-    });
-    
-    console.log('🚨 Grid renderGrid COMPLETED SUCCESSFULLY');
-  } catch (error) {
-    console.error('💥 CRITICAL ERROR in renderGrid:', error);
+    });} catch (error) {
+    //console.error('💥 CRITICAL ERROR in renderGrid:', error);
     allUI.gridTableLoader.style.display = 'none';
     allUI.gridTableContent.innerHTML = `<p class="text-red-600">Error loading grid: ${error.message}</p>`;
   }
@@ -3740,10 +3666,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
  // 💎 ADD USERS TO POOL FUNCTIONS - Diamond Level Implementation! 🚀
 
  async function fetchRecentUsers() {
-  try {
-    console.log('🔍 Fetching recent users for pool addition...');
-    
-    // Get all users and sort by creation date (most recent first)
+  try {// Get all users and sort by creation date (most recent first)
     const usersCollectionRef = collection(db, usersPath());
     const usersQuery = query(usersCollectionRef, orderBy('createdAt', 'desc'), limit(20));
     const usersSnap = await getDocs(usersQuery);
@@ -3764,22 +3687,16 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
       // Sort by ID descending as fallback (newer UIDs are typically larger)
       allUsersArray.sort((a, b) => b.id.localeCompare(a.id));
       return allUsersArray.slice(0, 10);
-    }
-    
-    console.log(`💎 Found ${recentUsers.length} recent users`);
-    return recentUsers.slice(0, 10);
+    }return recentUsers.slice(0, 10);
     
   } catch (error) {
-    console.error('Error fetching recent users:', error);
+    //console.error('Error fetching recent users:', error);
     return [];
   }
  }
 
  async function filterUsersNotInPool(users, poolId) {
-  try {
-    console.log(`🔍 Filtering users not in pool: ${poolId}`);
-    
-    // Get current pool members
+  try {// Get current pool members
     const poolMembersRef = doc(db, getPoolMembersPath(poolId));
     const poolMembersSnap = await getDoc(poolMembersRef);
     
@@ -3790,13 +3707,10 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
     }
     
     // Filter out users already in the pool
-    const availableUsers = users.filter(user => !currentMembers.has(user.id));
-    
-    console.log(`💎 Found ${availableUsers.length} users not in pool (filtered ${currentMembers.size} existing members)`);
-    return availableUsers;
+    const availableUsers = users.filter(user => !currentMembers.has(user.id));return availableUsers;
     
   } catch (error) {
-    console.error('Error filtering users not in pool:', error);
+    //console.error('Error filtering users not in pool:', error);
     return users; // Return all users if filtering fails
   }
  }
@@ -3805,34 +3719,24 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
   try {
     if (!searchTerm || searchTerm.trim().length < 2) {
       return [];
-    }
-    
-    console.log(`🔍 Searching users with term: "${searchTerm}"`);
-    
-    const allUsers = await fetchAllUsers();
+    }const allUsers = await fetchAllUsers();
     const searchRegex = new RegExp(searchTerm.trim(), 'i'); // Case insensitive
     
     const matchingUsers = allUsers.filter(user => {
       const displayName = user.displayName || '';
       const email = user.email || '';
       return searchRegex.test(displayName) || searchRegex.test(email);
-    });
-    
-    console.log(`💎 Found ${matchingUsers.length} users matching "${searchTerm}"`);
-    return matchingUsers;
+    });return matchingUsers;
     
   } catch (error) {
-    console.error('Error searching users:', error);
+    //console.error('Error searching users:', error);
     return [];
   }
  }
 
  // 💎 CORE ADD USER TO POOL FUNCTION - Complete Database Associations! 🚀
  async function addUserToPool(userId, userEmail, userDisplayName, role, poolId, poolName, adminUID) {
-  try {
-    console.log(`💎 Adding user ${userId} (${userDisplayName}) to pool ${poolId} as ${role}`);
-    
-    // Validate inputs
+  try {// Validate inputs
     if (!userId || !role || !poolId || !adminUID) {
       throw new Error('Missing required parameters for user addition');
     }
@@ -3871,10 +3775,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         }
       };
       
-      transaction.update(poolMembersRef, poolMemberData);
-      console.log('✅ Updated poolMembers document');
-      
-      // 2. Update userPools/{userUID} - Add pool membership record
+      transaction.update(poolMembersRef, poolMemberData);// 2. Update userPools/{userUID} - Add pool membership record
       const userPoolsRef = doc(db, `userPools/${userId}`);
       const userPoolData = {
         [poolId]: {
@@ -3886,10 +3787,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         }
       };
       
-      transaction.set(userPoolsRef, userPoolData, { merge: true });
-      console.log('✅ Updated userPools document');
-      
-      // 3. Initialize picks documents for current and future weeks
+      transaction.set(userPoolsRef, userPoolData, { merge: true });// 3. Initialize picks documents for current and future weeks
       const currentWeek = getCurrentNflWeek();
       const maxWeeks = 18; // NFL season weeks
       
@@ -3907,10 +3805,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         };
         
         transaction.set(picksDocRef, initialPicksData, { merge: true });
-      }
-      console.log(`✅ Initialized picks documents for weeks ${currentWeek}-${maxWeeks}`);
-      
-      // 4. Update pool member count statistics (using data from read phase)
+      }// 4. Update pool member count statistics (using data from read phase)
       if (poolConfigSnap.exists()) {
         const currentConfig = poolConfigSnap.data();
         const currentMemberCount = currentConfig.memberCount || 0;
@@ -3918,9 +3813,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         transaction.update(poolConfigRef, {
           memberCount: currentMemberCount + 1,
           lastUpdated: timestamp
-        });
-        console.log('✅ Updated pool member count statistics');
-      }
+        });}
       
       // 5. Create audit log entry
       const auditLogRef = doc(db, `auditLogs/${poolId}`, 'userActions', `${Date.now()}_${userId}`);
@@ -3940,15 +3833,10 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         }
       };
       
-      transaction.set(auditLogRef, auditData);
-      console.log('✅ Created audit log entry');
-    });
-    
-    console.log(`🎉 Successfully added ${userDisplayName} to pool ${poolName} as ${role}!`);
-    return { success: true, message: `${userDisplayName} successfully added as ${role}` };
+      transaction.set(auditLogRef, auditData);});return { success: true, message: `${userDisplayName} successfully added as ${role}` };
     
   } catch (error) {
-    console.error('💥 Error adding user to pool:', error);
+    //console.error('💥 Error adding user to pool:', error);
     
     // Provide specific error messages
     if (error.message.includes('already a member')) {
@@ -3971,10 +3859,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
  let currentSelectedUser = null;
  
  async function initializeAddUsersSection() {
-  try {
-    console.log('💎 Initializing Add Users section...');
-    
-    const currentPool = getCurrentPool();
+  try {const currentPool = getCurrentPool();
     const poolName = getPoolDisplayName(currentPool);
     
     // Update pool name in the header
@@ -3989,12 +3874,8 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
     setupUserSearch();
     
     // Setup modal interactions
-    setupModalInteractions();
-    
-    console.log('✅ Add Users section initialized successfully');
-    
-  } catch (error) {
-    console.error('Error initializing Add Users section:', error);
+    setupModalInteractions();} catch (error) {
+    //console.error('Error initializing Add Users section:', error);
   }
  }
  
@@ -4071,12 +3952,8 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
     allUI.recentUsersList.innerHTML = usersHTML;
     
     // Setup inline add button interactions
-    setupInlineAddButtons();
-    
-    console.log(`💎 Displayed ${availableUsers.length} recent users`);
-    
-  } catch (error) {
-    console.error('Error loading recent users display:', error);
+    setupInlineAddButtons();} catch (error) {
+    //console.error('Error loading recent users display:', error);
     allUI.recentUsersList.innerHTML = `
       <div class="text-center py-8 text-red-500">
         <p class="text-sm">Error loading recent users.</p>
@@ -4212,12 +4089,8 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         
         openAddUserModal(userId, userName, userEmail);
       });
-    });
-    
-    console.log(`💎 Found ${availableUsers.length} users matching "${searchTerm}"`);
-    
-  } catch (error) {
-    console.error('Error performing user search:', error);
+    });} catch (error) {
+    //console.error('Error performing user search:', error);
     if (allUI.searchLoading) allUI.searchLoading.classList.add('hidden');
     allUI.searchResultsList.innerHTML = `
       <div class="text-center py-4 text-red-500">
@@ -4241,7 +4114,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
       e.preventDefault();
       
       if (!currentSelectedUser) {
-        console.error('No user selected for addition');
+        //console.error('No user selected for addition');
         return;
       }
       
@@ -4273,10 +4146,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
  }
  
  async function executeAddUser(userId, userEmail, userName, role, isFromModal = false) {
-  try {
-    console.log(`💎 Executing add user: ${userId} (${userName}) as ${role}`);
-    
-    // Show loading state
+  try {// Show loading state
     if (isFromModal) {
       allUI.addUserBtnText.classList.add('hidden');
       allUI.addUserLoading.classList.remove('hidden');
@@ -4322,7 +4192,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
     }
     
   } catch (error) {
-    console.error('Error in executeAddUser:', error);
+    //console.error('Error in executeAddUser:', error);
     showMessage('❌ Unexpected error occurred while adding user', 'error');
   } finally {
     // Reset loading state
@@ -4380,10 +4250,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
  }
 
  async function cleanupDuplicateUsers() {
-  try {
-   console.log('Starting cleanup of duplicate users...');
-   
-   // Get all users from Firestore
+  try {// Get all users from Firestore
    const usersCollectionRef = collection(db, usersPath());
    const usersSnap = await getDocs(usersCollectionRef);
    const allUsersRaw = [];
@@ -4392,84 +4259,48 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
    });
    
    // Find duplicates for tonyweeg@gmail.com specifically
-   const tonyweegUsers = allUsersRaw.filter(u => u.email === 'tonyweeg@gmail.com');
-   console.log(`Found ${tonyweegUsers.length} users with tonyweeg@gmail.com:`, tonyweegUsers);
-   
-   if (tonyweegUsers.length > 1) {
+   const tonyweegUsers = allUsersRaw.filter(u => u.email === 'tonyweeg@gmail.com');if (tonyweegUsers.length > 1) {
     const keepUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
     const usersToRemove = tonyweegUsers.filter(u => u.id !== keepUID);
     
-    for (const userToRemove of usersToRemove) {
-     console.log(`Removing duplicate user: ${userToRemove.id}`);
-     await removeUserCompletely(userToRemove.id, `${userToRemove.displayName} (duplicate)`);
-    }
-    
-    console.log(`Cleanup complete. Kept user with UID: ${keepUID}`);
-   } else {
-    console.log('No duplicate tonyweeg@gmail.com users found.');
-   }
+    for (const userToRemove of usersToRemove) {await removeUserCompletely(userToRemove.id, `${userToRemove.displayName} (duplicate)`);
+    }} else {}
    
   } catch (error) {
-   console.error('Error during duplicate cleanup:', error);
+   //console.error('Error during duplicate cleanup:', error);
    alert(`Error cleaning up duplicates: ${error.message}`);
   }
  }
 
  async function removeUserCompletely(userId, userName) {
-  try {
-   console.log(`Starting complete removal of user: ${userId} (${userName})`);
-   
-   // Step 1: Delete user profile
-   console.log('Deleting user profile...');
-   const userDocRef = doc(db, `${usersPath()}/${userId}`);
+  try {// Step 1: Delete user profileconst userDocRef = doc(db, `${usersPath()}/${userId}`);
    await deleteDoc(userDocRef);
    
-   // Step 2: Delete all weekly picks (check all weeks 1-18)
-   console.log('Deleting all weekly picks...');
-   for (let week = 1; week <= 18; week++) {
+   // Step 2: Delete all weekly picks (check all weeks 1-18)for (let week = 1; week <= 18; week++) {
     try {
      const picksDocRef = doc(db, picksPath(week, userId));
-     await deleteDoc(picksDocRef);
-     console.log(`Deleted picks for week ${week}`);
-    } catch (error) {
-     console.log(`No picks found for week ${week} (this is normal)`);
-    }
+     await deleteDoc(picksDocRef);} catch (error) {}
    }
    
-   // Step 3: Delete survivor picks
-   console.log('Deleting survivor picks...');
-   try {
+   // Step 3: Delete survivor pickstry {
     const survivorDocRef = doc(db, survivorPicksPath(userId));
-    await deleteDoc(survivorDocRef);
-    console.log('Deleted survivor picks');
-   } catch (error) {
-    console.log('No survivor picks found (this is normal)');
-   }
+    await deleteDoc(survivorDocRef);} catch (error) {}
    
-   // Step 4: Clean up any other user references (if any exist in other collections)
-   console.log('Checking for other user references...');
-   
-   // Step 5: Refresh the user list (with small delay to avoid connection issues)
+   // Step 4: Clean up any other user references (if any exist in other collections)// Step 5: Refresh the user list (with small delay to avoid connection issues)
    setTimeout(async () => {
      try {
        await fetchAllUsers();
        renderUserManagement();
-     } catch (error) {
-       console.log('Non-critical cache refresh error after user deletion:', error);
-       // Still render with existing data
+     } catch (error) {// Still render with existing data
        renderUserManagement();
      }
    }, 1000);
    
-   alert(`✅ User "${userName}" has been completely removed from the system.\n\nAll data deleted:\n- User profile\n- All weekly picks (weeks 1-18)\n- Survivor picks\n- All associated data`);
-   
-   console.log(`Successfully completed removal of user: ${userId} (${userName})`);
-   
-   // 💎 CRITICAL: Invalidate all cache affected by user removal
+   alert(`✅ User "${userName}" has been completely removed from the system.\n\nAll data deleted:\n- User profile\n- All weekly picks (weeks 1-18)\n- Survivor picks\n- All associated data`);// 💎 CRITICAL: Invalidate all cache affected by user removal
    window.gameStateCache.invalidateAfterDataUpdate('users_modified');
    
   } catch (error) {
-   console.error('Error during user removal:', error);
+   //console.error('Error during user removal:', error);
    alert(`❌ Error removing user "${userName}": ${error.message}\n\nPlease try again or contact support.`);
   }
  }
@@ -4635,7 +4466,6 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
     // Live leaderboard removed from Games tab per user request
  }
 
-
  // User management sorting state
  let userSortField = 'role'; // Start by sorting by role (admins first)
  let userSortDirection = 'desc'; // desc = admins first, asc = regular users first
@@ -4779,16 +4609,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
  let originalUserPicks = {};
  let editableGamesForUser = [];
 
- async function renderPicksManagement(weekNumber) {
-     console.log('🔥 NEW PICKS MANAGEMENT LOADING - Week:', weekNumber);
-     console.log('🔍 Elements check:', {
-         adminPicksWeekNumber: !!allUI.adminPicksWeekNumber,
-         playerIconsGrid: !!allUI.playerIconsGrid,
-         userPicksEditor: !!allUI.userPicksEditor,
-         allUsersCount: allUsers.length
-     });
-     
-     // Update week display
+ async function renderPicksManagement(weekNumber) {// Update week display
      if (allUI.adminPicksWeekNumber) {
          allUI.adminPicksWeekNumber.textContent = weekNumber;
      }
@@ -4806,11 +4627,8 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
          
          picksSnapshot.forEach(doc => {
              allUserPicks[doc.id] = doc.data();
-         });
-         
-         console.log(`💎 Loaded picks for ${Object.keys(allUserPicks).length} users for week ${weekNumber}`);
-     } catch (error) {
-         console.error('Error loading user picks:', error);
+         });} catch (error) {
+         //console.error('Error loading user picks:', error);
      }
      
      // Render player icons grid
@@ -4933,7 +4751,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
          allUI.userPicksEditor.classList.remove('hidden');
          
      } catch (error) {
-         console.error('Error loading week data:', error);
+         //console.error('Error loading week data:', error);
          showMessageStatus('Error loading games for this week', 'error');
      }
  }
@@ -5231,34 +5049,15 @@ async function renderSurvivorStatus(weekNumber) {
 }
 
 // Function to attach survivor elimination button handlers
-function attachSurvivorEliminationHandlers() {
-    console.log('🔧 Attaching survivor elimination button handlers...');
-    
-    const checkCurrentWeekBtn = document.getElementById('check-current-week-eliminations-btn');
+function attachSurvivorEliminationHandlers() {const checkCurrentWeekBtn = document.getElementById('check-current-week-eliminations-btn');
     const checkAllWeeksBtn = document.getElementById('check-all-weeks-eliminations-btn');
     const checkSpecificUserBtn = document.getElementById('check-specific-user-btn');
-    const eliminationResults = document.getElementById('elimination-results');
-    
-    console.log('Button elements found:', {
-        checkCurrentWeekBtn: !!checkCurrentWeekBtn,
-        checkAllWeeksBtn: !!checkAllWeeksBtn,
-        checkSpecificUserBtn: !!checkSpecificUserBtn,
-        eliminationResults: !!eliminationResults
-    });
-    
-    if (checkCurrentWeekBtn && !checkCurrentWeekBtn._handlerAttached) {
+    const eliminationResults = document.getElementById('elimination-results');if (checkCurrentWeekBtn && !checkCurrentWeekBtn._handlerAttached) {
         checkCurrentWeekBtn._handlerAttached = true;
         checkCurrentWeekBtn.addEventListener('click', async () => {
-            try {
-                console.log('🔧 Check Current Week button clicked');
-                eliminationResults.innerHTML = '<span class="text-blue-600">🔄 Checking current week eliminations...</span>';
+            try {eliminationResults.innerHTML = '<span class="text-blue-600">🔄 Checking current week eliminations...</span>';
                 
-                // Debug: Check if required components are available
-                console.log('Debug - SurvivorAutoElimination available:', typeof window.SurvivorAutoElimination !== 'undefined');
-                console.log('Debug - db available:', typeof db !== 'undefined');
-                console.log('Debug - gameStateCache available:', typeof window.gameStateCache !== 'undefined');
-                
-                if (typeof window.SurvivorAutoElimination === 'undefined') {
+                // Debug: Check if required components are availableif (typeof window.SurvivorAutoElimination === 'undefined') {
                     eliminationResults.innerHTML = '<span class="text-red-600">❌ Error: SurvivorAutoElimination not loaded</span>';
                     return;
                 }
@@ -5292,7 +5091,7 @@ function attachSurvivorEliminationHandlers() {
                 }
             } catch (error) {
                 eliminationResults.innerHTML = `<span class="text-red-600">❌ Error: ${error.message}</span>`;
-                console.error('Error checking current week eliminations:', error);
+                //console.error('Error checking current week eliminations:', error);
             }
         });
     }
@@ -5300,9 +5099,7 @@ function attachSurvivorEliminationHandlers() {
     if (checkAllWeeksBtn && !checkAllWeeksBtn._handlerAttached) {
         checkAllWeeksBtn._handlerAttached = true;
         checkAllWeeksBtn.addEventListener('click', async () => {
-            try {
-                console.log('🔧 Check All Weeks button clicked');
-                eliminationResults.innerHTML = '<span class="text-blue-600">🔄 Checking all weeks for eliminations (this may take a moment)...</span>';
+            try {eliminationResults.innerHTML = '<span class="text-blue-600">🔄 Checking all weeks for eliminations (this may take a moment)...</span>';
                 
                 if (typeof window.SurvivorAutoElimination === 'undefined') {
                     eliminationResults.innerHTML = '<span class="text-red-600">❌ Error: SurvivorAutoElimination not loaded</span>';
@@ -5352,7 +5149,7 @@ function attachSurvivorEliminationHandlers() {
                 }
             } catch (error) {
                 eliminationResults.innerHTML = `<span class="text-red-600">❌ Error: ${error.message}</span>`;
-                console.error('Error checking all weeks eliminations:', error);
+                //console.error('Error checking all weeks eliminations:', error);
             }
         });
     }
@@ -5363,9 +5160,7 @@ function attachSurvivorEliminationHandlers() {
             const userId = prompt('Enter User ID to check (e.g. BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2):');
             if (!userId) return;
             
-            try {
-                console.log('🔧 Check Specific User button clicked for:', userId);
-                eliminationResults.innerHTML = `<span class="text-blue-600">🔄 Checking user ${userId}...</span>`;
+            try {eliminationResults.innerHTML = `<span class="text-blue-600">🔄 Checking user ${userId}...</span>`;
                 
                 if (typeof window.SurvivorAutoElimination === 'undefined') {
                     eliminationResults.innerHTML = '<span class="text-red-600">❌ Error: SurvivorAutoElimination not loaded</span>';
@@ -5402,7 +5197,7 @@ function attachSurvivorEliminationHandlers() {
                 }
             } catch (error) {
                 eliminationResults.innerHTML = `<span class="text-red-600">❌ Error: ${error.message}</span>`;
-                console.error('Error checking specific user:', error);
+                //console.error('Error checking specific user:', error);
             }
         });
     }
@@ -5526,12 +5321,7 @@ async function loadCustomUsersList() {
                 } else {
                     usersWithoutNotifications.push(user);
                 }
-            });
-            
-            console.log('💎 Diamond Level: Single query loaded custom users list successfully');
-        } catch (collectionGroupError) {
-            console.log('💎 CollectionGroup not available, using batched queries:', collectionGroupError);
-            // Fallback: Batch all queries in parallel instead of sequential
+            });} catch (collectionGroupError) {// Fallback: Batch all queries in parallel instead of sequential
             const snapshots = await Promise.all(allUsers.map(user => 
                 getDocs(collection(db, `users/${user.id}/fcm_tokens`))
             ));
@@ -5543,11 +5333,9 @@ async function loadCustomUsersList() {
                 } else {
                     usersWithoutNotifications.push(user);
                 }
-            });
-            console.log('💎 Diamond Level: Batched parallel queries completed for custom users');
-        }
+            });}
     } catch (error) {
-        console.error('💎 Diamond Level custom users failed, falling back to individual queries:', error);
+        //console.error('💎 Diamond Level custom users failed, falling back to individual queries:', error);
         // Final fallback to original method if needed
         for (const user of allUsers) {
             try {
@@ -5557,16 +5345,10 @@ async function loadCustomUsersList() {
                 } else {
                     usersWithoutNotifications.push(user);
                 }
-            } catch (error) {
-                console.log(`Could not check FCM tokens for ${user.email}:`, error);
-                usersWithoutNotifications.push(user);
+            } catch (error) {usersWithoutNotifications.push(user);
             }
         }
-    }
-    
-    console.log(`📱 Users with notifications: ${usersWithNotifications.length}, without: ${usersWithoutNotifications.length}`);
-    
-    if (usersWithNotifications.length === 0) {
+    }if (usersWithNotifications.length === 0) {
         allUI.customUsersList.innerHTML = `
             <div class="text-center py-4">
                 <p class="text-gray-500 text-sm">❌ No users have enabled push notifications yet.</p>
@@ -5614,18 +5396,10 @@ async function getFilteredRecipients(recipientType, weekNumber) {
     // 💎🔥 DIAMOND FIX: Use proper deduplication instead of broken loadUsers()!
     if (!allUsers || allUsers.length === 0) {
         allUsers = await fetchAllUsers();
-    }
-    
-    console.log('🔔 getFilteredRecipients called with:', {recipientType, weekNumber, totalUsers: allUsers.length});
-    
-    switch (recipientType) {
-        case 'all':
-            console.log('🔔 Returning ALL users:', allUsers.length);
-            return allUsers;
+    }switch (recipientType) {
+        case 'all':return allUsers;
             
-        case 'no-picks':
-            console.log(`💎 User picks filtering optimization - fetching all picks for week ${weekNumber} in 1 query`);
-            const usersWithoutPicks = [];
+        case 'no-picks':const usersWithoutPicks = [];
             
             // 💎 DIAMOND LEVEL: Single collection query instead of N individual getDoc calls
             const allPicksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
@@ -5660,16 +5434,7 @@ async function getFilteredRecipients(recipientType, weekNumber) {
         case 'custom':
             const selectedCheckboxes = allUI.customUsersList.querySelectorAll('.custom-user-checkbox:checked');
             const selectedUserIds = Array.from(selectedCheckboxes).map(cb => cb.value);
-            const filteredUsers = allUsers.filter(user => selectedUserIds.includes(user.id));
-            
-            console.log('🔔 CUSTOM selection:', {
-                checkboxesFound: selectedCheckboxes.length,
-                selectedUserIds: selectedUserIds,
-                filteredUsers: filteredUsers.length,
-                userEmails: filteredUsers.map(u => u.email)
-            });
-            
-            return filteredUsers;
+            const filteredUsers = allUsers.filter(user => selectedUserIds.includes(user.id));return filteredUsers;
             
         default:
             return [];
@@ -5728,20 +5493,12 @@ async function sendSystemMessage() {
     }
     
     const weekNumber = allUI.adminWeekSelector ? allUI.adminWeekSelector.value : getCurrentNflWeek();
-    const recipientType = allUI.messageRecipients.value;
-    
-    console.log('🔔 FCM Debug - recipientType:', recipientType, 'weekNumber:', weekNumber);
-    
-    showMessageStatus('🔔 Preparing to send push notifications...', 'info');
+    const recipientType = allUI.messageRecipients.value;showMessageStatus('🔔 Preparing to send push notifications...', 'info');
     allUI.sendMessageBtn.disabled = true;
     
     try {
         // Get recipients and their FCM tokens
-        const recipients = await getFilteredRecipients(recipientType, weekNumber);
-        
-        console.log('🔔 FCM Debug - recipients found:', recipients.length, recipients.map(r => r.email));
-        
-        if (recipients.length === 0) {
+        const recipients = await getFilteredRecipients(recipientType, weekNumber);if (recipients.length === 0) {
             showMessageStatus('No recipients found for the selected criteria.', 'error');
             allUI.sendMessageBtn.disabled = false;
             return;
@@ -5777,12 +5534,7 @@ async function sendSystemMessage() {
                     } else {
                         usersWithoutTokens.push(user.displayName || user.email);
                     }
-                });
-                
-                console.log('💎 Diamond Level: Single query collected tokens successfully');
-            } catch (collectionGroupError) {
-                console.log('💎 CollectionGroup not available, using batched queries:', collectionGroupError);
-                // Fallback: Batch all queries in parallel instead of sequential
+                });} catch (collectionGroupError) {// Fallback: Batch all queries in parallel instead of sequential
                 const snapshots = await Promise.all(recipients.map(user => 
                     getDocs(collection(db, `users/${user.id}/fcm_tokens`))
                 ));
@@ -5806,11 +5558,9 @@ async function sendSystemMessage() {
                     } else {
                         usersWithoutTokens.push(user.displayName || user.email);
                     }
-                });
-                console.log('💎 Diamond Level: Batched parallel queries completed');
-            }
+                });}
         } catch (error) {
-            console.error('💎 Diamond Level FCM collection failed, falling back to individual queries:', error);
+            //console.error('💎 Diamond Level FCM collection failed, falling back to individual queries:', error);
             // Fallback to original method if needed
             for (const user of recipients) {
                 try {
@@ -5830,24 +5580,10 @@ async function sendSystemMessage() {
                     } else {
                         usersWithoutTokens.push(user.displayName || user.email);
                     }
-                } catch (error) {
-                    console.log(`Could not get FCM tokens for ${user.email}:`, error);
-                    usersWithoutTokens.push(user.displayName || user.email);
+                } catch (error) {usersWithoutTokens.push(user.displayName || user.email);
                 }
             }
-        }
-        
-        console.log('📱 FCM Token Collection Results:', {
-            totalRecipients: recipients.length,
-            usersWithTokens: usersWithTokens.length, 
-            usersWithoutTokens: usersWithoutTokens.length,
-            totalTokens: fcmTokens.length,
-            recipientEmails: recipients.map(r => r.email),
-            usersWithTokensNames: usersWithTokens,
-            usersWithoutTokensNames: usersWithoutTokens
-        });
-        
-        if (fcmTokens.length === 0) {
+        }if (fcmTokens.length === 0) {
             showMessageStatus('❌ No users have enabled push notifications yet. Ask users to enable notifications on the website first.', 'warning');
             allUI.sendMessageBtn.disabled = false;
             return;
@@ -5870,11 +5606,7 @@ async function sendSystemMessage() {
             targetTokens: fcmTokens,
             priority: 'normal',
             clickAction: '/'
-        });
-        
-        console.log('FCM notification sent successfully:', result);
-        
-        const { successCount, failureCount } = result.data;
+        });const { successCount, failureCount } = result.data;
         
         let message = `✅ Successfully sent ${successCount} push notification${successCount !== 1 ? 's' : ''}.`;
         
@@ -5894,7 +5626,7 @@ async function sendSystemMessage() {
         allUI.messagePreviewSection.classList.add('hidden');
         
     } catch (error) {
-        console.error('Error sending FCM notifications:', error);
+        //console.error('Error sending FCM notifications:', error);
         showMessageStatus(`❌ Error sending notifications: ${error.message}`, 'error');
     } finally {
         allUI.sendMessageBtn.disabled = false;
@@ -5940,16 +5672,12 @@ async function calculateWeeklyLeaderboard(weekNumber) {
     const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
     const results = resultsSnap.exists() ? resultsSnap.data() : {};
     
-    if (!results || Object.keys(results).length === 0) {
-        console.log(`No results found for week ${weekNumber} - skipping leaderboard calculation`);
-        return [];
+    if (!results || Object.keys(results).length === 0) {return [];
     }
     
     const scores = [];
     
-    // 💎 DIAMOND LEVEL: Single collection query instead of N individual getDoc calls
-    console.log(`💎 Optimized leaderboard calculation - fetching all picks for week ${weekNumber} in 1 query`);
-    const allPicksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
+    // 💎 DIAMOND LEVEL: Single collection query instead of N individual getDoc callsconst allPicksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
     
     // Create map of user picks for fast lookup
     const userPicksMap = {};
@@ -5981,7 +5709,6 @@ async function calculateWeeklyLeaderboard(weekNumber) {
     
     return scores.sort((a, b) => b.score - a.score);
 }
-
 
  async function renderAdminView(weekNumber) {
  const activeTab = document.querySelector('.admin-tab.active').id;
@@ -6063,7 +5790,7 @@ async function renderAnalytics(weekNumber) {
         contentEl.classList.remove('hidden');
 
     } catch (error) {
-        console.error('Error rendering analytics:', error);
+        //console.error('Error rendering analytics:', error);
         
         // Show error state
         loadingEl.classList.add('hidden');
@@ -6194,7 +5921,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (result.success) {
                     await renderAnalytics(weekNumber);
                 } else {
-                    console.error('Failed to refresh analytics:', result.error);
+                    //console.error('Failed to refresh analytics:', result.error);
                 }
             }
         });
@@ -6209,10 +5936,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (result.success) {
                     downloadAnalyticsCSV(result.data, weekNumber);
                 } else {
-                    console.error('Failed to export analytics:', result.error);
+                    //console.error('Failed to export analytics:', result.error);
                 }
             } catch (error) {
-                console.error('Error exporting analytics:', error);
+                //console.error('Error exporting analytics:', error);
             }
         });
     }
@@ -6257,9 +5984,7 @@ function downloadAnalyticsCSV(data, weekNumber) {
 }
 
  // --- INITIALIZATION & AUTH ---
- async function initializeAppAndAuth() {
- console.log('💎 initializeAppAndAuth started');
- const firebaseConfig = {
+ async function initializeAppAndAuth() {const firebaseConfig = {
  apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
  authDomain: "nerdfootball.firebaseapp.com",
  databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
@@ -6288,23 +6013,15 @@ function downloadAnalyticsCSV(data, weekNumber) {
      const messaging = getMessaging(app);
      // Make messaging available to compatibility mode
      if (!window.firebase) window.firebase = {};
-     window.firebase.messaging = () => messaging;
-     console.log('✅ Firebase messaging initialized for FCM compatibility');
- } catch (error) {
-     console.warn('Firebase messaging initialization failed:', error);
- }
- onAuthStateChanged(auth, handleAuthStateChange);
-console.log('💎 onAuthStateChanged listener set up');
-
-// Check for invite code on page load
+     window.firebase.messaging = () => messaging;} catch (error) {}
+ onAuthStateChanged(auth, handleAuthStateChange);// Check for invite code on page load
 checkForInviteCode();
  
  // Register service worker for caching - temporarily disabled for debugging
  // if ('serviceWorker' in navigator) {
  //  navigator.serviceWorker.register('/sw.js')
  //   .then(registration => {
- //    console.log('ServiceWorker registration successful');
- //    
+ ////    
  //    // Check for updates every 30 seconds
  //    setInterval(() => {
  //     registration.update();
@@ -6324,16 +6041,13 @@ checkForInviteCode();
  //     });
  //    });
  //   })
- //   .catch(error => console.log('ServiceWorker registration failed: ', error));
- // }
+ //   .catch(error =>// }
  }
 
  // Flag to prevent URL updates during initial page load
 let isInitialLoad = true;
 
-async function handleAuthStateChange(user) {
- console.log('💎 handleAuthStateChange called with user:', user ? user.uid : 'null');
- // Validate pool isolation on auth state change
+async function handleAuthStateChange(user) {// Validate pool isolation on auth state change
  if (user) {
    setTimeout(() => {
      validatePoolIsolation();
@@ -6372,10 +6086,8 @@ async function handleAuthStateChange(user) {
     emailVerified: true,
     lastUpdated: new Date().toISOString()
    });
-   localStorage.removeItem('pendingEmailChange');
-   console.log('Email verification completed and Firestore updated');
-  } catch (error) {
-   console.error('Error updating email in Firestore after verification:', error);
+   localStorage.removeItem('pendingEmailChange');} catch (error) {
+   //console.error('Error updating email in Firestore after verification:', error);
   }
  }
  
@@ -6420,11 +6132,7 @@ async function handleAuthStateChange(user) {
  // Restore saved view state
  if (savedState.leaderboardView === 'season') {
   allUI.lbSeasonBtn.click();
- }
- 
- console.log('💎 URL state - currentView:', savedState.currentView);
-console.log('💎 About to switch on view:', savedState.currentView);
-switch (savedState.currentView) {
+ }switch (savedState.currentView) {
   case 'admin':
    if (ADMIN_UIDS.includes(user.uid)) {
     allUI.adminViewBtn.click();
@@ -6435,12 +6143,10 @@ switch (savedState.currentView) {
   case 'leaderboard':
    allUI.leaderboardViewBtn.click();
    break;
-  case 'grid':
-   console.log('💎 Grid view requested - allUI.gridViewBtn:', !!allUI.gridViewBtn);
-   if (allUI.gridViewBtn) {
+  case 'grid':if (allUI.gridViewBtn) {
      allUI.gridViewBtn.click();
    } else {
-     console.error('❌ gridViewBtn not found - manually showing grid');
+     //console.error('❌ gridViewBtn not found - manually showing grid');
      // Manually show grid if button doesn't exist
      hideAllViews();
      allUI.gridContainer.classList.remove('hidden');
@@ -6454,9 +6160,7 @@ switch (savedState.currentView) {
   case 'survivor-picks':
    SurvivorPicksView.show();
    break;
-  case 'rules':
-   console.log('💎 Rules view not implemented in unified system - user should navigate directly');
-   allUI.picksViewBtn.click(); // Fallback to picks view
+  case 'rules':allUI.picksViewBtn.click(); // Fallback to picks view
    break;
   case 'picks':
   default:
@@ -6465,9 +6169,7 @@ switch (savedState.currentView) {
 
  // CRITICAL FIX: Allow URL updates after initial load is complete
  setTimeout(() => {
-  isInitialLoad = false;
-  console.log('💎 Initial load complete, URL updates now enabled');
- }, 2000);
+  isInitialLoad = false;}, 2000);
 
  } else {
  currentUser = null;
@@ -6475,9 +6177,7 @@ switch (savedState.currentView) {
  
  // Check if specific views should be shown even without authentication
  const savedState = loadAppState();
- if (savedState.currentView === 'survivor-picks') {
-   console.log('💎 Showing survivor-picks view for unauthenticated user');
-   allUI.loginView.classList.add('hidden');
+ if (savedState.currentView === 'survivor-picks') {allUI.loginView.classList.add('hidden');
    allUI.appView.classList.remove('hidden');
    SurvivorPicksView.show();
  } else {
@@ -6636,9 +6336,7 @@ switch (savedState.currentView) {
   
   try {
    const result = await signInWithPopup(auth, provider);
-   // New user or existing Google account - proceed normally
-   console.log('Google sign-in successful:', result.user);
-  } catch (error) {
+   // New user or existing Google account - proceed normally} catch (error) {
    if (error.code === 'auth/account-exists-with-different-credential') {
     // Account exists with different credential (email/password)
     pendingCredential = GoogleAuthProvider.credentialFromError(error);
@@ -6653,7 +6351,7 @@ switch (savedState.currentView) {
       return;
      }
     } catch (fetchError) {
-     console.error('Error fetching sign-in methods:', fetchError);
+     //console.error('Error fetching sign-in methods:', fetchError);
     }
    } else if (error.code === 'auth/popup-cancelled-by-user') {
     // User cancelled the popup - no action needed
@@ -6661,7 +6359,7 @@ switch (savedState.currentView) {
    } else if (error.code === 'auth/popup-blocked') {
     showAuthError('Popup was blocked by your browser. Please allow popups and try again.');
    } else {
-    console.error('Google sign-in error:', error);
+    //console.error('Google sign-in error:', error);
     showAuthError('Failed to sign in with Google. Please try again.');
    }
   }
@@ -6669,7 +6367,7 @@ switch (savedState.currentView) {
 
  async function linkAccountWithGoogle() {
   if (!pendingCredential || !pendingEmail) {
-   console.error('No pending credential found');
+   //console.error('No pending credential found');
    return;
   }
 
@@ -6686,7 +6384,7 @@ switch (savedState.currentView) {
    }
    
   } catch (error) {
-   console.error('Account linking error:', error);
+   //console.error('Account linking error:', error);
    hideAccountLinkingDialog();
    showAuthError('Failed to link accounts. Please try again.');
   }
@@ -6702,11 +6400,7 @@ switch (savedState.currentView) {
    await linkWithCredential(user, pendingCredential);
    
    // Update user profile to mark Google as primary auth method
-   await updateUserAuthMethod(user.uid, 'google');
-   
-   console.log('Account successfully linked with Google');
-   
-   // Clear pending data
+   await updateUserAuthMethod(user.uid, 'google');// Clear pending data
    pendingCredential = null;
    pendingEmail = null;
    
@@ -6714,7 +6408,7 @@ switch (savedState.currentView) {
    hidePasswordPrompt();
    
   } catch (error) {
-   console.error('Account linking completion error:', error);
+   //console.error('Account linking completion error:', error);
    
    if (error.code === 'auth/wrong-password') {
     showPasswordError('Incorrect password. Please try again.');
@@ -6738,7 +6432,7 @@ switch (savedState.currentView) {
     lastUpdated: new Date().toISOString()
    });
   } catch (error) {
-   console.error('Error updating user auth method:', error);
+   //console.error('Error updating user auth method:', error);
   }
  }
 
@@ -6822,7 +6516,7 @@ switch (savedState.currentView) {
     } else if (popupError.code === 'auth/credential-already-in-use') {
      showSettingsError('This Google account is already linked to another user.');
     } else {
-     console.error('Google linking popup error:', popupError);
+     //console.error('Google linking popup error:', popupError);
      showSettingsError('Failed to link Google account. Please try again.');
     }
    }
@@ -6831,7 +6525,7 @@ switch (savedState.currentView) {
 
  async function unlinkGoogleAccount() {
   if (!currentUser) {
-   console.error('No current user for unlinking');
+   //console.error('No current user for unlinking');
    return;
   }
 
@@ -6845,7 +6539,7 @@ switch (savedState.currentView) {
    showSettingsSuccess('Google account unlinked successfully.');
    
   } catch (error) {
-   console.error('Unlinking error:', error);
+   //console.error('Unlinking error:', error);
    if (error.code === 'auth/no-such-provider') {
     showSettingsError('Google account is not linked to this account.');
    } else {
@@ -6872,7 +6566,7 @@ switch (savedState.currentView) {
    const isGoogleLinked = user.providerData.some(provider => provider.providerId === 'google.com');
    await updateGoogleLinkingUI(isGoogleLinked);
   } catch (error) {
-   console.error('Error checking Google linking status:', error);
+   //console.error('Error checking Google linking status:', error);
   }
  }
 
@@ -6893,9 +6587,7 @@ switch (savedState.currentView) {
   allUI.emailChangeStatus.innerHTML = `Attempting to send verification email to <span class="font-medium">${newEmail}</span>...`;
   
   // Method 1: Try verifyBeforeUpdateEmail
-  try {
-   console.log('Method 1: Attempting verifyBeforeUpdateEmail');
-   await verifyBeforeUpdateEmail(auth.currentUser, newEmail);
+  try {await verifyBeforeUpdateEmail(auth.currentUser, newEmail);
    
    allUI.emailChangeStatus.innerHTML = `Verification email sent to <span class="font-medium">${newEmail}</span>! Please check your inbox and spam folder.`;
    allUI.resendVerificationBtn.classList.remove('hidden');
@@ -6903,10 +6595,7 @@ switch (savedState.currentView) {
    allUI.settingsSuccess.classList.remove('hidden');
    return; // Success!
    
-  } catch (error1) {
-   console.log('Method 1 failed:', error1);
-   
-   // Method 2: Try direct updateEmail after user reauthentication
+  } catch (error1) {// Method 2: Try direct updateEmail after user reauthentication
    allUI.emailChangeStatus.innerHTML = `Standard email verification not available. <span class="font-medium">Please use the alternative method below.</span>`;
    allUI.tryDifferentMethodBtn.classList.remove('hidden');
    allUI.settingsError.textContent = 'Standard email verification is not configured. Please use the alternative method below.';
@@ -6916,14 +6605,10 @@ switch (savedState.currentView) {
 
  async function attemptDirectEmailChange(newEmail, password) {
   try {
-   // Step 1: Reauthenticate user
-   console.log('Reauthenticating user for email change');
-   const credential = EmailAuthProvider.credential(currentUser.email, password);
+   // Step 1: Reauthenticate userconst credential = EmailAuthProvider.credential(currentUser.email, password);
    await reauthenticateWithCredential(auth.currentUser, credential);
    
-   // Step 2: Update email directly
-   console.log('Updating email directly to:', newEmail);
-   await updateEmail(auth.currentUser, newEmail);
+   // Step 2: Update email directlyawait updateEmail(auth.currentUser, newEmail);
    
    // Step 3: Update Firestore
    const userDocRef = doc(db, `${usersPath()}/${currentUser.uid}`);
@@ -6949,7 +6634,7 @@ switch (savedState.currentView) {
    }, 2000);
    
   } catch (error) {
-   console.error('Direct email change failed:', error);
+   //console.error('Direct email change failed:', error);
    let errorMsg = 'Failed to change email address.';
    
    if (error.code === 'auth/wrong-password') {
@@ -7097,12 +6782,9 @@ const getPoolBasePath = () => {
  const validatePoolIsolation = () => {
    const currentPool = getCurrentPool();
    if (!currentPool) {
-     console.error('⚠️ Pool isolation compromised: No current pool set');
+     //console.error('⚠️ Pool isolation compromised: No current pool set');
      return false;
-   }
-   
-   console.log(`🔒 Pool isolation active: ${currentPool}`);
-   return true;
+   }return true;
  };
 
  // Update pool name display dynamically
@@ -7125,40 +6807,20 @@ const getPoolBasePath = () => {
 
  // Diagnostic functions to check migration status
  async function checkMigrationStatus() {
-   if (!currentUser) {
-     console.log('❌ Not authenticated - please log in first');
-     return;
-   }
-
-   console.log('🔍 MIGRATION STATUS DIAGNOSTIC');
-   console.log('================================');
-   
-   let poolExists = false;
+   if (!currentUser) {return;
+   }let poolExists = false;
    let isMember = false;
    let hasUserPools = false;
    
-   // Check current active pool setting
-   console.log(`🎯 Current active pool: ${getCurrentPool()}`);
-   
-   // Check if NerdUniverse 2025 pool exists
+   // Check current active pool setting// Check if NerdUniverse 2025 pool exists
    try {
      const poolConfigRef = doc(db, getPoolMetadataPath('nerduniverse-2025'));
      const poolConfigSnap = await getDoc(poolConfigRef);
      
      if (poolConfigSnap.exists()) {
        poolExists = true;
-       const poolData = poolConfigSnap.data();
-       console.log('✅ NerdUniverse 2025 pool EXISTS');
-       console.log(`   - Name: ${poolData.name}`);
-       console.log(`   - Members: ${poolData.memberCount || 'Unknown'}`);
-       console.log(`   - Created: ${poolData.created}`);
-     } else {
-       console.log('❌ NerdUniverse 2025 pool does NOT exist');
-     }
-   } catch (error) {
-     console.log(`❌ Cannot access pool config: ${error.message}`);
-     console.log('   (This likely means the pool does not exist yet)');
-   }
+       const poolData = poolConfigSnap.data();} else {}
+   } catch (error) {}
    
    // Check pool membership
    try {
@@ -7167,23 +6829,11 @@ const getPoolBasePath = () => {
      
      if (poolMembersSnap.exists()) {
        const members = poolMembersSnap.data();
-       const memberCount = Object.keys(members).length;
-       console.log(`✅ Pool membership data exists (${memberCount} members)`);
-       
-       if (members[currentUser.uid]) {
+       const memberCount = Object.keys(members).length;if (members[currentUser.uid]) {
          isMember = true;
-         const userRole = members[currentUser.uid].role;
-         console.log(`✅ You ARE a member (Role: ${userRole})`);
-       } else {
-         console.log('❌ You are NOT a member of this pool');
-       }
-     } else {
-       console.log('❌ No pool membership data found');
-     }
-   } catch (error) {
-     console.log(`❌ Cannot access pool membership: ${error.message}`);
-     console.log('   (Pool membership structure likely does not exist)');
-   }
+         const userRole = members[currentUser.uid].role;} else {}
+     } else {}
+   } catch (error) {}
    
    // Check your personal pool memberships
    try {
@@ -7192,57 +6842,22 @@ const getPoolBasePath = () => {
      
      if (userPoolsSnap.exists()) {
        hasUserPools = true;
-       const userPools = userPoolsSnap.data();
-       console.log(`✅ Your pool memberships: ${Object.keys(userPools).join(', ')}`);
-       
-       if (userPools['nerduniverse-2025']) {
-         console.log(`✅ NerdUniverse 2025 in your memberships (${userPools['nerduniverse-2025'].role})`);
-       } else {
-         console.log('❌ NerdUniverse 2025 NOT in your memberships');
-       }
-     } else {
-       console.log('❌ No personal pool membership data found');
-     }
-   } catch (error) {
-     console.log(`❌ Cannot access user pool memberships: ${error.message}`);
-     console.log('   (User pool membership structure likely does not exist)');
-   }
+       const userPools = userPoolsSnap.data();if (userPools['nerduniverse-2025']) {} else {}
+     } else {}
+   } catch (error) {}
    
    // Test legacy data access (should always work)
    try {
      const legacyPicksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/1/submissions';
-     const legacyPicksSnap = await getDocs(collection(db, legacyPicksPath));
-     console.log(`✅ Legacy data accessible: ${legacyPicksSnap.size} picks in week 1`);
-   } catch (error) {
-     console.log(`❌ Cannot access legacy data: ${error.message}`);
-   }
+     const legacyPicksSnap = await getDocs(collection(db, legacyPicksPath));} catch (error) {}
    
-   // Overall status
-   console.log('\n📋 SUMMARY:');
-   if (!poolExists && !isMember && !hasUserPools) {
-     console.log('🚨 MIGRATION NEEDED: Pool structure does not exist');
-     console.log('   → Run: runMigration() to create the pool');
-   } else if (poolExists && !isMember) {
-     console.log('⚠️  PARTIAL MIGRATION: Pool exists but you are not a member');
-     console.log('   → Migration may have failed partway through');
-   } else if (poolExists && isMember) {
-     console.log('✅ MIGRATION COMPLETE: Pool exists and you are a member');
-   } else {
-     console.log('❓ UNKNOWN STATE: Mixed results - may need re-migration');
-   }
-   
-   console.log('================================');
- }
+   // Overall statusif (!poolExists && !isMember && !hasUserPools) {} else if (poolExists && !isMember) {} else if (poolExists && isMember) {} else {}}
 
  // Add diagnostic button for admins
  window.runDiagnostics = checkMigrationStatus;
 
  // Simplified migration runner with better error handling
- async function runMigrationWithDiagnostics() {
-   console.log('🚀 STARTING MIGRATION WITH DIAGNOSTICS');
-   console.log('======================================');
-   
-   // First run diagnostics
+ async function runMigrationWithDiagnostics() {// First run diagnostics
    await checkMigrationStatus();
    
    // Ask user if they want to proceed
@@ -7257,22 +6872,17 @@ The migration will:
 
 Proceed with migration?`);
 
-   if (!proceed) {
-     console.log('❌ Migration cancelled by user');
-     return;
+   if (!proceed) {return;
    }
    
    try {
      // Run the actual migration
      await runNerdUniverseMigration(false);
      
-     // Run diagnostics again to verify success
-     console.log('\n🔍 POST-MIGRATION VERIFICATION');
-     console.log('===============================');
-     await checkMigrationStatus();
+     // Run diagnostics again to verify successawait checkMigrationStatus();
      
    } catch (error) {
-     console.error('❌ Migration failed:', error);
+     //console.error('❌ Migration failed:', error);
      alert(`Migration failed: ${error.message}`);
    }
  }
@@ -7285,12 +6895,7 @@ Proceed with migration?`);
    if (!currentUser || !ADMIN_UIDS.includes(currentUser.uid)) {
      alert('Only admins can run this fix');
      return;
-   }
-   
-   console.log('🔧 FIXING POOL VISIBILITY (LOCAL STATE)');
-   console.log('=======================================');
-   
-   try {
+   }try {
      // Update local pool memberships to include NerdUniverse 2025
      userPoolMemberships['nerduniverse-2025'] = {
        poolId: 'nerduniverse-2025',
@@ -7298,10 +6903,7 @@ Proceed with migration?`);
        role: ADMIN_UIDS.includes(currentUser.uid) ? 'admin' : 'member',
        joinedAt: new Date().toISOString(),
        status: 'active'
-     };
-     console.log('✅ Added NerdUniverse 2025 to your pool memberships');
-     
-     // Create local pool cache with all users
+     };// Create local pool cache with all users
      const users = await getAllUsers();
      const poolMembers = {};
      
@@ -7317,10 +6919,7 @@ Proceed with migration?`);
      });
      
      // Store in local memory for this session
-     window.nerdUniverseMembers = poolMembers;
-     console.log(`✅ Loaded ${Object.keys(poolMembers).length} members for NerdUniverse 2025`);
-     
-     // Store pool config in local memory
+     window.nerdUniverseMembers = poolMembers;// Store pool config in local memory
      window.nerdUniverseConfig = {
        poolId: 'nerduniverse-2025',
        name: 'NerdUniverse 2025',
@@ -7338,30 +6937,20 @@ Proceed with migration?`);
        status: 'active',
        season: '2025',
        memberCount: Object.keys(poolMembers).length
-     };
-     console.log('✅ Created pool configuration in memory');
-     
-     // Force refresh UI components
+     };// Force refresh UI components
      updatePoolNameDisplay();
      if (typeof renderPoolSwitcher === 'function') {
        await renderPoolSwitcher();
-     }
-     
-     console.log('✅ Pool visibility fixed! NerdUniverse 2025 should now be visible.');
-     alert('✅ Pool visibility fixed! NerdUniverse 2025 should now appear in your pools.');
+     }alert('✅ Pool visibility fixed! NerdUniverse 2025 should now appear in your pools.');
      
    } catch (error) {
-     console.error('❌ Fix failed:', error);
+     //console.error('❌ Fix failed:', error);
      alert(`Fix failed: ${error.message}`);
    }
  };
 
  // Simple migration runner for cases where diagnostics fail
- window.runSimpleMigration = async () => {
-   console.log('🚀 RUNNING SIMPLE MIGRATION');
-   console.log('============================');
-   
-   const proceed = confirm(`
+ window.runSimpleMigration = async () => {const proceed = confirm(`
 🚀 SIMPLE MIGRATION
 
 This will:
@@ -7372,26 +6961,18 @@ This will:
 
 Continue?`);
 
-   if (!proceed) {
-     console.log('❌ Migration cancelled');
-     return;
+   if (!proceed) {return;
    }
    
    try {
-     await runNerdUniverseMigration(false);
-     console.log('✅ Migration completed! Try runDiagnostics() to verify.');
-   } catch (error) {
-     console.error('❌ Migration failed:', error);
+     await runNerdUniverseMigration(false);} catch (error) {
+     //console.error('❌ Migration failed:', error);
      alert(`Migration failed: ${error.message}`);
    }
  };
 
  // Ultra-simple migration that just works with existing data
- window.runWorkingMigration = async () => {
-   console.log('🚀 MINIMAL WORKING MIGRATION');
-   console.log('==============================');
-   
-   const proceed = confirm(`
+ window.runWorkingMigration = async () => {const proceed = confirm(`
 🚀 WORKING MIGRATION
 
 This will:
@@ -7402,9 +6983,7 @@ This will:
 
 This is the safest approach - continue?`);
 
-   if (!proceed) {
-     console.log('❌ Migration cancelled');
-     return;
+   if (!proceed) {return;
    }
    
    try {
@@ -7413,26 +6992,17 @@ This is the safest approach - continue?`);
      
      if (currentUser) {
        localStorage.setItem(`activePool_${currentUser.uid}`, 'nerduniverse-2025');
-     }
-     
-     console.log('✅ Pool name updated to NerdUniverse 2025');
-     console.log('✅ All your data remains accessible');
-     console.log('✅ App now shows "NerdUniverse 2025" as pool name');
-     
-     // Update any UI elements
+     }// Update any UI elements
      if (allUI && allUI.poolName) {
        allUI.poolName.textContent = 'NerdUniverse 2025';
      }
      
      // Validate it worked
-     setTimeout(() => {
-       console.log(`🔒 Pool isolation active: ${getCurrentPool()}`);
-       console.log('🎉 Migration completed successfully!');
-       alert('✅ Migration completed! Your pool is now "NerdUniverse 2025"');
+     setTimeout(() => {alert('✅ Migration completed! Your pool is now "NerdUniverse 2025"');
      }, 1000);
      
    } catch (error) {
-     console.error('❌ Migration failed:', error);
+     //console.error('❌ Migration failed:', error);
      alert(`Migration failed: ${error.message}`);
    }
  };
@@ -7459,9 +7029,7 @@ async function loadUserPoolMemberships() {
       };
       await setDoc(userPoolsRef, userPoolMemberships);
     }
-  } catch (error) {
-    console.log('ℹ️ Using default pool membership (pool metadata not accessible via client)');
-    // Default fallback - this is expected for new pool structures
+  } catch (error) {// Default fallback - this is expected for new pool structures
     userPoolMemberships = {
       'nerduniverse-2025': {
         role: ADMIN_UIDS.includes(currentUser.uid) ? 'admin' : 'member',
@@ -7499,11 +7067,9 @@ async function ensureDefaultPoolExists() {
         migrated: true
       };
       
-      await setDoc(poolConfigRef, defaultPoolConfig);
-      console.log('Default pool configuration created');
-    }
+      await setDoc(poolConfigRef, defaultPoolConfig);}
   } catch (error) {
-    console.error('Error ensuring default pool exists:', error);
+    //console.error('Error ensuring default pool exists:', error);
   }
 }
 
@@ -7551,7 +7117,7 @@ async function joinPool(poolId, inviteCode = null) {
     
     return { success: true, poolId, poolName: poolConfig.name };
   } catch (error) {
-    console.error('Error joining pool:', error);
+    //console.error('Error joining pool:', error);
     throw error;
   }
 }
@@ -7591,9 +7157,7 @@ async function getUserPools() {
           isActive: poolId === getCurrentPool()
         });
       }
-    } catch (error) {
-      console.log(`ℹ️ Pool ${poolId} metadata not accessible via client (expected for server-created pools)`);
-    }
+    } catch (error) {}
   }
   return pools;
 }
@@ -7641,7 +7205,7 @@ async function renderPoolSwitcher() {
       allUI.userPoolsList.appendChild(poolItem);
     });
   } catch (error) {
-    console.error('Error rendering pool switcher:', error);
+    //console.error('Error rendering pool switcher:', error);
   }
 }
 
@@ -7659,7 +7223,7 @@ async function switchToPool(poolId) {
     // Show success feedback
     showPoolSwitchFeedback(`Switched to ${allUI.currentPoolName.textContent}`);
   } catch (error) {
-    console.error('Error switching pools:', error);
+    //console.error('Error switching pools:', error);
     showPoolSwitchFeedback('Error switching pools', 'error');
   }
 }
@@ -7970,7 +7534,7 @@ async function createPool() {
     await loadAndRenderWeek(currentWeek);
     
   } catch (error) {
-    console.error('Error creating pool:', error);
+    //console.error('Error creating pool:', error);
     showWizardError('Failed to create pool. Please try again.');
   } finally {
     // Reset loading state
@@ -8047,7 +7611,7 @@ async function loadPoolManagementData() {
     await initializeAddUsersSection();
     
   } catch (error) {
-    console.error('Error loading pool management data:', error);
+    //console.error('Error loading pool management data:', error);
   }
 }
 
@@ -8110,11 +7674,7 @@ async function loadPoolMembers() {
         if (user.email) {
           emailMap.set(user.email, user.id); // Latest processed becomes preferred
         }
-      });
-      
-      console.log('💎 Pool Members - Using deduplicated user data to eliminate ghost users');
-      
-      let displayedMemberCount = 0;
+      });let displayedMemberCount = 0;
       
       memberEntries.forEach(([uid, member]) => {
         // 💎 Get deduplicated user data and check if this is a ghost user
@@ -8122,17 +7682,11 @@ async function loadPoolMembers() {
         
         // Skip ghost/legacy users that have been replaced by preferred UIDs
         if (!userData && member.email && emailMap.has(member.email)) {
-          const preferredUID = emailMap.get(member.email);
-          console.log(`🚫 Skipping ghost user ${uid} (${member.email}) - replaced by preferred UID: ${preferredUID}`);
-          return; // Skip this legacy user entirely
+          const preferredUID = emailMap.get(member.email);return; // Skip this legacy user entirely
         }
         
         const displayName = userData?.displayName || member.displayName || 'Unknown User';
-        const email = userData?.email || member.email || 'No email';
-        
-        console.log(`💎 Member ${uid}: Using ${userData ? 'deduplicated' : 'fallback'} data - ${displayName} (${email})`);
-        
-        const row = document.createElement('tr');
+        const email = userData?.email || member.email || 'No email';const row = document.createElement('tr');
         row.className = 'hover:bg-slate-50';
         
         // Format joined date
@@ -8220,7 +7774,7 @@ async function loadPoolMembers() {
     }
     
   } catch (error) {
-    console.error('Error loading pool members:', error);
+    //console.error('Error loading pool members:', error);
     allUI.poolMembersTbody.innerHTML = `
       <tr>
         <td colspan="5" class="px-6 py-4 text-center text-sm text-red-500">
@@ -8230,7 +7784,6 @@ async function loadPoolMembers() {
     `;
   }
 }
-
 
 async function updatePoolStatistics() {
   try {
@@ -8243,7 +7796,7 @@ async function updatePoolStatistics() {
     allUI.activePicksCount.textContent = picksSnap.size.toString();
     
   } catch (error) {
-    console.error('Error updating pool statistics:', error);
+    //console.error('Error updating pool statistics:', error);
     allUI.activePicksCount.textContent = '0';
   }
 }
@@ -8270,7 +7823,7 @@ window.promoteMember = async function(uid) {
     await loadPoolMembers();
     
   } catch (error) {
-    console.error('Error promoting member:', error);
+    //console.error('Error promoting member:', error);
     showPoolSwitchFeedback('Failed to promote member', 'error');
   }
 }
@@ -8296,7 +7849,7 @@ window.demoteMember = async function(uid) {
     await loadPoolMembers();
     
   } catch (error) {
-    console.error('Error demoting member:', error);
+    //console.error('Error demoting member:', error);
     showPoolSwitchFeedback('Failed to remove admin privileges', 'error');
   }
 }
@@ -8323,7 +7876,7 @@ window.removeMember = async function(uid) {
     await loadPoolMembers();
     
   } catch (error) {
-    console.error('Error removing member:', error);
+    //console.error('Error removing member:', error);
     showPoolSwitchFeedback('Failed to remove member', 'error');
   }
 }
@@ -8362,7 +7915,7 @@ function setupPoolManagementEventHandlers() {
       showPoolSwitchFeedback('Pool archived successfully', 'success');
       
     } catch (error) {
-      console.error('Error archiving pool:', error);
+      //console.error('Error archiving pool:', error);
       showPoolSwitchFeedback('Failed to archive pool', 'error');
     }
   });
@@ -8438,7 +7991,7 @@ async function createInviteLink(expiresInDays = 7, maxUses = null) {
     };
     
   } catch (error) {
-    console.error('Error creating invite link:', error);
+    //console.error('Error creating invite link:', error);
     throw new Error('Failed to create invite link');
   }
 }
@@ -8511,7 +8064,7 @@ async function validateInviteCode(inviteCode) {
     };
     
   } catch (error) {
-    console.error('Error validating invite code:', error);
+    //console.error('Error validating invite code:', error);
     return { valid: false, reason: 'Error validating invite code' };
   }
 }
@@ -8543,7 +8096,7 @@ async function useInviteCode(inviteCode) {
     };
     
   } catch (error) {
-    console.error('Error using invite code:', error);
+    //console.error('Error using invite code:', error);
     throw error;
   }
 }
@@ -8585,7 +8138,7 @@ async function loadInviteLinks() {
       `;
     }
   } catch (error) {
-    console.error('Error loading invite links:', error);
+    //console.error('Error loading invite links:', error);
     allUI.inviteLinksContainer.innerHTML = `
       <div class="text-sm text-red-500 text-center py-4">
         Error loading invite links. Please refresh the page.
@@ -8673,7 +8226,7 @@ window.copyInviteLink = async function(url) {
       showPoolSwitchFeedback('Invite link copied!', 'success');
     }
   } catch (error) {
-    console.error('Error copying invite link:', error);
+    //console.error('Error copying invite link:', error);
     showPoolSwitchFeedback('Failed to copy link', 'error');
   }
 };
@@ -8692,7 +8245,7 @@ window.shareInviteLink = async function(url, code) {
       showPoolSwitchFeedback('Invite shared successfully!', 'success');
     } catch (error) {
       if (error.name !== 'AbortError') {
-        console.error('Error sharing invite:', error);
+        //console.error('Error sharing invite:', error);
         fallbackShare(url, code, poolName);
       }
     }
@@ -8741,7 +8294,7 @@ window.revokeInviteLink = async function(code) {
     await loadInviteLinks(); // Reload the invite list
     
   } catch (error) {
-    console.error('Error revoking invite link:', error);
+    //console.error('Error revoking invite link:', error);
     showPoolSwitchFeedback('Failed to revoke invite link', 'error');
   }
 };
@@ -8758,7 +8311,7 @@ async function createQuickInviteLink() {
     await loadInviteLinks(); // Reload the invite list
     
   } catch (error) {
-    console.error('Error creating quick invite link:', error);
+    //console.error('Error creating quick invite link:', error);
     showPoolSwitchFeedback('Failed to create invite link', 'error');
   } finally {
     // Reset button state
@@ -8803,7 +8356,7 @@ async function processInviteCode(inviteCode) {
     await loadAndRenderWeek(currentWeek);
     
   } catch (error) {
-    console.error('Error processing invite code:', error);
+    //console.error('Error processing invite code:', error);
     showInviteError(error.message);
   }
 }
@@ -8937,7 +8490,7 @@ window.joinPoolWithCode = async function() {
     await loadAndRenderWeek(currentWeek);
     
   } catch (error) {
-    console.error('Error joining pool with code:', error);
+    //console.error('Error joining pool with code:', error);
     showJoinPoolError(error.message);
     
     // Reset button state
@@ -9113,7 +8666,7 @@ async function searchPublicPools() {
     updateActiveFilters();
     
   } catch (error) {
-    console.error('Error searching pools:', error);
+    //console.error('Error searching pools:', error);
     showPoolsError('Failed to search pools. Please try again.');
   } finally {
     currentPoolSearchState.isLoading = false;
@@ -9171,7 +8724,7 @@ function displayPoolResults(pools) {
         showPoolSwitchFeedback(`Successfully joined ${poolName}!`, 'success');
         
       } catch (error) {
-        console.error('Error joining pool:', error);
+        //console.error('Error joining pool:', error);
         btn.disabled = false;
         btn.textContent = 'Join Pool';
         showPoolSwitchFeedback(`Failed to join ${poolName}: ${error.message}`, 'error');
@@ -9322,7 +8875,6 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
- 
  // --- SAVE STATUS ---
  function updateSaveStatus(status, message) {
  if(saveTimeout) clearTimeout(saveTimeout);
@@ -9504,9 +9056,7 @@ function getTeamHelmetClass(teamName) {
          liveData = espnGame;
        }
      }
-   } catch (error) {
-     console.warn('Could not fetch live data for expanded view');
-   }
+   } catch (error) {}
    
    // Render expanded content
    const awayAbbr = teamNameToAbbr[game.away] || game.away;
@@ -9548,8 +9098,7 @@ function getTeamHelmetClass(teamName) {
           ${liveData?.homeScore !== undefined ? `<div class="text-2xl font-bold mt-2">${liveData.homeScore}</div>` : ''}
        </div>
      </div>
-     
-     
+
      <!-- Game Info -->
      <div class="bg-white rounded-lg p-3 space-y-2 text-sm">
        <div class="flex justify-between">
@@ -9703,9 +9252,7 @@ function getTeamHelmetClass(teamName) {
      if (weekNumber == currentWeek) {
        // Simply re-expand the game to get the latest data
        const gameCard = document.querySelector(`[data-game-id="${expandedGameId}"]`);
-       if (gameCard) {
-         console.log(`🔄 Refreshing expanded view for game ${expandedGameId} with ESPN updates`);
-         window.expandGameView(expandedGameId, gameCard);
+       if (gameCard) {window.expandGameView(expandedGameId, gameCard);
        }
      }
    }
@@ -9967,9 +9514,7 @@ function getTeamHelmetClass(teamName) {
    
    let statusMessage = 'Picks Saved!';
    if (lockedGames.length > 0) {
-    statusMessage = `Saved! ${lockedGames.length} locked games skipped`;
-    console.warn('Locked games skipped:', lockedGames);
-   }
+    statusMessage = `Saved! ${lockedGames.length} locked games skipped`;}
    
    updateSaveStatus('saved', statusMessage);
    
@@ -9986,7 +9531,7 @@ function getTeamHelmetClass(teamName) {
     await renderActivePicksSummary();
    }
   } catch (error) { 
-   console.error("Error saving picks:", error); 
+   //console.error("Error saving picks:", error); 
    updateSaveStatus('error', 'Save Failed');
   } 
  }
@@ -10002,7 +9547,7 @@ function getTeamHelmetClass(teamName) {
     try {
      await auth.currentUser.getIdToken(true); // Force token refresh
     } catch (tokenError) {
-     console.error('Failed to refresh auth token for pick confirmation:', tokenError);
+     //console.error('Failed to refresh auth token for pick confirmation:', tokenError);
      // Continue anyway for pick confirmation as it's less critical
     }
    }
@@ -10016,14 +9561,12 @@ function getTeamHelmetClass(teamName) {
     weekNumber: weekNumber
    });
    
-   if (result.data.success) {
-    console.log('Pick confirmation email sent successfully');
-   } else {
-    console.error('Failed to send pick confirmation email:', result.data.error);
+   if (result.data.success) {} else {
+    //console.error('Failed to send pick confirmation email:', result.data.error);
    }
    
   } catch (error) {
-   console.error('Error sending confirmation email:', error);
+   //console.error('Error sending confirmation email:', error);
   }
  }
 
@@ -10053,41 +9596,27 @@ function getTeamHelmetClass(teamName) {
  }
 
  async function calculateAndDisplayLeaderboard(weekNumber, targetBody = allUI.leaderboardBody, loader = allUI.leaderboardLoader) {
-    if (!targetBody || !loader) {
-        console.warn('calculateAndDisplayLeaderboard: target elements not found, skipping');
-        return;
+    if (!targetBody || !loader) {return;
     }
     loader.classList.remove('hidden');
     targetBody.innerHTML = '';
     
-    try {
-        console.log(`📊 Loading leaderboard for ${weekNumber ? `week ${weekNumber}` : 'season'}...`);
-        const startTime = performance.now();
+    try {const startTime = performance.now();
         
         // 🚀 CONFIDENCE-ON-CRACK: Use optimized system when activated
-        if (window.confidenceOnCrack && window.unifiedConfidenceManager) {
-            console.log('🚀 Using CONFIDENCE-ON-CRACK optimized leaderboard system');
-            const optimizedData = await window.unifiedConfidenceManager.getDisplayLeaderboard(weekNumber);
+        if (window.confidenceOnCrack && window.unifiedConfidenceManager) {const optimizedData = await window.unifiedConfidenceManager.getDisplayLeaderboard(weekNumber);
             
             if (optimizedData && optimizedData.success) {
-                const loadTime = performance.now() - startTime;
-                console.log(`⚡ CONFIDENCE-ON-CRACK: Leaderboard loaded in ${loadTime.toFixed(0)}ms with ${optimizedData.readCount} reads`);
-                
-                targetBody.innerHTML = optimizedData.html;
+                const loadTime = performance.now() - startTime;targetBody.innerHTML = optimizedData.html;
                 loader.classList.add('hidden');
                 return;
-            } else {
-                console.warn('🔄 CONFIDENCE-ON-CRACK failed, falling back to legacy system');
-            }
+            } else {}
         }
         
         // Use the optimized function that checks for summary first
         const standings = await calculateLeaderboardOptimized(weekNumber);
         
-        const timeTaken = (performance.now() - startTime).toFixed(0);
-        console.log(`✅ Leaderboard loaded in ${timeTaken}ms`);
-        
-        if (!standings || standings.length === 0) {
+        const timeTaken = (performance.now() - startTime).toFixed(0);if (!standings || standings.length === 0) {
             targetBody.innerHTML = '<tr><td colspan="3" class="text-center text-slate-500">No leaderboard data available</td></tr>';
             loader.classList.add('hidden');
             return;
@@ -10117,7 +9646,7 @@ function getTeamHelmetClass(teamName) {
         });
         
     } catch (error) {
-        console.error('Error loading leaderboard:', error);
+        //console.error('Error loading leaderboard:', error);
         targetBody.innerHTML = '<tr><td colspan="3" class="text-center text-red-500">Error loading leaderboard. Please try again.</td></tr>';
     } finally {
         loader.classList.add('hidden');
@@ -10153,9 +9682,7 @@ async function calculateLeaderboard(weekNumber = null) {
                 scores[userId].totalScore = userScore;
             }
         });
-    } else { // Season calculation - 💎 DIAMOND LEVEL OPTIMIZED
-        console.log(`💎 Season calculation optimization - batching ${currentWeek * 2} queries in parallel`);
-        const batchQueries = [];
+    } else { // Season calculation - 💎 DIAMOND LEVEL OPTIMIZEDconst batchQueries = [];
         for (let i = 1; i <= currentWeek; i++) {
             batchQueries.push(getDoc(doc(db, resultsPath(i))));
             batchQueries.push(getDocs(collection(db, picksCollectionPath(i))));
@@ -10197,9 +9724,7 @@ async function calculateLeaderboard(weekNumber = null) {
 const leaderboardSummaryPath = () => `artifacts/${appId()}/leaderboard_summaries/season_2025`;
 
 // Update the leaderboard summary document (called after results are saved)
-async function updateLeaderboardSummary(weekNumber = null) {
-    console.log('🚀 Updating leaderboard summary document...');
-    const startTime = performance.now();
+async function updateLeaderboardSummary(weekNumber = null) {const startTime = performance.now();
     
     try {
         const users = await getCleanUsers();
@@ -10222,9 +9747,7 @@ async function updateLeaderboardSummary(weekNumber = null) {
             };
         }
 
-        // 💎 DIAMOND LEVEL: Batch all database queries in parallel instead of sequential
-        console.log(`💎 Season leaderboard optimization - batching ${currentWeek * 2} queries in parallel`);
-        const batchQueries = [];
+        // 💎 DIAMOND LEVEL: Batch all database queries in parallel instead of sequentialconst batchQueries = [];
         for (let week = 1; week <= currentWeek; week++) {
             batchQueries.push(getDoc(doc(db, resultsPath(week))));
             batchQueries.push(getDocs(collection(db, picksCollectionPath(week))));
@@ -10282,30 +9805,20 @@ async function updateLeaderboardSummary(weekNumber = null) {
         // Save to Firestore
         await setDoc(doc(db, leaderboardSummaryPath()), summaryData);
         
-        const timeTaken = (performance.now() - startTime).toFixed(0);
-        console.log(`✅ Leaderboard summary updated in ${timeTaken}ms`);
-        console.log(`📊 Processed ${currentWeek} weeks of data for ${Object.keys(users).length} users`);
-        
-        return summaryData;
+        const timeTaken = (performance.now() - startTime).toFixed(0);return summaryData;
     } catch (error) {
-        console.error('Error updating leaderboard summary:', error);
+        //console.error('Error updating leaderboard summary:', error);
         throw error;
     }
 }
 
 // Modified calculateLeaderboard to use summary when available
-async function calculateLeaderboardOptimized(weekNumber = null) {
-    console.log(`📊 Calculating leaderboard for ${weekNumber ? `week ${weekNumber}` : 'season'}`);
-    
-    try {
+async function calculateLeaderboardOptimized(weekNumber = null) {try {
         // Try to get summary document first
         const summaryDoc = await getDoc(doc(db, leaderboardSummaryPath()));
         
         if (summaryDoc.exists()) {
-            const summary = summaryDoc.data();
-            console.log('✅ Using cached leaderboard summary (1 read instead of 36+)');
-            
-            if (weekNumber && summary.weeklyLeaderboards[weekNumber]) {
+            const summary = summaryDoc.data();if (weekNumber && summary.weeklyLeaderboards[weekNumber]) {
                 // Return weekly leaderboard from summary
                 return summary.weeklyLeaderboards[weekNumber];
             } else if (!weekNumber) {
@@ -10313,11 +9826,8 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
                 const standings = Object.values(summary.seasonStandings);
                 return await sortLeaderboardWithTiebreaker(standings, null, 'totalScore');
             }
-        }
-        
-        console.log('⚠️ Summary not found, falling back to original calculation method');
-    } catch (error) {
-        console.error('Error reading summary, falling back:', error);
+        }} catch (error) {
+        //console.error('Error reading summary, falling back:', error);
     }
     
     // Fall back to original method if summary not available
@@ -10384,9 +9894,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
       }
      });
     }
-   } catch (error) {
-    console.warn('Could not fetch live scores from ESPN:', error);
-   }
+   } catch (error) {}
 
    // Filter picks that have winners selected
    const activePicks = [];
@@ -10468,12 +9976,10 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      const gameKickoff = new Date(pick.game.kickoff);
      const gameWinner = getGameWinner(pick.gameResult);
      const hasActuallyStarted = currentTime > gameKickoff;
-     
-     
+
      // FIXED: Use actual time check, not the potentially incorrect pick.gameHasStarted
      const isInProgress = hasActuallyStarted && !gameWinner;
-     
-     
+
      let timeDisplay = '';
      if (gameWinner && hasActuallyStarted) {
       // Game is completed (has a winner and has started)
@@ -10565,15 +10071,13 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
     if (autoExpandGameId) {
      setTimeout(() => {
       const gameCard = document.querySelector(`[data-game-id="${autoExpandGameId}"]`);
-      if (gameCard) {
-       console.log(`🎯 Auto-expanding game ${autoExpandGameId}`);
-       window.expandGameView(autoExpandGameId, gameCard);
+      if (gameCard) {window.expandGameView(autoExpandGameId, gameCard);
       }
      }, 100);
     }
    }
   } catch (error) {
-   console.error('Error loading active picks:', error);
+   //console.error('Error loading active picks:', error);
    allUI.activePicksList.innerHTML = '<p class="text-center text-red-500 text-sm">Error loading picks</p>';
   }
  }
@@ -10634,7 +10138,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
    }).join('');
    
   } catch (error) {
-   console.error('Error loading yearly leaderboard:', error);
+   //console.error('Error loading yearly leaderboard:', error);
    allUI.yearlyLeaderboardContent.innerHTML = '<p class="text-center text-red-500 text-sm">Error loading leaderboard</p>';
   } finally {
    allUI.yearlyLeaderboardLoader.classList.add('hidden');
@@ -10779,8 +10283,7 @@ function updatePicksButtonStates(weekData) {
  const gameState = getGameState(game);
  const isLocked = isGameLocked(game);
  const gameRow = document.createElement('div');
- 
- 
+
  // Determine background colors based on game state
  let gameRowBg = 'bg-white border-slate-200';
  
@@ -11214,8 +10717,6 @@ if (!activePicks.mnfTotalPoints) {
     });
  }
 
-
- 
  async function renderPublicLeaderboard() {
     allUI.publicLeaderboardLoader.classList.remove('hidden');
     allUI.publicLeaderboardBody.innerHTML = '';
@@ -11245,7 +10746,6 @@ if (!activePicks.mnfTotalPoints) {
     saveAppState();
  });
  allUI.lbWeekSelector.addEventListener('change', renderPublicLeaderboard);
-
 
  allUI.weekSelector.addEventListener('change', (e) => {
   loadAndRenderWeek(e.target.value);
@@ -11305,10 +10805,8 @@ if (!activePicks.mnfTotalPoints) {
  
  // Update the leaderboard summary for optimization
  try {
-     await updateLeaderboardSummary();
-     console.log('✅ Leaderboard summary updated after results save');
- } catch (error) {
-     console.error('Failed to update leaderboard summary:', error);
+     await updateLeaderboardSummary();} catch (error) {
+     //console.error('Failed to update leaderboard summary:', error);
      // Continue anyway - summary is optimization, not critical
  }
  
@@ -11320,26 +10818,20 @@ if (!activePicks.mnfTotalPoints) {
 allUI.refreshSummaryBtn.addEventListener('click', async () => {
     try {
         allUI.refreshSummaryBtn.disabled = true;
-        allUI.refreshSummaryBtn.textContent = '🔄 Refreshing All Cache...';
-        
-        console.log('💎 Manual comprehensive cache refresh triggered by admin');
-        
-        // 💎 CRITICAL: Complete cache invalidation for data integrity
+        allUI.refreshSummaryBtn.textContent = '🔄 Refreshing All Cache...';// 💎 CRITICAL: Complete cache invalidation for data integrity
         const clearedEntries = window.gameStateCache.invalidateAfterDataUpdate('complete_refresh');
         
         // Force update leaderboard summary after cache clear
         await updateLeaderboardSummary();
         
         // Visual feedback only - no alert
-        updateCacheStatusIndicator('current');
-        console.log(`✅ Complete cache refresh successful! Cleared ${clearedEntries} cache entries`);
-        allUI.refreshSummaryBtn.textContent = '💎 Refresh Cache';
+        updateCacheStatusIndicator('current');allUI.refreshSummaryBtn.textContent = '💎 Refresh Cache';
         
         // Cache refreshed - no leaderboard to refresh on Games tab
     } catch (error) {
-        console.error('Failed to refresh cache:', error);
+        //console.error('Failed to refresh cache:', error);
         updateCacheStatusIndicator('outdated');
-        console.error('❌ Failed to refresh cache:', error.message);
+        //console.error('❌ Failed to refresh cache:', error.message);
         allUI.refreshSummaryBtn.textContent = '💎 Refresh Cache';
     } finally {
         allUI.refreshSummaryBtn.disabled = false;
@@ -11394,7 +10886,7 @@ allUI.refreshSummaryBtn.addEventListener('click', async () => {
        updateTimestamps();
      }, 2000);
    } catch (error) {
-     console.error('Error saving picks:', error);
+     //console.error('Error saving picks:', error);
      savePicksText.textContent = 'Save Picks';
      savePicksSpinner.classList.add('hidden');
      allUI.topSavePicksBtn.disabled = false;
@@ -11430,7 +10922,7 @@ allUI.refreshSummaryBtn.addEventListener('click', async () => {
         await renderPicksManagement(weekNumber);
         
     } catch (error) {
-        console.error('Error saving user picks:', error);
+        //console.error('Error saving user picks:', error);
         alert('Error saving picks. Please try again.');
     }
 });
@@ -11458,7 +10950,7 @@ allUI.validateAllPicksBtn.addEventListener('click', async () => {
     try {
         await validateAllUserPicks(weekNumber);
     } catch (error) {
-        console.error('Error during validation:', error);
+        //console.error('Error during validation:', error);
         alert('Error during validation. Please try again.');
     } finally {
         allUI.validateAllPicksBtn.disabled = false;
@@ -11510,7 +11002,7 @@ allUI.saveSurvivorPickBtn.addEventListener('click', async () => {
         hideSurvivorPickEditor();
         
     } catch (error) {
-        console.error('Error saving survivor pick:', error);
+        //console.error('Error saving survivor pick:', error);
         alert('Error saving survivor pick. Please try again.');
     } finally {
         allUI.saveSurvivorPickBtn.disabled = false;
@@ -11554,7 +11046,7 @@ allUI.clearSurvivorPickBtn.addEventListener('click', async () => {
         hideSurvivorPickEditor();
         
     } catch (error) {
-        console.error('Error clearing survivor pick:', error);
+        //console.error('Error clearing survivor pick:', error);
         alert('Error clearing survivor pick. Please try again.');
     } finally {
         allUI.clearSurvivorPickBtn.disabled = false;
@@ -11563,19 +11055,13 @@ allUI.clearSurvivorPickBtn.addEventListener('click', async () => {
 });
 
 // Function to recalculate leaderboards after pick updates
-async function recalculateLeaderboardAfterPickUpdate(weekNumber) {
-    console.log('💎 Recalculating leaderboards after pick update for week', weekNumber);
-    
-    try {
+async function recalculateLeaderboardAfterPickUpdate(weekNumber) {try {
         // Recalculate weekly leaderboard for the specific week
         await calculateWeeklyLeaderboard(weekNumber);
         
         // Recalculate season leaderboard which includes all weeks
-        await calculateLeaderboardOptimized();
-        
-        console.log('✅ Leaderboards recalculated successfully');
-    } catch (error) {
-        console.error('❌ Error recalculating leaderboards:', error);
+        await calculateLeaderboardOptimized();} catch (error) {
+        //console.error('❌ Error recalculating leaderboards:', error);
         // Don't throw error to prevent blocking the save operation
     }
 }
@@ -11718,7 +11204,7 @@ async function recalculateLeaderboardAfterPickUpdate(weekNumber) {
         });
         
     } catch (error) {
-        console.error("Error updating settings:", error);
+        //console.error("Error updating settings:", error);
         let errorMessage = 'An error occurred while updating your settings.';
         
         if (error.code === 'auth/invalid-email') {
@@ -11747,7 +11233,7 @@ async function recalculateLeaderboardAfterPickUpdate(weekNumber) {
             alert(`Winners for Week ${weekNumber} have been reset.`);
             await renderGameResultsAdmin(weekNumber);
         } catch (error) {
-            console.error("Error resetting winners:", error);
+            //console.error("Error resetting winners:", error);
             alert("An error occurred while resetting the winners.");
         }
     }
@@ -11920,7 +11406,7 @@ async function runNerdUniverseMigration(isDryRun = false) {
     } catch (error) {
         updateMigrationProgress(0, 'Migration failed');
         logMigration(`❌ Migration failed: ${error.message}`, 'error');
-        console.error('Migration error:', error);
+        //console.error('Migration error:', error);
         
         allUI.migrationResultsSection.classList.remove('hidden');
         allUI.migrationResultsSection.className = 'mt-6 p-4 bg-red-50 border border-red-200 rounded-lg';
@@ -12011,9 +11497,7 @@ function showAdminMigrationTool() {
 
 // Stub function to prevent errors from cached code
 function updatePoolSwitcherDisplay() {
-    // This function was removed but adding stub to prevent cached errors
-    console.log('updatePoolSwitcherDisplay called (stub function)');
-}
+    // This function was removed but adding stub to prevent cached errors}
 
 // ===== PICK VALIDATION SYSTEM =====
 function validateUserPicks(userPicks, games) {
@@ -12051,9 +11535,7 @@ function validateUserPicks(userPicks, games) {
     return issues;
 }
 
-async function validateAllUserPicks(weekNumber) {
-    console.log('🔍 DIAMOND VALIDATION: Starting pick validation for week', weekNumber);
-    allUI.validationResults.innerHTML = '<div class="text-sm text-gray-600">Validating picks...</div>';
+async function validateAllUserPicks(weekNumber) {allUI.validationResults.innerHTML = '<div class="text-sm text-gray-600">Validating picks...</div>';
     
     const flaggedUsers = [];
     const picksCollectionPath = `artifacts/${appId()}/public/data/nerdfootball_picks/${weekNumber}/submissions`;
@@ -12086,15 +11568,8 @@ async function validateAllUserPicks(weekNumber) {
         }
         
         // Display results
-        displayValidationResults(flaggedUsers, weekNumber);
-        
-        console.log('🔍 DIAMOND VALIDATION: Complete', {
-            totalUsers: picksSnapshot.docs.length,
-            flaggedUsers: flaggedUsers.length
-        });
-        
-    } catch (error) {
-        console.error('Error validating picks:', error);
+        displayValidationResults(flaggedUsers, weekNumber);} catch (error) {
+        //console.error('Error validating picks:', error);
         allUI.validationResults.innerHTML = '<div class="text-sm text-red-600">Error during validation</div>';
     }
 }
@@ -12214,7 +11689,7 @@ async function renderSurvivorTeamSelector(currentPick) {
         });
         
     } catch (error) {
-        console.error('Error loading teams for survivor picker:', error);
+        //console.error('Error loading teams for survivor picker:', error);
         allUI.survivorTeamSelector.innerHTML = '<div class="text-red-600 text-sm">Error loading teams</div>';
     }
 }
@@ -12224,20 +11699,12 @@ const SurvivorView = {
     // Cache for optimized week results loading
     cachedWeekResults: null,
     
-    show: function() {
-        console.log('🏆 Showing Survivor Results view');
-        console.log('🔍 Debug - allUI.survivorContainer exists:', !!allUI.survivorContainer);
-        console.log('🔍 Debug - hideAllViews function exists:', typeof hideAllViews);
-        console.log('🔍 Debug - updateUrl function exists:', typeof updateUrl);
-        
-        try {
+    show: function() {try {
             hideAllViews();
-            allUI.survivorContainer.classList.remove('hidden');
-            console.log('✅ Survivor container shown successfully');
-            this.loadSurvivorResults();
+            allUI.survivorContainer.classList.remove('hidden');this.loadSurvivorResults();
             updateUrl();
         } catch (error) {
-            console.error('❌ Error in SurvivorView.show():', error);
+            //console.error('❌ Error in SurvivorView.show():', error);
             // Fallback to show error
             if (allUI.survivorContainer) {
                 allUI.survivorContainer.classList.remove('hidden');
@@ -12296,20 +11763,13 @@ const SurvivorView = {
                     cacheHits++;
                 }
             }
-            if (cacheHits > 0) {
-                console.log(`⚡ ESPN CACHE: Using gameStateCache (${cacheHits}/${currentWeek} weeks)`);
-                return cachedResults;
+            if (cacheHits > 0) {return cachedResults;
             }
         }
         
         // ESPN OPTIMIZATION: Instance-level caching for repeated calls
-        if (this.cachedWeekResults && this.cacheTimestamp && (Date.now() - this.cacheTimestamp) < 30000) {
-            console.log('🚀 ESPN CACHE HIT: Using fresh cached week results');
-            return this.cachedWeekResults;
-        }
-        
-        console.log(`🚀 ESPN BATCH LOAD: Loading results for weeks 1-${currentWeek} from ESPN API`);
-        const startTime = performance.now();
+        if (this.cachedWeekResults && this.cacheTimestamp && (Date.now() - this.cacheTimestamp) < 30000) {return this.cachedWeekResults;
+        }const startTime = performance.now();
         
         try {
             // ESPN OPTIMIZATION: Use ESPN API for all week data
@@ -12337,7 +11797,7 @@ const SurvivorView = {
                             return { week, data: weekData };
                         })
                         .catch(error => {
-                            console.error(`Error loading ESPN week ${week} results:`, error);
+                            //console.error(`Error loading ESPN week ${week} results:`, error);
                             return { week, data: null };
                         });
                 });
@@ -12350,19 +11810,15 @@ const SurvivorView = {
                 
                 this.cacheTimestamp = Date.now();
                 
-                const loadTime = (performance.now() - startTime).toFixed(0);
-                console.log(`⚡ ESPN WEEK RESULTS: ${Object.keys(this.cachedWeekResults).length}/${currentWeek} weeks loaded in ${loadTime}ms`);
-                return this.cachedWeekResults;
+                const loadTime = (performance.now() - startTime).toFixed(0);return this.cachedWeekResults;
             }
             
-            // Fallback to Firestore if ESPN API unavailable
-            console.warn('⚠️ ESPN API unavailable, falling back to Firestore');
-            const resultPromises = Array.from({ length: currentWeek }, (_, i) => {
+            // Fallback to Firestore if ESPN API unavailableconst resultPromises = Array.from({ length: currentWeek }, (_, i) => {
                 const week = i + 1;
                 return getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`))
                     .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
                     .catch(error => {
-                        console.error(`Error loading week ${week} results:`, error);
+                        //console.error(`Error loading week ${week} results:`, error);
                         return { week, data: null };
                     });
             });
@@ -12375,11 +11831,9 @@ const SurvivorView = {
             
             this.cacheTimestamp = Date.now();
             
-            const loadTime = (performance.now() - startTime).toFixed(0);
-            console.log(`⚡ FIRESTORE FALLBACK RESULTS: ${Object.keys(this.cachedWeekResults).length}/${currentWeek} weeks loaded in ${loadTime}ms`);
-            return this.cachedWeekResults;
+            const loadTime = (performance.now() - startTime).toFixed(0);return this.cachedWeekResults;
         } catch (error) {
-            console.error('ESPN/FIRESTORE ERROR: Week results loading failed:', error);
+            //console.error('ESPN/FIRESTORE ERROR: Week results loading failed:', error);
             return {};
         }
     },
@@ -12459,37 +11913,21 @@ const SurvivorView = {
             
             return weeksSurvived;
         } catch (error) {
-            console.error('Error calculating weeks survived for user:', error);
+            //console.error('Error calculating weeks survived for user:', error);
             // Fallback to old logic
             return Math.max(0, currentWeek - 1);
         }
     },
     
     // Determine row background color based on user's current pick status
-    getPlayerRowStatus: function(user, currentWeek, allWeekResults) {
-        console.log('🔍 SURVIVOR DEBUG - getPlayerRowStatus for:', user.displayName, '(', user.uid, ')');
-        console.log('👤 User eliminated?', user.isEliminated);
-        console.log('🏈 User current week pick:', user.currentWeekPick);
-        console.log('📅 Current week:', currentWeek);
-        console.log('🎮 All week results:', allWeekResults);
-        
-        if (user.isEliminated) {
-            console.log('❌ RESULT: loser (eliminated)');
-            return 'loser'; // Blood red for eliminated players
+    getPlayerRowStatus: function(user, currentWeek, allWeekResults) {if (user.isEliminated) {return 'loser'; // Blood red for eliminated players
         }
         
-        if (!user.currentWeekPick) {
-            console.log('⚠️ RESULT: pending (no pick)');
-            return 'pending'; // Muted yellow for no pick yet
+        if (!user.currentWeekPick) {return 'pending'; // Muted yellow for no pick yet
         }
         
         // Check if current week games have started/completed
-        const currentWeekResults = allWeekResults[currentWeek];
-        console.log('📊 Current week results:', currentWeekResults);
-        
-        if (!currentWeekResults) {
-            console.log('📭 RESULT: pending (no results yet)');
-            return 'pending'; // No results yet, games haven't started
+        const currentWeekResults = allWeekResults[currentWeek];if (!currentWeekResults) {return 'pending'; // No results yet, games haven't started
         }
         
         // Find if user's current week pick won - using SPECIFIC GAME LOOKUP
@@ -12497,55 +11935,26 @@ const SurvivorView = {
         let gameStarted = false;
         
         // Get user's pick with gameId for current week
-        const currentWeekPick = user.allPicks?.[currentWeek];
-        console.log('👤 Current week pick object:', currentWeekPick);
-        
-        if (currentWeekPick?.gameId && currentWeekResults[currentWeekPick.gameId]) {
+        const currentWeekPick = user.allPicks?.[currentWeek];if (currentWeekPick?.gameId && currentWeekResults[currentWeekPick.gameId]) {
             // Use specific game lookup (matches survivorAutoElimination.js pattern)
-            const specificGame = currentWeekResults[currentWeekPick.gameId];
-            console.log('🏈 Checking SPECIFIC game result:', specificGame);
-            console.log('🏆 Winner:', specificGame?.winner);
-            console.log('👤 User pick:', user.currentWeekPick);
-            console.log('🔍 Winner matches user pick?', specificGame?.winner === user.currentWeekPick);
-            
-            if (specificGame && specificGame.winner) {
+            const specificGame = currentWeekResults[currentWeekPick.gameId];if (specificGame && specificGame.winner) {
                 gameStarted = true;
                 if (specificGame.winner === user.currentWeekPick) {
-                    teamWon = true;
-                    console.log('🎉 USER WON! User picked:', user.currentWeekPick, 'Winner:', specificGame.winner);
-                } else {
-                    console.log('💔 User lost. User picked:', user.currentWeekPick, 'Winner was:', specificGame.winner);
-                }
+                    teamWon = true;} else {}
             }
         } else {
-            // Backward compatibility: fallback to checking all games
-            console.log('⚠️ No gameId found, using backward compatibility mode');
-            Object.values(currentWeekResults).forEach(gameResult => {
-                console.log('🏈 Checking game result:', gameResult);
-                console.log('🏆 Winner:', gameResult?.winner);
-                console.log('👤 User pick:', user.currentWeekPick);
-                console.log('🔍 Winner matches user pick?', gameResult?.winner === user.currentWeekPick);
-                
-                if (gameResult && gameResult.winner) {
+            // Backward compatibility: fallback to checking all gamesObject.values(currentWeekResults).forEach(gameResult => {if (gameResult && gameResult.winner) {
                     gameStarted = true;
                     if (gameResult.winner === user.currentWeekPick) {
-                        teamWon = true;
-                        console.log('🎉 USER WON! User picked:', user.currentWeekPick, 'Winner:', gameResult.winner);
-                    } else {
-                        console.log('💔 User lost. User picked:', user.currentWeekPick, 'Winner was:', gameResult.winner);
-                    }
+                        teamWon = true;} else {}
                 }
             });
         }
         
-        if (!gameStarted) {
-            console.log('⏳ RESULT: pending (game not started)');
-            return 'pending'; // Game hasn't started yet
+        if (!gameStarted) {return 'pending'; // Game hasn't started yet
         }
         
-        const result = teamWon ? 'winner' : 'loser';
-        console.log('🏁 FINAL RESULT:', result);
-        return result;
+        const result = teamWon ? 'winner' : 'loser';return result;
     },
     
     // DIAMOND OPTIMIZATION: Helper method for clean pool selection
@@ -12575,19 +11984,13 @@ const SurvivorView = {
     // DIAMOND OPTIMIZATION: Non-blocking elimination processing
     processEliminationsAsync: function(currentWeek, userResults) {
         // Process eliminations in background without blocking UI
-        setTimeout(async () => {
-            console.log('🔄 Background elimination processing...');
-            if (typeof window.SurvivorAutoElimination !== 'undefined' && typeof db !== 'undefined') {
+        setTimeout(async () => {if (typeof window.SurvivorAutoElimination !== 'undefined' && typeof db !== 'undefined') {
                 try {
                     const survivorElimination = new window.SurvivorAutoElimination(db, window.gameStateCache);
                     const eliminationResult = await survivorElimination.checkEliminationsForWeek(currentWeek);
                     
-                    if (eliminationResult.eliminatedCount > 0) {
-                        console.log(`🚨 Background: ${eliminationResult.eliminatedCount} users eliminated! UI will update next reload.`);
-                    }
-                } catch (elimError) {
-                    console.warn('Background elimination processing failed:', elimError);
-                }
+                    if (eliminationResult.eliminatedCount > 0) {}
+                } catch (elimError) {}
             }
         }, 100); // Small delay to ensure UI renders first
     },
@@ -12599,11 +12002,8 @@ const SurvivorView = {
         try {
             // DIAMOND PERFORMANCE: Use ESPN-integrated survivor data
             let loadResult = null;
-            
-            
-            if (window.espnSurvivorIntegration) {
-                console.log('💎 Using ESPN-integrated survivor data with real-time eliminations');
-                const enhancedData = await window.espnSurvivorIntegration.getDisplayData();
+
+            if (window.espnSurvivorIntegration) {const enhancedData = await window.espnSurvivorIntegration.getDisplayData();
                 
                 loadResult = {
                     results: enhancedData.data,
@@ -12611,9 +12011,7 @@ const SurvivorView = {
                     loadTime: enhancedData.loadTimeMs,
                     source: 'espn-integrated'
                 };
-            } else if (window.unifiedSurvivorManager) {
-                console.log('⚡ Fallback to unified survivor manager');
-                const displayData = await window.unifiedSurvivorManager.getDisplayData();
+            } else if (window.unifiedSurvivorManager) {const displayData = await window.unifiedSurvivorManager.getDisplayData();
                 const stats = {
                     totalPlayers: displayData.length,
                     activePlayers: displayData.filter(u => !u.eliminated).length,
@@ -12626,9 +12024,7 @@ const SurvivorView = {
                     loadTime: performance.now() - loadStartTime,
                     source: 'unified'
                 };
-            } else if (window.optimizedSurvivorLoader) {
-                console.log('🚀 Using optimized cached loader');
-                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
+            } else if (window.optimizedSurvivorLoader) {const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
                 const optimized = await window.optimizedSurvivorLoader.loadSurvivorData(currentPool);
                 loadResult = {
                     results: optimized.data,
@@ -12636,9 +12032,7 @@ const SurvivorView = {
                     loadTime: optimized.loadTimeMs,
                     source: optimized.fromCache ? 'cache' : 'fresh'
                 };
-            } else if (window.survivorCacheManager) {
-                console.log('📦 Using cache manager directly');
-                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
+            } else if (window.survivorCacheManager) {const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
                 const currentWeek = (typeof window.currentWeek !== 'undefined') ? window.currentWeek : 1;
                 const cacheResult = await window.survivorCacheManager.getCachedOrCompute(currentPool, currentWeek);
                 loadResult = {
@@ -12647,9 +12041,7 @@ const SurvivorView = {
                     loadTime: cacheResult.loadTimeMs,
                     source: cacheResult.fromCache ? 'cache' : 'fresh'
                 };
-            } else if (window.simpleSurvivorSystem) {
-                console.log('⚡ Fallback to simple survivor system');
-                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
+            } else if (window.simpleSurvivorSystem) {const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
                 const results = await window.simpleSurvivorSystem.getSurvivorTable(currentPool);
                 loadResult = {
                     results,
@@ -12666,12 +12058,7 @@ const SurvivorView = {
             }
 
             const { results, stats } = loadResult;
-            const totalLoadTime = performance.now() - loadStartTime;
-            
-            console.log(`✅ SURVIVOR LOADED: ${totalLoadTime.toFixed(1)}ms (${loadResult.source})`);
-            console.log(`📊 ${stats.totalPlayers} players, ${stats.activePlayers} active, ${stats.eliminatedPlayers} eliminated`);
-
-            // Update summary stats
+            const totalLoadTime = performance.now() - loadStartTime;// Update summary stats
             allUI.survivorTotalPlayers.textContent = stats.totalPlayers;
             allUI.survivorActivePlayers.textContent = stats.activePlayers;
             allUI.survivorEliminatedPlayers.textContent = stats.eliminatedPlayers;
@@ -12699,17 +12086,13 @@ const SurvivorView = {
             }
             
             // Show performance metrics in console
-            if (totalLoadTime < 500) {
-                console.log(`🎯 PERFORMANCE TARGET MET: ${totalLoadTime.toFixed(1)}ms < 500ms`);
-            } else {
-                console.warn(`⚠️ Performance target missed: ${totalLoadTime.toFixed(1)}ms > 500ms`);
-            }
+            if (totalLoadTime < 500) {} else {}
             
             // Show the results
             this.showResults();
 
         } catch (error) {
-            console.error('❌ Survivor loading error:', error);
+            //console.error('❌ Survivor loading error:', error);
             this.showError(`Failed to load survivor results: ${error.message}`);
         }
     },
@@ -12863,11 +12246,7 @@ const SurvivorView = {
 
         const currentWeek = window.currentWeek || 1;
         const activeCount = userResults.filter(u => !u.isEliminated).length;
-        const eliminatedCount = userResults.filter(u => u.isEliminated).length;
-        
-        console.log(`📊 Survivor Stats: Total=${userResults.length}, Active=${activeCount}, Eliminated=${eliminatedCount}`);
-
-        // Update summary stats
+        const eliminatedCount = userResults.filter(u => u.isEliminated).length;// Update summary stats
         allUI.survivorTotalPlayers.textContent = userResults.length;
         allUI.survivorActivePlayers.textContent = activeCount;
         allUI.survivorEliminatedPlayers.textContent = eliminatedCount;
@@ -12954,9 +12333,7 @@ const SurvivorView = {
 
 // Survivor Picks View object
 const SurvivorPicksView = {
-    show: async function() {
-        console.log('🏈 Showing Survivor Picks view');
-        hideAllViews();
+    show: async function() {hideAllViews();
         allUI.survivorPicksContainer.classList.remove('hidden');
         await this.renderSurvivorPicks();
         updateUrl();
@@ -12980,7 +12357,7 @@ const SurvivorPicksView = {
             await this.initializeSurvivorPicksApp(container);
             
         } catch (error) {
-            console.error('Error rendering survivor picks:', error);
+            //console.error('Error rendering survivor picks:', error);
             container.innerHTML = '<div class="text-center py-12"><p class="text-red-600">Error loading Survivor Picks. Please try again.</p></div>';
         }
     },
@@ -13065,9 +12442,7 @@ const SurvivorPicksView = {
     },
     
     fetchWeeklyGames: async function(weekNumber) {
-        try {
-            console.log(`🔥 Survivor: Fetching schedule for week ${weekNumber}`);
-            const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+        try {const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
             }
@@ -13082,7 +12457,7 @@ const SurvivorPicksView = {
                 startingQBs: {away: 'TBD', home: 'TBD'}
             })) : [];
         } catch (error) {
-            console.error(`Error fetching games for week ${weekNumber}:`, error);
+            //console.error(`Error fetching games for week ${weekNumber}:`, error);
             return [];
         }
     },
@@ -13115,7 +12490,7 @@ const SurvivorPicksView = {
                 return gameState === 'IN_PROGRESS' || gameState === 'COMPLETED';
             });
         } catch (error) {
-            console.error('Error checking game lock status:', error);
+            //console.error('Error checking game lock status:', error);
             return false;
         }
     },
@@ -13333,7 +12708,7 @@ const SurvivorPicksView = {
                     const gameId = e.target.dataset.gameId;
                     
                     if (!team) {
-                        console.error('Team is undefined - button missing data-team attribute');
+                        //console.error('Team is undefined - button missing data-team attribute');
                         return;
                     }
                     
@@ -13641,9 +13016,7 @@ function initializeEspnApiAdmin() {
 }
 
 // DIAMOND LEVEL: Cache Management Functions
-function initializeCacheManagement() {
-    console.log('⚡ Initializing cache management interface');
-    bindCacheEventListeners();
+function initializeCacheManagement() {bindCacheEventListeners();
     updateCacheStatus();
     setInterval(updateCacheStatus, 30000);
 }
@@ -13718,9 +13091,7 @@ function bindCacheEventListeners() {
     }
 }
 
-async function performanceTestCache() {
-    console.log('🧪 Starting performance test');
-    const testOutput = document.getElementById('cache-test-output');
+async function performanceTestCache() {const testOutput = document.getElementById('cache-test-output');
     const testResults = document.getElementById('cache-test-results');
     
     if (!testOutput || !testResults) return;
@@ -13771,33 +13142,27 @@ async function performanceTestCache() {
         });
         
     } catch (error) {
-        console.error('❌ Performance test error:', error);
+        //console.error('❌ Performance test error:', error);
         testOutput.innerHTML += `\nERROR: ${error.message}\n`;
     }
 }
 
-async function warmCache() {
-    console.log('🔥 Warming cache');
-    try {
+async function warmCache() {try {
         const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
         const currentWeek = 1; // Or get from week manager
         
         if (window.survivorCacheManager) {
             await window.survivorCacheManager.warmCache(currentPool, currentWeek);
         }
-        updateCacheStatusIndicator('current');
-        console.log('✅ Cache warmed successfully!');
-        updateCacheStatus();
+        updateCacheStatusIndicator('current');updateCacheStatus();
     } catch (error) {
-        console.error('❌ Cache warming error:', error);
+        //console.error('❌ Cache warming error:', error);
         updateCacheStatusIndicator('outdated');
-        console.error(`Cache warming failed: ${error.message}`);
+        //console.error(`Cache warming failed: ${error.message}`);
     }
 }
 
-async function invalidateCache() {
-    console.log('♻️ Invalidating cache');
-    try {
+async function invalidateCache() {try {
         const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
         const currentWeek = 1; // Or get from week manager
         
@@ -13809,31 +13174,25 @@ async function invalidateCache() {
         setTimeout(() => updateCacheStatusIndicator('current'), 2000);
         updateCacheStatus();
     } catch (error) {
-        console.error('❌ Cache invalidation error:', error);
+        //console.error('❌ Cache invalidation error:', error);
         updateCacheStatusIndicator('outdated');
-        console.error(`Cache invalidation failed: ${error.message}`);
+        //console.error(`Cache invalidation failed: ${error.message}`);
     }
 }
 
-async function refreshAllCaches() {
-    console.log('🔄 Refreshing all caches');
-    try {
+async function refreshAllCaches() {try {
         if (window.optimizedSurvivorLoader) {
             await window.optimizedSurvivorLoader.refreshResults();
         }
-        updateCacheStatusIndicator('current');
-        console.log('✅ All caches refreshed successfully!');
-        updateCacheStatus();
+        updateCacheStatusIndicator('current');updateCacheStatus();
     } catch (error) {
-        console.error('❌ Cache refresh error:', error);
+        //console.error('❌ Cache refresh error:', error);
         updateCacheStatusIndicator('outdated');
-        console.error(`Cache refresh failed: ${error.message}`);
+        //console.error(`Cache refresh failed: ${error.message}`);
     }
 }
 
-async function clearAllCaches() {
-    console.log('🗑️ Clearing all caches');
-    try {
+async function clearAllCaches() {try {
         if (window.db) {
             const cacheQuery = await window.db.collectionGroup('results').get();
             const batch = window.db.batch();
@@ -13843,14 +13202,12 @@ async function clearAllCaches() {
             });
             
             await batch.commit();
-            updateCacheStatusIndicator('current');
-            console.log(`✅ Cleared ${cacheQuery.size} cache entries!`);
-        }
+            updateCacheStatusIndicator('current');}
         updateCacheStatus();
     } catch (error) {
-        console.error('❌ Cache clearing error:', error);
+        //console.error('❌ Cache clearing error:', error);
         updateCacheStatusIndicator('outdated');
-        console.error(`Cache clearing failed: ${error.message}`);
+        //console.error(`Cache clearing failed: ${error.message}`);
     }
 }
 
@@ -13948,7 +13305,7 @@ async function loadCacheStatusTable() {
         }
         
     } catch (error) {
-        console.error('❌ Cache status loading error:', error);
+        //console.error('❌ Cache status loading error:', error);
         tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Error loading cache status</td></tr>';
     }
 }
@@ -13958,33 +13315,23 @@ async function deleteSingleCache(cachePath) {
     
     try {
         if (window.db) {
-            await window.db.doc(cachePath).delete();
-            console.log(`✅ Deleted cache: ${cachePath}`);
-            await loadCacheStatusTable();
+            await window.db.doc(cachePath).delete();await loadCacheStatusTable();
         }
     } catch (error) {
-        console.error('❌ Cache deletion error:', error);
+        //console.error('❌ Cache deletion error:', error);
         updateCacheStatusIndicator('outdated');
-        console.error(`Failed to delete cache: ${error.message}`);
+        //console.error(`Failed to delete cache: ${error.message}`);
     }
-}
-
- console.log('💎 About to call initializeAppAndAuth');
-initializeAppAndAuth().then(() => {
+}initializeAppAndAuth().then(() => {
     // Wait a moment to ensure all Firebase globals are set
     setTimeout(() => {
         // Initialize ESPN API client
         if (typeof EspnNerdApiClient !== 'undefined') {
-            window.espnApi = new EspnNerdApiClient();
-            console.log('✅ ESPN API client initialized');
-            
-            // Initialize ESPN API admin functionality (moved inside setTimeout)
+            window.espnApi = new EspnNerdApiClient();// Initialize ESPN API admin functionality (moved inside setTimeout)
             setTimeout(() => {
                 if (typeof window.espnApi !== 'undefined') {
                     initializeEspnApiAdmin();
-                } else {
-                    console.warn('ESPN API client not loaded');
-                }
+                } else {}
             }, 200);
             
             // Initialize ESPN Score Sync system (moved inside setTimeout with more delay)
@@ -13995,9 +13342,7 @@ initializeAppAndAuth().then(() => {
                         window.espnApi,
                         window.gameStateCache
                     );
-                    window.espnScoreSync.initialize();
-                    console.log('💎 ESPN Score Sync system initialized');
-                }
+                    window.espnScoreSync.initialize();}
             }, 300);
         }
     }, 100);
