@@ -4,6 +4,11 @@
 // Add enhanced ESPN data function for game cards
 async function addEnhancedGameData(gameId, game, gameState) {
     try {
+        // Guard against undefined game object
+        if (!game || !game.away || !game.home) {
+            return; // Silently exit if game data is invalid
+        }
+        
         const espnGames = await window.espnApi.getWeekGames(currentWeek);
         const espnGame = espnGames.find(eg => 
             (eg.a === game.away || eg.awayTeam === game.away) && 
@@ -127,6 +132,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // Enhanced Game Data for Picks Area - Shows ESPN data while users make selections
 async function addEnhancedGameDataToPicks(gameId, game, gameState) {
     try {
+        // Guard against undefined game object
+        if (!game || !game.away || !game.home) {
+            return; // Silently exit if game data is invalid
+        }
+        
         // Get current week from global variable or default to 1
         const weekNumber = (typeof currentWeek !== 'undefined') ? currentWeek : 
                           (typeof window.currentWeek !== 'undefined') ? window.currentWeek : 1;
