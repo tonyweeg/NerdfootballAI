@@ -1,12 +1,10 @@
 /**
- * Real-Time Game Sync Cloud Function
- * Fetches ESPN data and publishes to Firebase Realtime Database
- * Triggers instant client updates via WebSocket
+ * PHAROAH'S REALTIME GAME SYNC FUNCTION
+ * Firebase Function for syncing game scores and leaderboard updates to RTDB
+ * Diamond-level real-time architecture for NerdFootball
  */
 
-const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onCall, onRequest } = require('firebase-functions/v2/https');
-const { logger } = require('firebase-functions/v2');
+const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin if not already initialized
@@ -14,263 +12,456 @@ if (!admin.apps.length) {
     admin.initializeApp();
 }
 
+const db = admin.firestore();
 const rtdb = admin.database();
-const firestore = admin.firestore();
-
-// Import our existing realtimePublisher
-const realtimePublisher = require('./realtimePublisher');
 
 /**
- * Manual trigger function for testing - HTTP endpoint with CORS
+ * Sync game scores from ESPN to Realtime Database
+ * Triggered by HTTP request or scheduled function
  */
-exports.syncGameDataRealtime = onRequest({
-    cors: {
-        origin: ['https://nerdfootball.web.app', 'https://nerdfootball.firebaseapp.com'],
-        methods: ['GET', 'POST', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
-    }
-}, async (req, res) => {
-    try {
-        logger.info('🔄 Manual real-time sync triggered');
+exports.syncGameScores = functions.https.onRequest(async (req, res) => {
+        console.log('🏈 Starting real-time game scores sync...');
         
-        // Handle preflight OPTIONS request
-        if (req.method === 'OPTIONS') {
-            res.set('Access-Control-Allow-Origin', 'https://nerdfootball.web.app');
-            res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-            res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-            res.status(204).send('');
-            return;
+        try {
+            // Get current NFL week
+            const currentWeek = getCurrentNflWeek();
+            const year = 2025;
+            
+            // Fetch game scores from ESPN API
+            const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${year}&seasontype=2&week=${currentWeek}`;
+            
+            const espnResponse = await fetch(espnUrl);
+            const espnData = await espnResponse.json();
+            
+            if (!espnData.events || espnData.events.length === 0) {
+                console.log('No games found for current week');
+                res.status(200).json({ success: true, message: 'No games to sync' });
+                return;
+            }
+            
+            const liveScores = {};
+            const gameUpdates = {};
+            
+            // Process each game
+            for (const event of espnData.events) {
+                const gameId = event.id;
+                const competition = event.competitions[0];
+                
+                if (!competition) continue;
+                
+                const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+                const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+                
+                if (!homeTeam || !awayTeam) continue;
+                
+                const gameData = {
+                    gameId: gameId,
+                    homeTeam: normalizeTeamName(homeTeam.team.displayName),
+                    awayTeam: normalizeTeamName(awayTeam.team.displayName),
+                    homeScore: parseInt(homeTeam.score) || 0,
+                    awayScore: parseInt(awayTeam.score) || 0,
+                    status: getGameStatus(competition.status),
+                    lastUpdated: admin.database.ServerValue.TIMESTAMP,
+                    week: currentWeek,
+                    year: year
+                };
+                
+                liveScores[gameId] = gameData;
+                
+                // Check if this is a significant update (score change or status change)
+                const existingGame = await rtdb.ref(`nfl/games/${year}/week-${currentWeek}/live/${gameId}`).once('value');
+                const existing = existingGame.val();
+                
+                if (!existing || 
+                    existing.homeScore !== gameData.homeScore ||
+                    existing.awayScore !== gameData.awayScore ||
+                    existing.status !== gameData.status) {
+                    
+                    gameUpdates[gameId] = gameData;
+                    console.log(`📊 Game update: ${gameData.awayTeam} @ ${gameData.homeTeam} - ${gameData.awayScore}-${gameData.homeScore} (${gameData.status})`);
+                }
+            }
+            
+            // Batch update to RTDB
+            const updates = {};
+            updates[`nfl/games/${year}/week-${currentWeek}/live`] = liveScores;
+            updates[`nfl/games/${year}/week-${currentWeek}/lastSync`] = admin.database.ServerValue.TIMESTAMP;
+            
+            await rtdb.ref().update(updates);
+            
+            // If there are significant updates, trigger leaderboard recalculation
+            if (Object.keys(gameUpdates).length > 0) {
+                console.log(`🚀 Triggering leaderboard update for ${Object.keys(gameUpdates).length} game changes`);
+                await syncLeaderboardToRTDB(currentWeek);
+            }
+            
+            console.log(`✅ Synced ${Object.keys(liveScores).length} games to RTDB`);
+            res.status(200).json({
+                success: true,
+                gamesSync: Object.keys(liveScores).length,
+                significantUpdates: Object.keys(gameUpdates).length,
+                week: currentWeek
+            });
+            
+        } catch (error) {
+            console.error('❌ Game scores sync failed:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
         }
-        
-        const { week = 1, forceRefresh = false } = req.body || {};
-        
-        const result = await syncWeekData(week, forceRefresh);
-        
-        logger.info('✅ Manual sync complete', result);
-        
-        res.set('Access-Control-Allow-Origin', 'https://nerdfootball.web.app');
-        res.json({ success: true, ...result });
-        
-    } catch (error) {
-        logger.error('❌ Manual sync failed:', error);
-        res.set('Access-Control-Allow-Origin', 'https://nerdfootball.web.app');
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+    });
 
 /**
- * Scheduled function - runs every 30 seconds during game days
+ * Sync leaderboard data to Realtime Database
+ * Called internally or via HTTP trigger
  */
-exports.scheduledGameSync = onSchedule('every 30 seconds', async (event) => {
-    try {
-        logger.info('⏰ Scheduled real-time sync started');
+exports.syncLeaderboard = functions.https.onRequest(async (req, res) => {
+        console.log('🏆 Starting leaderboard sync to RTDB...');
         
-        const currentWeek = getCurrentNflWeek();
-        const result = await syncWeekData(currentWeek, false);
-        
-        logger.info('✅ Scheduled sync complete', result);
-        return result;
-        
-    } catch (error) {
-        logger.error('❌ Scheduled sync failed:', error);
-        throw error;
-    }
-});
+        try {
+            const week = req.query.week ? parseInt(req.query.week) : null;
+            const poolId = req.query.poolId || 'nerduniverse-2025';
+            
+            const result = await syncLeaderboardToRTDB(week, poolId);
+            
+            res.status(200).json(result);
+            
+        } catch (error) {
+            console.error('❌ Leaderboard sync failed:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
 
 /**
- * Core sync function - fetches from ESPN and publishes to RTDB
+ * Real-time leaderboard sync function (internal)
  */
-async function syncWeekData(weekNumber, forceRefresh = false) {
-    const startTime = Date.now();
-    logger.info(`🏈 Syncing Week ${weekNumber} game data...`);
+async function syncLeaderboardToRTDB(weekNumber = null, poolId = 'nerduniverse-2025') {
+    console.log(`📊 Syncing leaderboard to RTDB for ${weekNumber ? `week ${weekNumber}` : 'season'}`);
     
     try {
-        // 1. Check if there are live games this week
-        const liveGames = await checkForLiveGames(weekNumber);
-        if (!liveGames.hasLiveGames && !forceRefresh) {
-            logger.info(`⏸️ No live games for Week ${weekNumber}, skipping sync`);
-            return { 
-                success: true, 
-                week: weekNumber, 
-                liveGames: 0, 
-                message: 'No live games' 
+        // Get leaderboard data from Firestore
+        const leaderboardData = await calculateLeaderboardFromFirestore(weekNumber, poolId);
+        
+        if (!leaderboardData || leaderboardData.length === 0) {
+            console.log('No leaderboard data to sync');
+            return { success: true, message: 'No data to sync', userCount: 0 };
+        }
+        
+        // Transform for RTDB format
+        const rtdbLeaderboard = {};
+        leaderboardData.forEach((user, index) => {
+            rtdbLeaderboard[user.userId] = {
+                displayName: user.displayName,
+                totalScore: user.totalScore || user.score || 0,
+                position: index + 1,
+                weeklyScores: user.weeklyScores || {},
+                mnfPoints: user.mnfPoints || 0,
+                lastUpdated: admin.database.ServerValue.TIMESTAMP
             };
-        }
-        
-        // 2. Fetch fresh game data from ESPN
-        const espnData = await fetchEspnGameData(weekNumber);
-        if (!espnData || !espnData.games) {
-            throw new Error('No ESPN data received');
-        }
-        
-        // 3. Process and publish each game to RTDB
-        const publishPromises = espnData.games.map(game => 
-            publishGameToRTDB(weekNumber, game)
-        );
-        
-        const publishResults = await Promise.allSettled(publishPromises);
-        
-        // 4. Count successes and failures
-        const successful = publishResults.filter(r => r.status === 'fulfilled').length;
-        const failed = publishResults.filter(r => r.status === 'rejected').length;
-        
-        // 5. Update metadata
-        await updateWeekMetadata(weekNumber, {
-            lastSync: admin.database.ServerValue.TIMESTAMP,
-            activeGames: liveGames.count,
-            totalGames: espnData.games.length,
-            syncDuration: Date.now() - startTime
         });
         
-        logger.info(`✅ Week ${weekNumber} sync: ${successful} games published, ${failed} failed`);
+        // Update RTDB
+        const updatePath = weekNumber 
+            ? `pools/${poolId}/leaderboard/week-${weekNumber}/live`
+            : `pools/${poolId}/leaderboard/season/live`;
+            
+        await rtdb.ref(updatePath).set(rtdbLeaderboard);
+        
+        // Also update the general live leaderboard path
+        await rtdb.ref(`pools/${poolId}/leaderboard/live`).set(rtdbLeaderboard);
+        
+        console.log(`✅ Leaderboard synced to RTDB: ${leaderboardData.length} users`);
         
         return {
             success: true,
+            userCount: leaderboardData.length,
             week: weekNumber,
-            gamesProcessed: espnData.games.length,
-            successful,
-            failed,
-            duration: Date.now() - startTime
+            poolId: poolId
         };
         
     } catch (error) {
-        logger.error(`❌ Week ${weekNumber} sync failed:`, error);
+        console.error('❌ Leaderboard RTDB sync failed:', error);
         throw error;
     }
 }
 
 /**
- * Check for live games this week
+ * Calculate leaderboard from Firestore data
  */
-async function checkForLiveGames(weekNumber) {
+async function calculateLeaderboardFromFirestore(weekNumber = null, poolId = 'nerduniverse-2025') {
     try {
-        // Quick check from Firestore first
-        const gamesDoc = await firestore
-            .doc(`artifacts/nerdfootball/public/data/nerdfootball_games/week${weekNumber}`)
-            .get();
-            
-        if (!gamesDoc.exists) {
-            return { hasLiveGames: false, count: 0 };
+        // Get pool members
+        const poolMembersRef = db.doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersSnap = await poolMembersRef.get();
+        
+        if (!poolMembersSnap.exists) {
+            throw new Error(`Pool ${poolId} not found`);
         }
         
-        const games = gamesDoc.data();
-        let liveCount = 0;
+        const poolMembers = poolMembersSnap.data();
+        const memberUserIds = Object.keys(poolMembers);
         
-        Object.entries(games).forEach(([gameId, game]) => {
-            if (gameId !== 'lastUpdated' && gameId !== 'weekNumber') {
-                const status = game.status?.toLowerCase() || '';
-                if (status.includes('live') || status.includes('progress') || status.includes('halftime')) {
-                    liveCount++;
+        console.log(`📊 Calculating leaderboard for ${memberUserIds.length} pool members`);
+        
+        const userScores = [];
+        
+        for (const userId of memberUserIds) {
+            const userData = poolMembers[userId];
+            
+            if (weekNumber) {
+                // Calculate weekly score
+                const weeklyScore = await calculateWeeklyScoreForUser(userId, weekNumber);
+                userScores.push({
+                    userId: userId,
+                    displayName: userData.displayName || userData.name || `User ${userId.substring(0, 8)}`,
+                    score: weeklyScore.totalScore || 0,
+                    totalScore: weeklyScore.totalScore || 0,
+                    mnfPoints: weeklyScore.mnfPoints || 0
+                });
+            } else {
+                // Calculate season score
+                const seasonScore = await calculateSeasonScoreForUser(userId);
+                userScores.push({
+                    userId: userId,
+                    displayName: userData.displayName || userData.name || `User ${userId.substring(0, 8)}`,
+                    score: seasonScore.totalScore || 0,
+                    totalScore: seasonScore.totalScore || 0,
+                    weeklyScores: seasonScore.weeklyScores || {}
+                });
+            }
+        }
+        
+        // Sort by total score (descending)
+        userScores.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+        
+        return userScores;
+        
+    } catch (error) {
+        console.error('❌ Error calculating leaderboard from Firestore:', error);
+        throw error;
+    }
+}
+
+/**
+ * Calculate weekly score for a specific user
+ */
+async function calculateWeeklyScoreForUser(userId, weekNumber) {
+    try {
+        // Get user's picks for the week
+        const picksRef = db.doc(`artifacts/nerdfootball/users/${userId}/picks/2025/weeks/week-${weekNumber}/picks`);
+        const picksSnap = await picksRef.get();
+        
+        if (!picksSnap.exists) {
+            return { totalScore: 0, mnfPoints: 0 };
+        }
+        
+        const picks = picksSnap.data();
+        
+        // Get game results for the week
+        const resultsRef = db.doc(`artifacts/nerdfootball/weeks/week-${weekNumber}/results`);
+        const resultsSnap = await resultsRef.get();
+        
+        if (!resultsSnap.exists) {
+            return { totalScore: 0, mnfPoints: 0 };
+        }
+        
+        const results = resultsSnap.data();
+        let totalScore = 0;
+        let mnfPoints = 0;
+        
+        // Calculate score for each pick
+        Object.keys(picks).forEach(gameId => {
+            const pick = picks[gameId];
+            const result = results[gameId];
+            
+            if (result && result.winner && pick.team === result.winner) {
+                const confidence = parseInt(pick.confidence) || 1;
+                totalScore += confidence;
+                
+                // Check if this is Monday Night Football
+                if (result.isMondayNight) {
+                    mnfPoints += confidence;
                 }
             }
         });
         
-        return {
-            hasLiveGames: liveCount > 0,
-            count: liveCount
-        };
+        return { totalScore, mnfPoints };
         
     } catch (error) {
-        logger.warn('Error checking live games, proceeding with sync:', error);
-        return { hasLiveGames: true, count: 0 }; // Default to true to ensure sync
+        console.error(`❌ Error calculating weekly score for user ${userId}:`, error);
+        return { totalScore: 0, mnfPoints: 0 };
     }
 }
 
 /**
- * Fetch game data from ESPN (or existing Firestore)
+ * Calculate season score for a specific user
  */
-async function fetchEspnGameData(weekNumber) {
+async function calculateSeasonScoreForUser(userId) {
     try {
-        // For now, fetch from our existing Firestore data
-        // TODO: Add direct ESPN API integration later
-        const gamesDoc = await firestore
-            .doc(`artifacts/nerdfootball/public/data/nerdfootball_games/week${weekNumber}`)
-            .get();
-            
-        if (!gamesDoc.exists) {
-            throw new Error(`No game data found for week ${weekNumber}`);
+        const currentWeek = getCurrentNflWeek();
+        let totalScore = 0;
+        const weeklyScores = {};
+        
+        // Calculate score for each completed week
+        for (let week = 1; week <= currentWeek; week++) {
+            const weekScore = await calculateWeeklyScoreForUser(userId, week);
+            weeklyScores[week] = weekScore.totalScore;
+            totalScore += weekScore.totalScore;
         }
         
-        const gamesData = gamesDoc.data();
-        const games = [];
-        
-        // Convert Firestore format to standardized format
-        Object.entries(gamesData).forEach(([gameId, game]) => {
-            if (gameId !== 'lastUpdated' && gameId !== 'weekNumber') {
-                games.push({
-                    gameId,
-                    status: game.status || 'pregame',
-                    quarter: game.quarter || '',
-                    timeRemaining: game.clock || '',
-                    homeTeam: game.homeTeam,
-                    awayTeam: game.awayTeam,
-                    homeScore: parseInt(game.homeScore) || 0,
-                    awayScore: parseInt(game.awayScore) || 0,
-                    possession: game.possession || '',
-                    redzone: game.redzone || false,
-                    lastUpdate: game.lastUpdated || Date.now()
-                });
-            }
-        });
-        
-        return { games };
+        return { totalScore, weeklyScores };
         
     } catch (error) {
-        logger.error('Error fetching ESPN data:', error);
-        throw error;
+        console.error(`❌ Error calculating season score for user ${userId}:`, error);
+        return { totalScore: 0, weeklyScores: {} };
     }
 }
 
 /**
- * Publish individual game to RTDB
- */
-async function publishGameToRTDB(weekNumber, game) {
-    try {
-        const result = await realtimePublisher.publishGameUpdate(
-            weekNumber, 
-            game.gameId, 
-            game
-        );
-        
-        if (!result.success) {
-            throw new Error(result.error || 'Publish failed');
-        }
-        
-        logger.info(`📡 Published game ${game.gameId}: ${game.awayTeam} @ ${game.homeTeam} (${game.status})`);
-        return result;
-        
-    } catch (error) {
-        logger.error(`Failed to publish game ${game.gameId}:`, error);
-        throw error;
-    }
-}
-
-/**
- * Update week metadata in RTDB
- */
-async function updateWeekMetadata(weekNumber, metadata) {
-    try {
-        const metaPath = `nerdfootball/live/2025/week_${weekNumber}/metadata`;
-        const metaRef = rtdb.ref(metaPath);
-        
-        await metaRef.update(metadata);
-        
-        logger.info(`📊 Updated metadata for week ${weekNumber}`);
-        
-    } catch (error) {
-        logger.error('Error updating metadata:', error);
-        // Don't throw - metadata update failure shouldn't stop sync
-    }
-}
-
-/**
- * Get current NFL week number
+ * Helper functions
  */
 function getCurrentNflWeek() {
-    const seasonStart = new Date('2025-09-04'); // Week 1 starts Sept 4, 2025
+    // NFL 2025 season starts September 4, 2025
+    const seasonStart = new Date('2025-09-04T00:00:00Z');
     const now = new Date();
-    const diffTime = Math.abs(now - seasonStart);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const weekNumber = Math.ceil(diffDays / 7);
-    return Math.min(Math.max(1, weekNumber), 18);
+    const diffTime = now.getTime() - seasonStart.getTime();
+    const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+    
+    // Clamp to valid range (1-18)
+    return Math.max(1, Math.min(18, diffWeeks));
 }
+
+function normalizeTeamName(teamName) {
+    // Normalize team names for consistency
+    const nameMap = {
+        'New England Patriots': 'NE Patriots',
+        'New York Giants': 'NY Giants',
+        'New York Jets': 'NY Jets',
+        'Tampa Bay Buccaneers': 'TB Buccaneers',
+        'Green Bay Packers': 'GB Packers',
+        'Kansas City Chiefs': 'KC Chiefs',
+        'Los Angeles Rams': 'LA Rams',
+        'Los Angeles Chargers': 'LA Chargers',
+        'Las Vegas Raiders': 'LV Raiders',
+        'San Francisco 49ers': 'SF 49ers'
+    };
+    
+    return nameMap[teamName] || teamName;
+}
+
+function getGameStatus(espnStatus) {
+    if (!espnStatus) return 'Not Started';
+    
+    const statusType = espnStatus.type;
+    
+    if (statusType.name === 'STATUS_FINAL') {
+        return 'Final';
+    } else if (statusType.name === 'STATUS_IN_PROGRESS') {
+        const period = espnStatus.period;
+        const clock = espnStatus.displayClock;
+        return `Q${period} ${clock}`;
+    } else if (statusType.name === 'STATUS_HALFTIME') {
+        return 'Halftime';
+    } else if (statusType.name === 'STATUS_END_OF_PERIOD') {
+        return `End Q${espnStatus.period}`;
+    } else {
+        return espnStatus.type.description || 'Not Started';
+    }
+}
+
+/**
+ * Scheduled function to sync game scores every 2 minutes during game days
+ * TODO: Enable when scheduler is supported
+ */
+/*
+exports.scheduledGameSync = functions.pubsub
+    .schedule('every 2 minutes')
+    .timeZone('America/New_York')
+    .onRun(async (context) => {
+        console.log('⏰ Scheduled game sync triggered');
+        
+        try {
+            // Only run during NFL game days (Thursday, Sunday, Monday)
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0 = Sunday, 4 = Thursday, 1 = Monday
+            
+            if (![0, 1, 4].includes(dayOfWeek)) {
+                console.log('⏭️  Not a game day, skipping scheduled sync');
+                return;
+            }
+            
+            // Only run during game hours (12 PM - 12 AM ET)
+            const etHour = now.getUTCHours() - 5; // Approximate ET conversion
+            if (etHour < 12 || etHour > 24) {
+                console.log('⏭️  Outside game hours, skipping scheduled sync');
+                return;
+            }
+            
+            // Trigger the sync
+            const currentWeek = getCurrentNflWeek();
+            await syncLeaderboardToRTDB(currentWeek);
+            
+            console.log('✅ Scheduled sync completed');
+            
+        } catch (error) {
+            console.error('❌ Scheduled sync failed:', error);
+        }
+    });
+*/
+
+/**
+ * Firestore trigger - sync leaderboard when results are updated
+ * TODO: Enable when Firestore triggers are supported
+ */
+/*
+exports.onResultsUpdate = functions.firestore
+    .document('artifacts/nerdfootball/weeks/{weekId}/results')
+    .onWrite(async (change, context) => {
+        const weekId = context.params.weekId;
+        const weekNumber = parseInt(weekId.replace('week-', ''));
+        
+        console.log(`🔄 Results updated for ${weekId}, syncing leaderboard...`);
+        
+        try {
+            await syncLeaderboardToRTDB(weekNumber);
+            console.log(`✅ Leaderboard synced after results update for ${weekId}`);
+        } catch (error) {
+            console.error(`❌ Failed to sync leaderboard after results update:`, error);
+        }
+    });
+*/
+
+/**
+ * Test endpoint for manual triggering
+ */
+exports.testRealTimeSync = functions.https.onRequest(async (req, res) => {
+    console.log('🧪 Test real-time sync triggered');
+    
+    try {
+        // Test RTDB connection
+        await rtdb.ref('test/connection').set({
+            timestamp: admin.database.ServerValue.TIMESTAMP,
+            message: 'Test connection successful'
+        });
+        
+        // Test leaderboard sync
+        await syncLeaderboardToRTDB();
+        
+        res.status(200).json({
+            success: true,
+            message: 'Real-time sync test completed successfully',
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Test sync failed:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});

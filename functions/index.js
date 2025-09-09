@@ -538,3 +538,14 @@ exports.fetchGamesByDate = fetchGamesByDate;
 exports.fetchNflTeams = fetchNflTeams;
 exports.fetchSeasonSchedule = fetchSeasonSchedule;
 exports.espnApiStatus = espnApiStatus;
+
+// TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
+// Will be enabled once client-side integration is verified
+// const {
+//     syncGameScores,
+//     syncLeaderboard,
+//     testRealTimeSync
+// } = require('./realtimeGameSync');
+// exports.syncGameScores = syncGameScores;
+// exports.syncLeaderboard = syncLeaderboard;
+// exports.testRealTimeSync = testRealTimeSync;

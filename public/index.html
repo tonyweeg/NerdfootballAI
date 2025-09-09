@@ -39,6 +39,8 @@
  <script src="./survivor-bundle.js"></script>
  <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
+ <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
+ <script src="./realtimeManager.js"></script>
 <!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
@@ -702,7 +704,7 @@
 
  <!-- Active Picks Summary Section -->
  <div id="picks-summary-container" class="hidden mb-4">
-  <div class="bg-white p-4 rounded-lg shadow-md border border-slate-200">
+  <div class="bg-white p-4 rounded-lg shadow-md border border-slate-200" data-realtime="picks">
    <!-- Flex container for side-by-side layout -->
    <div class="flex flex-col lg:flex-row gap-6 items-start">
     <!-- Current Active Picks -->
@@ -731,7 +733,7 @@
        <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
        <span class="ml-2 text-sm text-slate-600">Loading leaderboard...</span>
       </div>
-      <div id="yearly-leaderboard-content" class="space-y-1">
+      <div id="yearly-leaderboard-content" class="space-y-1" data-realtime="leaderboard">
        <!-- Leaderboard will be rendered here -->
       </div>
      </div>
@@ -796,7 +798,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MNF Points</th>
                 </tr>
             </thead>
-            <tbody id="public-leaderboard-body" class="bg-white divide-y divide-gray-200"></tbody>
+            <tbody id="public-leaderboard-body" class="bg-white divide-y divide-gray-200" data-realtime="leaderboard"></tbody>
         </table>
     </div>
 </div>
@@ -2575,6 +2577,8 @@ Role
  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField, serverTimestamp, runTransaction, query, orderBy, limit, collectionGroup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 import { getMessaging } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
+// PHAROAH'S REALTIME INTEGRATION - Firebase RTDB for WebSocket integration
+import { getDatabase, ref, onValue, set, push, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
 // --- FCM INTEGRATION ---
 // Include FCM integration module
@@ -6269,6 +6273,7 @@ function downloadAnalyticsCSV(data, weekNumber) {
  const firebaseConfig = {
  apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
  authDomain: "nerdfootball.firebaseapp.com",
+ databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
  projectId: "nerdfootball",
  storageBucket: "nerdfootball.appspot.com",
  messagingSenderId: "969304790725",
@@ -6285,6 +6290,17 @@ function downloadAnalyticsCSV(data, weekNumber) {
  window.doc = doc;
  window.updateDoc = updateDoc;
  window.deleteDoc = deleteDoc;
+ 
+ // PHAROAH'S REALTIME INTEGRATION - Initialize Firebase RTDB for WebSocket features
+ const rtdb = getDatabase(app);
+ window.rtdb = rtdb; // Make RTDB globally available for RealTimeManager
+ window.dbRef = ref;
+ window.onValue = onValue;
+ window.set = set;
+ window.push = push;
+ window.serverTimestamp = rtdbServerTimestamp;
+ console.log('✅ Firebase RTDB initialized for real-time features');
+ 
  auth = getAuth(app);
  window.auth = auth; // Make Auth globally available for FCM
  functions = getFunctions(app, 'us-central1'); // Initialize global functions variable with region
