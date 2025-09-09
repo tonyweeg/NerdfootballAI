@@ -10328,6 +10328,7 @@ async function calculateLeaderboard(weekNumber = null) {
         
         picksSnap.forEach(pickDoc => {
             const userId = pickDoc.id;
+            // CRITICAL: Only process picks for users who are in the confidence pool
             if (scores[userId]) {
                 const userPicks = pickDoc.data();
                 let userScore = 0;
@@ -10504,6 +10505,13 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
                 // Get cached leaderboard but need to add MNF points
                 const cachedLeaderboard = summary.weeklyLeaderboards[weekNumber];
                 
+                // Filter out users not in confidence pool
+                const activeUsers = await getCleanUsers();
+                const filteredLeaderboard = cachedLeaderboard.filter(user => {
+                    const userId = user.uid || user.userId;
+                    return activeUsers[userId] !== undefined;
+                });
+                
                 // Fetch MNF points for this week
                 const picksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
                 const userMnfPoints = {};
@@ -10514,19 +10522,24 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
                     }
                 });
                 
-                // Add MNF points to cached leaderboard
-                cachedLeaderboard.forEach(user => {
+                // Add MNF points to filtered leaderboard
+                filteredLeaderboard.forEach(user => {
                     const userId = user.uid || user.userId;
                     if (userMnfPoints[userId] !== undefined) {
                         user.mnfTotalPoints = userMnfPoints[userId];
                     }
                 });
                 
-                return cachedLeaderboard;
+                return filteredLeaderboard;
             } else if (!weekNumber) {
-                // Convert season standings to array format
+                // Convert season standings to array format and filter
                 const standings = Object.values(summary.seasonStandings);
-                return await sortLeaderboardWithTiebreaker(standings, null, 'totalScore');
+                const activeUsers = await getCleanUsers();
+                const filteredStandings = standings.filter(user => {
+                    const userId = user.uid || user.userId;
+                    return activeUsers[userId] !== undefined;
+                });
+                return await sortLeaderboardWithTiebreaker(filteredStandings, null, 'totalScore');
             }
         }
         
