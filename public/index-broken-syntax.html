@@ -35,6 +35,7 @@
  <!-- BUNDLED JavaScript Files - Reduced from 18 to 4 files for 75% faster load -->
  <script src="./poolParticipationManager.js"></script>
  <script src="./poolRemovalService.js"></script>
+ <script src="./realtimeManager.js"></script>
  <script src="./core-bundle.js"></script>
  <script src="./survivor-bundle.js"></script>
  <script src="./confidence-bundle.js"></script>
@@ -687,7 +688,6 @@
             <a href="./index.html?view=survivor-picks" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">⚔️ Survivor Picks</a>
             <a href="./index.html?view=survivor" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">💀 Survivors List</a>
             <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">📋 Rules</a>
-            <a href="./websocket-test.html" class="block px-4 py-2 text-sm text-blue-700 hover:bg-blue-50" role="menuitem">🚀 WebSocket Test</a>
             
             <!-- Account Section -->
             <div class="border-t border-gray-200 my-1"></div>
@@ -2575,6 +2575,7 @@ Role
  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField, serverTimestamp, runTransaction, query, orderBy, limit, collectionGroup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 import { getMessaging } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
+import { getDatabase } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
 // --- FCM INTEGRATION ---
 // Include FCM integration module
@@ -6286,6 +6287,14 @@ function downloadAnalyticsCSV(data, weekNumber) {
  window.updateDoc = updateDoc;
  window.deleteDoc = deleteDoc;
  auth = getAuth(app);
+ 
+ // Initialize Realtime Database
+ const rtdb = getDatabase(app);
+ window.firebase = { 
+   database: () => rtdb,
+   auth: () => auth,
+   firestore: () => db
+ };
  window.auth = auth; // Make Auth globally available for FCM
  functions = getFunctions(app, 'us-central1'); // Initialize global functions variable with region
  window.functions = functions; // Make Functions globally available
@@ -10057,9 +10066,15 @@ function getTeamHelmetClass(teamName) {
  
  async function loadAndRenderWeek(weekNumber) { 
  currentWeek = parseInt(weekNumber, 10);
+ window.currentWeek = currentWeek; // Make available globally
  if (!currentUser) return; 
  if (unsubscribeFromPicks) unsubscribeFromPicks(); 
  updateSaveStatus('idle');
+
+ // Subscribe to real-time updates for this week
+ if (typeof realtimeGameManager !== 'undefined' && realtimeGameManager.isInitialized) {
+   realtimeGameManager.subscribeToWeek(currentWeek);
+ }
 
  allUI.gameList.innerHTML = `<div class="loader"></div>`;
  const weekIsLocked = await getWeekLockStatus(currentWeek);
@@ -14206,6 +14221,22 @@ initializeAppAndAuth().then(() => {
         if (typeof EspnNerdApiClient !== 'undefined') {
             window.espnApi = new EspnNerdApiClient();
             console.log('✅ ESPN API client initialized');
+        }
+        
+        // Initialize Realtime Game Manager
+        if (typeof realtimeGameManager !== 'undefined') {
+            realtimeGameManager.initialize().then(success => {
+                if (success) {
+                    console.log('✅ Realtime Game Manager initialized');
+                    // Subscribe to current week if available
+                    if (window.currentWeek) {
+                        realtimeGameManager.subscribeToWeek(window.currentWeek);
+                    }
+                } else {
+                    console.warn('⚠️ Realtime Manager initialization failed, using fallback polling');
+                }
+            });
+        }
             
             // Initialize ESPN API admin functionality (moved inside setTimeout)
             setTimeout(() => {
@@ -14231,7 +14262,6 @@ initializeAppAndAuth().then(() => {
         }
     }, 100);
 });
- });
- </script>
+</script>
 </body>
 </html>

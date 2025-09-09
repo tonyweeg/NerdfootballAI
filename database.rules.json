@@ -1,0 +1,119 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    
+    "websocket-test": {
+      ".read": true,
+      ".write": true,
+      "connection-test": {
+        ".validate": "newData.hasChildren(['timestamp', 'testId'])"
+      }
+    },
+    
+    "nfl": {
+      ".read": true,
+      ".write": "auth != null",
+      
+      "games": {
+        ".indexOn": ["week", "status", "timestamp"],
+        
+        "live": {
+          ".read": true,
+          ".write": "auth != null",
+          "$gameId": {
+            ".validate": "newData.hasChildren(['gameId', 'homeTeam', 'awayTeam', 'status'])"
+          }
+        },
+        
+        "week": {
+          "$weekNumber": {
+            ".indexOn": ["gameId", "status", "timestamp"],
+            "$gameId": {
+              ".validate": "newData.hasChildren(['gameId', 'homeTeam', 'awayTeam'])"
+            }
+          }
+        }
+      },
+      
+      "scores": {
+        ".indexOn": ["week", "gameId", "timestamp"],
+        "$gameId": {
+          ".validate": "newData.hasChildren(['homeScore', 'awayScore', 'status', 'timestamp'])"
+        }
+      }
+    },
+    
+    "leaderboards": {
+      ".read": true,
+      ".write": "auth != null",
+      
+      "live": {
+        ".read": true,
+        ".write": "auth != null",
+        "$userId": {
+          ".validate": "newData.hasChildren(['score']) && newData.child('score').isNumber()"
+        }
+      },
+      
+      "weekly": {
+        "$weekNumber": {
+          ".indexOn": ["score", "timestamp"],
+          "$userId": {
+            ".validate": "newData.hasChildren(['score']) && newData.child('score').isNumber()"
+          }
+        }
+      },
+      
+      "season": {
+        ".indexOn": ["totalScore", "weeklyScores"],
+        "$userId": {
+          ".validate": "newData.hasChildren(['totalScore']) && newData.child('totalScore').isNumber()"
+        }
+      }
+    },
+    
+    "system": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      
+      "performance": {
+        ".read": true,
+        ".write": "auth != null",
+        "metrics": {
+          ".indexOn": ["timestamp", "type"],
+          "$metricId": {
+            ".validate": "newData.hasChildren(['timestamp', 'value', 'type'])"
+          }
+        }
+      },
+      
+      "connections": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$userId": {
+          ".validate": "newData.hasChildren(['status', 'timestamp'])"
+        }
+      }
+    },
+    
+    "user-presence": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$userId": {
+        ".validate": "newData.hasChildren(['online', 'lastSeen']) && newData.child('online').isBoolean()"
+      }
+    },
+    
+    "debug": {
+      ".read": true,
+      ".write": true,
+      "logs": {
+        ".indexOn": ["timestamp", "level", "source"],
+        "$logId": {
+          ".validate": "newData.hasChildren(['message', 'timestamp', 'level'])"
+        }
+      }
+    }
+  }
+}

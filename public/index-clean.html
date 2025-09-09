@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>NerdfootballAI v3.2 - RTDB Test</title>
+ 
+ <!-- NUCLEAR Cache Control -->
+ <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0, private">
+ <meta http-equiv="Pragma" content="no-cache">
+ <meta http-equiv="Expires" content="0">
+ <meta name="version" content="3.2.0">
+ 
+ <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-8">
+        <h1 class="text-3xl font-bold mb-4">🚀 RTDB Direct Test</h1>
+        <div id="status" class="text-lg mb-4">Initializing...</div>
+        <button id="testBtn" class="bg-blue-500 text-white px-4 py-2 rounded" disabled>Test RTDB</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        console.log('🔥 Starting clean Firebase initialization...');
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const rtdb = getDatabase(app);
+        
+        const status = document.getElementById('status');
+        const testBtn = document.getElementById('testBtn');
+        
+        window.auth = auth;
+        window.rtdb = rtdb;
+        
+        status.innerHTML = '✅ Firebase initialized! Checking auth...';
+        
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                status.innerHTML = `🟢 Signed in as: ${user.displayName || user.email}`;
+                testBtn.disabled = false;
+                console.log('✅ User authenticated:', user.uid);
+                
+                // Test RTDB connection automatically
+                testRTDB();
+            } else {
+                status.innerHTML = '❌ Not signed in. <button onclick="signIn()">Sign In with Google</button>';
+                testBtn.disabled = true;
+            }
+        });
+        
+        window.signIn = async () => {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error('Sign-in failed:', error);
+                status.innerHTML = '❌ Sign-in failed: ' + error.message;
+            }
+        };
+        
+        function testRTDB() {
+            console.log('🧪 Testing RTDB connection...');
+            
+            // Test .info/connected
+            const connectedRef = ref(rtdb, '.info/connected');
+            onValue(connectedRef, (snapshot) => {
+                const connected = snapshot.val() === true;
+                console.log('🔗 RTDB Connected:', connected);
+                
+                if (connected) {
+                    // Test access to our path
+                    const testPath = 'nerdfootball/live/2025/week_1/games';
+                    const testRef = ref(rtdb, testPath);
+                    
+                    onValue(testRef, 
+                        (snapshot) => {
+                            console.log('✅ SUCCESS! Can read RTDB data:', snapshot.val());
+                            status.innerHTML += '<br>✅ RTDB access successful!';
+                        },
+                        (error) => {
+                            console.log('⚠️ Permission/data issue (expected):', error.message);
+                            status.innerHTML += '<br>⚠️ Path access: ' + error.message;
+                        }
+                    );
+                }
+            });
+        }
+        
+        testBtn.addEventListener('click', testRTDB);
+        
+        console.log('🚀 Clean test page ready!');
+    </script>
+</body>
+</html>
