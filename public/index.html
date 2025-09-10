@@ -9907,6 +9907,119 @@ function getTeamHelmetClass(teamName) {
    }
  });
 
+ // === AUTO-CYCLING FUNCTIONALITY FOR EXPANDED GAME VIEW ===
+ let gameCycleTimer = null;
+ let currentCycleIndex = 0;
+ let availableGameIds = [];
+ let cyclingPaused = false;
+
+ // Get available game IDs from Active Picks in order
+ function getAvailableGameIds() {
+   const gameCards = document.querySelectorAll('.game-pick-card[data-game-id]');
+   return Array.from(gameCards).map(card => card.dataset.gameId);
+ }
+
+ // Start auto-cycling through games
+ function startGameCycling() {
+   availableGameIds = getAvailableGameIds();
+   if (availableGameIds.length <= 1) return; // No point cycling with 1 or 0 games
+   
+   // Clear any existing timer
+   if (gameCycleTimer) {
+     clearInterval(gameCycleTimer);
+   }
+   
+   // Add glow effect to expanded view
+   const expandedView = document.getElementById('expanded-game-view');
+   if (expandedView) {
+     expandedView.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)';
+     expandedView.style.transition = 'box-shadow 0.3s ease-in-out';
+   }
+   
+   // Start 60-second interval
+   gameCycleTimer = setInterval(() => {
+     if (!cyclingPaused && availableGameIds.length > 1) {
+       cycleToNextGame();
+     }
+   }, 60000); // 60 seconds
+ }
+
+ // Stop auto-cycling
+ function stopGameCycling() {
+   if (gameCycleTimer) {
+     clearInterval(gameCycleTimer);
+     gameCycleTimer = null;
+   }
+   
+   // Remove glow effect
+   const expandedView = document.getElementById('expanded-game-view');
+   if (expandedView) {
+     expandedView.style.boxShadow = '';
+   }
+ }
+
+ // Cycle to next game with fade transitions
+ async function cycleToNextGame() {
+   if (availableGameIds.length <= 1) return;
+   
+   // Move to next game (loop back to start if at end)
+   currentCycleIndex = (currentCycleIndex + 1) % availableGameIds.length;
+   const nextGameId = availableGameIds[currentCycleIndex];
+   const nextGameCard = document.querySelector(`[data-game-id="${nextGameId}"]`);
+   
+   if (nextGameCard && nextGameId !== currentExpandedGame) {
+     // Expand the next game (this handles fade transitions internally)
+     await originalExpandGameView.call(window, nextGameId, nextGameCard);
+   }
+ }
+
+ // Add hover event listeners to pause/resume cycling
+ function setupCyclingEventListeners() {
+   const expandedView = document.getElementById('expanded-game-view');
+   if (expandedView) {
+     expandedView.addEventListener('mouseenter', () => {
+       cyclingPaused = true;
+     });
+     
+     expandedView.addEventListener('mouseleave', () => {
+       cyclingPaused = false;
+     });
+   }
+ }
+
+ // Modified expandGameView to handle cycling
+ const originalExpandGameView = window.expandGameView;
+ window.expandGameView = async function(gameId, element, isManualClick = true) {
+   // If manually clicked, reset cycling timer and update index
+   if (isManualClick) {
+     availableGameIds = getAvailableGameIds();
+     currentCycleIndex = availableGameIds.indexOf(gameId);
+     if (currentCycleIndex === -1) currentCycleIndex = 0;
+     
+     // Restart cycling timer
+     if (gameCycleTimer) {
+       stopGameCycling();
+       startGameCycling();
+     }
+   }
+   
+   // Call original function
+   await originalExpandGameView.call(this, gameId, element);
+   
+   // If this is the first expansion, start cycling
+   if (!gameCycleTimer && availableGameIds.length > 1) {
+     startGameCycling();
+     setupCyclingEventListeners();
+   }
+ };
+
+ // Modified collapseGameView to stop cycling
+ const originalCollapseGameView = window.collapseGameView;
+ window.collapseGameView = function() {
+   stopGameCycling();
+   originalCollapseGameView.call(this);
+ };
+
  // Helper function to calculate total points scored in a game
  function calculateGameTotalPoints(gameResult) {
    if (!gameResult) return null;
