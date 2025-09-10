@@ -10784,7 +10784,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
         <div class="flex-1 min-w-0">
          <div class="text-sm text-slate-800 ${textClass} truncate">${pick.team} (${pick.confidence})</div>
          <div class="text-xs text-slate-600 mt-1">
-          ${homeAwayIndicator} ${opponent}
+          ${opponent ? `${homeAwayIndicator} ${opponent}` : ''}
          </div>
          ${pick.liveScore && pick.liveScore.hasScores ? `<div class="text-xs font-medium mt-1 ${pick.liveScore.status === 'FINAL' ? 'text-slate-700' : 'text-emerald-600'}">
           ${pick.liveScore.awayScore} - ${pick.liveScore.homeScore}${pick.liveScore.status === 'FINAL' ? ' (F)' : (pick.liveScore.clock && pick.liveScore.quarter ? ` (${pick.liveScore.clock} Q${pick.liveScore.quarter})` : '')}
@@ -10801,7 +10801,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
           Win Prob: ${isHome ? pick.liveScore.probability.homeWinPercentage : pick.liveScore.probability.awayWinPercentage}%
          </div>` : ''}
          <div class="text-xs text-slate-500 mt-0.5 ${isInProgress ? 'text-emerald-600 font-medium' : ''}">
-          ${timeDisplay}
+          ${timeDisplay && timeDisplay !== 'Invalid Date' ? timeDisplay : ''}
          </div>
         </div>
        </div>
@@ -10866,7 +10866,16 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
     }
     
     const positionDisplay = position <= 10 ? position : `${position}`;
-    const bgClass = isCurrentUser ? 'bg-blue-100' : '';
+    let bgClass = '';
+    if (position === 1) {
+      bgClass = 'bg-gradient-to-r from-yellow-100 to-yellow-200';
+    } else if (position === 2) {
+      bgClass = 'bg-gradient-to-r from-gray-100 to-gray-200';
+    } else if (position === 3) {
+      bgClass = 'bg-gradient-to-r from-orange-100 to-orange-200';
+    } else if (isCurrentUser) {
+      bgClass = 'bg-blue-100';
+    }
     const textClass = isCurrentUser ? 'font-semibold' : '';
     
     return `
@@ -11068,9 +11077,9 @@ function updatePicksButtonStates(weekData) {
          if (gameState === 'IN_PROGRESS') {
              // Special styling for in-progress games
              if (isSelected) {
-                 return `${baseClasses} bg-blue-800 border-emerald-400 text-white border-2`;
+                 return `${baseClasses} bg-blue-800 border-emerald-400 text-slate-900 border-2`;
              } else {
-                 return `${baseClasses} bg-blue-700 border-emerald-400 text-white opacity-75`;
+                 return `${baseClasses} bg-blue-700 border-emerald-400 text-slate-900 opacity-75`;
              }
          } else if (isWinner) {
              return `${baseClasses} bg-emerald-100 border-emerald-400 text-emerald-800 opacity-90`;
@@ -11084,7 +11093,7 @@ function updatePicksButtonStates(weekData) {
          if (isSelected) {
              return `${baseClasses} bg-sky-50 border-slate-600 text-slate-800 border-4 shadow-md hover:bg-sky-100`;
          } else {
-             return `${baseClasses} bg-sky-100 border-sky-200 text-white hover:bg-sky-200 hover:border-sky-300 hover:shadow-md`;
+             return `${baseClasses} bg-sky-100 border-sky-200 text-slate-800 hover:bg-sky-200 hover:border-sky-300 hover:shadow-md`;
          }
      }
  }
@@ -11095,7 +11104,7 @@ function updatePicksButtonStates(weekData) {
          <button data-game-id="${game.id}" data-team="${game.away}" ${isLocked ? 'disabled' : ''} 
                  class="${getTeamButtonClasses(game.away)} flex-1 min-w-0">
              <div class="helmet-mini ${awayHelmetClass} w-6 h-6 bg-contain bg-center bg-no-repeat flex-shrink-0"></div>
-             ${pick.winner === game.away || !isLocked ? `<span class="truncate">${game.away}</span>` : ''}
+             <span class="truncate">${game.away}</span>
          </button>
          
          <div class="flex items-center gap-1 text-slate-400 font-bold text-lg flex-shrink-0">
@@ -11106,7 +11115,7 @@ function updatePicksButtonStates(weekData) {
          <button data-game-id="${game.id}" data-team="${game.home}" ${isLocked ? 'disabled' : ''} 
                  class="${getTeamButtonClasses(game.home, true)} flex-1 min-w-0">
              <div class="helmet-mini ${homeHelmetClass} w-6 h-6 bg-contain bg-center bg-no-repeat flex-shrink-0"></div>
-             ${pick.winner === game.home || !isLocked ? `<span class="truncate">${game.home}</span>` : ''}
+             <span class="truncate">${game.home}</span>
          </button>
      </div>
      
@@ -11246,7 +11255,7 @@ if (!activePicks.mnfTotalPoints) {
      // Apply new classes based on state
      if (!isLocked) {
        if (isSelected) {
-         button.className += ' bg-blue-600 border-blue-600 text-white shadow-md hover:bg-blue-700';
+         button.className += ' bg-blue-600 border-blue-600 text-slate-900 shadow-md hover:bg-blue-700';
        } else {
          button.className += ' bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 hover:shadow-md';
        }
