@@ -747,21 +747,21 @@
  <!-- Picks View -->
  <div id="picks-container" class="hidden">
  <div class="bg-slate-50 p-6 rounded-lg shadow-xl border border-slate-200">
+ <h2 id="picks-container-title" class="text-2xl font-bold text-slate-800 mb-4">My picks for Week 1</h2>
  <div class="mb-6 flex flex-wrap gap-4 justify-between items-center">
- <div>
- <label for="week-selector" class="block text-lg font-medium text-slate-700 mb-2">Select a Week:</label>
- <select id="week-selector" class="p-3 rounded-lg border-2 border-slate-300 bg-white"></select>
- </div>
- <div class="flex items-center space-x-4">
- <div id="save-status" class="flex items-center space-x-2 h-10">
- <div id="save-status-icon" class="w-6 h-6"></div>
- <span id="save-status-text" class="text-sm font-medium"></span>
- </div>
- <button id="top-save-picks-btn" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 mr-2 flex items-center gap-2">
-   <span id="save-picks-text">Save Picks</span>
-   <div id="save-picks-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+ <div class="flex items-center space-x-2">
+ <button id="prev-week-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-medium py-1 px-2 rounded text-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+ <span id="week-display" class="text-lg font-medium text-slate-700 px-2">Week 1</span>
+ <button id="next-week-btn" class="bg-slate-600 hover:bg-slate-700 text-white font-medium py-1 px-2 rounded text-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+ <button id="top-save-picks-btn" class="bg-blue-600 text-white font-medium py-1 px-3 rounded text-sm hover:bg-blue-700 flex items-center gap-2">
+   <span id="save-picks-text">Save</span>
+   <div id="save-picks-spinner" class="hidden w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
  </button>
- <button id="reset-picks-btn" class="bg-emerald-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-emerald-800">Reset Picks</button>
+ <button id="reset-picks-btn" class="bg-emerald-500 text-white font-medium py-1 px-3 rounded text-sm hover:bg-emerald-800">Reset</button>
+ <div id="save-status" class="flex items-center space-x-1 h-8">
+ <div id="save-status-icon" class="w-4 h-4"></div>
+ <span id="save-status-text" class="text-xs font-medium"></span>
+ </div>
  </div>
  </div>
  <div id="timestamps-display" class="text-xs text-gray-500 mb-4 text-center">
@@ -2686,7 +2686,7 @@ await new Promise(resolve => {
  userDiagnosticBtn: document.getElementById('user-diagnostic-btn'),
  leaderboardViewBtn: document.getElementById('leaderboard-view-btn'),
  gridViewBtn: document.getElementById('grid-view-btn'), survivorPicksViewBtn: document.getElementById('survivor-picks-view-btn'), closeRulesBtn: document.getElementById('close-rules-btn'), rulesUserName: document.getElementById('rules-user-name'),
- weekSelector: document.getElementById('week-selector'), adminWeekSelector: document.getElementById('admin-week-selector'),
+ prevWeekBtn: document.getElementById('prev-week-btn'), nextWeekBtn: document.getElementById('next-week-btn'), weekDisplay: document.getElementById('week-display'), adminWeekSelector: document.getElementById('admin-week-selector'),
  gameList: document.getElementById('game-list'), resultsGameList: document.getElementById('results-game-list'),
  saveResultsBtn: document.getElementById('save-results-btn'),
  refreshSummaryBtn: document.getElementById('refresh-summary-btn'),
@@ -6445,7 +6445,8 @@ async function handleAuthStateChange(user) {
  }
  
  populateWeekSelectors();
- allUI.weekSelector.value = currentWeek;
+ allUI.weekDisplay.textContent = `Week ${currentWeek}`;
+ updateWeekButtonStates();
  allUI.adminWeekSelector.value = currentWeek;
  allUI.lbWeekSelector.value = currentWeek;
 
@@ -9932,7 +9933,7 @@ function getTeamHelmetClass(teamName) {
    // Add glow effect to expanded view
    const expandedView = document.getElementById('expanded-game-view');
    if (expandedView) {
-     expandedView.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)';
+     expandedView.style.boxShadow = '0 0 8px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(59, 130, 246, 0.1)';
      expandedView.style.transition = 'box-shadow 0.3s ease-in-out';
    }
    
@@ -10187,8 +10188,16 @@ function getTeamHelmetClass(teamName) {
    }).join('');
  }
  
+ function updateWeekButtonStates() {
+  if (allUI.prevWeekBtn && allUI.nextWeekBtn) {
+    allUI.prevWeekBtn.disabled = currentWeek <= 1;
+    allUI.nextWeekBtn.disabled = currentWeek >= 18;
+  }
+ }
+
  async function loadAndRenderWeek(weekNumber) { 
  currentWeek = parseInt(weekNumber, 10);
+ document.getElementById('picks-container-title').textContent = `My picks for Week ${currentWeek}`;
  if (!currentUser) return; 
  if (unsubscribeFromPicks) unsubscribeFromPicks(); 
  updateSaveStatus('idle');
@@ -10687,7 +10696,6 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
 
  function populateWeekSelectors() {
  const options = Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}">Week ${i + 1}</option>`).join('');
- allUI.weekSelector.innerHTML = options;
  allUI.adminWeekSelector.innerHTML = options;
  allUI.lbWeekSelector.innerHTML = options;
  }
@@ -10703,6 +10711,17 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
     allUI.activePicksList.innerHTML = '<p class="text-center text-slate-500 text-sm">No games available for this week</p>';
     return;
    }
+
+   // Helper function to check if data is valid for display
+   const isValidData = (value) => {
+     return value && 
+            value !== 'undefined' && 
+            value !== 'null' && 
+            value !== 'Invalid Date' && 
+            String(value).trim() !== '' &&
+            !String(value).includes('undefined') &&
+            !String(value).includes('null');
+   };
 
    const docRef = doc(db, picksPath(currentWeek, currentUser.uid));
    const docSnap = await getDoc(docRef);
@@ -10818,6 +10837,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      const opponentLogoUrl = nflTeamLogos[opponentAbbr] || '';
      const homeAwayIndicator = isHome ? 'vs' : '@';
      
+     
      // Format game time
      const gameTime = new Date(pick.game.kickoff);
      const now = new Date();
@@ -10897,24 +10917,24 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
         <div class="flex-1 min-w-0">
          <div class="text-sm text-slate-800 ${textClass} truncate">${pick.team} (${pick.confidence})</div>
          <div class="text-xs text-slate-600 mt-1">
-          ${opponent ? `${homeAwayIndicator} ${opponent}` : ''}
+          ${isValidData(opponent) ? `${homeAwayIndicator} ${opponent}` : '<span class="text-slate-400 italic">loading...</span>'}
          </div>
-         ${pick.liveScore && pick.liveScore.hasScores ? `<div class="text-xs font-medium mt-1 ${pick.liveScore.status === 'FINAL' ? 'text-slate-700' : 'text-emerald-600'}">
+         ${pick.liveScore && pick.liveScore.hasScores && isValidData(pick.liveScore.awayScore) && isValidData(pick.liveScore.homeScore) ? `<div class="text-xs font-medium mt-1 ${pick.liveScore.status === 'FINAL' ? 'text-slate-700' : 'text-emerald-600'}">
           ${pick.liveScore.awayScore} - ${pick.liveScore.homeScore}${pick.liveScore.status === 'FINAL' ? ' (F)' : (pick.liveScore.clock && pick.liveScore.quarter ? ` (${pick.liveScore.clock} Q${pick.liveScore.quarter})` : '')}
          </div>` : ''}
-         ${pick.liveScore && pick.liveScore.weather ? `<div class="text-xs text-slate-500 mt-0.5 flex items-center">
+         ${pick.liveScore && pick.liveScore.weather && isValidData(pick.liveScore.weather.temperature) ? `<div class="text-xs text-slate-500 mt-0.5 flex items-center">
           <span class="mr-1">🌡️</span>
           ${pick.liveScore.weather.temperature}°F ${pick.liveScore.weather.condition || pick.liveScore.weather.description || ''}
          </div>` : ''}
-         ${pick.liveScore && pick.liveScore.venue ? `<div class="text-xs text-slate-500 mt-0.5 flex items-center">
+         ${pick.liveScore && pick.liveScore.venue && isValidData(pick.liveScore.venue.name) ? `<div class="text-xs text-slate-500 mt-0.5 flex items-center">
           <span class="mr-1">${pick.liveScore.venue.indoor ? '🏟️' : '🌤️'}</span>
           ${pick.liveScore.venue.name}
          </div>` : ''}
-         ${pick.liveScore && pick.liveScore.probability ? `<div class="text-xs text-emerald-600 font-medium mt-0.5">
+         ${pick.liveScore && pick.liveScore.probability && isValidData(isHome ? pick.liveScore.probability.homeWinPercentage : pick.liveScore.probability.awayWinPercentage) ? `<div class="text-xs text-emerald-600 font-medium mt-0.5">
           Win Prob: ${isHome ? pick.liveScore.probability.homeWinPercentage : pick.liveScore.probability.awayWinPercentage}%
          </div>` : ''}
          <div class="text-xs text-slate-500 mt-0.5 ${isInProgress ? 'text-emerald-600 font-medium' : ''}">
-          ${timeDisplay && timeDisplay !== 'Invalid Date' ? timeDisplay : ''}
+          ${isValidData(timeDisplay) ? timeDisplay : '<span class="text-slate-400 italic">loading...</span>'}
          </div>
         </div>
        </div>
@@ -11652,9 +11672,25 @@ if (!activePicks.mnfTotalPoints) {
  allUI.lbWeekSelector.addEventListener('change', renderPublicLeaderboard);
 
 
- allUI.weekSelector.addEventListener('change', (e) => {
-  loadAndRenderWeek(e.target.value);
-  saveAppState();
+ allUI.prevWeekBtn.addEventListener('click', () => {
+  if (currentWeek > 1) {
+   currentWeek--;
+   allUI.weekDisplay.textContent = `Week ${currentWeek}`;
+   document.getElementById('picks-container-title').textContent = `My picks for Week ${currentWeek}`;
+   updateWeekButtonStates();
+   loadAndRenderWeek(currentWeek);
+   saveAppState();
+  }
+ });
+ allUI.nextWeekBtn.addEventListener('click', () => {
+  if (currentWeek < 18) {
+   currentWeek++;
+   allUI.weekDisplay.textContent = `Week ${currentWeek}`;
+   document.getElementById('picks-container-title').textContent = `My picks for Week ${currentWeek}`;
+   updateWeekButtonStates();
+   loadAndRenderWeek(currentWeek);
+   saveAppState();
+  }
  });
  allUI.adminWeekSelector.addEventListener('change', (e) => renderAdminView(e.target.value));
  
@@ -11756,7 +11792,7 @@ allUI.refreshSummaryBtn.addEventListener('click', async () => {
  if (weekIsLocked) return;
 
  // Show confirmation dialog
- const confirmReset = confirm('Are you sure you want to reset all picks for this week? This action cannot be undone.');
+ const confirmReset = confirm('Are you sure?');
  
  // If user clicks Cancel, abort the operation
  if (!confirmReset) return;
