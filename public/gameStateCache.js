@@ -31,7 +31,9 @@ class GameStateCache {
     // 🎯 Intelligent Game State Detection
     getGameState(game) {
         const now = new Date();
-        const kickoff = new Date(game.kickoff);
+        // Handle both raw JSON format (dt) and processed format (kickoff)
+        const gameTime = game.kickoff || game.dt;
+        const kickoff = new Date(gameTime);
         
         if (now < kickoff) {
             return 'PRE_GAME';
