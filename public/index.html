@@ -13514,8 +13514,11 @@ const SurvivorPicksView = {
             return;
         }
         
-        // Check if selected week is locked (only lock past weeks and current week if games started)
-        const isLocked = await this.checkSurvivorPickLocked(this.selectedWeek);
+        // Reuse status data from earlier elimination check
+        const currentUserStatus = allStatuses[this.currentUser.uid] || { eliminated: false };
+        
+        // Check if selected week is locked (eliminated users always locked, others based on game timing)
+        const isLocked = currentUserStatus.eliminated || await this.checkSurvivorPickLocked(this.selectedWeek);
         
         // Render the survivor picks interface with week selector
         this.renderSurvivorPicksHTML(container, userPicks, weeklyGames, isLocked);
@@ -13608,7 +13611,9 @@ const SurvivorPicksView = {
     
     getGameState: function(game) {
         const now = new Date();
-        const kickoff = new Date(game.kickoff);
+        // Handle both raw JSON format (dt) and processed format (kickoff)
+        const gameTime = game.kickoff || game.dt;
+        const kickoff = new Date(gameTime);
         
         if (now < kickoff) {
             return 'PRE_GAME';
