@@ -181,7 +181,11 @@
         // Admin Panel Logic
         class SurvivorAdminPanel {
             constructor() {
-                this.currentWeek = 1;
+                // Check URL parameters for week
+                const urlParams = new URLSearchParams(window.location.search);
+                const weekParam = parseInt(urlParams.get('week'));
+                this.currentWeek = weekParam || 1;
+                
                 this.logs = [];
                 this.userData = [];
                 this.gameData = {};
@@ -232,6 +236,17 @@
                 // Week selector
                 document.getElementById('week-selector').addEventListener('change', (e) => {
                     this.currentWeek = parseInt(e.target.value);
+                    
+                    // Update URL with breadcrumb navigation
+                    const params = new URLSearchParams(window.location.search);
+                    if (this.currentWeek !== 1) {
+                        params.set('week', this.currentWeek);
+                    } else {
+                        params.delete('week');
+                    }
+                    const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+                    window.history.pushState({}, '', newUrl);
+                    
                     this.loadData();
                 });
 

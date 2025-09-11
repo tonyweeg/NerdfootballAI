@@ -1,0 +1,98 @@
+# Claude Instructions for NerdFootball Development
+
+## Core Development Philosophy
+- **Concise and Direct**: Keep responses focused and actionable. No verbose explanations unless debugging issues.
+- **Test-Driven Development**: Always implement unit tests. Regression test everything. Small, testable units with single responsibility.
+- **Object-Oriented Thinking**: Modular architecture, clean separation of concerns, dependency injection where appropriate.
+- **Incremental Development**: Build in small units, verify functionality, then move forward. No large refactors without testing intermediary steps.
+
+## Project Context: NerdFootball Platform
+**Technology Stack**: Firebase (Auth/Firestore/Functions), Vanilla JavaScript ES6+, HTML5/Tailwind CSS
+**Architecture**: 4-bundle system (core, confidence, survivor, features)
+**Performance Target**: Sub-500ms queries, <2MB total bundle size, <10 Firebase reads per page load
+
+## Code Quality Standards (Diamond Level)
+- Zero tolerance for `any` or `unknown` types in TypeScript-style code
+- >90% test coverage mandatory for all new features
+- Comprehensive error handling with specific error types
+- Firebase cost optimization in all architectural decisions
+- Single responsibility principle for all functions/classes
+
+## Development Workflow
+1. **Start Small**: Write minimal working version first
+2. **Test Immediately**: Unit test before moving to next feature
+3. **Regression Check**: Ensure previous functionality still works
+4. **Optimize Last**: Performance and bundle optimization after functionality confirmed
+
+## Firebase-Specific Guidelines
+- Always use pool members as authoritative source: `artifacts/nerdfootball/pools/{poolId}/metadata/members`
+- Implement unified document architecture for performance (1-2 reads vs 500-900)
+- Batch operations for writes, single document reads where possible
+- Cache with game-completion-based invalidation
+- Block ghost user: `okl4sw2aDhW3yKpOfOwe5lH7OQj1`
+
+## Bundle Architecture Rules
+- **core-bundle.js**: Firebase utilities only (target: 55KB)
+- **confidence-bundle.js**: Confidence pool logic (target: 84KB)
+- **survivor-bundle.js**: Survivor pool system (target: 100KB)
+- **features-bundle.js**: UI enhancements (target: 48KB)
+- Use dependency gating system for proper load order
+- Lazy load non-critical modules
+
+## Critical Business Logic
+- **Confidence Pool**: 1-16 rankings, no duplicates, picks lock at game start
+- **Survivor Pool**: One team/week, no repeats, elimination on loss
+- **ESPN Integration**: Team name normalization required (e.g., "NE Patriots" ↔ "New England Patriots")
+- **Security**: Pre-game pick hiding, role-based access control
+
+## Testing Requirements
+- Jest for unit tests, Puppeteer for integration
+- Test files: `test-*-diamond.js` for integration, `*.test.js` for units
+- Must test: Firebase security rules, ESPN integration, elimination logic, RTDB sync
+- ESPN API mocking required for reliable tests
+- Benchmark against: `survivor-system-benchmark-v2` branch
+
+## Performance Constraints
+- Firebase reads: Minimize through unified documents and caching
+- Bundle loading: Use dependency gates, avoid race conditions
+- Real-time updates: Firebase RTDB for WebSocket alternative
+- Mobile optimization: <100ms touch response, gesture support
+
+## Security Checklist
+- Pool membership validation before any user display
+- Pick deadline enforcement (game start times)
+- Admin privilege verification for sensitive operations
+- Content Security Policy compliance
+- Ghost user elimination
+
+## Deployment Standards
+- All tests must pass (Jest + Puppeteer)
+- No regression in existing functionality
+- Performance benchmarks must be met
+- Security rules validated
+- Bundle sizes within targets
+
+## Communication Style
+- **Problem-Solving Mode**: Direct technical solutions, minimal context
+- **Code Review Mode**: Focus on issues and improvements only
+- **Debugging Mode**: Step-by-step analysis, test intermediate states
+- **Architecture Mode**: Brief explanations of design decisions
+
+## Common Pitfalls to Avoid
+- Never use individual user documents for leaderboards (performance killer)
+- Always normalize ESPN team names before comparisons
+- Don't forget dependency gating for bundle loading
+- Validate pool membership before displaying any user data
+- Test Firebase security rules changes in emulator first
+
+## When to Ask for Clarification
+- If implementation approach could significantly impact bundle size
+- If Firebase read patterns might exceed performance targets
+- If changes could affect existing user data structures
+- If security implications are unclear
+
+## Tools and Testing
+- Local development: Firebase emulators
+- Testing: `npm test` for units, `npm run test:integration` for full suite
+- Deployment: `firebase deploy` with staging validation
+- Monitoring: Firebase console for quota and performance metrics

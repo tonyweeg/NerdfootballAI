@@ -1248,7 +1248,7 @@ Role
                        </button>
                    </div>
                    
-                   <div class="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+                   <div id="delete-pool-section" class="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg" style="display: none">
                        <div>
                            <h5 class="text-sm font-medium text-red-800">Delete Pool</h5>
                            <p class="text-sm text-red-700">Permanently delete this pool and all associated data</p>
@@ -1747,7 +1747,7 @@ Role
                         <div class="flex justify-between items-center">
                             <h2 class="text-lg font-semibold text-gray-900">Survivor Pool Status</h2>
                             <div class="flex items-center space-x-4">
-                                <button onclick="window.open('survivorAdminPanel.html', '_blank')" class="px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors">
+                                <button id="survivor-admin-panel-btn" onclick="window.open('survivorAdminPanel.html', '_blank')" class="px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors" style="display: none">
                                     <i class="fas fa-cog mr-1"></i> Admin Panel
                                 </button>
                                 <div class="flex items-center text-sm">
@@ -3381,7 +3381,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
   return result;
  }
 
- function updateUrl() {
+ function updateUrl(usePushState = false) {
   // CRITICAL FIX: Don't update URL during initial page load
   console.log('💎 updateUrl called, isInitialLoad:', isInitialLoad, 'current URL:', window.location.search);
   if (isInitialLoad) {
@@ -3391,16 +3391,41 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
   
   const currentView = getCurrentView();
   const isSeasonView = allUI.lbSeasonBtn.classList.contains('active');
-  const params = new URLSearchParams();
   
-  if (currentView !== 'picks') params.set('view', currentView);
-  if (currentWeek !== getCurrentNflWeek()) params.set('week', currentWeek);
-  if (currentView === 'leaderboard' && isSeasonView) params.set('lb', 'season');
+  // Preserve ALL existing parameters and only update specific ones
+  const params = new URLSearchParams(window.location.search);
+  
+  // Update or remove view parameter
+  if (currentView !== 'picks') {
+   params.set('view', currentView);
+  } else {
+   params.delete('view');
+  }
+  
+  // Update or remove week parameter  
+  if (currentWeek !== getCurrentNflWeek()) {
+   params.set('week', currentWeek);
+  } else {
+   params.delete('week');
+  }
+  
+  // Update or remove leaderboard parameter
+  if (currentView === 'leaderboard' && isSeasonView) {
+   params.set('lb', 'season');
+  } else if (currentView === 'leaderboard') {
+   params.delete('lb');
+  }
   
   // Preserve existing hash fragment
   const currentHash = window.location.hash;
   const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + currentHash;
-  window.history.replaceState({}, '', newUrl);
+  
+  // Use pushState for user actions (breadcrumb navigation) or replaceState for automatic updates
+  if (usePushState) {
+   window.history.pushState({}, '', newUrl);
+  } else {
+   window.history.replaceState({}, '', newUrl);
+  }
  }
 
  // --- GRID VIEW FUNCTIONS ---
@@ -6440,6 +6465,9 @@ async function handleAuthStateChange(user) {
 
  if (ADMIN_UIDS.includes(user.uid)) {
  allUI.menuAdminControls.classList.remove('hidden');
+ // Show admin-only buttons
+ document.getElementById('delete-pool-section').style.display = 'flex';
+ document.getElementById('survivor-admin-panel-btn').style.display = 'inline-block';
  await fetchAllUsers();
  showAdminMigrationTool();
  }
@@ -11669,7 +11697,12 @@ if (!activePicks.mnfTotalPoints) {
     renderPublicLeaderboard();
     saveAppState();
  });
- allUI.lbWeekSelector.addEventListener('change', renderPublicLeaderboard);
+ allUI.lbWeekSelector.addEventListener('change', (e) => {
+  currentWeek = parseInt(e.target.value, 10);
+  renderPublicLeaderboard();
+  updateUrl(true); // Breadcrumb navigation - add to browser history
+  saveAppState();
+ });
 
 
  allUI.prevWeekBtn.addEventListener('click', () => {
@@ -11679,6 +11712,7 @@ if (!activePicks.mnfTotalPoints) {
    document.getElementById('picks-container-title').textContent = `My picks for Week ${currentWeek}`;
    updateWeekButtonStates();
    loadAndRenderWeek(currentWeek);
+   updateUrl(true); // Breadcrumb navigation - add to browser history
    saveAppState();
   }
  });
@@ -11689,14 +11723,25 @@ if (!activePicks.mnfTotalPoints) {
    document.getElementById('picks-container-title').textContent = `My picks for Week ${currentWeek}`;
    updateWeekButtonStates();
    loadAndRenderWeek(currentWeek);
+   updateUrl(true); // Breadcrumb navigation - add to browser history
    saveAppState();
   }
  });
- allUI.adminWeekSelector.addEventListener('change', (e) => renderAdminView(e.target.value));
+ allUI.adminWeekSelector.addEventListener('change', (e) => {
+  currentWeek = parseInt(e.target.value, 10);
+  renderAdminView(e.target.value);
+  updateUrl(true); // Breadcrumb navigation - add to browser history
+  saveAppState();
+ });
  
  // Grid view event listeners
  if (allUI.gridWeekSelector) {
-   allUI.gridWeekSelector.addEventListener('change', renderGrid);
+   allUI.gridWeekSelector.addEventListener('change', (e) => {
+    currentWeek = parseInt(e.target.value, 10);
+    renderGrid();
+    updateUrl(true); // Breadcrumb navigation - add to browser history
+    saveAppState();
+   });
  }
  if (allUI.gridYearlyLeaderboardLink) {
    allUI.gridYearlyLeaderboardLink.addEventListener('click', (e) => {
@@ -13818,10 +13863,12 @@ const SurvivorPicksView = {
     },
     
     updateWeekAndRerender: function() {
-        // Update URL with new week
-        const params = new URLSearchParams(window.location.search);
-        params.set('week', this.selectedWeek);
-        window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+        // Update global currentWeek to keep in sync
+        currentWeek = this.selectedWeek;
+        
+        // Use the enhanced updateUrl function for breadcrumb navigation
+        updateUrl(true); // Breadcrumb navigation - add to browser history
+        
         // Re-render with new week
         this.show();
     }

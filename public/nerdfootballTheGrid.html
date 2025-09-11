@@ -919,13 +919,31 @@
                 weekSelector.value = currentWeek;
             }
             
-            document.getElementById('grid-week-selector').addEventListener('change', renderGrid);
+            document.getElementById('grid-week-selector').addEventListener('change', (e) => {
+                currentWeek = parseInt(e.target.value, 10);
+                
+                // Update URL with breadcrumb navigation
+                const params = new URLSearchParams(window.location.search);
+                if (currentWeek !== getCurrentNflWeek()) {
+                    params.set('week', currentWeek);
+                } else {
+                    params.delete('week');
+                }
+                const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+                window.history.pushState({}, '', newUrl);
+                
+                renderGrid();
+            });
             document.getElementById('yearly-leaderboard-link').addEventListener('click', (e) => {
                 e.preventDefault();
                 window.location.href = './index.html?view=leaderboard&lb=season';
             });
             
-            currentWeek = getCurrentNflWeek();
+            // Check URL parameters for week
+            const urlParams = new URLSearchParams(window.location.search);
+            const weekParam = parseInt(urlParams.get('week'));
+            currentWeek = weekParam || getCurrentNflWeek();
+            
             populateWeekSelectors();
             initializeGridApp();
         });
