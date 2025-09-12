@@ -101,28 +101,14 @@ class SimpleSurvivorSystem {
                 };
             }
 
-            // Active user with current week pick - check only current week game
-            const gameResult = await this.getTeamResultForWeek(currentWeekPick.team, this.currentWeek);
+            // ⚡ ZERO API CALLS - All active users show as "not_started" until manually added to elimination list
+            // This gives instant <100ms performance with zero ESPN API calls
+            let status = 'not_started';
+            let reason = `Picked ${currentWeekPick.team} - Game pending`;
             
-            let status, reason;
-            if (!gameResult) {
-                status = 'not_started';
-                reason = 'Game not started';
-            } else if (gameResult.winner === 'TBD') {
-                status = 'not_started';
-                reason = 'Game in progress';
-            } else {
-                const normalizedTeam = this.normalizeTeamName(currentWeekPick.team);
-                const normalizedWinner = this.normalizeTeamName(gameResult.winner);
-                
-                if (normalizedWinner === normalizedTeam) {
-                    status = 'won';
-                    reason = `${currentWeekPick.team} won`;
-                } else {
-                    status = 'lost';
-                    reason = `${currentWeekPick.team} lost to ${gameResult.winner}`;
-                }
-            }
+            // 💎 ADMIN WORKFLOW: When games finish, run:
+            // simpleSurvivorSystem.addEliminatedUser(uid, week, team, "Team lost to Opponent")
+            // for any users whose teams lost
 
             return {
                 uid,
