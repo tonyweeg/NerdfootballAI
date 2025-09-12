@@ -137,8 +137,9 @@ class ESPNCacheManager {
             console.log(`⚡ ESPN Cache: Updating week ${targetWeek}`);
             
             // Fetch ESPN data if available
+            let espnGames = null;
             if (typeof window.espnNerdApi !== 'undefined') {
-                const espnGames = await window.espnNerdApi.getWeekGames(targetWeek);
+                espnGames = await window.espnNerdApi.getWeekGames(targetWeek);
                 
                 if (espnGames && Array.isArray(espnGames)) {
                     // Update games data
