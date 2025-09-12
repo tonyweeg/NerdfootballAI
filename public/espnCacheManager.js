@@ -138,14 +138,14 @@ class ESPNCacheManager {
             
             // Fetch ESPN data if available
             if (typeof window.espnNerdApi !== 'undefined') {
-                const espnData = await window.espnNerdApi.getWeekScores(targetWeek);
+                const espnGames = await window.espnNerdApi.getWeekGames(targetWeek);
                 
-                if (espnData && espnData.games) {
+                if (espnGames && Array.isArray(espnGames)) {
                     // Update games data
-                    currentCache.allGamesData[targetWeek] = espnData.games;
+                    currentCache.allGamesData[targetWeek] = espnGames;
                     
                     // Process each game to extract team results
-                    espnData.games.forEach(game => {
+                    espnGames.forEach(game => {
                         if (game.home_team && game.away_team) {
                             // Cache result for home team
                             const homeKey = `${this.normalizeTeamName(game.home_team)}_${targetWeek}`;
@@ -166,7 +166,7 @@ class ESPNCacheManager {
                         }
                     });
                     
-                    console.log(`⚡ ESPN Cache: Processed ${espnData.games.length} games for week ${targetWeek}`);
+                    console.log(`⚡ ESPN Cache: Processed ${espnGames.length} games for week ${targetWeek}`);
                 }
             }
             
@@ -184,7 +184,7 @@ class ESPNCacheManager {
             return { 
                 success: true, 
                 week: targetWeek,
-                gamesProcessed: currentCache.allGamesData[targetWeek]?.length || 0,
+                gamesProcessed: espnGames?.length || 0,
                 updateTimeMs: updateTime
             };
             
