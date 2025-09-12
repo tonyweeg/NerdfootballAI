@@ -13432,8 +13432,29 @@ const SurvivorView = {
             let loadResult = null;
             
             
-            if (window.espnSurvivorIntegration) {
-                console.log('💎 Using ESPN-integrated survivor data with real-time eliminations');
+            if (window.simpleSurvivorSystem) {
+                console.log('💎 Using simple survivor system (PROVEN WORKING)');
+                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
+                const results = await window.simpleSurvivorSystem.getSurvivorTable(currentPool);
+                
+                // Simple stats calculation
+                const total = results.length;
+                const eliminated = results.filter(r => r.status === 'lost' || r.status === 'eliminated').length;
+                const alive = total - eliminated;
+                
+                loadResult = {
+                    results,
+                    stats: {
+                        totalPlayers: total,
+                        activePlayers: alive,
+                        eliminatedPlayers: eliminated,
+                        pendingPlayers: 0
+                    },
+                    loadTime: performance.now() - loadStartTime,
+                    source: 'simple-survivor'
+                };
+            } else if (window.espnSurvivorIntegration) {
+                console.log('⚡ Fallback to ESPN-integrated survivor data');
                 const enhancedData = await window.espnSurvivorIntegration.getDisplayData();
                 
                 loadResult = {
@@ -13457,37 +13478,6 @@ const SurvivorView = {
                     loadTime: performance.now() - loadStartTime,
                     source: 'unified'
                 };
-            } else if (window.optimizedSurvivorLoader) {
-                console.log('🚀 Using optimized cached loader');
-                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
-                const optimized = await window.optimizedSurvivorLoader.loadSurvivorData(currentPool);
-                loadResult = {
-                    results: optimized.data,
-                    stats: optimized.stats,
-                    loadTime: optimized.loadTimeMs,
-                    source: optimized.fromCache ? 'cache' : 'fresh'
-                };
-            } else if (window.survivorCacheManager) {
-                console.log('📦 Using cache manager directly');
-                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
-                const currentWeek = (typeof window.currentWeek !== 'undefined') ? window.currentWeek : 1;
-                const cacheResult = await window.survivorCacheManager.getCachedOrCompute(currentPool, currentWeek);
-                loadResult = {
-                    results: Object.values(cacheResult.results || {}),
-                    stats: cacheResult.stats,
-                    loadTime: cacheResult.loadTimeMs,
-                    source: cacheResult.fromCache ? 'cache' : 'fresh'
-                };
-            } else if (window.simpleSurvivorSystem) {
-                console.log('⚡ Fallback to simple survivor system');
-                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
-                const results = await window.simpleSurvivorSystem.getSurvivorTable(currentPool);
-                loadResult = {
-                    results,
-                    stats: this.calculateSimpleStats(results),
-                    loadTime: performance.now() - loadStartTime,
-                    source: 'fallback'
-                };
             } else {
                 throw new Error('No survivor loading system available');
             }
@@ -13510,10 +13500,10 @@ const SurvivorView = {
             
             // Generate and display table
             let tableHtml;
-            if (loadResult.source === 'unified') {
-                tableHtml = this.generateUnifiedTable(results);
-            } else if (window.simpleSurvivorSystem) {
+            if (loadResult.source === 'simple-survivor' && window.simpleSurvivorSystem) {
                 tableHtml = window.simpleSurvivorSystem.generateTable(results);
+            } else if (loadResult.source === 'unified') {
+                tableHtml = this.generateUnifiedTable(results);
             } else {
                 tableHtml = this.generateFallbackTable(results);
             }

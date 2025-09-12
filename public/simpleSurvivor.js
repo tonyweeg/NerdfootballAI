@@ -31,59 +31,108 @@ class SimpleSurvivorSystem {
         }
     }
 
-    // Calculate user status from scratch
+    // Enhanced user status calculation with elimination tracking
     async calculateUserStatus(uid, member) {
         try {
-            // Get user's pick for current week
+            // Get all user's picks across all weeks
             const picksDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`));
-            const picks = picksDoc.exists() ? picksDoc.data().picks || {} : {};
-            const userPick = picks[this.currentWeek];
-
-            if (!userPick || !userPick.team) {
-                return {
-                    uid,
-                    displayName: member.displayName || member.email,
-                    teamPicked: 'No pick',
-                    status: 'eliminated',
-                    reason: 'No pick made',
-                    week: this.currentWeek,
-                    cached: false
-                };
-            }
-
-            // Normalize team name before lookup
-            const normalizedTeamName = this.normalizeTeamName(userPick.team);
+            const allPicks = picksDoc.exists() ? picksDoc.data().picks || {} : {};
             
-            // Get ESPN result for this team
-            const gameResult = await this.getTeamResult(normalizedTeamName);
+            // Track elimination across all weeks
+            let eliminationWeek = null;
+            let eliminationDetails = null;
+            let eliminationTeam = null;
+            let weeksActive = 0;
             
-            
-            let status, reason;
-            if (!gameResult) {
-                status = 'not_started';
-                reason = 'Game not started';
-            } else if (gameResult.winner === 'TBD') {
-                status = 'not_started';
-                reason = 'Game in progress';
-            } else {
-                // Normalize winner for comparison
-                const normalizedWinner = this.normalizeTeamName(gameResult.winner);
-                if (normalizedWinner === normalizedTeamName) {
-                    status = 'won';
-                    reason = `${userPick.team} won`;
+            // Check each week from 1 to current week for elimination
+            for (let week = 1; week <= this.currentWeek; week++) {
+                const weekPick = allPicks[week];
+                
+                if (!weekPick || !weekPick.team) {
+                    // No pick = immediate elimination
+                    if (!eliminationWeek) {
+                        eliminationWeek = week;
+                        eliminationDetails = 'No pick submitted';
+                        eliminationTeam = 'No pick';
+                    }
+                    break; // Stop checking further weeks
+                }
+                
+                // Get game result for this week's pick
+                const gameResult = await this.getTeamResultForWeek(weekPick.team, week);
+                
+                if (gameResult && gameResult.winner !== 'TBD') {
+                    // Game finished - check if they lost
+                    const normalizedTeam = this.normalizeTeamName(weekPick.team);
+                    const normalizedWinner = this.normalizeTeamName(gameResult.winner);
+                    
+                    if (normalizedWinner !== normalizedTeam) {
+                        // They lost - eliminated this week
+                        if (!eliminationWeek) {
+                            eliminationWeek = week;
+                            eliminationDetails = `${weekPick.team} lost to ${gameResult.winner}`;
+                            eliminationTeam = weekPick.team;
+                        }
+                        break; // Stop checking further weeks
+                    } else {
+                        // They won this week
+                        weeksActive++;
+                    }
                 } else {
-                    status = 'lost';
-                    reason = `${userPick.team} lost to ${gameResult.winner}`;
+                    // Game not finished or no result - assume still active for this week
+                    weeksActive++;
+                }
+            }
+            
+            // Get current week's pick for display
+            const currentWeekPick = allPicks[this.currentWeek];
+            const currentTeamPicked = currentWeekPick ? currentWeekPick.team : 'No pick';
+            
+            // Determine current status
+            let status, reason;
+            if (eliminationWeek) {
+                status = 'eliminated';
+                reason = eliminationDetails;
+            } else if (!currentWeekPick || !currentWeekPick.team) {
+                status = 'eliminated';
+                reason = 'No pick made';
+                eliminationWeek = this.currentWeek;
+                eliminationDetails = 'No pick submitted';
+            } else {
+                // Still active - check current week game
+                const currentGameResult = await this.getTeamResultForWeek(currentWeekPick.team, this.currentWeek);
+                
+                if (!currentGameResult) {
+                    status = 'not_started';
+                    reason = 'Game not started';
+                } else if (currentGameResult.winner === 'TBD') {
+                    status = 'not_started';
+                    reason = 'Game in progress';
+                } else {
+                    const normalizedTeam = this.normalizeTeamName(currentWeekPick.team);
+                    const normalizedWinner = this.normalizeTeamName(currentGameResult.winner);
+                    
+                    if (normalizedWinner === normalizedTeam) {
+                        status = 'won';
+                        reason = `${currentWeekPick.team} won`;
+                    } else {
+                        status = 'lost';
+                        reason = `${currentWeekPick.team} lost to ${currentGameResult.winner}`;
+                    }
                 }
             }
 
             return {
                 uid,
                 displayName: member.displayName || member.email,
-                teamPicked: userPick.team,
+                teamPicked: currentTeamPicked,
                 status,
                 reason,
                 week: this.currentWeek,
+                eliminationWeek,
+                eliminationDetails, 
+                eliminationTeam,
+                weeksActive,
                 cached: false
             };
 
@@ -95,37 +144,42 @@ class SimpleSurvivorSystem {
                 status: 'error',
                 reason: 'Calculation failed',
                 week: this.currentWeek,
+                eliminationWeek: null,
+                eliminationDetails: null,
+                eliminationTeam: null,
+                weeksActive: 0,
                 cached: false
             };
         }
     }
 
-    // Get team result from ESPN data
-    async getTeamResult(teamName) {
+    // Get team result for specific week
+    async getTeamResultForWeek(teamName, weekNumber) {
         try {
+            // Normalize team name before lookup
+            const normalizedTeam = this.normalizeTeamName(teamName);
+            
             // Use ESPN API if available
             if (typeof window.espnNerdApi !== 'undefined') {
-                const espnData = await window.espnNerdApi.getCurrentWeekScores();
+                const espnData = await window.espnNerdApi.getWeekScores(weekNumber);
                 if (espnData && espnData.games) {
                     // Find game where this team participated (home or away)
                     const game = espnData.games.find(g => 
-                        g.home_team === teamName || g.away_team === teamName
+                        this.normalizeTeamName(g.home_team) === normalizedTeam || 
+                        this.normalizeTeamName(g.away_team) === normalizedTeam
                     );
                     
                     if (game) {
-                        // Game found - return actual result
                         return {
                             winner: game.winner || 'TBD',
                             homeScore: game.home_score || 0,
                             awayScore: game.away_score || 0,
                             homeTeam: game.home_team,
                             awayTeam: game.away_team,
-                            status: game.status
+                            status: game.status,
+                            week: weekNumber
                         };
                     }
-                    
-                    // Team didn't play this week
-                    return null;
                 }
             }
             
@@ -133,6 +187,11 @@ class SimpleSurvivorSystem {
         } catch (error) {
             return null;
         }
+    }
+
+    // Get team result from ESPN data (current week - kept for compatibility)
+    async getTeamResult(teamName) {
+        return this.getTeamResultForWeek(teamName, this.currentWeek);
     }
 
     // Team name normalization (matches ESPN API style)
@@ -203,8 +262,13 @@ class SimpleSurvivorSystem {
                 'error': 'Error'
             };
 
+            // Format elimination info
+            const eliminationWeekDisplay = user.eliminationWeek ? `Week ${user.eliminationWeek}` : '-';
+            const eliminationDetailsDisplay = user.eliminationDetails || '-';
+            const weeksActiveDisplay = user.weeksActive || 0;
+
             return `
-                <tr class="border-b border-gray-200">
+                <tr class="border-b border-gray-200 ${user.status === 'eliminated' ? 'bg-red-50' : ''}">
                     <td class="px-4 py-3 font-medium">${user.displayName}</td>
                     <td class="px-4 py-3">${user.teamPicked}</td>
                     <td class="px-4 py-3">
@@ -213,6 +277,9 @@ class SimpleSurvivorSystem {
                         </span>
                         ${user.cached ? '<span class="text-xs text-gray-400 ml-2">(cached)</span>' : ''}
                     </td>
+                    <td class="px-4 py-3 text-sm ${user.eliminationWeek ? 'text-red-600 font-medium' : 'text-gray-400'}">${eliminationWeekDisplay}</td>
+                    <td class="px-4 py-3 text-sm ${user.eliminationDetails ? 'text-red-600' : 'text-gray-400'}">${eliminationDetailsDisplay}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-center">${weeksActiveDisplay}</td>
                 </tr>
             `;
         }).join('');
@@ -222,9 +289,12 @@ class SimpleSurvivorSystem {
                 <table class="min-w-full bg-white">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team Picked</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Pick</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Eliminated Week</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Elimination Details</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Weeks Survived</th>
                         </tr>
                     </thead>
                     <tbody>
