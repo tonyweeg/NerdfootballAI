@@ -141,9 +141,24 @@ class SimpleSurvivorSystem {
         }
     }
 
-    // Get team result for specific week
+    // Get team result for specific week - CACHE-FIRST approach (sub-100ms performance)
     async getTeamResultForWeek(teamName, weekNumber) {
         try {
+            const startTime = Date.now();
+            
+            // 🚀 CACHE FIRST: Try ESPN cache (target <10ms)
+            if (typeof window.espnCacheManager !== 'undefined') {
+                const cachedResult = await window.espnCacheManager.getCachedTeamResult(teamName, weekNumber);
+                if (cachedResult) {
+                    const cacheTime = Date.now() - startTime;
+                    console.log(`⚡ Team result from cache: ${teamName} Week ${weekNumber} (${cacheTime}ms)`);
+                    return cachedResult;
+                }
+            }
+            
+            // 🐌 FALLBACK: ESPN API only if cache miss (this is what causes 14+ second delays)
+            console.warn(`⚠️ Cache miss for ${teamName} Week ${weekNumber}, falling back to ESPN API`);
+            
             // Normalize team name before lookup
             const normalizedTeam = this.normalizeTeamName(teamName);
             
@@ -158,7 +173,7 @@ class SimpleSurvivorSystem {
                     );
                     
                     if (game) {
-                        return {
+                        const result = {
                             winner: game.winner || 'TBD',
                             homeScore: game.home_score || 0,
                             awayScore: game.away_score || 0,
@@ -167,12 +182,26 @@ class SimpleSurvivorSystem {
                             status: game.status,
                             week: weekNumber
                         };
+                        
+                        // TODO: Cache this result for next time (async, don't wait)
+                        if (typeof window.espnCacheManager !== 'undefined') {
+                            window.espnCacheManager.setTeamResult(
+                                teamName, weekNumber, 
+                                result.winner, result.homeTeam, result.awayTeam,
+                                result.homeScore, result.awayScore, result.status
+                            ).catch(err => console.warn('Cache save failed:', err));
+                        }
+                        
+                        const totalTime = Date.now() - startTime;
+                        console.log(`⚠️ Team result from ESPN API: ${teamName} Week ${weekNumber} (${totalTime}ms)`);
+                        return result;
                     }
                 }
             }
             
             return null;
         } catch (error) {
+            console.error(`Error getting team result for ${teamName} Week ${weekNumber}:`, error);
             return null;
         }
     }
