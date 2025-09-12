@@ -3916,8 +3916,9 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         
         // Check for missing upcoming picks
         const upcomingGames = games.filter(game => {
-            const kickoffTime = game.kickoff.endsWith('Z') ? game.kickoff.slice(0, -1) : game.kickoff;
-            const gameTime = new Date(kickoffTime);
+            // Handle both raw JSON format (dt) and processed format (kickoff) - preserve UTC timezone
+            const gameTimeString = game.kickoff || game.dt;
+            const gameTime = new Date(gameTimeString);
             return now < gameTime;
         });
         
@@ -3953,8 +3954,9 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         
         games.forEach((game, gameIndex) => {
             const pick = user.picks[game.id];
-            const kickoffTime = game.kickoff.endsWith('Z') ? game.kickoff.slice(0, -1) : game.kickoff;
-            const gameTime = new Date(kickoffTime);
+            // Handle both raw JSON format (dt) and processed format (kickoff) - preserve UTC timezone
+            const gameTimeString = game.kickoff || game.dt;
+            const gameTime = new Date(gameTimeString);
             const gameStarted = now >= gameTime;
             
             let cellContent = '-';
@@ -6660,6 +6662,7 @@ function downloadAnalyticsCSV(data, weekNumber) {
  window.doc = doc;
  window.updateDoc = updateDoc;
  window.deleteDoc = deleteDoc;
+ window.runTransaction = runTransaction;
  
  // PHAROAH'S REALTIME INTEGRATION - Initialize Firebase RTDB for WebSocket features
  const rtdb = getDatabase(app);
@@ -12317,7 +12320,7 @@ allUI.saveSurvivorPickBtn.addEventListener('click', async () => {
         // 💎 UNIFIED: Save to BOTH unified document AND individual for backwards compatibility
         if (window.unifiedSurvivorManager) {
             // Save to unified document (1 transaction)
-            await window.unifiedSurvivorManager.updateUserPick(selectedSurvivorUser, selectedSurvivorTeam, null);
+            await window.unifiedSurvivorManager.updateUserPick(weekNumber, selectedSurvivorUser, user.displayName, selectedSurvivorTeam);
         }
         
         // Also save to individual document for backwards compatibility

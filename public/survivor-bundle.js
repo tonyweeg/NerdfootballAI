@@ -1494,14 +1494,18 @@ class UnifiedSurvivorManager {
         const docRef = this.getWeekDocRef(weekNumber);
         
         try {
-            await runTransaction(this.db, async (transaction) => {
-                const doc = await transaction.get(docRef);
+            await window.runTransaction(this.db, async (transaction) => {
+                let doc = await transaction.get(docRef);
+                let weekData;
                 
+                let isNewDocument = false;
                 if (!doc.exists()) {
-                    throw new Error('Week document not found');
+                    // Initialize the week document if it doesn't exist
+                    weekData = await this.initializeWeekDocument(weekNumber);
+                    isNewDocument = true;
+                } else {
+                    weekData = doc.data();
                 }
-                
-                const weekData = doc.data();
                 
                 // Check if week is locked
                 if (weekData.status.locked) {
@@ -1555,16 +1559,28 @@ class UnifiedSurvivorManager {
                     [userId]: updatedPick
                 }).filter(p => p.teamPicked && !p.eliminated).length;
                 
-                // Perform atomic update
-                transaction.update(docRef, {
-                    [`picks.${userId}`]: updatedPick,
-                    'stats.pickDistribution': pickDistribution,
-                    'stats.mostPopularPick': mostPopularPick,
-                    'stats.totalActivePlayers': activePlayers,
-                    'stats.updatedAt': new Date(),
-                    'lastUpdated': new Date(),
-                    'version': (weekData.version || 0) + 1
-                });
+                if (isNewDocument) {
+                    // For new documents, include the pick data in the initial set
+                    weekData.picks[userId] = updatedPick;
+                    weekData.stats.pickDistribution = pickDistribution;
+                    weekData.stats.mostPopularPick = mostPopularPick;
+                    weekData.stats.totalActivePlayers = activePlayers;
+                    weekData.stats.updatedAt = new Date();
+                    weekData.lastUpdated = new Date();
+                    weekData.version = 1;
+                    transaction.set(docRef, weekData);
+                } else {
+                    // For existing documents, use update
+                    transaction.update(docRef, {
+                        [`picks.${userId}`]: updatedPick,
+                        'stats.pickDistribution': pickDistribution,
+                        'stats.mostPopularPick': mostPopularPick,
+                        'stats.totalActivePlayers': activePlayers,
+                        'stats.updatedAt': new Date(),
+                        'lastUpdated': new Date(),
+                        'version': (weekData.version || 0) + 1
+                    });
+                }
             });
             
             // Clear cache for this week
@@ -1583,7 +1599,7 @@ class UnifiedSurvivorManager {
         const docRef = this.getWeekDocRef(weekNumber);
         
         try {
-            await runTransaction(this.db, async (transaction) => {
+            await window.runTransaction(this.db, async (transaction) => {
                 const doc = await transaction.get(docRef);
                 
                 if (!doc.exists()) {
