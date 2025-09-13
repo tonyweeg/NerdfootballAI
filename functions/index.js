@@ -539,6 +539,15 @@ exports.fetchNflTeams = fetchNflTeams;
 exports.fetchSeasonSchedule = fetchSeasonSchedule;
 exports.espnApiStatus = espnApiStatus;
 
+// Import and export contact form functions
+const {
+    submitContactForm,
+    getContactSubmissions
+} = require('./contactHandler');
+
+exports.submitContactForm = submitContactForm;
+exports.getContactSubmissions = getContactSubmissions;
+
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
 // Will be enabled once client-side integration is verified
 // const {
