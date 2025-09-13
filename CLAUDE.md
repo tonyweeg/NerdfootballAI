@@ -3,10 +3,28 @@
 ## Core Philosophy
 **"Diamond Level" means absolute precision, no mistakes, and comprehensive verification at every step.**
 
-## 🏆 SURVIVOR SYSTEM BENCHMARK - v2.0
-**CURRENT PRODUCTION STANDARD - OPTIMIZED SURVIVOR SYSTEM**
+## 🏆 ESPN CACHE SYSTEM BENCHMARK - v3.0
+**CURRENT PRODUCTION STANDARD - SUB-500MS ESPN PERFORMANCE**
 
 ### 📌 Current Benchmark Details:
+- **Branch**: `main` (latest Diamond Fixes)
+- **Tag**: `v3.0-espn-cache-benchmark` (permanent reference point)
+- **Features**: ESPN Firebase cache system, game credit tracking, UI security
+- **Performance**: Sub-500ms ESPN responses, 90x survivor performance improvement
+- **Commit**: `f94ffec` (Diamond Fixes: Game credit + UI security complete)
+
+### ✅ ESPN Cache System v3.0 Features (MUST ALL WORK):
+- ESPN Firebase cache system with sub-500ms response times
+- Game credit system - users get credit when games show FINAL status
+- UI security - buttons disabled for completed games (Packers game example)
+- Firestore permissions optimized for cache system
+- Zero ESPN API timeout disasters (eliminated 14+ second failures)
+- Real-time score synchronization with cache invalidation
+
+## 🏆 SURVIVOR SYSTEM BENCHMARK - v2.0
+**FALLBACK STANDARD - OPTIMIZED SURVIVOR SYSTEM**
+
+### 📌 Survivor Benchmark Details:
 - **Branch**: `survivor-system-benchmark-v2` (protected in GitHub)
 - **Tag**: `v2.0-survivor-benchmark` (permanent reference point)
 - **Features**: All pool members, correct Win/Lost status, fast loading
@@ -35,33 +53,42 @@
 
 #### Before ANY new development:
 ```bash
-git checkout survivor-system-benchmark-v2
+git checkout main
 git checkout -b feature/new-feature
 ```
 
 #### Before ANY deployment:
 ```bash
-# Test survivor system functionality
-# Verify all pool members show with correct Win/Lost status
+# Test ESPN cache system and game credit functionality
+# Verify sub-500ms performance and UI security features
 firebase deploy --only hosting
+firebase deploy --only functions
 ```
 
 #### If ANYTHING breaks:
 ```bash
 # Instant recovery to current benchmark
-git checkout survivor-system-benchmark-v2
+git checkout main
 firebase deploy --only hosting
+firebase deploy --only functions
 ```
 
 #### To compare changes:
 ```bash
 # See what's different from current benchmark
-git diff survivor-system-benchmark-v2
+git diff main
 ```
 
-#### If survivor system completely fails:
+#### If ESPN cache system fails:
 ```bash
-# Fallback to golden standard
+# Fallback to survivor system benchmark
+git checkout survivor-system-benchmark-v2
+firebase deploy --only hosting
+```
+
+#### If complete system failure:
+```bash
+# Emergency fallback to golden standard
 git checkout golden-benchmark-v1
 firebase deploy --only hosting
 ```
@@ -137,11 +164,15 @@ firebase deploy --only hosting
 - When in doubt, ask for clarification
 
 ### 9. Performance & Refactoring Standards
+- **ESPN Cache Target**: Sub-500ms response times (achieved v3.0)
+- **UI Response Target**: <100ms for user interactions
+- **Survivor Pool Target**: Sub-100ms loading (90x improvement achieved)
 - **Always scan for similar patterns** when fixing performance issues
 - **Check for N+1 query problems** in any database-related code
 - **Search codebase for duplicate inefficient logic** before concluding refactoring
 - **Seek user approval** before implementing broader performance optimizations
 - **Document performance improvements** with before/after metrics
+- **Cache First**: Use ESPN Firebase cache system to eliminate API timeouts
 - Example: If fixing `getDocs(collection(db, users/${user.id}/...))` in one function, search entire codebase for similar patterns
 
 ### 10. Cross-Impact Analysis Standards
@@ -160,12 +191,15 @@ firebase deploy --only hosting
 - Use pool members to prevent ghost users
 
 ### Critical Features That Must Work
-1. **Picks Summary**: "Your Active Picks" and "Season Leaderboard"
-2. **The Grid**: Must show picks only after games start (security)
-3. **URL Routing**: Parameters like `?view=rules` must work
-4. **Admin Functions**: Add/remove users from pools
-5. **Pool Settings**: Must display correct users
-6. **Authentication**: Users must be able to sign in/out
+1. **ESPN Cache System**: Sub-500ms performance, zero timeout disasters
+2. **Game Credit System**: Users get credit when games show FINAL status
+3. **UI Security**: Buttons disabled for completed games, proper game state display
+4. **Picks Summary**: "Your Active Picks" and "Season Leaderboard"
+5. **The Grid**: Must show picks only after games start (security)
+6. **URL Routing**: Parameters like `?view=rules` must work
+7. **Admin Functions**: Add/remove users from pools
+8. **Pool Settings**: Must display correct users
+9. **Authentication**: Users must be able to sign in/out
 
 ## 📋 Project-Specific Commands
 
@@ -183,14 +217,17 @@ npx jest pool-members-unit.test.js
 
 ### Build & Deploy
 ```bash
-# Deploy to Firebase
+# Full deployment (recommended for major updates)
 firebase deploy
 
-# Deploy only hosting
+# Deploy only hosting (frontend changes)
 firebase deploy --only hosting
 
-# Deploy only functions
+# Deploy only functions (backend/cache/API changes)
 firebase deploy --only functions
+
+# Deploy with cache system validation
+firebase deploy --only functions && firebase deploy --only hosting
 ```
 
 ### Linting & Type Checking
@@ -212,6 +249,17 @@ firebase deploy --only functions
 - `/Users/tonyweeg/nerdfootball-project/public/nerdSurvivor.html` - Survivor pool
 - `/Users/tonyweeg/nerdfootball-project/public/nerdfootballRules.html` - Rules page
 
+### ESPN Cache System Files
+- `/Users/tonyweeg/nerdfootball-project/public/espnCacheManager.js` - Frontend cache manager
+- `/Users/tonyweeg/nerdfootball-project/functions/espnNerdApi.js` - Backend ESPN API integration
+- `/Users/tonyweeg/nerdfootball-project/functions/realtimeGameSync.js` - Real-time synchronization
+- `/Users/tonyweeg/nerdfootball-project/functions/survivorCacheUpdater.js` - Survivor cache optimization
+
+### Bundle Architecture Files
+- `/Users/tonyweeg/nerdfootball-project/public/core-bundle.js` - Core application functionality
+- `/Users/tonyweeg/nerdfootball-project/public/confidence-bundle.js` - Confidence pool features
+- `/Users/tonyweeg/nerdfootball-project/public/bundle-dependency-gate.js` - Bundle loading coordination
+
 ### Configuration
 - `/Users/tonyweeg/nerdfootball-project/firestore.rules` - Database security
 - `/Users/tonyweeg/nerdfootball-project/firebase.json` - Firebase config
@@ -228,6 +276,14 @@ const poolId = 'nerduniverse-2025';
 const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
 ```
 
+### ESPN Cache System (Primary Performance)
+```javascript
+// ESPN Firebase cache - Sub-500ms performance
+const espnCachePath = 'cache/espn_current_data';
+const teamResultsKey = `${normalizedTeamName}_${weekNumber}`;
+const cacheMaxAge = 6 * 60 * 60 * 1000; // 6 hours
+```
+
 ### Legacy Paths (Deprecated - contains ghosts)
 ```javascript
 // DO NOT USE - contains ghost users
@@ -240,11 +296,13 @@ A task is ONLY complete when:
 1. **Pre-feature commit**: Working state committed to git before starting
 2. Code is written and tested
 3. All tests pass (Puppeteer + JEST)
-4. No existing functionality broken
-5. Deployed successfully
-6. **Human regression test passes**: User confirms feature works correctly
-7. **Post-feature commit & push**: Changes committed and pushed to remote git
-8. Ghost users verified eliminated
+4. **ESPN Cache Performance**: Sub-500ms response times maintained
+5. **Game Credit System**: Proper credit assignment and UI security verified
+6. No existing functionality broken
+7. Deployed successfully (both hosting and functions if needed)
+8. **Human regression test passes**: User confirms feature works correctly
+9. **Post-feature commit & push**: Changes committed and pushed to remote git
+10. Ghost users verified eliminated
 
 ## 🚀 Emergency Procedures
 
@@ -269,6 +327,8 @@ Before starting ANY new feature:
 Before ANY deployment:
 - [ ] Tests written (Puppeteer/JEST)
 - [ ] Tests passing
+- [ ] **ESPN Cache Performance**: Sub-500ms response times verified
+- [ ] **Game Credit System**: Proper credit assignment and UI security tested
 - [ ] No functionality lost
 - [ ] Ghost users eliminated
 - [ ] Pool members used everywhere
