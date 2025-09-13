@@ -35,7 +35,9 @@ const MAX_SUBMISSIONS_PER_WINDOW = 5;
 
 exports.submitContactForm = functions.https.onCall(async (data, context) => {
     try {
-        const { name, email, subject, message, userAgent = '', ipAddress = '' } = data;
+        // Extract data from the correct location (data.data for Firebase Functions v2)
+        const actualData = data.data || data;
+        const { name, email, subject, message, userAgent = '', ipAddress = '' } = actualData;
 
         if (!name || !email || !subject || !message) {
             throw new functions.https.HttpsError('invalid-argument', 'All fields are required');
@@ -212,7 +214,9 @@ exports.getContactSubmissions = functions.https.onCall(async (data, context) => 
     }
 
     try {
-        const { limit = 50, startAfter = null, status = null } = data;
+        // Extract data from the correct location (data.data for Firebase Functions v2)
+        const actualData = data.data || data;
+        const { limit = 50, startAfter = null, status = null } = actualData;
 
         let query = admin.firestore()
             .collection('contact_submissions')
