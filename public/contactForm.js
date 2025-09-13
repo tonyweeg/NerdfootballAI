@@ -270,11 +270,11 @@ class ContactForm {
             const formData = new FormData(this.formElement);
             const validatedData = this.validateForm(formData);
 
-            if (!window.firebase || !window.firebase.functions) {
+            if (!window.functions || !window.httpsCallable) {
                 throw new Error('Firebase Functions not available. Please refresh the page and try again.');
             }
 
-            const submitContactForm = window.firebase.functions().httpsCallable('submitContactForm');
+            const submitContactForm = window.httpsCallable(window.functions, 'submitContactForm');
 
             const submissionData = {
                 ...validatedData,
