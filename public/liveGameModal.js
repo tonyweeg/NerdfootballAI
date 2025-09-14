@@ -487,7 +487,7 @@ async function fetchUserPickForGame(espnEventId) {
         const currentWeek = getCurrentWeek();
 
         // Look up user's unified picks document
-        const userPicksRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_picks_2025/week_${currentWeek}`, currentUser.uid);
+        const userPicksRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`, currentUser.uid);
         const userPicksDoc = await getDoc(userPicksRef);
 
         if (!userPicksDoc.exists()) {
