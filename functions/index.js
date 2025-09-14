@@ -548,6 +548,15 @@ const {
 exports.submitContactForm = submitContactForm;
 exports.getContactSubmissions = getContactSubmissions;
 
+// Emergency cache clear functions for live games
+const {
+    clearESPNCache,
+    forceFreshESPNData
+} = require('./emergencyCacheClear');
+
+exports.clearESPNCache = clearESPNCache;
+exports.forceFreshESPNData = forceFreshESPNData;
+
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
 // Will be enabled once client-side integration is verified
 // const {
