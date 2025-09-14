@@ -6,11 +6,18 @@ let transporter = null;
 
 const setupEmailTransport = () => {
     try {
-        const gmailEmail = process.env.GMAIL_EMAIL;
-        const gmailPassword = process.env.GMAIL_PASSWORD;
+        // Check for Firebase Functions config first (functions:config:set)
+        let gmailEmail = functions.config().gmail?.email;
+        let gmailPassword = functions.config().gmail?.password;
+
+        // Fallback to environment variables
+        if (!gmailEmail || !gmailPassword) {
+            gmailEmail = process.env.GMAIL_EMAIL;
+            gmailPassword = process.env.GMAIL_PASSWORD;
+        }
 
         if (gmailEmail && gmailPassword) {
-            transporter = nodemailer.createTransporter({
+            transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
                     user: gmailEmail,
@@ -32,6 +39,83 @@ setupEmailTransport();
 
 const RATE_LIMIT_WINDOW = 24 * 60 * 60 * 1000;
 const MAX_SUBMISSIONS_PER_WINDOW = 5;
+
+// Global admin emails (fallback)
+const GLOBAL_ADMIN_EMAILS = ['tonyweeg@gmail.com'];
+
+// Get pool admin emails for dynamic routing
+async function getPoolAdminEmails(userId, poolId = 'nerduniverse-2025') {
+    try {
+        const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersSnap = await poolMembersRef.get();
+
+        if (!poolMembersSnap.exists) {
+            console.log(`Pool ${poolId} not found, using global admins`);
+            return GLOBAL_ADMIN_EMAILS;
+        }
+
+        const poolMembers = poolMembersSnap.data();
+        const adminEmails = [];
+
+        // Find pool admins and get their emails
+        for (const [uid, userData] of Object.entries(poolMembers)) {
+            if (userData && userData.role === 'admin' && userData.email) {
+                adminEmails.push(userData.email);
+                console.log(`Found pool admin: ${userData.email}`);
+            }
+        }
+
+        // If no pool admins found, use global admins
+        if (adminEmails.length === 0) {
+            console.log(`No pool admins found for ${poolId}, using global admins`);
+            return GLOBAL_ADMIN_EMAILS;
+        }
+
+        return adminEmails;
+
+    } catch (error) {
+        console.error('Error getting pool admin emails:', error);
+        return GLOBAL_ADMIN_EMAILS;
+    }
+}
+
+// Get user's primary pool
+async function getUserPool(userId) {
+    try {
+        if (!userId) return 'nerduniverse-2025'; // Default pool for anonymous users
+
+        // Try to get user's pool memberships
+        const userPoolsRef = admin.firestore().doc(`userPools/${userId}`);
+        const userPoolsSnap = await userPoolsRef.get();
+
+        if (userPoolsSnap.exists) {
+            const userPools = userPoolsSnap.data();
+            // Return the first active pool
+            for (const [poolId, poolData] of Object.entries(userPools)) {
+                if (poolData && poolData.status === 'active') {
+                    return poolId;
+                }
+            }
+        }
+
+        // Fallback: Check if user is in the default pool
+        const defaultPoolRef = admin.firestore().doc(`artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members`);
+        const defaultPoolSnap = await defaultPoolRef.get();
+
+        if (defaultPoolSnap.exists) {
+            const poolMembers = defaultPoolSnap.data();
+            if (poolMembers[userId]) {
+                return 'nerduniverse-2025';
+            }
+        }
+
+        return 'nerduniverse-2025'; // Default fallback
+
+    } catch (error) {
+        console.error('Error getting user pool:', error);
+        return 'nerduniverse-2025';
+    }
+}
 
 exports.submitContactForm = functions.https.onCall(async (data, context) => {
     try {
@@ -71,6 +155,10 @@ exports.submitContactForm = functions.https.onCall(async (data, context) => {
             }
         }
 
+        // Get user's pool and admin emails for dynamic routing
+        const userPool = await getUserPool(userId);
+        const adminEmails = await getPoolAdminEmails(userId, userPool);
+
         const submissionId = admin.firestore().collection('contact_submissions').doc().id;
         const timestamp = Date.now();
 
@@ -85,6 +173,8 @@ exports.submitContactForm = functions.https.onCall(async (data, context) => {
             userAgent,
             ipAddress,
             userId,
+            userPool,
+            adminEmails,
             status: 'new',
             adminNotes: '',
             createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -99,7 +189,7 @@ exports.submitContactForm = functions.https.onCall(async (data, context) => {
             setupEmailTransport();
         }
 
-        const adminEmailContent = `New Contact Form Submission
+        const adminEmailContent = `New Contact Form Submission from ${userPool} Pool
 
 From: ${name} <${email}>
 Subject: ${subject}
@@ -109,12 +199,14 @@ ${message}
 
 ---
 Submission Details:
+- Pool: ${userPool}
 - Timestamp: ${new Date(timestamp).toLocaleString()}
-- User ID: ${userId || 'Not authenticated'}
+- User ID: ${userId || 'Not authenticated (anonymous user)'}
 - IP Address: ${ipAddress || 'Not available'}
 - User Agent: ${userAgent || 'Not available'}
 - Submission ID: ${submissionId}
 
+This message was routed to you as a pool administrator.
 Reply directly to this email to respond to the user.`;
 
         const userConfirmationContent = `Dear ${name},
@@ -136,15 +228,23 @@ Submission ID: ${submissionId}`;
 
         try {
             if (transporter) {
-                const gmailEmail = process.env.GMAIL_EMAIL;
+                // Get sender email from config or environment
+                let gmailEmail = functions.config().gmail?.email;
+                if (!gmailEmail) {
+                    gmailEmail = process.env.GMAIL_EMAIL;
+                }
 
-                const adminMailOptions = {
-                    from: `NerdFootball Contact Form <${gmailEmail}>`,
-                    to: 'tonyweeg@gmail.com',
-                    subject: `Contact Form: ${subject}`,
-                    text: adminEmailContent,
-                    replyTo: email
-                };
+                // Send to all pool admins
+                const adminEmailPromises = adminEmails.map(adminEmail => {
+                    const adminMailOptions = {
+                        from: `NerdFootball Contact Form <${gmailEmail}>`,
+                        to: adminEmail,
+                        subject: `Contact Form from ${userPool}: ${subject}`,
+                        text: adminEmailContent,
+                        replyTo: email
+                    };
+                    return transporter.sendMail(adminMailOptions);
+                });
 
                 const userMailOptions = {
                     from: `NerdFootball <${gmailEmail}>`,
@@ -154,18 +254,20 @@ Submission ID: ${submissionId}`;
                 };
 
                 await Promise.all([
-                    transporter.sendMail(adminMailOptions),
+                    ...adminEmailPromises,
                     transporter.sendMail(userMailOptions)
                 ]);
 
-                console.log(`Contact form emails sent successfully for submission ${submissionId}`);
+                console.log(`Contact form emails sent successfully to ${adminEmails.length} admins for submission ${submissionId}`);
             } else {
                 console.log('=== CONTACT FORM EMAIL LOG ===');
-                console.log('ADMIN EMAIL:');
-                console.log(`To: tonyweeg@gmail.com`);
-                console.log(`From: ${email}`);
-                console.log(`Subject: Contact Form: ${subject}`);
-                console.log(`Body:\n${adminEmailContent}`);
+                console.log('ADMIN EMAILS:');
+                adminEmails.forEach(adminEmail => {
+                    console.log(`To: ${adminEmail}`);
+                    console.log(`From: ${email}`);
+                    console.log(`Subject: Contact Form from ${userPool}: ${subject}`);
+                    console.log(`Body:\n${adminEmailContent}\n`);
+                });
                 console.log('\nUSER CONFIRMATION:');
                 console.log(`To: ${email}`);
                 console.log(`Subject: Thank you for contacting NerdFootball`);
