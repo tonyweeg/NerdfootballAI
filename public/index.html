@@ -9933,13 +9933,41 @@ function escapeHtml(text) {
  // Get game state using proper validation logic
 function getGameState(game) {
     const now = new Date();
-    const kickoff = new Date(game.kickoff);
-    
-    if (now < kickoff) {
+
+    // SECURITY FIX: Properly handle UTC time zone in game kickoff
+    // Game data uses format "2025-09-14T17:00:00Z" which is UTC
+    let kickoff;
+    if (game.kickoff) {
+        // Ensure we parse as UTC time
+        kickoff = new Date(game.kickoff);
+        // Additional parsing check for edge cases
+        if (isNaN(kickoff.getTime())) {
+            console.warn('Invalid kickoff time for game:', game);
+            return 'PRE_GAME'; // Fail safe to pre-game
+        }
+    } else if (game.dt) {
+        kickoff = new Date(game.dt);
+        if (isNaN(kickoff.getTime())) {
+            console.warn('Invalid dt time for game:', game);
+            return 'PRE_GAME';
+        }
+    } else {
+        console.warn('No kickoff time found for game:', game);
+        return 'PRE_GAME';
+    }
+
+    // Debug logging for time zone issues
+    const timeDiff = now.getTime() - kickoff.getTime();
+    const minutesPast = Math.floor(timeDiff / (1000 * 60));
+
+    if (timeDiff < 0) {
+        console.log(`Game ${game.id} is PRE_GAME (starts in ${Math.abs(minutesPast)} minutes)`);
         return 'PRE_GAME';
     } else if (game.winner && game.winner !== 'TBD') {
+        console.log(`Game ${game.id} is COMPLETED (winner: ${game.winner})`);
         return 'COMPLETED';
     } else {
+        console.log(`Game ${game.id} is IN_PROGRESS (started ${minutesPast} minutes ago)`);
         return 'IN_PROGRESS';
     }
 }
