@@ -58,7 +58,8 @@ async function openLiveGameModal(gameId, espnEventId) {
                 startModalAutoRefresh();
             }
         } else {
-            throw new Error(gameData.error || 'Failed to fetch game data');
+            // Show user-friendly error message for ESPN data issues
+            showModalError(gameData.error || 'ESPN data not available for this game');
         }
 
     } catch (error) {
@@ -89,6 +90,15 @@ async function fetchLiveGameData(espnEventId) {
 
     } catch (error) {
         console.error('Error calling fetchLiveGameDetails:', error);
+
+        // Handle 500 errors (likely invalid ESPN Event ID) gracefully
+        if (error.message.includes('500')) {
+            return {
+                success: false,
+                error: 'ESPN data not available for this game',
+                data: null
+            };
+        }
         throw error;
     }
 }
