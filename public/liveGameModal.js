@@ -70,12 +70,22 @@ async function openLiveGameModal(gameId, espnEventId) {
 // 🔄 Fetch live game data from Firebase Function
 async function fetchLiveGameData(espnEventId) {
     try {
-        // Call our Firebase Function with the ESPN Event ID
-        const fetchLiveGameDetailsFn = httpsCallable(functions, 'fetchLiveGameDetails');
-        const result = await fetchLiveGameDetailsFn({ espnEventId });
+        // Use testLiveGameDetails function which has CORS headers for now
+        const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/testLiveGameDetails', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ espnEventId })
+        });
 
-        console.log('Live game data received:', result.data);
-        return result.data;
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('Live game data received:', result);
+        return result;
 
     } catch (error) {
         console.error('Error calling fetchLiveGameDetails:', error);
