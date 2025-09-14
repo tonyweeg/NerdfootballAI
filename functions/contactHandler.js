@@ -1,22 +1,22 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const cors = require('cors')({ origin: true });
 
 let transporter = null;
 
 const setupEmailTransport = () => {
     try {
-        // Check for Firebase Functions config first (functions:config:set)
-        let gmailEmail = functions.config().gmail?.email;
-        let gmailPassword = functions.config().gmail?.password;
+        // Use environment variables for Firebase Functions v2 compatibility
+        const gmailEmail = process.env.GMAIL_EMAIL;
+        const gmailPassword = process.env.GMAIL_PASSWORD;
 
-        // Fallback to environment variables
-        if (!gmailEmail || !gmailPassword) {
-            gmailEmail = process.env.GMAIL_EMAIL;
-            gmailPassword = process.env.GMAIL_PASSWORD;
-        }
+        console.log('=== EMAIL TRANSPORT DEBUG ===');
+        console.log('Environment GMAIL_EMAIL:', gmailEmail ? 'SET' : 'NOT SET');
+        console.log('Environment GMAIL_PASSWORD:', gmailPassword ? 'SET' : 'NOT SET');
 
         if (gmailEmail && gmailPassword) {
+            console.log('Creating nodemailer transporter with email:', gmailEmail);
             transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
@@ -25,6 +25,7 @@ const setupEmailTransport = () => {
                 }
             });
             console.log('Contact form email transport configured successfully');
+            console.log('Transporter object created:', !!transporter);
             return true;
         }
         console.log('Contact form: Email credentials not found, messages will be logged only');
@@ -227,12 +228,16 @@ This is an automated confirmation. Please do not reply to this message.
 Submission ID: ${submissionId}`;
 
         try {
+            console.log('=== EMAIL SENDING DEBUG ===');
+            console.log('Transporter exists:', !!transporter);
+            console.log('Admin emails to send to:', adminEmails);
+
             if (transporter) {
-                // Get sender email from config or environment
-                let gmailEmail = functions.config().gmail?.email;
-                if (!gmailEmail) {
-                    gmailEmail = process.env.GMAIL_EMAIL;
-                }
+                // Get sender email from environment variables (Functions v2 compatible)
+                const gmailEmail = process.env.GMAIL_EMAIL;
+
+                console.log('Using sender email:', gmailEmail);
+                console.log('Attempting to send emails to', adminEmails.length, 'admins');
 
                 // Send to all pool admins
                 const adminEmailPromises = adminEmails.map(adminEmail => {
@@ -243,6 +248,7 @@ Submission ID: ${submissionId}`;
                         text: adminEmailContent,
                         replyTo: email
                     };
+                    console.log('Sending admin email to:', adminEmail);
                     return transporter.sendMail(adminMailOptions);
                 });
 
@@ -253,10 +259,18 @@ Submission ID: ${submissionId}`;
                     text: userConfirmationContent
                 };
 
-                await Promise.all([
+                console.log('Sending user confirmation email to:', email);
+
+                const emailResults = await Promise.all([
                     ...adminEmailPromises,
                     transporter.sendMail(userMailOptions)
                 ]);
+
+                console.log('Email results:', emailResults.map(result => ({
+                    messageId: result.messageId,
+                    accepted: result.accepted,
+                    rejected: result.rejected
+                })));
 
                 console.log(`Contact form emails sent successfully to ${adminEmails.length} admins for submission ${submissionId}`);
             } else {
