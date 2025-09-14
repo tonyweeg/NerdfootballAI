@@ -59,22 +59,53 @@ class ESPNCacheManager {
         }
     }
 
-    // Check if cache is fresh (within max age)
+    // Check if cache is fresh (within max age) - LIVE GAME OVERRIDE
     async isCacheFresh() {
         try {
+            // 🚨 DURING LIVE GAMES: Force refresh every 30 seconds
+            if (this.isGameTimeWindow()) {
+                console.log('⚡ LIVE GAMES DETECTED: Forcing cache refresh');
+                const cacheDoc = await getDoc(doc(this.db, this.cacheDocPath));
+                if (!cacheDoc.exists()) return false;
+
+                const cacheData = cacheDoc.data();
+                if (!cacheData.lastUpdated) return false;
+
+                // During live games: 30 second max age instead of 6 hours
+                const liveGameMaxAge = 30 * 1000; // 30 seconds
+                const cacheAge = Date.now() - cacheData.lastUpdated;
+                return cacheAge < liveGameMaxAge;
+            }
+
+            // Normal cache freshness check (6 hours)
             const cacheDoc = await getDoc(doc(this.db, this.cacheDocPath));
             if (!cacheDoc.exists()) return false;
-            
+
             const cacheData = cacheDoc.data();
             if (!cacheData.lastUpdated) return false;
-            
+
             const cacheAge = Date.now() - cacheData.lastUpdated;
             return cacheAge < this.cacheMaxAge;
-            
+
         } catch (error) {
             console.error('⚡ Cache freshness check error:', error);
             return false;
         }
+    }
+
+    // Detect if we're in a live game time window (Thu 8PM - Mon 11PM ET)
+    isGameTimeWindow() {
+        const now = new Date();
+        const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, 4 = Thursday
+        const currentHour = now.getHours();
+
+        // Thursday 8PM ET through Monday 11PM ET
+        if (currentDay === 4 && currentHour >= 20) return true; // Thursday 8PM+
+        if (currentDay === 5 || currentDay === 6) return true; // Friday/Saturday all day
+        if (currentDay === 0) return true; // Sunday all day
+        if (currentDay === 1 && currentHour <= 23) return true; // Monday until 11PM
+
+        return false;
     }
 
     // Get cache status for admin dashboard
@@ -405,19 +436,19 @@ window.testCachePerformance = async function(teamName = 'Patriots', weekNumber =
 // Quick setup command for first-time cache initialization
 window.setupESPNCache = async function() {
     console.log('🏗️ Setting up ESPN cache for the first time...');
-    
+
     // Check status
     const status = await window.getESPNCacheStatus();
-    
+
     if (!status.exists) {
         console.log('📝 Initializing cache structure...');
         await window.espnCacheManager.initializeCache();
     }
-    
+
     // Update current week
     console.log('📡 Updating cache with current week data...');
     const updateResult = await window.updateESPNCache();
-    
+
     if (updateResult.success) {
         console.log('✅ ESPN cache setup complete!');
         console.log('💡 Use window.getESPNCacheStatus() to check cache status');
@@ -426,6 +457,47 @@ window.setupESPNCache = async function() {
     } else {
         console.error('❌ ESPN cache setup failed');
     }
-    
+
     return updateResult;
+};
+
+// 🚨 EMERGENCY CACHE CLEAR - LIVE GAMES
+window.emergencyCacheClear = async function() {
+    console.log('🚨 EMERGENCY: Clearing all ESPN cache for live game data...');
+
+    try {
+        // Call Firebase function to clear cache completely
+        const clearESPNCache = httpsCallable(window.functions, 'clearESPNCache');
+        const result = await clearESPNCache();
+
+        if (result.data.success) {
+            console.log(`✅ EMERGENCY CLEAR SUCCESS: ${result.data.documentsDeleted} cache documents deleted`);
+
+            // Force fresh data fetch
+            const forceFreshESPNData = httpsCallable(window.functions, 'forceFreshESPNData');
+            const freshResult = await forceFreshESPNData();
+
+            if (freshResult.data.success) {
+                console.log(`⚡ FRESH DATA LOADED: ${freshResult.data.gamesCount} games for Week ${freshResult.data.week}`);
+                console.log('🔄 Refreshing page to load new data...');
+                window.location.reload();
+            } else {
+                console.error('❌ Fresh data fetch failed:', freshResult.data.error);
+            }
+        } else {
+            console.error('❌ Emergency cache clear failed:', result.data.error);
+        }
+
+        return result.data;
+
+    } catch (error) {
+        console.error('❌ Emergency cache clear error:', error);
+        return { success: false, error: error.message };
+    }
+};
+
+// Quick shortcut for live games
+window.forceCurrentDataLoad = async function() {
+    console.log('⚡ FORCING CURRENT DATA LOAD...');
+    await window.emergencyCacheClear();
 };

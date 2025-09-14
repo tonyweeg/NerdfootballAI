@@ -29,17 +29,29 @@ class EspnNerdApiClient {
             
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
+                    // 🚨 EMERGENCY DIAGNOSTIC LOGGING
+                    console.log(`🔧 ESPN API Init Attempt ${attempt + 1}: Checking Firebase availability...`);
+                    console.log(`🔧 window exists: ${typeof window !== 'undefined'}`);
+                    console.log(`🔧 window.functions exists: ${typeof window !== 'undefined' && typeof window.functions !== 'undefined'}`);
+                    console.log(`🔧 window.httpsCallable exists: ${typeof window !== 'undefined' && typeof window.httpsCallable !== 'undefined'}`);
+                    console.log(`🔧 functions global exists: ${typeof functions !== 'undefined'}`);
+                    console.log(`🔧 firebase exists: ${typeof firebase !== 'undefined'}`);
+
                     // Check multiple Firebase access patterns
                     if (typeof window !== 'undefined' && window.functions) {
                         this.functions = window.functions;
+                        console.log('🔧 Using window.functions');
                     } else if (typeof functions !== 'undefined' && functions) {
                         this.functions = functions;
+                        console.log('🔧 Using global functions');
                     } else if (typeof firebase !== 'undefined' && firebase.functions) {
                         this.functions = firebase.functions();
+                        console.log('🔧 Using firebase.functions()');
                     } else {
+                        console.log('🔧 ERROR: No Firebase Functions access pattern available');
                         throw new Error('Firebase Functions not available');
                     }
-                    
+
                     // Test function call to verify it works
                     if (typeof window !== 'undefined' && window.httpsCallable) {
                         const testCall = window.httpsCallable(this.functions, 'espnApiStatus');
@@ -49,6 +61,7 @@ class EspnNerdApiClient {
                         resolve();
                         return;
                     } else {
+                        console.log('🔧 ERROR: window.httpsCallable not available');
                         throw new Error('httpsCallable not available');
                     }
                 } catch (error) {

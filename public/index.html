@@ -34,19 +34,20 @@
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
  <!-- BUNDLED JavaScript Files - Reduced from 18 to 4 files for 75% faster load -->
  <!-- CRITICAL: Eastern Time Parser must load FIRST to fix ESPN timezone bugs -->
- <script src="./easternTimeParser.js"></script>
+ <script src="./easternTimeParser-v2.js"></script>
  <script src="./poolParticipationManager.js"></script>
  <script src="./poolRemovalService.js"></script>
  <script src="./espnCacheManager.js?v=fix3"></script>
+ <script src="./gameStateCache.js"></script>
+ <script src="./emergencyCacheRefresh.js"></script>
  <script src="./core-bundle.js"></script>
  <script src="./survivor-bundle.js"></script>
  <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
- <script src="./contactForm.js"></script>
  <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
  <script src="./realtimeManager.js"></script>
- <!-- TEMPORARY: Test Eastern Time Parser Fix -->
- <script src="./test-timezone-fix.js"></script>
+<!-- 🚨 EMERGENCY CACHE REFRESH TOOL - For live game issues -->
+<script src="./emergency-cache-refresh.js"></script>
 <!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
@@ -2968,7 +2969,7 @@ await new Promise(resolve => {
  id: game.id,
  away: game.a,
  home: game.h,
- kickoff: game.dt.slice(0, -1),
+ kickoff: game.dt,
  stadium: game.stadium
  })) : [];
  
@@ -9934,44 +9935,16 @@ function escapeHtml(text) {
  }
  }
 
- // Get game state using proper validation logic
+ // Simple game state logic - just compare times
 function getGameState(game) {
     const now = new Date();
+    const gameTime = new Date(game.dt || game.kickoff);
 
-    // SECURITY FIX: Properly handle UTC time zone in game kickoff
-    // Game data uses format "2025-09-14T17:00:00Z" which is UTC
-    let kickoff;
-    if (game.kickoff) {
-        // Ensure we parse as UTC time
-        kickoff = new Date(game.kickoff);
-        // Additional parsing check for edge cases
-        if (isNaN(kickoff.getTime())) {
-            console.warn('Invalid kickoff time for game:', game);
-            return 'PRE_GAME'; // Fail safe to pre-game
-        }
-    } else if (game.dt) {
-        kickoff = new Date(game.dt);
-        if (isNaN(kickoff.getTime())) {
-            console.warn('Invalid dt time for game:', game);
-            return 'PRE_GAME';
-        }
-    } else {
-        console.warn('No kickoff time found for game:', game);
-        return 'PRE_GAME';
-    }
-
-    // Debug logging for time zone issues
-    const timeDiff = now.getTime() - kickoff.getTime();
-    const minutesPast = Math.floor(timeDiff / (1000 * 60));
-
-    if (timeDiff < 0) {
-        console.log(`Game ${game.id} is PRE_GAME (starts in ${Math.abs(minutesPast)} minutes)`);
+    if (now < gameTime) {
         return 'PRE_GAME';
     } else if (game.winner && game.winner !== 'TBD') {
-        console.log(`Game ${game.id} is COMPLETED (winner: ${game.winner})`);
         return 'COMPLETED';
     } else {
-        console.log(`Game ${game.id} is IN_PROGRESS (started ${minutesPast} minutes ago)`);
         return 'IN_PROGRESS';
     }
 }
@@ -9993,13 +9966,13 @@ function getTeamHelmetClass(teamName) {
     return teamMap[teamName] || '';
 }
 
-// Check if individual game is locked (started)
- function isGameLocked(game) {
+// Check if individual game is locked (started) - SIMPLE TIME COMPARISON
+function isGameLocked(game) {
   // SECURITY FIX: Use proper game state validation to prevent picks during IN_PROGRESS games
   const gameState = getGameState(game);
   // Only allow picks when games are PRE_GAME
   return gameState === 'IN_PROGRESS' || gameState === 'COMPLETED';
- }
+}
 
  // Get locked games for a week
  async function getLockedGames(weekNumber) {

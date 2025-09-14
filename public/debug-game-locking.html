@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Game Locking Debug - EMERGENCY</title>
+</head>
+<body>
+    <h1>Emergency Game Locking Debug</h1>
+    <div id="debug-output"></div>
+
+    <script src="./easternTimeParser-v2.js"></script>
+    <script src="./espnCacheManager.js?v=fix3"></script>
+    <script>
+        // Copy the exact functions from index.html
+        function getGameState(game) {
+            const now = new Date();
+
+            // 🔧 CRITICAL FIX: Use Eastern Time Parser for accurate game times
+            // ESPN timestamps are Eastern Time with Z suffix, not actual UTC
+            let kickoff;
+            const timestamp = game.kickoff || game.dt;
+
+            if (timestamp) {
+                // Use Eastern Time Parser if available
+                kickoff = window.easternTimeParser ?
+                    window.easternTimeParser.parseESPNTimestamp(timestamp) :
+                    new Date(timestamp);
+
+                // Additional parsing check for edge cases
+                if (isNaN(kickoff.getTime())) {
+                    console.warn('Invalid kickoff time for game:', game);
+                    return 'PRE_GAME'; // Fail safe to pre-game
+                }
+            } else {
+                console.warn('No kickoff time found for game:', game);
+                return 'PRE_GAME';
+            }
+
+            // Debug logging for time zone issues
+            const timeDiff = now.getTime() - kickoff.getTime();
+            const minutesPast = Math.floor(timeDiff / (1000 * 60));
+
+            if (timeDiff < 0) {
+                console.log(`Game ${game.id} is PRE_GAME (starts in ${Math.abs(minutesPast)} minutes)`);
+                return 'PRE_GAME';
+            } else if (game.winner && game.winner !== 'TBD') {
+                console.log(`Game ${game.id} is COMPLETED (winner: ${game.winner})`);
+                return 'COMPLETED';
+            } else {
+                console.log(`Game ${game.id} is IN_PROGRESS (started ${minutesPast} minutes ago)`);
+                return 'IN_PROGRESS';
+            }
+        }
+
+        function isGameLocked(game) {
+            // SECURITY FIX: Use proper game state validation to prevent picks during IN_PROGRESS games
+            const gameState = getGameState(game);
+            // Only allow picks when games are PRE_GAME
+            return gameState === 'IN_PROGRESS' || gameState === 'COMPLETED';
+        }
+
+        // Get games function from main app
+        async function getGamesForWeek(weekNumber) {
+            try {
+                console.log(`🔥 Fetching schedule for week ${weekNumber}`);
+                const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch: ${response.status}`);
+                }
+                const data = await response.json();
+                return data.games || data;
+            } catch (error) {
+                console.error('Error fetching games:', error);
+                return [];
+            }
+        }
+
+        // Debug test function
+        async function debugGameLocking() {
+            console.log("🚨 EMERGENCY DEBUG - Current Time:", new Date());
+            console.log("🚨 Eastern Time Parser Available:", !!window.easternTimeParser);
+
+            const debugOutput = document.getElementById('debug-output');
+            let output = '<h2>Debug Results:</h2>';
+
+            // Test with REAL game data from week 2
+            try {
+                const realGames = await getGamesForWeek(2);
+                console.log("🚨 Real games data:", realGames);
+
+                output += `<h3>Testing with REAL Week 2 Data (${realGames.length} games):</h3>`;
+
+                // Test specifically games 202-205 (the failing ones)
+                const testGameIds = ['202', '203', '204', '205'];
+                const testGames = realGames.filter(game => testGameIds.includes(game.id.toString()));
+
+                if (testGames.length === 0) {
+                    output += `<p><strong>ERROR:</strong> No games found with IDs ${testGameIds.join(', ')}</p>`;
+
+                    // Show first few games to debug structure
+                    output += '<h4>First 3 games structure:</h4>';
+                    realGames.slice(0, 3).forEach(game => {
+                        output += `<p><strong>Game ${game.id}:</strong> ${JSON.stringify(game, null, 2)}</p>`;
+                    });
+                } else {
+                    testGames.forEach(game => {
+                        const state = getGameState(game);
+                        const locked = isGameLocked(game);
+
+                        output += `<p><strong>Game ${game.id} (${game.away} @ ${game.home}):</strong><br>`;
+                        output += `- Raw Data: ${JSON.stringify(game, null, 2)}<br>`;
+                        output += `- Kickoff: ${game.kickoff || game.dt || 'NO KICKOFF FIELD'}<br>`;
+                        output += `- Winner: ${game.winner || 'TBD'}<br>`;
+                        output += `- State: ${state}<br>`;
+                        output += `- Locked: ${locked}<br></p>`;
+
+                        console.log(`🚨 Game ${game.id}: State=${state}, Locked=${locked}`, game);
+                    });
+                }
+            } catch (error) {
+                output += `<p><strong>ERROR loading real games:</strong> ${error.message}</p>`;
+                console.error("Error loading real games:", error);
+            }
+
+            // Also test with sample data to ensure functions work
+            output += '<h3>Testing with Sample Data:</h3>';
+            const testGames = [
+                {
+                    id: '202',
+                    away: 'Carolina',
+                    home: 'New Orleans',
+                    kickoff: '2025-09-14T17:00:00Z', // 1PM Eastern
+                    winner: 'TBD'
+                }
+            ];
+
+            testGames.forEach(game => {
+                const state = getGameState(game);
+                const locked = isGameLocked(game);
+
+                output += `<p><strong>Sample Game ${game.id}:</strong><br>`;
+                output += `- State: ${state}<br>`;
+                output += `- Locked: ${locked}<br></p>`;
+            });
+
+            debugOutput.innerHTML = output;
+        }
+
+        // Run debug on page load
+        window.addEventListener('load', () => {
+            setTimeout(debugGameLocking, 1000); // Give time for scripts to load
+        });
+    </script>
+</body>
+</html>

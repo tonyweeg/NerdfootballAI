@@ -18,8 +18,9 @@ class EasternTimeParser {
     constructor() {
         // EST: UTC-5 (Standard Time: November - March)
         // EDT: UTC-4 (Daylight Time: March - November)
-        this.EST_OFFSET = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
-        this.EDT_OFFSET = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+        // Eastern is BEHIND UTC, so offsets are negative
+        this.EST_OFFSET = -5 * 60 * 60 * 1000; // -5 hours in milliseconds
+        this.EDT_OFFSET = -4 * 60 * 60 * 1000; // -4 hours in milliseconds
 
         console.log('⏰ EasternTimeParser initialized - ESPN timestamp fixes active');
     }
@@ -64,10 +65,14 @@ class EasternTimeParser {
             // Determine which one is correct based on DST rules
             const correctDate = this.isDST(year, month, day) ? edtDate : easternDate;
 
-            // Alternative bulletproof method using UTC constructor with offset
-            const utcTime = Date.UTC(year, month, day, hours, minutes, seconds);
+            // CRITICAL FIX: Convert Eastern Time to UTC properly
+            // Eastern Time is behind UTC: EDT is UTC-4, EST is UTC-5
+            // To convert FROM Eastern TO UTC, we SUBTRACT the offset (1PM Eastern - (-4) = 5PM UTC)
             const offset = this.isDST(year, month, day) ? this.EDT_OFFSET : this.EST_OFFSET;
-            const properUTCDate = new Date(utcTime + offset);
+
+            // Create local time in Eastern, then subtract the negative offset to get UTC
+            const localTime = new Date(year, month, day, hours, minutes, seconds).getTime();
+            const properUTCDate = new Date(localTime - offset);
 
             console.log(`⏰ ESPN Time Conversion:
   Original: ${espnTimestamp}

@@ -33,8 +33,12 @@ class GameStateCache {
         const now = new Date();
         // Handle both raw JSON format (dt) and processed format (kickoff)
         const gameTime = game.kickoff || game.dt;
-        const kickoff = new Date(gameTime);
-        
+
+        // 🔧 CRITICAL FIX: Use Eastern Time Parser for accurate game times
+        const kickoff = window.easternTimeParser ?
+            window.easternTimeParser.parseESPNTimestamp(gameTime) :
+            new Date(gameTime);
+
         if (now < kickoff) {
             return 'PRE_GAME';
         } else if (game.winner && game.winner !== 'TBD') {
@@ -259,14 +263,60 @@ class GameStateCache {
     // 💎 Force complete cache flush for data integrity fixes
     clearAllCache() {
         const totalEntries = this.cache.size + this.memoryCache.size;
-        
+
         this.cache.clear();
         this.memoryCache.clear();
         this.weekStates.clear();
         this.gameStates.clear();
-        
+
         console.log(`💎 COMPLETE CACHE FLUSH: Cleared all ${totalEntries} cache entries 🔥`);
         return totalEntries;
+    }
+
+    // 🚨 EMERGENCY CACHE CLEAR - For live game situations
+    emergencyClearAllCaches() {
+        console.log('🚨 EMERGENCY CACHE CLEAR - Live game situation detected');
+
+        // Clear all in-memory caches
+        const totalCleared = this.clearAllCache();
+
+        // Clear browser storage caches
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const lsKeys = Object.keys(localStorage);
+                const clearedLS = [];
+                lsKeys.forEach(key => {
+                    if (key.includes('espn') || key.includes('game') || key.includes('cache') ||
+                        key.includes('nerdfootball') || key.includes('schedule') || key.includes('picks')) {
+                        localStorage.removeItem(key);
+                        clearedLS.push(key);
+                    }
+                });
+                console.log(`🗑️ Cleared ${clearedLS.length} localStorage entries:`, clearedLS);
+            }
+        } catch (error) {
+            console.log('ℹ️ Could not access localStorage:', error.message);
+        }
+
+        try {
+            if (typeof sessionStorage !== 'undefined') {
+                const ssKeys = Object.keys(sessionStorage);
+                const clearedSS = [];
+                ssKeys.forEach(key => {
+                    if (key.includes('espn') || key.includes('game') || key.includes('cache') ||
+                        key.includes('nerdfootball') || key.includes('schedule') || key.includes('picks')) {
+                        sessionStorage.removeItem(key);
+                        clearedSS.push(key);
+                    }
+                });
+                console.log(`🗑️ Cleared ${clearedSS.length} sessionStorage entries:`, clearedSS);
+            }
+        } catch (error) {
+            console.log('ℹ️ Could not access sessionStorage:', error.message);
+        }
+
+        console.log(`🚨 EMERGENCY CACHE CLEAR COMPLETE: ${totalCleared} total entries cleared`);
+        return totalCleared;
     }
 
     // 💎 CRITICAL SYSTEM: Comprehensive Cache Invalidation Management 🚨
