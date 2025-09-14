@@ -170,7 +170,7 @@ class EspnNerdApi {
             // Teams and scores
             a: awayTeam,
             h: homeTeam,
-            dt: espnGame.date,
+            dt: espnGame.date, // ESPN timestamp (Eastern Time with Z suffix - needs parsing)
             homeScore: homeScore,
             awayScore: awayScore,
             winner: winner,

@@ -475,7 +475,9 @@ if (typeof module !== 'undefined') {
             
             // Check if any games are live or completed
             const hasLiveGames = games.some(game => {
-                const gameTime = new Date(game.dt);
+                const gameTime = window.easternTimeParser ?
+                    window.easternTimeParser.parseESPNTimestamp(game.dt) :
+                    new Date(game.dt);
                 return now >= gameTime && game.winner === 'TBD';
             });
             

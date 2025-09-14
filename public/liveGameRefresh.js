@@ -38,7 +38,9 @@ class LiveGameRefresh {
 
             const now = new Date();
             const liveGames = games.filter(game => {
-                const gameTime = new Date(game.dt || game.kickoff);
+                const gameTime = window.easternTimeParser ?
+                    window.easternTimeParser.parseESPNTimestamp(game.dt || game.kickoff) :
+                    new Date(game.dt || game.kickoff);
                 const gameEndApprox = new Date(gameTime.getTime() + (4 * 60 * 60 * 1000)); // ~4 hours later
                 
                 // Game is live if it has started but not completed and doesn't have a winner yet
