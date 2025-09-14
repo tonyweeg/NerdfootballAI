@@ -11782,11 +11782,18 @@ if (!activePicks.mnfTotalPoints) {
  btn.addEventListener('click', (e) => {
  const gameId = e.target.dataset.gameId;
  const team = e.target.dataset.team;
+
+ // CRITICAL SECURITY: Check if game is locked before allowing pick changes
+ const gameData = weekData.games.find(game => game.id === gameId);
+ if (gameData && isGameLocked(gameData)) {
+   console.warn(`🚫 SECURITY BLOCK: Attempted to modify pick for locked game ${gameId} (${gameData.away} @ ${gameData.home})`);
+   return; // Block the pick change
+ }
+
  activePicks[gameId].winner = team;
- 
+
  // Update visual state by re-rendering the UI instead of just toggling classes
  // This ensures the new color scheme is applied correctly
- const gameData = weekData.games.find(game => game.id === gameId);
  if (gameData) {
    // Find the game row and update button classes
    const gameButtons = targetContainer.querySelectorAll(`.winner-btn[data-game-id="${gameId}"]`);
@@ -11819,6 +11826,14 @@ if (!activePicks.mnfTotalPoints) {
  const newConfidence = parseInt(e.target.value, 10);
  const oldConfidence = activePicks[gameId].confidence;
  if (newConfidence === oldConfidence) return;
+
+ // CRITICAL SECURITY: Check if current game is locked before allowing confidence changes
+ const currentGame = weekData.games.find(game => game.id === gameId);
+ if (currentGame && isGameLocked(currentGame)) {
+   console.warn(`🚫 SECURITY BLOCK: Attempted to modify confidence for locked game ${gameId} (${currentGame.away} @ ${currentGame.home})`);
+   e.target.value = oldConfidence; // Revert the change
+   return; // Block the confidence change
+ }
  const otherGameId = Object.keys(activePicks).find(id => id !== gameId && activePicks[id].confidence === newConfidence);
  if (otherGameId) {
  // CRITICAL BUG FIX: Check if the other game is locked before swapping
