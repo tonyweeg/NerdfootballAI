@@ -81,6 +81,15 @@ async function fetchLiveGameData(espnEventId) {
         });
 
         if (!response.ok) {
+            // Handle 500 errors gracefully instead of throwing
+            if (response.status === 500) {
+                console.log('ESPN data not available for this game (500 error)');
+                return {
+                    success: false,
+                    error: 'ESPN data not available for this game',
+                    data: null
+                };
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -91,15 +100,12 @@ async function fetchLiveGameData(espnEventId) {
     } catch (error) {
         console.error('Error calling fetchLiveGameDetails:', error);
 
-        // Handle 500 errors (likely invalid ESPN Event ID) gracefully
-        if (error.message.includes('500')) {
-            return {
-                success: false,
-                error: 'ESPN data not available for this game',
-                data: null
-            };
-        }
-        throw error;
+        // Return graceful error for any fetch issues
+        return {
+            success: false,
+            error: 'Unable to load game data at this time',
+            data: null
+        };
     }
 }
 
