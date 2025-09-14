@@ -32,6 +32,11 @@
  
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+ <!-- FIREBASE INITIALIZATION - Must load before bundles -->
+ <script src="./firebase-global-init.js"></script>
+ <script src="./bundle-dependency-gate.js"></script>
+
  <!-- BUNDLED JavaScript Files - Reduced from 18 to 4 files for 75% faster load -->
  <!-- CRITICAL: Eastern Time Parser must load FIRST to fix ESPN timezone bugs -->
  <script src="./easternTimeParser-v2.js"></script>
@@ -48,6 +53,8 @@
  <script src="./realtimeManager.js"></script>
 <!-- 🚨 EMERGENCY CACHE REFRESH TOOL - For live game issues -->
 <script src="./emergency-cache-refresh.js"></script>
+<!-- 🚀 DOPE LIVE GAME MODAL SYSTEM - On-demand ESPN Integration -->
+<script src="./liveGameModal.js"></script>
 <!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
@@ -2717,7 +2724,7 @@ Role
  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
  import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, updateEmail, signOut, GoogleAuthProvider, signInWithPopup, linkWithCredential, fetchSignInMethodsForEmail, verifyBeforeUpdateEmail, sendEmailVerification, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, getDocs, updateDoc, deleteDoc, deleteField, serverTimestamp, runTransaction, query, orderBy, limit, collectionGroup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 import { getMessaging } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
 // PHAROAH'S REALTIME INTEGRATION - Firebase RTDB for WebSocket integration
 import { getDatabase, ref, onValue, set, push, serverTimestamp as rtdbServerTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
@@ -6687,6 +6694,19 @@ function downloadAnalyticsCSV(data, weekNumber) {
  auth = getAuth(app);
  window.auth = auth; // Make Auth globally available for FCM
  functions = getFunctions(app, 'us-central1'); // Initialize global functions variable with region
+
+ // Configure Functions emulator for development only
+ if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+     console.log('🔧 Configuring Firebase Functions emulator on port 5001');
+     try {
+         connectFunctionsEmulator(functions, 'localhost', 5001);
+     } catch (error) {
+         console.warn('⚠️ Failed to connect to emulator, using production Functions');
+     }
+ } else {
+     console.log('🚀 Using production Firebase Functions');
+ }
+
  window.functions = functions; // Make Functions globally available
  window.httpsCallable = httpsCallable; // Make httpsCallable globally available for analytics
  
@@ -11715,6 +11735,14 @@ function updatePicksButtonStates(weekData) {
  
  targetContainer.appendChild(gameRow);
 
+// 🚀 Add DOPE Live Game Modal click handler
+if (window.addGameClickHandler && game.espnId) {
+    window.addGameClickHandler(gameRow, game.id, game.espnId);
+} else if (window.addGameClickHandler) {
+    // Fallback: use game.id as ESPN event ID for testing
+    window.addGameClickHandler(gameRow, game.id, `401671${game.id}`);
+}
+
 // Add enhanced ESPN data for ALL games in picks area
 if (window.espnApi) {
     setTimeout(() => addEnhancedGameDataToPicks(game.id, game, gameState), 100);
@@ -14910,5 +14938,184 @@ function showUserDiagnostics() {
 
  });
  </script>
+
+<!-- 🚀 DOPE LIVE GAME MODAL - Real-time ESPN Integration -->
+<div id="live-game-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex">
+    <div class="fixed inset-0 bg-black bg-opacity-75" onclick="closeLiveGameModal()"></div>
+    <div class="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center p-6 border-b border-slate-200">
+            <h2 id="modal-game-title" class="text-xl font-bold text-slate-800">Game Details</h2>
+            <button onclick="closeLiveGameModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="modal-loading" class="flex items-center justify-center p-12">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+            <span class="ml-4 text-lg text-slate-600">Loading live game data...</span>
+        </div>
+
+        <!-- Game Content -->
+        <div id="modal-game-content" class="hidden">
+
+            <!-- Game Header - Score and Status -->
+            <div id="modal-game-header" class="bg-gradient-to-r from-slate-50 to-blue-50 p-6 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <!-- Away Team -->
+                    <div class="flex items-center space-x-4">
+                        <div id="modal-away-logo" class="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center">
+                            <span id="modal-away-abbr" class="text-lg font-bold text-slate-600">???</span>
+                        </div>
+                        <div>
+                            <h3 id="modal-away-name" class="text-xl font-bold text-slate-800">Away Team</h3>
+                            <p id="modal-away-record" class="text-sm text-slate-500">(0-0)</p>
+                        </div>
+                        <div id="modal-away-score" class="text-4xl font-bold text-slate-800">0</div>
+                    </div>
+
+                    <!-- Game Status -->
+                    <div class="text-center">
+                        <div id="modal-game-status" class="text-sm font-medium text-slate-600 mb-1">Scheduled</div>
+                        <div id="modal-game-clock" class="text-lg font-bold text-slate-800">--:--</div>
+                        <div id="modal-game-period" class="text-sm text-slate-500">--</div>
+                    </div>
+
+                    <!-- Home Team -->
+                    <div class="flex items-center space-x-4">
+                        <div id="modal-home-score" class="text-4xl font-bold text-slate-800">0</div>
+                        <div class="text-right">
+                            <h3 id="modal-home-name" class="text-xl font-bold text-slate-800">Home Team</h3>
+                            <p id="modal-home-record" class="text-sm text-slate-500">(0-0)</p>
+                        </div>
+                        <div id="modal-home-logo" class="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center">
+                            <span id="modal-home-abbr" class="text-lg font-bold text-slate-600">???</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Game State (for in-progress games) -->
+            <div id="modal-live-state" class="hidden bg-gradient-to-r from-green-50 to-blue-50 p-4 border-b border-slate-200">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-sm text-slate-600 mb-1">🏈 POSSESSION</div>
+                        <div id="modal-possession" class="font-bold text-green-700">--</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-slate-600 mb-1">📍 FIELD POSITION</div>
+                        <div id="modal-field-position" class="font-bold text-blue-700">--</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-slate-600 mb-1">⚡ LAST PLAY</div>
+                        <div id="modal-last-play" class="font-medium text-slate-800 text-sm">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Win Probability (for live games) -->
+            <div id="modal-win-probability" class="hidden p-4 border-b border-slate-200">
+                <div class="text-center mb-2">
+                    <h4 class="font-semibold text-slate-700">🎲 Win Probability</h4>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span id="modal-away-team-short" class="text-sm font-medium text-slate-600">AWY</span>
+                    <div class="flex-1 bg-slate-200 rounded-full h-6 relative overflow-hidden">
+                        <div id="modal-probability-bar" class="bg-gradient-to-r from-blue-500 to-green-500 h-full transition-all duration-500" style="width: 50%"></div>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span id="modal-probability-text" class="text-xs font-bold text-white drop-shadow">50% - 50%</span>
+                        </div>
+                    </div>
+                    <span id="modal-home-team-short" class="text-sm font-medium text-slate-600">HOM</span>
+                </div>
+            </div>
+
+            <!-- Team Statistics -->
+            <div id="modal-team-stats" class="hidden p-6 border-b border-slate-200">
+                <h4 class="font-semibold text-slate-700 mb-4 text-center">📊 Team Statistics</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-sm">
+                    <div>
+                        <div class="text-slate-600 mb-1">Total Yards</div>
+                        <div class="flex justify-between">
+                            <span id="modal-away-total-yards" class="font-bold">--</span>
+                            <span id="modal-home-total-yards" class="font-bold">--</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-slate-600 mb-1">Passing Yards</div>
+                        <div class="flex justify-between">
+                            <span id="modal-away-passing-yards" class="font-bold">--</span>
+                            <span id="modal-home-passing-yards" class="font-bold">--</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-slate-600 mb-1">Rushing Yards</div>
+                        <div class="flex justify-between">
+                            <span id="modal-away-rushing-yards" class="font-bold">--</span>
+                            <span id="modal-home-rushing-yards" class="font-bold">--</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-slate-600 mb-1">Time of Possession</div>
+                        <div class="flex justify-between">
+                            <span id="modal-away-time-possession" class="font-bold">--</span>
+                            <span id="modal-home-time-possession" class="font-bold">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Plays -->
+            <div id="modal-recent-plays" class="hidden p-6 border-b border-slate-200">
+                <h4 class="font-semibold text-slate-700 mb-4">🔥 Recent Plays</h4>
+                <div id="modal-plays-list" class="space-y-2 max-h-64 overflow-y-auto">
+                    <!-- Plays will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Game Info -->
+            <div id="modal-game-info" class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Venue Info -->
+                    <div>
+                        <h4 class="font-semibold text-slate-700 mb-3">🏟️ Venue</h4>
+                        <div class="space-y-2 text-sm text-slate-600">
+                            <div id="modal-venue-name" class="font-medium">--</div>
+                            <div id="modal-venue-location">--</div>
+                            <div id="modal-venue-capacity">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Weather & Broadcast -->
+                    <div>
+                        <h4 class="font-semibold text-slate-700 mb-3">📺 Broadcast & Weather</h4>
+                        <div class="space-y-2 text-sm text-slate-600">
+                            <div><strong>Network:</strong> <span id="modal-broadcast">--</span></div>
+                            <div id="modal-weather-info">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="flex justify-between items-center p-6 border-t border-slate-200 bg-slate-50">
+            <button id="modal-refresh-btn" onclick="refreshLiveGameData()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span>Refresh Live Data</span>
+            </button>
+            <div id="modal-last-updated" class="text-xs text-slate-500">Last updated: --</div>
+        </div>
+
+    </div>
+</div>
+
 </body>
 </html>

@@ -466,34 +466,230 @@ class EspnNerdApi {
             const db = admin.firestore();
             const cacheRef = db.collection('cache').doc(cacheKey);
             const cacheDoc = await cacheRef.get();
-            
+
             if (cacheDoc.exists) {
                 const cached = cacheDoc.data();
                 const age = Date.now() - cached.timestamp;
-                
+
                 if (cacheDuration === Infinity || age < cacheDuration) {
                     console.log(`Cache hit for ${cacheKey}`);
                     return cached.data;
                 }
             }
-            
+
             // Cache miss or expired - fetch fresh data
             console.log(`Cache miss for ${cacheKey} - fetching fresh data`);
             const freshData = await fetchFunction();
-            
+
             // Store in cache
             await cacheRef.set({
                 data: freshData,
                 timestamp: Date.now(),
                 lastUpdated: new Date().toISOString()
             });
-            
+
             return freshData;
-            
+
         } catch (error) {
             console.error(`Error in getCachedOrFetch for ${cacheKey}:`, error);
             throw error;
         }
+    }
+
+    // 🚀 LIVE GAME DETAILS - For DOPE Game Modal System
+    async fetchLiveGameDetails(espnEventId) {
+        try {
+            const endpoint = `/summary?event=${espnEventId}`;
+            const data = await this.makeRequest(endpoint);
+
+            if (!data || !data.header) {
+                throw new Error(`No game details found for event ${espnEventId}`);
+            }
+
+            return this.transformLiveGameData(data);
+
+        } catch (error) {
+            console.error(`Error fetching live game details for ${espnEventId}:`, error);
+            throw error;
+        }
+    }
+
+    // Helper function to remove undefined values (Firestore doesn't allow them)
+    sanitizeForFirestore(obj) {
+        if (obj === null || obj === undefined) return null;
+        if (typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) {
+            return obj.map(item => this.sanitizeForFirestore(item)).filter(item => item !== undefined);
+        }
+
+        const sanitized = {};
+        for (const [key, value] of Object.entries(obj)) {
+            if (value !== undefined) {
+                sanitized[key] = this.sanitizeForFirestore(value);
+            }
+        }
+        return sanitized;
+    }
+
+    // Transform ESPN summary data into DOPE live game format
+    transformLiveGameData(espnSummary) {
+        const header = espnSummary.header;
+        const gameInfo = header.competitions?.[0];
+        const homeTeam = gameInfo?.competitors?.find(c => c.homeAway === 'home');
+        const awayTeam = gameInfo?.competitors?.find(c => c.homeAway === 'away');
+        const situation = gameInfo?.situation;
+        const plays = espnSummary.plays;
+        const boxScore = espnSummary.boxscore;
+
+        const gameData = {
+            // Basic game info
+            id: header.id,
+            espnId: header.id,
+            status: gameInfo?.status?.type?.name || 'STATUS_SCHEDULED',
+            statusDisplay: gameInfo?.status?.type?.shortDetail || 'Scheduled',
+
+            // Teams and current score
+            teams: {
+                home: {
+                    name: this.normalizeTeamName(homeTeam?.team),
+                    abbreviation: homeTeam?.team?.abbreviation || null,
+                    logo: homeTeam?.team?.logo || null,
+                    color: homeTeam?.team?.color || null,
+                    score: parseInt(homeTeam?.score) || 0,
+                    record: homeTeam?.records?.[0]?.summary || '0-0'
+                },
+                away: {
+                    name: this.normalizeTeamName(awayTeam?.team),
+                    abbreviation: awayTeam?.team?.abbreviation || null,
+                    logo: awayTeam?.team?.logo || null,
+                    color: awayTeam?.team?.color || null,
+                    score: parseInt(awayTeam?.score) || 0,
+                    record: awayTeam?.records?.[0]?.summary || '0-0'
+                }
+            },
+
+            // 🕐 Live game state (quarter, clock, possession)
+            gameState: situation ? {
+                period: {
+                    number: situation.period || 0,
+                    displayValue: this.getPeriodDisplay(situation.period),
+                    type: 'quarter'
+                },
+                clock: {
+                    displayValue: situation.clock?.displayValue || '15:00',
+                    remainingSeconds: situation.clock?.value || 900
+                },
+                possession: situation.possession ? {
+                    team: this.normalizeTeamName(situation.possession),
+                    abbreviation: situation.possession?.abbreviation
+                } : null,
+                down: situation.down || null,
+                distance: situation.distance || null,
+                yardLine: situation.yardLine || null,
+                description: situation.shortDownDistanceText || null
+            } : null,
+
+            // ⚡ Last play with excitement factor
+            lastPlay: situation?.lastPlay ? {
+                id: situation.lastPlay.id,
+                type: situation.lastPlay.type?.text || 'Play',
+                text: situation.lastPlay.text || 'No description available',
+                yards: situation.lastPlay.statYardage || 0,
+                scoreChange: situation.lastPlay.scoreValue > 0,
+                scoreValue: situation.lastPlay.scoreValue || 0,
+                team: this.normalizeTeamName(situation.lastPlay.team),
+                probability: situation.lastPlay.probability ? {
+                    homeWin: Math.round(situation.lastPlay.probability.homeWinPercentage || 0),
+                    awayWin: Math.round(situation.lastPlay.probability.awayWinPercentage || 0),
+                    tie: Math.round(situation.lastPlay.probability.tiePercentage || 0)
+                } : null
+            } : null,
+
+            // 🏃‍♂️ Current drive info
+            currentDrive: situation?.possessionText ? {
+                description: situation.possessionText,
+                team: this.normalizeTeamName(situation.possession)
+            } : null,
+
+            // 📊 Team statistics (from boxscore)
+            teamStats: this.extractTeamStats(boxScore),
+
+            // 🎯 Recent plays (last 10 plays for excitement)
+            recentPlays: plays?.items?.slice(-10)?.map(play => ({
+                id: play.id,
+                period: play.period?.number,
+                clock: play.clock?.displayValue,
+                type: play.type?.text || 'Play',
+                text: play.text,
+                yards: play.statYardage || 0,
+                team: this.normalizeTeamName(play.team),
+                scoreChange: play.scoreValue > 0,
+                down: play.down,
+                distance: play.distance
+            })).reverse() || [],
+
+            // 🏟️ Venue and conditions
+            venue: {
+                name: gameInfo?.venue?.fullName || 'Unknown',
+                city: gameInfo?.venue?.address?.city,
+                state: gameInfo?.venue?.address?.state,
+                capacity: gameInfo?.venue?.capacity,
+                indoor: gameInfo?.venue?.indoor || false
+            },
+
+            // 🌤️ Weather (if outdoor game)
+            weather: header.weather ? {
+                temperature: header.weather.temperature,
+                description: header.weather.displayValue,
+                condition: header.weather.conditionId,
+                humidity: header.weather.humidity,
+                windSpeed: header.weather.windSpeed
+            } : null,
+
+            // 📺 Broadcast info
+            broadcast: gameInfo?.broadcasts?.[0]?.names?.[0] || 'Not Available',
+
+            // ⏰ Timestamps
+            gameTime: header.gameTime,
+            lastUpdated: new Date().toISOString()
+        };
+
+        // Sanitize the data to remove undefined values (Firestore doesn't allow them)
+        return this.sanitizeForFirestore(gameData);
+    }
+
+    // Extract team statistics from boxscore
+    extractTeamStats(boxScore) {
+        if (!boxScore?.teams) return null;
+
+        const homeTeam = boxScore.teams.find(t => t.homeAway === 'home');
+        const awayTeam = boxScore.teams.find(t => t.homeAway === 'away');
+
+        const extractStats = (team) => {
+            const stats = {};
+            team?.statistics?.forEach(stat => {
+                const label = stat.label?.toLowerCase().replace(/\s+/g, '_');
+                stats[label] = stat.displayValue;
+            });
+            return stats;
+        };
+
+        return {
+            home: homeTeam ? extractStats(homeTeam) : {},
+            away: awayTeam ? extractStats(awayTeam) : {}
+        };
+    }
+
+    // Get display text for period number
+    getPeriodDisplay(period) {
+        const periodMap = {
+            1: '1st Quarter',
+            2: '2nd Quarter',
+            3: '3rd Quarter',
+            4: '4th Quarter',
+            5: 'Overtime'
+        };
+        return periodMap[period] || `Period ${period}`;
     }
 }
 
@@ -589,6 +785,58 @@ exports.fetchSeasonSchedule = functions.https.onCall(async (data, context) => {
     }
 });
 
+// 🚀 FETCH LIVE GAME DETAILS - For DOPE Game Modal System (ADMIN ONLY)
+exports.fetchLiveGameDetails = functions.https.onCall(async (data, context) => {
+    try {
+        // ADMIN VALIDATION: Check if user is authenticated and admin
+        if (!context.auth) {
+            throw new Error('Authentication required for live game details');
+        }
+
+        const userId = context.auth.uid;
+        const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
+
+        if (!ADMIN_UIDS.includes(userId)) {
+            console.log(`🔒 Access denied: User ${userId} is not an admin`);
+            throw new Error('Live game details are restricted to admin users only');
+        }
+
+        console.log(`🔒 Admin access granted for user: ${userId}`);
+
+        // Extract data from the correct location (data.data for Firebase Functions v2)
+        const actualData = data.data || data;
+
+        const { espnEventId } = actualData;
+
+        if (!espnEventId) {
+            throw new Error('ESPN Event ID is required');
+        }
+
+        console.log(`Fetching live details for ESPN Event: ${espnEventId} (Admin: ${userId})`);
+
+        // Use short cache for live games (15 seconds), longer for completed games
+        const gameDetails = await espnApi.getCachedOrFetch(
+            `live_game_${espnEventId}`,
+            () => espnApi.fetchLiveGameDetails(espnEventId),
+            15 * 1000 // 15 seconds cache for live data
+        );
+
+        return {
+            success: true,
+            data: gameDetails,
+            timestamp: new Date().toISOString()
+        };
+
+    } catch (error) {
+        console.error('fetchLiveGameDetails error:', error);
+        return {
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        };
+    }
+});
+
 // Fetch NFL news
 exports.fetchNflNews = functions.https.onCall(async (data, context) => {
     try {
@@ -667,6 +915,40 @@ exports.espnApiStatus = functions.https.onCall(async (data, context) => {
         return { success: false, error: error.message };
     }
 });*/
+
+// 🧪 TEMPORARY TEST FUNCTION - No auth required for testing
+exports.testLiveGameDetails = functions.https.onRequest(async (req, res) => {
+    // Set CORS headers
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+
+    try {
+        console.log('🧪 TEST: Request body:', JSON.stringify(req.body, null, 2));
+        console.log('🧪 TEST: Request query:', JSON.stringify(req.query, null, 2));
+
+        const espnEventId = req.body.espnEventId || req.query.espnEventId;
+
+        if (!espnEventId) {
+            throw new Error('ESPN Event ID is required');
+        }
+
+        console.log(`🧪 TEST: Fetching live details for ESPN Event: ${espnEventId}`);
+
+        const espnApi = new EspnNerdApi();
+        const gameData = await espnApi.fetchLiveGameDetails(espnEventId);
+
+        res.json({ success: true, data: gameData });
+    } catch (error) {
+        console.error('❌ TEST ERROR:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 // Export class for direct usage
 module.exports.EspnNerdApi = EspnNerdApi;

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modal Integration Verification</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .test-result { padding: 12px; border-radius: 8px; margin: 8px 0; }
+        .test-success { background-color: #d1fae5; border: 1px solid #10b981; }
+        .test-failure { background-color: #fee2e2; border: 1px solid #ef4444; }
+        .test-pending { background-color: #fef3c7; border: 1px solid #f59e0b; }
+    </style>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
+        <h1 class="text-2xl font-bold mb-6">🚀 DOPE Live Game Modal Integration Verification</h1>
+
+        <div class="space-y-4">
+            <div id="test-functions" class="test-result test-pending">
+                🔄 Testing Firebase Functions connection...
+            </div>
+
+            <div id="test-modal-js" class="test-result test-pending">
+                🔄 Testing liveGameModal.js loading...
+            </div>
+
+            <div id="test-main-app" class="test-result test-pending">
+                🔄 Testing main app integration...
+            </div>
+
+            <div id="test-espn-function" class="test-result test-pending">
+                🔄 Testing fetchLiveGameDetails function...
+            </div>
+
+            <div id="test-games" class="test-result test-pending">
+                🔄 Testing week 1 games availability...
+            </div>
+        </div>
+
+        <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h3 class="font-semibold text-blue-900 mb-2">Integration Summary:</h3>
+            <ul class="text-sm text-blue-800 space-y-1">
+                <li>• Main app runs on: <strong>http://127.0.0.1:5005</strong></li>
+                <li>• Firebase Functions on: <strong>http://127.0.0.1:5001</strong></li>
+                <li>• Modal system loaded via: <strong>liveGameModal.js</strong></li>
+                <li>• Click handlers added to games with: <strong>addGameClickHandler()</strong></li>
+                <li>• ESPN IDs fallback pattern: <strong>401671{game.id}</strong></li>
+            </ul>
+        </div>
+
+        <div id="results-log" class="mt-6 bg-slate-800 text-green-400 p-4 rounded-lg font-mono text-sm max-h-64 overflow-y-auto">
+            <div class="text-white font-semibold mb-2">📊 Test Results Log:</div>
+        </div>
+
+        <div class="mt-6 space-x-4">
+            <button id="run-tests" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                Run All Tests
+            </button>
+            <button id="test-modal" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                Test Modal with Known Game
+            </button>
+            <a href="http://127.0.0.1:5005" target="_blank" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 inline-block">
+                Open Main App
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function updateTestResult(testId, status, message) {
+            const element = document.getElementById(testId);
+            element.className = `test-result test-${status}`;
+
+            const icons = { success: '✅', failure: '❌', pending: '🔄' };
+            element.textContent = `${icons[status]} ${message}`;
+        }
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            document.getElementById('results-log').innerHTML += `[${timestamp}] ${message}<br>`;
+            console.log(message);
+        }
+
+        async function testFunctionsConnection() {
+            try {
+                log('Testing Functions connection to http://127.0.0.1:5001...');
+
+                const response = await fetch('http://127.0.0.1:5001/nerdfootball/us-central1/fetchLiveGameDetails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: { espnEventId: '401547429' } })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.result && data.result.success) {
+                    updateTestResult('test-functions', 'success', 'Firebase Functions working perfectly!');
+                    log(`✅ Functions test passed - Game: ${data.result.data.teams.away.name} @ ${data.result.data.teams.home.name}`);
+                    return true;
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                updateTestResult('test-functions', 'failure', `Functions connection failed: ${error.message}`);
+                log(`❌ Functions test failed: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function testModalJSLoading() {
+            try {
+                log('Testing liveGameModal.js loading...');
+
+                // Try to load the script dynamically to test
+                const response = await fetch('http://127.0.0.1:5005/liveGameModal.js');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const jsContent = await response.text();
+                if (jsContent.includes('openLiveGameModal') && jsContent.includes('fetchLiveGameDetails')) {
+                    updateTestResult('test-modal-js', 'success', 'liveGameModal.js loaded successfully!');
+                    log('✅ Modal JS contains all required functions');
+                    return true;
+                } else {
+                    throw new Error('Missing required functions in modal JS');
+                }
+            } catch (error) {
+                updateTestResult('test-modal-js', 'failure', `Modal JS loading failed: ${error.message}`);
+                log(`❌ Modal JS test failed: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function testMainAppIntegration() {
+            try {
+                log('Testing main app integration...');
+
+                const response = await fetch('http://127.0.0.1:5005/');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const htmlContent = await response.text();
+
+                const checks = [
+                    { name: 'liveGameModal.js script', pattern: 'liveGameModal.js' },
+                    { name: 'live-game-modal div', pattern: 'live-game-modal' },
+                    { name: 'addGameClickHandler call', pattern: 'addGameClickHandler' },
+                    { name: 'Firebase functions setup', pattern: 'window.functions' }
+                ];
+
+                let allPassed = true;
+                checks.forEach(check => {
+                    if (htmlContent.includes(check.pattern)) {
+                        log(`✅ Found: ${check.name}`);
+                    } else {
+                        log(`❌ Missing: ${check.name}`);
+                        allPassed = false;
+                    }
+                });
+
+                if (allPassed) {
+                    updateTestResult('test-main-app', 'success', 'Main app integration complete!');
+                    return true;
+                } else {
+                    updateTestResult('test-main-app', 'failure', 'Main app integration incomplete');
+                    return false;
+                }
+            } catch (error) {
+                updateTestResult('test-main-app', 'failure', `Main app test failed: ${error.message}`);
+                log(`❌ Main app test failed: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function testESPNFunction() {
+            try {
+                log('Testing fetchLiveGameDetails with known working ESPN ID...');
+
+                // Test with multiple ESPN IDs
+                const testIds = ['401547429', '40167101', '40167102'];
+                let workingIds = 0;
+
+                for (const espnId of testIds) {
+                    try {
+                        const response = await fetch('http://127.0.0.1:5001/nerdfootball/us-central1/fetchLiveGameDetails', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: { espnEventId: espnId } })
+                        });
+
+                        const data = await response.json();
+                        if (data.result && data.result.success) {
+                            workingIds++;
+                            log(`✅ ESPN ID ${espnId} works: ${data.result.data.teams.away.name} @ ${data.result.data.teams.home.name}`);
+                        } else {
+                            log(`⚠️ ESPN ID ${espnId} returned no data (expected for fallback IDs)`);
+                        }
+                    } catch (error) {
+                        log(`⚠️ ESPN ID ${espnId} failed: ${error.message}`);
+                    }
+                }
+
+                if (workingIds > 0) {
+                    updateTestResult('test-espn-function', 'success', `ESPN Function working! ${workingIds}/${testIds.length} IDs returned data`);
+                    return true;
+                } else {
+                    updateTestResult('test-espn-function', 'failure', 'No ESPN IDs returned valid data');
+                    return false;
+                }
+            } catch (error) {
+                updateTestResult('test-espn-function', 'failure', `ESPN function test failed: ${error.message}`);
+                log(`❌ ESPN function test failed: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function testGamesAvailability() {
+            try {
+                log('Testing week 1 games availability...');
+
+                const response = await fetch('http://127.0.0.1:5005/nfl_2025_week_1.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const weekData = await response.json();
+                if (weekData.games && weekData.games.length > 0) {
+                    updateTestResult('test-games', 'success', `Week 1 games loaded! ${weekData.games.length} games available`);
+                    log(`✅ Week 1 has ${weekData.games.length} games`);
+                    log(`🏈 Sample game: ${weekData.games[0].a} @ ${weekData.games[0].h}`);
+                    log(`🔢 Fallback ESPN ID for game 101: 401671101`);
+                    return true;
+                } else {
+                    throw new Error('No games found in week data');
+                }
+            } catch (error) {
+                updateTestResult('test-games', 'failure', `Games test failed: ${error.message}`);
+                log(`❌ Games test failed: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function runAllTests() {
+            log('🚀 Starting complete integration test suite...');
+
+            const results = await Promise.all([
+                testFunctionsConnection(),
+                testModalJSLoading(),
+                testMainAppIntegration(),
+                testESPNFunction(),
+                testGamesAvailability()
+            ]);
+
+            const passed = results.filter(r => r).length;
+            const total = results.length;
+
+            log(`📊 Test Results: ${passed}/${total} tests passed`);
+
+            if (passed === total) {
+                log('🎉 ALL TESTS PASSED! Modal integration is complete and working!');
+                log('🎯 Ready to test: Click games in main app to open live modals');
+            } else {
+                log(`⚠️ ${total - passed} tests failed. Check individual results above.`);
+            }
+        }
+
+        async function testModalWithKnownGame() {
+            try {
+                log('🎯 Testing modal with known working game...');
+
+                // Simulate clicking on a game with known ESPN ID
+                if (typeof window.openLiveGameModal === 'function') {
+                    window.openLiveGameModal('test-game', '401547429');
+                    log('✅ Modal opened successfully!');
+                } else {
+                    // Load modal script if not loaded
+                    const script = document.createElement('script');
+                    script.src = 'http://127.0.0.1:5005/liveGameModal.js';
+                    script.onload = () => {
+                        setTimeout(() => {
+                            if (typeof window.openLiveGameModal === 'function') {
+                                window.openLiveGameModal('test-game', '401547429');
+                                log('✅ Modal script loaded and modal opened!');
+                            } else {
+                                log('❌ Modal function still not available after loading script');
+                            }
+                        }, 500);
+                    };
+                    document.head.appendChild(script);
+                }
+            } catch (error) {
+                log(`❌ Modal test failed: ${error.message}`);
+            }
+        }
+
+        document.getElementById('run-tests').addEventListener('click', runAllTests);
+        document.getElementById('test-modal').addEventListener('click', testModalWithKnownGame);
+
+        // Auto-run tests on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(runAllTests, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -530,7 +530,9 @@ const {
     fetchGamesByDate,
     fetchNflTeams,
     fetchSeasonSchedule,
-    espnApiStatus
+    espnApiStatus,
+    fetchLiveGameDetails,
+    testLiveGameDetails
 } = require('./espnNerdApi');
 
 exports.fetchCurrentWeekGames = fetchCurrentWeekGames;
@@ -538,6 +540,8 @@ exports.fetchGamesByDate = fetchGamesByDate;
 exports.fetchNflTeams = fetchNflTeams;
 exports.fetchSeasonSchedule = fetchSeasonSchedule;
 exports.espnApiStatus = espnApiStatus;
+exports.fetchLiveGameDetails = fetchLiveGameDetails;
+exports.testLiveGameDetails = testLiveGameDetails;
 
 // Import and export contact form functions
 const {

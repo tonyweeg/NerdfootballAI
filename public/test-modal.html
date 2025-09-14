@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test DOPE Game Modal</title>
+    <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.2/firebase-functions-compat.js"></script>
+</head>
+<body class="bg-slate-100 p-8">
+    <h1 class="text-2xl font-bold mb-6">🚀 DOPE Game Modal Test</h1>
+
+    <!-- Test Game Card -->
+    <div id="test-game-card" class="bg-white p-4 rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-shadow border border-slate-200" title="Click to test modal">
+        <div class="flex items-center justify-between">
+            <div class="font-semibold">Cleveland Browns</div>
+            <div class="text-slate-500">@</div>
+            <div class="font-semibold">Baltimore Ravens</div>
+        </div>
+        <div class="text-sm text-slate-600 mt-2">Game 202 - Click to test modal</div>
+    </div>
+
+    <!-- Direct Test Button -->
+    <button id="test-button" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        Direct Modal Test
+    </button>
+
+    <div class="mt-4 p-4 bg-slate-50 rounded">
+        <h3 class="font-bold mb-2">Debug Info:</h3>
+        <div id="debug-log" class="text-sm text-slate-600"></div>
+    </div>
+
+    <!-- Firebase Config -->
+    <script>
+        // Firebase configuration for local testing
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfz6GfHlmpXmjjEhOLAMTJX2xE3U_mZZE",
+            authDomain: "nerdfootball.firebaseapp.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.firebasestorage.app",
+            messagingSenderId: "1074653118890",
+            appId: "1:1074653118890:web:6ee24cf5be97cf99ce9e81"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const functions = firebase.functions();
+
+        // Use local emulator for testing
+        functions.useEmulator("localhost", 5004);
+
+        function debugLog(message) {
+            console.log(message);
+            const debugDiv = document.getElementById('debug-log');
+            debugDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+        }
+
+        debugLog("Firebase initialized for local testing");
+
+        // Test function to call our live game modal
+        async function testLiveGameModal() {
+            debugLog("🚀 Testing live game modal...");
+
+            try {
+                // Call our Firebase Function directly
+                const fetchLiveGameDetailsFn = firebase.functions().httpsCallable('fetchLiveGameDetails');
+                debugLog("Calling fetchLiveGameDetails function...");
+
+                const result = await fetchLiveGameDetailsFn({ espnEventId: '401547429' });
+
+                debugLog(`Function call successful: ${JSON.stringify(result.data)}`);
+
+                if (result.data.success) {
+                    debugLog("✅ Live game data retrieved successfully!");
+                    debugLog(`Game: ${JSON.stringify(result.data.data.teams)}`);
+                } else {
+                    debugLog(`❌ Function returned error: ${result.data.error}`);
+                }
+
+            } catch (error) {
+                debugLog(`❌ Error calling function: ${error.message}`);
+                console.error('Full error:', error);
+            }
+        }
+
+        // Add event listeners when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            debugLog("DOM loaded, adding event listeners...");
+
+            const testCard = document.getElementById('test-game-card');
+            const testButton = document.getElementById('test-button');
+
+            if (testCard) {
+                testCard.addEventListener('click', testLiveGameModal);
+                debugLog("✅ Click handler added to game card");
+            }
+
+            if (testButton) {
+                testButton.addEventListener('click', testLiveGameModal);
+                debugLog("✅ Click handler added to test button");
+            }
+
+            debugLog("Ready for testing! Click the game card or button.");
+        });
+    </script>
+</body>
+</html>

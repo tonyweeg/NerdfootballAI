@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOPE Live Game Modal Test - Port 5005</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .game-card {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .game-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 p-6">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h1 class="text-2xl font-bold text-slate-800 mb-4">🚀 DOPE Live Game Modal Test</h1>
+            <p class="text-slate-600 mb-4">Testing the complete integration on emulator port 5005</p>
+
+            <div class="space-y-3">
+                <div id="connection-status" class="p-3 rounded-lg bg-yellow-100 text-yellow-800">
+                    🔄 Initializing Firebase connection...
+                </div>
+                <div id="modal-status" class="p-3 rounded-lg bg-yellow-100 text-yellow-800">
+                    🔄 Checking modal system...
+                </div>
+                <div id="function-status" class="p-3 rounded-lg bg-yellow-100 text-yellow-800">
+                    🔄 Testing Firebase Function...
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Game Cards -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold text-slate-800 mb-4">Test Game Cards (Click to Open Modal)</h2>
+            <div class="space-y-3">
+                <!-- Game Card 1: Working ESPN ID -->
+                <div class="game-card bg-slate-50 border border-slate-200 rounded-lg p-4 hover:bg-slate-100"
+                     data-game-id="test-1" data-espn-id="401547429">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-semibold text-slate-800">Denver Broncos @ Miami Dolphins</div>
+                            <div class="text-sm text-slate-600">ESPN ID: 401547429 (Known working)</div>
+                        </div>
+                        <div class="bg-green-600 text-white px-3 py-1 rounded-full text-sm">Final: MIA 70, DEN 20</div>
+                    </div>
+                </div>
+
+                <!-- Game Card 2: Fallback ESPN ID -->
+                <div class="game-card bg-slate-50 border border-slate-200 rounded-lg p-4 hover:bg-slate-100"
+                     data-game-id="test-2" data-espn-id="40167102">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-semibold text-slate-800">Test Game 2</div>
+                            <div class="text-sm text-slate-600">ESPN ID: 40167102 (Fallback pattern)</div>
+                        </div>
+                        <div class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm">Test Game</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Output -->
+        <div class="bg-slate-800 text-green-400 rounded-xl p-4 font-mono text-sm">
+            <h3 class="text-white font-semibold mb-2">🔍 Debug Log</h3>
+            <div id="debug-log" class="max-h-64 overflow-y-auto">
+                Initializing test...<br>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import the Live Game Modal System -->
+    <script src="./liveGameModal.js"></script>
+
+    <!-- 🚀 DOPE LIVE GAME MODAL - Real-time ESPN Integration -->
+    <div id="live-game-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex">
+        <div class="fixed inset-0 bg-black bg-opacity-75" onclick="closeLiveGameModal()"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-6 border-b border-slate-200">
+                <h2 id="modal-game-title" class="text-xl font-bold text-slate-800">Loading Game...</h2>
+                <div class="flex items-center space-x-3">
+                    <button id="modal-refresh-btn" onclick="refreshLiveGameData()"
+                            class="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700 flex items-center space-x-2">
+                        <span>🔄</span><span>Refresh</span>
+                    </button>
+                    <button onclick="closeLiveGameModal()" class="text-slate-400 hover:text-slate-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="modal-loading" class="text-center p-12">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <h3 class="text-lg font-semibold text-slate-800 mb-2">Loading Live Game Data...</h3>
+                <p class="text-slate-600">Fetching real-time ESPN data</p>
+            </div>
+
+            <!-- Game Content -->
+            <div id="modal-game-content" class="hidden">
+                <!-- Teams Score Header -->
+                <div class="flex items-center justify-between p-6 bg-slate-50 border-b border-slate-200">
+                    <div class="flex items-center space-x-4">
+                        <div id="modal-away-logo" class="w-12 h-12 bg-slate-300 rounded-full flex items-center justify-center">
+                            <span id="modal-away-abbr" class="text-white font-bold text-sm">AWY</span>
+                        </div>
+                        <div class="text-center">
+                            <div id="modal-away-name" class="font-semibold text-slate-800">Away Team</div>
+                            <div id="modal-away-record" class="text-sm text-slate-500">(0-0)</div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <div class="flex items-center space-x-4">
+                            <div id="modal-away-score" class="text-3xl font-bold text-slate-800">0</div>
+                            <div class="text-slate-400">-</div>
+                            <div id="modal-home-score" class="text-3xl font-bold text-slate-800">0</div>
+                        </div>
+                        <div class="mt-2 space-y-1">
+                            <div id="modal-game-status" class="text-sm font-medium text-slate-600">Scheduled</div>
+                            <div class="flex items-center justify-center space-x-2 text-xs text-slate-500">
+                                <span id="modal-game-period">--</span>
+                                <span>•</span>
+                                <span id="modal-game-clock">--:--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4">
+                        <div class="text-center">
+                            <div id="modal-home-name" class="font-semibold text-slate-800">Home Team</div>
+                            <div id="modal-home-record" class="text-sm text-slate-500">(0-0)</div>
+                        </div>
+                        <div id="modal-home-logo" class="w-12 h-12 bg-slate-300 rounded-full flex items-center justify-center">
+                            <span id="modal-home-abbr" class="text-white font-bold text-sm">HOM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Game State (shown for in-progress games) -->
+                <div id="modal-live-state" class="p-4 bg-yellow-50 border-b border-slate-200 hidden">
+                    <div class="flex items-center justify-between text-sm">
+                        <div><span class="font-medium">Possession:</span> <span id="modal-possession">--</span></div>
+                        <div><span class="font-medium">Field Position:</span> <span id="modal-field-position">--</span></div>
+                    </div>
+                    <div class="mt-2 text-sm">
+                        <span class="font-medium">Last Play:</span> <span id="modal-last-play">--</span>
+                    </div>
+                </div>
+
+                <!-- Win Probability (shown for live games) -->
+                <div id="modal-win-probability" class="p-4 border-b border-slate-200 hidden">
+                    <div class="text-sm font-medium text-slate-700 mb-2">Win Probability</div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span id="modal-away-team-short" class="text-sm font-medium">AWY</span>
+                        <span id="modal-probability-text" class="text-sm text-slate-600">50% - 50%</span>
+                        <span id="modal-home-team-short" class="text-sm font-medium">HOM</span>
+                    </div>
+                    <div class="bg-slate-200 rounded-full h-2">
+                        <div id="modal-probability-bar" class="bg-blue-500 h-full rounded-full transition-all duration-500" style="width: 50%"></div>
+                    </div>
+                </div>
+
+                <!-- Team Statistics -->
+                <div id="modal-team-stats" class="p-4 border-b border-slate-200 hidden">
+                    <div class="text-sm font-medium text-slate-700 mb-3">Team Statistics</div>
+                    <div class="grid grid-cols-3 gap-4 text-sm">
+                        <div class="text-center">
+                            <div class="font-medium text-slate-800" id="modal-away-total-yards">--</div>
+                            <div class="text-slate-500">Total Yards</div>
+                            <div class="font-medium text-slate-800" id="modal-home-total-yards">--</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="font-medium text-slate-800" id="modal-away-passing-yards">--</div>
+                            <div class="text-slate-500">Passing</div>
+                            <div class="font-medium text-slate-800" id="modal-home-passing-yards">--</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="font-medium text-slate-800" id="modal-away-rushing-yards">--</div>
+                            <div class="text-slate-500">Rushing</div>
+                            <div class="font-medium text-slate-800" id="modal-home-rushing-yards">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Plays -->
+                <div id="modal-recent-plays" class="p-4 border-b border-slate-200 hidden">
+                    <div class="text-sm font-medium text-slate-700 mb-3">Recent Plays</div>
+                    <div id="modal-plays-list" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Plays will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Venue & Broadcast Info -->
+                <div class="p-4 bg-slate-50 text-sm text-slate-600">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="font-medium text-slate-700">Venue</div>
+                            <div id="modal-venue-name">--</div>
+                            <div id="modal-venue-location">--</div>
+                            <div id="modal-venue-capacity">--</div>
+                        </div>
+                        <div>
+                            <div class="font-medium text-slate-700">Broadcast</div>
+                            <div id="modal-broadcast">--</div>
+                            <div class="font-medium text-slate-700 mt-2">Weather</div>
+                            <div id="modal-weather-info">--</div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-3 text-center">
+                        <span id="modal-last-updated">Last updated: --</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let functions, httpsCallable;
+
+        function debugLog(message) {
+            const logElement = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const colors = {
+                success: 'bg-green-100 text-green-800',
+                error: 'bg-red-100 text-red-800',
+                info: 'bg-blue-100 text-blue-800'
+            };
+            element.className = `p-3 rounded-lg ${colors[type]}`;
+            element.textContent = message;
+        }
+
+        async function initializeTest() {
+            debugLog('🚀 Starting DOPE Live Game Modal Test...');
+
+            try {
+                // Initialize Firebase
+                const firebaseConfig = {
+                    apiKey: "AIzaSyBVhJrZsHQqvA7wNPckSAjKLvKt5aV7rfs",
+                    authDomain: "nerdfootball.firebaseapp.com",
+                    databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+                    projectId: "nerdfootball",
+                    storageBucket: "nerdfootball.appspot.com",
+                    messagingSenderId: "767336095862",
+                    appId: "1:767336095862:web:f7a5b8f58a8b8934be5aef"
+                };
+
+                firebase.initializeApp(firebaseConfig);
+
+                // Initialize Functions with emulator
+                functions = firebase.functions();
+                functions.useEmulator('127.0.0.1', 5001);
+                httpsCallable = firebase.functions().httpsCallable;
+
+                debugLog('✅ Firebase initialized successfully');
+                updateStatus('connection-status', '✅ Firebase connected to emulator (port 5001)', 'success');
+
+                // Check if modal functions are available
+                if (typeof window.openLiveGameModal === 'function') {
+                    debugLog('✅ Modal system loaded successfully');
+                    updateStatus('modal-status', '✅ Modal system ready', 'success');
+                } else {
+                    debugLog('❌ Modal functions not available');
+                    updateStatus('modal-status', '❌ Modal system not loaded', 'error');
+                }
+
+                // Test the Firebase Function
+                debugLog('🔄 Testing fetchLiveGameDetails function...');
+                const fetchLiveGameDetailsFn = httpsCallable('fetchLiveGameDetails');
+                const result = await fetchLiveGameDetailsFn({ espnEventId: '401547429' });
+
+                if (result.data && result.data.success) {
+                    debugLog('✅ Firebase Function working perfectly!');
+                    debugLog(`📊 Game data: ${result.data.data.teams.away.name} @ ${result.data.data.teams.home.name}`);
+                    updateStatus('function-status', '✅ Firebase Function working', 'success');
+                } else {
+                    debugLog('❌ Function call failed');
+                    updateStatus('function-status', '❌ Function call failed', 'error');
+                }
+
+                // Add click handlers to game cards
+                setupGameCardHandlers();
+
+            } catch (error) {
+                debugLog(`❌ Error during initialization: ${error.message}`);
+                updateStatus('connection-status', '❌ Initialization failed', 'error');
+            }
+        }
+
+        function setupGameCardHandlers() {
+            const gameCards = document.querySelectorAll('.game-card');
+
+            gameCards.forEach(card => {
+                const gameId = card.dataset.gameId;
+                const espnId = card.dataset.espnId;
+
+                card.addEventListener('click', () => {
+                    debugLog(`🎯 Game card clicked: ${gameId} (ESPN: ${espnId})`);
+
+                    if (typeof window.openLiveGameModal === 'function') {
+                        window.openLiveGameModal(gameId, espnId);
+                    } else {
+                        debugLog('❌ openLiveGameModal function not available');
+                        alert('Modal system not loaded. Check the console for details.');
+                    }
+                });
+            });
+
+            debugLog(`✅ Added click handlers to ${gameCards.length} game cards`);
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeTest);
+    </script>
+</body>
+</html>

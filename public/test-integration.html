@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integration Test - Live Game Modal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold text-center mb-8">Live Game Modal Integration Test</h1>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Test Firebase Functions Connection</h2>
+            <button id="test-function" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Test Firebase Function Direct Call
+            </button>
+            <div id="function-result" class="mt-4 p-4 bg-gray-50 rounded hidden"></div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-4">Integration Verification</h2>
+            <button id="run-verification" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                Run Integration Verification Tests
+            </button>
+            <div id="verification-output" class="mt-4 p-4 bg-gray-50 rounded hidden">
+                <p class="text-sm text-gray-600">Open browser console (F12) to see verification results.</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4">Test Game Modal Integration</h2>
+            <p class="text-gray-600 mb-4">Click the game card below to test the live modal:</p>
+
+            <div id="test-game-card" class="border border-gray-300 p-4 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors bg-white shadow-sm">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-semibold">Test Game</h3>
+                        <p class="text-sm text-gray-500">Click to view live details</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-lg font-bold">Team A vs Team B</div>
+                        <div class="text-sm text-gray-500">ESPN ID: 401547429</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Firebase and dependencies -->
+    <script src="./firebase-global-init.js"></script>
+    <script src="./bundle-dependency-gate.js"></script>
+    <script src="./liveGameModal.js"></script>
+    <script src="./verify-integration.js"></script>
+
+    <script>
+        // Wait for Firebase to be ready
+        window.addEventListener('firebaseGlobalsReady', function() {
+            console.log('🔥 Firebase ready for integration test');
+
+            // Test direct Firebase Function call
+            document.getElementById('test-function').addEventListener('click', async function() {
+                const resultDiv = document.getElementById('function-result');
+                resultDiv.classList.remove('hidden');
+                resultDiv.innerHTML = '<div class="animate-pulse">Testing Firebase Function...</div>';
+
+                try {
+                    const fetchLiveGameDetailsFn = window.httpsCallable(window.functions, 'fetchLiveGameDetails');
+                    const result = await fetchLiveGameDetailsFn({ espnEventId: '401547429' });
+
+                    resultDiv.innerHTML = `
+                        <div class="text-green-600 font-semibold">✅ Function Call Successful!</div>
+                        <div class="mt-2 text-sm">
+                            <strong>Success:</strong> ${result.data.success}<br>
+                            <strong>Game:</strong> ${result.data.data?.teams?.away?.name || 'N/A'} @ ${result.data.data?.teams?.home?.name || 'N/A'}
+                        </div>
+                    `;
+                } catch (error) {
+                    resultDiv.innerHTML = `
+                        <div class="text-red-600 font-semibold">❌ Function Call Failed</div>
+                        <div class="mt-2 text-sm text-red-500">${error.message}</div>
+                    `;
+                }
+            });
+
+            // Set up verification test button
+            document.getElementById('run-verification').addEventListener('click', function() {
+                const outputDiv = document.getElementById('verification-output');
+                outputDiv.classList.remove('hidden');
+                console.log('🔍 Running integration verification...');
+                // The verification script will run automatically since it's loaded
+            });
+
+            // Set up game card click handler using the addGameClickHandler function
+            const gameCard = document.getElementById('test-game-card');
+            if (window.addGameClickHandler) {
+                console.log('🎯 Setting up game click handler');
+                window.addGameClickHandler(gameCard, 'test-game-1', '401547429');
+            } else {
+                console.warn('⚠️ addGameClickHandler not available');
+
+                // Fallback: direct click handler
+                gameCard.addEventListener('click', function() {
+                    if (window.openLiveGameModal) {
+                        console.log('🎯 Opening live game modal directly');
+                        window.openLiveGameModal('test-game-1', '401547429');
+                    } else {
+                        alert('Live game modal not available');
+                    }
+                });
+            }
+        });
+
+        // Fallback timeout for Firebase initialization
+        setTimeout(() => {
+            if (!window.firebaseReady) {
+                console.warn('⚠️ Firebase not ready after 3 seconds, setting up fallback handlers');
+                document.getElementById('test-function').addEventListener('click', function() {
+                    alert('Firebase not initialized. Please refresh the page.');
+                });
+            }
+        }, 3000);
+    </script>
+</body>
+</html>
