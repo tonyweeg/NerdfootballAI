@@ -701,10 +701,15 @@ exports.fetchCurrentWeekGames = functions.https.onCall(async (data, context) => 
     try {
         // If no week specified, fetch current ESPN scoreboard (no dates = current games)
         const week = data.week || espnApi.getCurrentWeek();
-        
+        const forceRefresh = data.forceRefresh || false;
+
+        // Use dynamic cache key to force refresh when requested
+        const cacheKey = forceRefresh ? `games_current_force_${Date.now()}` : `games_current`;
+
         const games = await espnApi.getCachedOrFetch(
-            `games_current`,
+            cacheKey,
             async () => {
+                console.log(`🔄 ${forceRefresh ? 'FORCE REFRESH:' : ''} Fetching current games from ESPN scoreboard`);
                 // Don't specify dates to get current/upcoming games from ESPN
                 const endpoint = '/scoreboard';
                 const espnData = await espnApi.makeRequest(endpoint);

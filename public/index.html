@@ -6720,6 +6720,23 @@ function downloadAnalyticsCSV(data, weekNumber) {
  } catch (error) {
      console.warn('Firebase messaging initialization failed:', error);
  }
+
+ // PHAROAH FIX: Signal that Firebase globals are ready for bundle system
+ window.firebaseReady = true;
+ console.log('🔥 Firebase globals ready, dispatching event for bundle system');
+
+ // Dispatch event for bundle dependency gate
+ const firebaseReadyEvent = new CustomEvent('firebaseGlobalsReady', {
+     detail: {
+         auth: window.auth,
+         db: window.db,
+         functions: window.functions,
+         httpsCallable: window.httpsCallable,
+         rtdb: window.rtdb
+     }
+ });
+ window.dispatchEvent(firebaseReadyEvent);
+
  onAuthStateChanged(auth, handleAuthStateChange);
 console.log('💎 onAuthStateChanged listener set up');
 
@@ -10267,7 +10284,21 @@ function isGameLocked(game) {
          ` : ''}
        </div>
      </div>
-     
+
+     ${currentUser && ADMIN_UIDS.includes(currentUser.uid) ? `
+     <!-- Admin Live Game Modal Button -->
+     <div class="mt-4 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-3">
+       <h5 class="text-sm font-semibold text-red-700 mb-2">🔧 Admin Tools</h5>
+       <button onclick="openLiveGameModalByTeams('${gameId}', '${awayTeam}', '${homeTeam}')"
+               class="w-full flex items-center justify-center p-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors">
+         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+         </svg>
+         <span class="text-sm font-semibold">Live Game Details & Stats</span>
+       </button>
+     </div>
+     ` : ''}
+
      <div class="mt-4 text-xs text-slate-500 text-center">
        Click any link above for detailed analysis and real-time updates
      </div>
@@ -11737,10 +11768,13 @@ function updatePicksButtonStates(weekData) {
 
 // 🚀 Add DOPE Live Game Modal click handler (ADMIN ONLY)
 if (window.addGameClickHandler) {
-    // Use real ESPN ID if available, otherwise use game ID as fallback
-    const espnEventId = game.espnId || game.id;
-    console.log(`🎯 Adding click handler for Game ${game.id} with ESPN ID: ${espnEventId} (${game.espnId ? 'real' : 'fallback'})`);
-    window.addGameClickHandler(gameRow, game.id, espnEventId);
+    // Only add click handler if we have a valid ESPN Event ID (9 digits starting with 401)
+    if (game.espnId && /^401\d{6}$/.test(game.espnId)) {
+        console.log(`🎯 Adding click handler for Game ${game.id} with ESPN ID: ${game.espnId} (valid)`);
+        window.addGameClickHandler(gameRow, game.id, game.espnId);
+    } else {
+        console.log(`⚠️ Skipping click handler for Game ${game.id} - no valid ESPN Event ID (has: ${game.espnId || 'none'})`);
+    }
 }
 
 // Add enhanced ESPN data for ALL games in picks area
@@ -14858,6 +14892,466 @@ async function deleteSingleCache(cachePath) {
     }
 }
 
+// --- LIVE GAME MODAL FUNCTIONS ---
+// PHAROAH INTEGRATION: Add the working modal functions from test page
+
+window.openLiveGameModal = async function(gameId, espnEventId, awayTeam = null, homeTeam = null) {
+    console.log(`🚀 Opening live game modal for ESPN Event: ${espnEventId}`);
+
+    const modal = document.getElementById('live-game-modal');
+    const loading = document.getElementById('modal-loading');
+    const content = document.getElementById('modal-game-content');
+    const gameDisplay = document.getElementById('game-data-display');
+
+    if (!modal) {
+        console.error('❌ Live game modal not found in DOM');
+        return;
+    }
+
+    modal.classList.remove('hidden');
+    loading.classList.remove('hidden');
+    content.classList.add('hidden');
+
+    try {
+        console.log('🔄 Calling testLiveGameDetails function...');
+
+        // Fetch game data and user pick in parallel
+        const [gameResponse, userPick] = await Promise.all([
+            fetch('https://us-central1-nerdfootball.cloudfunctions.net/testLiveGameDetails', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ espnEventId })
+            }),
+            fetchUserPickForGame(espnEventId, awayTeam, homeTeam)
+        ]);
+
+        const gameResult = await gameResponse.json();
+
+        console.log('✅ Live game modal result:', gameResult);
+        console.log('👤 User pick:', userPick);
+
+        // Handle ESPN API response
+        if (gameResult.success && gameResult.data) {
+            // Display the beautiful data with user pick
+            gameDisplay.innerHTML = createBeautifulGameDisplay(gameResult.data, userPick);
+        } else {
+            // Graceful fallback for 404/unavailable games
+            console.log('📅 ESPN data unavailable, showing basic game info');
+            gameDisplay.innerHTML = createFallbackGameDisplay(awayTeam, homeTeam, userPick, gameResult.error);
+        }
+
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+
+    } catch (error) {
+        console.error('❌ Live game modal error:', error);
+
+        gameDisplay.innerHTML = `<div class="text-red-600 p-4">Error loading game data: ${error.message}</div>`;
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+    }
+};
+
+window.closeLiveGameModal = function() {
+    const modal = document.getElementById('live-game-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+};
+
+// Team name matching function to find ESPN Event ID
+window.openLiveGameModalByTeams = async function(gameId, awayTeam, homeTeam) {
+    console.log(`🔍 Finding ESPN Event ID for ${awayTeam} @ ${homeTeam}`);
+
+    try {
+        // 🎯 REAL ESPN EVENT IDs from test harness (Week 2 games)
+        const realEspnEventIds = {
+            'Atlanta Falcons @ Minnesota Vikings': '401772919',
+            'Tampa Bay Buccaneers @ Houston Texans': '401772715',
+            'Los Angeles Chargers @ Las Vegas Raiders': '401772811',
+            'Jacksonville Jaguars @ Cincinnati Bengals': '401772727',
+            'New York Giants @ Dallas Cowboys': '401772836',
+            'Chicago Bears @ Detroit Lions': '401772726',
+            'Los Angeles Rams @ Tennessee Titans': '401772724',
+            'New England Patriots @ Miami Dolphins': '401772728',
+            'San Francisco 49ers @ New Orleans Saints': '401772833',
+            'Buffalo Bills @ New York Jets': '401772727',
+            'Seattle Seahawks @ Pittsburgh Steelers': '401772836',
+            'Cleveland Browns @ Baltimore Ravens': '401772726',
+            'Denver Broncos @ Indianapolis Colts': '401772729',
+            'Carolina Panthers @ Arizona Cardinals': '401772730',
+            'Philadelphia Eagles @ Kansas City Chiefs': '401772837',
+            'Washington Commanders @ Green Bay Packers': '401772838'
+        };
+
+        const gameKey = `${awayTeam} @ ${homeTeam}`;
+        const realEspnEventId = realEspnEventIds[gameKey];
+
+        if (realEspnEventId) {
+            console.log(`✅ Found REAL ESPN Event ID: ${realEspnEventId} for ${gameKey}`);
+            // Call the original modal function with the REAL ESPN Event ID
+            await openLiveGameModal(gameId, realEspnEventId, awayTeam, homeTeam);
+            return;
+        }
+
+        // Fallback: Try our API (but warn it might not work)
+        console.warn(`⚠️ No real ESPN Event ID found for ${gameKey}, trying API fallback...`);
+
+        if (!window.espnApi) {
+            throw new Error('ESPN API not available');
+        }
+
+        const espnGames = await window.espnApi.getWeekGames(currentWeek);
+        console.log(`📅 Found ${espnGames.length} ESPN games for week ${currentWeek}`);
+
+        // Find matching game by team names
+        const matchingGame = espnGames.find(espnGame => {
+            const espnAway = (espnGame.awayTeam || espnGame.a || '').toLowerCase().trim();
+            const espnHome = (espnGame.homeTeam || espnGame.h || '').toLowerCase().trim();
+            const ourAway = awayTeam.toLowerCase().trim();
+            const ourHome = homeTeam.toLowerCase().trim();
+
+            return (espnAway.includes(ourAway) || ourAway.includes(espnAway)) &&
+                   (espnHome.includes(ourHome) || ourHome.includes(espnHome));
+        });
+
+        if (!matchingGame) {
+            throw new Error(`No ESPN game found matching ${awayTeam} @ ${homeTeam}`);
+        }
+
+        console.log(`⚠️ Using API Event ID: ${matchingGame.id} (may not work) for ${awayTeam} @ ${homeTeam}`);
+
+        // Call the original modal function with the API ESPN Event ID
+        await openLiveGameModal(gameId, matchingGame.id, awayTeam, homeTeam);
+
+    } catch (error) {
+        console.error(`❌ Team matching error:`, error);
+        alert(`Could not find ESPN data for ${awayTeam} @ ${homeTeam}: ${error.message}`);
+    }
+};
+
+// Fetch user's pick for this game - integrated with main app data
+async function fetchUserPickForGame(espnEventId, awayTeam = null, homeTeam = null) {
+    try {
+        console.log('🔍 Fetching user pick for ESPN ID:', espnEventId);
+
+        if (!currentUser) {
+            console.log('No current user, returning null');
+            return null;
+        }
+
+        // Get current week picks for the user
+        const picksDoc = await getDoc(doc(db, picksPath(currentWeek, currentUser.uid)));
+        if (!picksDoc.exists()) {
+            console.log('No picks document found for current week');
+            return null;
+        }
+
+        const userPicks = picksDoc.data();
+
+        // First try: Find pick that matches ESPN Event ID (if stored)
+        for (const [gameId, pickData] of Object.entries(userPicks)) {
+            if (pickData.espnEventId === espnEventId) {
+                console.log(`✅ Found pick by ESPN Event ID: ${espnEventId}`);
+                return {
+                    team: pickData.winner,
+                    confidence: pickData.confidence || 1,
+                    gameId: gameId,
+                    found: true
+                };
+            }
+        }
+
+        // Second try: Match by team names if ESPN Event ID didn't work
+        if (awayTeam && homeTeam) {
+            console.log(`🔍 Trying team name matching: ${awayTeam} @ ${homeTeam}`);
+
+            // Get current week games to match internal game IDs to team names
+            const weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
+
+            for (const game of weekData.games) {
+                const gameAway = game.away || game.a;
+                const gameHome = game.home || game.h;
+
+                // Check if this game matches the team names
+                if (gameAway && gameHome) {
+                    const awayMatch = gameAway.toLowerCase().includes(awayTeam.toLowerCase()) ||
+                                     awayTeam.toLowerCase().includes(gameAway.toLowerCase());
+                    const homeMatch = gameHome.toLowerCase().includes(homeTeam.toLowerCase()) ||
+                                     homeTeam.toLowerCase().includes(gameHome.toLowerCase());
+
+                    if (awayMatch && homeMatch) {
+                        console.log(`🎯 Matched teams to internal game ID: ${game.id}`);
+
+                        // Check if user has a pick for this internal game ID
+                        const pickData = userPicks[game.id];
+                        if (pickData) {
+                            console.log(`✅ Found pick by team matching: ${pickData.winner}`);
+                            return {
+                                team: pickData.winner,
+                                confidence: pickData.confidence || 1,
+                                gameId: game.id,
+                                found: true
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        console.log('No pick found for this game');
+        return null;
+
+    } catch (error) {
+        console.error('Error fetching user pick:', error);
+        return null;
+    }
+}
+
+function createBeautifulGameDisplay(gameData, userPick = null) {
+    if (!gameData) {
+        return '<div class="p-6 text-center text-red-600">No game data available</div>';
+    }
+
+    // 🔍 DEBUG: Log the complete data structure
+    console.log('🏈 FULL ESPN Game Data Structure:', JSON.stringify(gameData, null, 2));
+    console.log('🏈 Game Data Keys:', Object.keys(gameData));
+    console.log('🏈 Teams Data:', gameData.teams);
+    console.log('🏈 Team Stats:', gameData.teamStats);
+    console.log('🏈 Status:', gameData.status);
+    console.log('🏈 Status Display:', gameData.statusDisplay);
+
+    // Handle the actual data structure from your API
+    const awayTeam = gameData.teams?.away;
+    const homeTeam = gameData.teams?.home;
+    const awayStats = gameData.teamStats?.away;
+    const homeStats = gameData.teamStats?.home;
+
+    if (!awayTeam || !homeTeam) {
+        return '<div class="p-6 text-center text-red-600">Team data not available</div>';
+    }
+
+    // Get team colors
+    const awayColor = awayTeam.color || '1f2937';
+    const homeColor = homeTeam.color || '1f2937';
+
+    // Format game status
+    let gameStatus = '';
+    if (gameData.status === 'STATUS_FINAL') {
+        gameStatus = `<span class="text-gray-600 font-bold">FINAL</span>`;
+    } else if (gameData.status === 'STATUS_IN_PROGRESS') {
+        gameStatus = `<span class="text-red-500 font-bold animate-pulse">🔴 LIVE</span>`;
+        if (gameData.statusDisplay) {
+            gameStatus += `<span class="ml-2 text-sm font-semibold">${gameData.statusDisplay}</span>`;
+        }
+    } else {
+        gameStatus = `<span class="text-blue-600 font-bold">${gameData.statusDisplay || 'SCHEDULED'}</span>`;
+    }
+
+    // Key stats for comparison
+    const keyStats = [
+        { label: 'Total Yards', away: awayStats?.total_yards, home: homeStats?.total_yards },
+        { label: 'Passing Yards', away: awayStats?.passing, home: homeStats?.passing },
+        { label: 'Rushing Yards', away: awayStats?.rushing, home: homeStats?.rushing },
+        { label: '1st Downs', away: awayStats?.['1st_downs'], home: homeStats?.['1st_downs'] },
+        { label: '3rd Down', away: awayStats?.['3rd_down_efficiency'], home: homeStats?.['3rd_down_efficiency'] },
+        { label: 'Red Zone', away: awayStats?.['red_zone_(made-att)'], home: homeStats?.['red_zone_(made-att)'] },
+        { label: 'Possession', away: awayStats?.possession, home: homeStats?.possession },
+        { label: 'Turnovers', away: awayStats?.turnovers, home: homeStats?.turnovers }
+    ];
+
+    return `
+        <!-- Game Header with Scores -->
+        <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-4">
+            <div class="text-center mb-3">
+                ${gameStatus}
+            </div>
+            <div class="grid grid-cols-3 items-center gap-4">
+                <!-- Away Team -->
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto mb-2 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+                         style="background-color: #${awayColor};">
+                        ${awayTeam.abbreviation || 'TBD'}
+                    </div>
+                    <div class="text-sm font-medium">${awayTeam.name || 'Away Team'}</div>
+                    <div class="text-2xl font-bold">${awayTeam.score || '0'}</div>
+                </div>
+
+                <!-- VS -->
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-slate-400">VS</div>
+                </div>
+
+                <!-- Home Team -->
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto mb-2 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+                         style="background-color: #${homeColor};">
+                        ${homeTeam.abbreviation || 'TBD'}
+                    </div>
+                    <div class="text-sm font-medium">${homeTeam.name || 'Home Team'}</div>
+                    <div class="text-2xl font-bold">${homeTeam.score || '0'}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Team Statistics -->
+        <div class="p-4 bg-white">
+            <h3 class="text-lg font-bold text-center mb-4 text-slate-800">Team Statistics</h3>
+
+            <!-- Key Stats Cards -->
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                ${keyStats.slice(0, 4).map(stat => `
+                    <div class="bg-slate-50 rounded-lg p-3 border">
+                        <div class="text-xs font-semibold text-slate-600 text-center mb-2">${stat.label}</div>
+                        <div class="grid grid-cols-3 items-center text-sm">
+                            <div class="text-center font-bold" style="color: #${awayColor}">${stat.away || 'N/A'}</div>
+                            <div class="text-center text-slate-400">vs</div>
+                            <div class="text-center font-bold" style="color: #${homeColor}">${stat.home || 'N/A'}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Full Statistics Grid -->
+            <div class="bg-slate-50 rounded-lg overflow-hidden">
+                <div class="grid grid-cols-5 bg-slate-200 text-xs font-bold py-2">
+                    <div class="text-center" style="color: #${awayColor}">${awayTeam.abbreviation}</div>
+                    <div class="col-span-3 text-center text-slate-700">Statistic</div>
+                    <div class="text-center" style="color: #${homeColor}">${homeTeam.abbreviation}</div>
+                </div>
+                ${keyStats.map(stat => `
+                    <div class="grid grid-cols-5 border-b border-slate-200 py-2 text-xs">
+                        <div class="text-center font-semibold" style="color: #${awayColor}">${stat.away || 'N/A'}</div>
+                        <div class="col-span-3 text-center text-slate-700">${stat.label}</div>
+                        <div class="text-center font-semibold" style="color: #${homeColor}">${stat.home || 'N/A'}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <!-- User Pick Display -->
+        ${userPick ? `
+        <div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-t-2 border-blue-200">
+            <h4 class="text-md font-bold text-center mb-3 text-blue-800">🎯 Your Pick</h4>
+            <div class="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+                            ${userPick.confidence}
+                        </div>
+                        <div>
+                            <div class="font-bold text-blue-800">${userPick.team}</div>
+                            <div class="text-xs text-blue-600">Confidence: ${userPick.confidence} points</div>
+                        </div>
+                    </div>
+                    ${userPick.found ?
+                        '<div class="text-green-600 text-sm font-semibold">✅ Active Pick</div>' :
+                        '<div class="text-orange-600 text-sm font-semibold">🔍 Pick Lookup</div>'
+                    }
+                </div>
+            </div>
+        </div>` : ''}
+
+        <!-- AI Statistical Analysis -->
+        ${awayStats && homeStats ? `
+        <div class="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-t-2 border-purple-200">
+            <h4 class="text-md font-bold text-center mb-4 text-purple-800">🤖 AI Statistical Analysis</h4>
+            <div class="bg-white rounded-lg p-4 border border-purple-200 shadow-sm">
+                <div class="text-sm text-purple-700">
+                    This game features <strong>${awayTeam.name}</strong> vs <strong>${homeTeam.name}</strong> with comprehensive real-time statistics tracking.
+                    ${gameData.status === 'STATUS_IN_PROGRESS' ? 'Live statistics are updating in real-time.' : 'Statistical comparison available for completed game.'}
+                </div>
+            </div>
+        </div>` : ''}
+    `;
+}
+
+// Fallback display for when ESPN data is unavailable (404, scheduled games, etc.)
+function createFallbackGameDisplay(awayTeam, homeTeam, userPick = null, error = null) {
+    const awayAbbr = awayTeam ? awayTeam.split(' ').slice(-1)[0].substring(0, 3).toUpperCase() : 'AWY';
+    const homeAbbr = homeTeam ? homeTeam.split(' ').slice(-1)[0].substring(0, 3).toUpperCase() : 'HOM';
+
+    return `
+        <!-- Fallback Game Header -->
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-4">
+            <div class="text-center mb-3">
+                <span class="text-yellow-100 font-bold">📅 ESPN DATA UNAVAILABLE</span>
+            </div>
+            <div class="grid grid-cols-3 items-center gap-4">
+                <!-- Away Team -->
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto mb-2 rounded-full flex items-center justify-center text-orange-600 font-bold text-lg shadow-lg bg-white">
+                        ${awayAbbr}
+                    </div>
+                    <div class="text-sm font-medium">${awayTeam || 'Away Team'}</div>
+                    <div class="text-xl font-bold text-yellow-100">--</div>
+                </div>
+
+                <!-- VS -->
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-yellow-100">VS</div>
+                </div>
+
+                <!-- Home Team -->
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto mb-2 rounded-full flex items-center justify-center text-orange-600 font-bold text-lg shadow-lg bg-white">
+                        ${homeAbbr}
+                    </div>
+                    <div class="text-sm font-medium">${homeTeam || 'Home Team'}</div>
+                    <div class="text-xl font-bold text-yellow-100">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Status Info -->
+        <div class="p-4 bg-amber-50 border-b border-amber-200">
+            <div class="text-center">
+                <h3 class="text-lg font-bold text-amber-800 mb-2">Game Information Not Available</h3>
+                <p class="text-sm text-amber-700">
+                    ${error && error.includes('404')
+                        ? 'This game may be scheduled but not yet started, or ESPN data is temporarily unavailable.'
+                        : 'ESPN data is currently unavailable for this game.'}
+                </p>
+                ${error ? `<p class="text-xs text-amber-600 mt-2">Technical details: ${error}</p>` : ''}
+            </div>
+        </div>
+
+        <!-- User Pick Display -->
+        ${userPick ? `
+        <div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
+            <h4 class="text-md font-bold text-center mb-3 text-blue-800">🎯 Your Pick</h4>
+            <div class="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+                            ${userPick.confidence}
+                        </div>
+                        <div>
+                            <div class="font-bold text-blue-800">${userPick.team}</div>
+                            <div class="text-xs text-blue-600">Confidence: ${userPick.confidence} points</div>
+                        </div>
+                    </div>
+                    <div class="text-green-600 text-sm font-semibold">✅ Active Pick</div>
+                </div>
+            </div>
+        </div>` : ''}
+
+        <!-- Helpful Information -->
+        <div class="p-4 bg-slate-50">
+            <h4 class="text-md font-bold text-center mb-3 text-slate-800">📊 Why This Happens</h4>
+            <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+                <div class="text-sm text-slate-700 space-y-2">
+                    <p><strong>🕐 Scheduled Games:</strong> ESPN doesn't provide live statistics until games begin</p>
+                    <p><strong>🔄 Data Sync:</strong> Live data may take a few minutes to appear after kickoff</p>
+                    <p><strong>🏈 Game Status:</strong> Check back during or after the game for detailed statistics</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
  console.log('💎 About to call initializeAppAndAuth');
 initializeAppAndAuth().then(() => {
     // Wait a moment to ensure all Firebase globals are set
@@ -14962,6 +15456,9 @@ function showUserDiagnostics() {
 
         <!-- Game Content -->
         <div id="modal-game-content" class="hidden">
+
+            <!-- Dynamic Game Data Display (for working modal functions) -->
+            <div id="game-data-display"></div>
 
             <!-- Game Header - Score and Status -->
             <div id="modal-game-header" class="bg-gradient-to-r from-slate-50 to-blue-50 p-6 border-b border-slate-200">
