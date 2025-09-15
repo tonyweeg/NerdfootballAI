@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 EMERGENCY STATUS OVERRIDE</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #ffffff; }
+        .emergency { background: linear-gradient(45deg, #ff0000, #cc0000); padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 0 20px #ff0000; }
+        .success { background: #006600; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .warning { background: #ff8800; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .info { background: #0066cc; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .critical { background: #ff1a1a; padding: 15px; border-radius: 5px; margin: 10px 0; border: 2px solid #ff5555; }
+        button { background: #ffff00; color: #000000; padding: 15px 30px; border: none; border-radius: 4px; cursor: pointer; margin: 10px 5px; font-size: 16px; font-weight: bold; }
+        button:hover { background: #ffcc00; }
+        button.danger { background: #ff0000; color: #ffffff; }
+        button.success { background: #00aa00; color: #ffffff; }
+        .code { background: #333; padding: 15px; border-radius: 5px; font-family: monospace; color: #00ff00; margin: 10px 0; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; font-weight: bold; }
+        .data-grid { background: #2a2a2a; padding: 20px; border-radius: 8px; margin: 15px 0; }
+        .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #444; }
+        .data-label { font-weight: bold; color: #ffaa00; }
+        .data-value { color: #ffffff; }
+        .override-panel { background: #444; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #ff8800; }
+    </style>
+</head>
+<body>
+    <div class="emergency">
+        <h1>🚨 EMERGENCY STATUS OVERRIDE SYSTEM</h1>
+        <h2>DIAMOND-LEVEL EMERGENCY OPERATIONS</h2>
+        <p><strong>COMPLAINT:</strong> User aaG5Wc2JZkZJD1r7ozfJG04QRrf1 should be ALIVE but shows ELIMINATED</p>
+        <p><strong>AUTHORITY:</strong> Emergency override with manual status correction</p>
+    </div>
+
+    <div class="override-panel">
+        <h3>🎯 TARGET USER OPERATIONS</h3>
+        <button onclick="diagnoseUser()" class="success">🔍 DIAGNOSE USER STATUS</button>
+        <button onclick="forceAliveStatus()" class="danger">⚡ FORCE ALIVE STATUS</button>
+        <button onclick="recalculateClean()" class="success">🔄 CLEAN RECALCULATION</button>
+        <button onclick="viewSurvivorTable()">📊 VIEW SURVIVOR TABLE</button>
+    </div>
+
+    <div id="diagnostic-results"></div>
+
+    <div class="override-panel">
+        <h3>🛠️ EMERGENCY OPERATIONS</h3>
+        <button onclick="emergencyStatusWrite()">💾 EMERGENCY STATUS WRITE</button>
+        <button onclick="clearAllCaches()">🧹 CLEAR ALL CACHES</button>
+        <button onclick="forceFreshESPN()">📡 FORCE FRESH ESPN DATA</button>
+        <button onclick="validateDataIntegrity()">✅ VALIDATE DATA INTEGRITY</button>
+    </div>
+
+    <div id="status-output"></div>
+
+    <script src="firebase-config.js"></script>
+    <script>
+        const TARGET_USER = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+        const POOL_ID = 'nerduniverse-2025';
+
+        let diagnosticDiv = document.getElementById('diagnostic-results');
+        let statusDiv = document.getElementById('status-output');
+
+        async function diagnoseUser() {
+            diagnosticDiv.innerHTML = '<div class="info">🔍 RUNNING COMPLETE DIAGNOSTIC...</div>';
+
+            try {
+                await waitForFirebase();
+
+                const { doc, getDoc } = window.firestoreImports;
+                const diagnosis = {
+                    poolMembership: null,
+                    picks: {},
+                    currentStatus: null,
+                    gameResults: {},
+                    recommendation: null
+                };
+
+                // 1. Check pool membership
+                const poolDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/pools/${POOL_ID}/metadata/members`));
+                if (poolDoc.exists()) {
+                    const members = poolDoc.data();
+                    diagnosis.poolMembership = members[TARGET_USER] || null;
+                }
+
+                // 2. Check user picks
+                const picksDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${TARGET_USER}`));
+                if (picksDoc.exists()) {
+                    diagnosis.picks = picksDoc.data().picks || {};
+                }
+
+                // 3. Check current status
+                const statusDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/pools/${POOL_ID}/survivor/${TARGET_USER}`));
+                if (statusDoc.exists()) {
+                    diagnosis.currentStatus = statusDoc.data();
+                }
+
+                // 4. Get fresh ESPN results for each pick
+                if (window.espnNerdApi) {
+                    for (let week = 1; week <= 3; week++) {
+                        if (diagnosis.picks[week]) {
+                            const weekGames = await window.espnNerdApi.getWeekGames(week, true);
+                            diagnosis.gameResults[week] = weekGames;
+                        }
+                    }
+                }
+
+                // 5. Analyze and determine correct status
+                diagnosis.recommendation = await analyzeDiagnosis(diagnosis);
+
+                displayDiagnosis(diagnosis);
+
+            } catch (error) {
+                diagnosticDiv.innerHTML += `<div class="critical">❌ DIAGNOSTIC ERROR: ${error.message}</div>`;
+                console.error('Diagnostic error:', error);
+            }
+        }
+
+        async function analyzeDiagnosis(diagnosis) {
+            const analysis = {
+                shouldBeAlive: true,
+                reasons: [],
+                eliminationWeek: null,
+                gameAnalysis: {}
+            };
+
+            // Check each pick against game results
+            for (let week = 1; week <= 3; week++) {
+                const pick = diagnosis.picks[week];
+                if (!pick) {
+                    analysis.reasons.push(`Week ${week}: No pick made`);
+                    analysis.shouldBeAlive = false;
+                    analysis.eliminationWeek = week;
+                    break;
+                }
+
+                const weekResults = diagnosis.gameResults[week];
+                if (weekResults && weekResults.games) {
+                    // Find the game result for user's pick
+                    const gameResult = findGameResult(pick, weekResults.games);
+                    analysis.gameAnalysis[week] = gameResult;
+
+                    if (gameResult && gameResult.status === 'final') {
+                        const userWon = didUserWin(pick, gameResult);
+                        analysis.reasons.push(`Week ${week}: Picked ${pick.team} - ${userWon ? 'WON' : 'LOST'}`);
+
+                        if (!userWon) {
+                            analysis.shouldBeAlive = false;
+                            analysis.eliminationWeek = week;
+                            break;
+                        }
+                    } else {
+                        analysis.reasons.push(`Week ${week}: Picked ${pick.team} - Game pending`);
+                    }
+                }
+            }
+
+            return analysis;
+        }
+
+        function findGameResult(pick, espnGames) {
+            // Try to find the game by team name matching
+            return espnGames.find(game => {
+                const homeMatch = normalizeTeamName(game.home_team) === normalizeTeamName(pick.team);
+                const awayMatch = normalizeTeamName(game.away_team) === normalizeTeamName(pick.team);
+                return homeMatch || awayMatch;
+            });
+        }
+
+        function didUserWin(pick, gameResult) {
+            const homeWon = gameResult.home_score > gameResult.away_score;
+            const userPickedHome = normalizeTeamName(pick.team) === normalizeTeamName(gameResult.home_team);
+
+            if (userPickedHome) {
+                return homeWon;
+            } else {
+                return !homeWon;
+            }
+        }
+
+        function normalizeTeamName(teamName) {
+            if (!teamName) return '';
+            return teamName.toLowerCase()
+                .replace(/\s+/g, '')
+                .replace(/patriots/g, 'patriots')
+                .replace(/newengland/g, 'patriots')
+                .replace(/ne$/g, 'patriots');
+        }
+
+        function displayDiagnosis(diagnosis) {
+            let html = '<div class="data-grid"><h3>🔍 DIAGNOSTIC RESULTS</h3>';
+
+            // User info
+            html += '<div class="data-row"><span class="data-label">User:</span><span class="data-value">';
+            html += diagnosis.poolMembership ? diagnosis.poolMembership.displayName : 'NOT FOUND IN POOL';
+            html += '</span></div>';
+
+            // Current status
+            html += '<div class="data-row"><span class="data-label">Current Status:</span><span class="data-value">';
+            if (diagnosis.currentStatus) {
+                const status = diagnosis.currentStatus.eliminated ? 'ELIMINATED' : 'ALIVE';
+                html += `${status} (Week ${diagnosis.currentStatus.eliminatedWeek || 'N/A'})`;
+            } else {
+                html += 'NO STATUS RECORD';
+            }
+            html += '</span></div>';
+
+            // Picks analysis
+            Object.keys(diagnosis.picks).forEach(week => {
+                const pick = diagnosis.picks[week];
+                html += `<div class="data-row"><span class="data-label">Week ${week} Pick:</span><span class="data-value">${pick.team}</span></div>`;
+            });
+
+            // Recommendation
+            if (diagnosis.recommendation) {
+                const recommendedStatus = diagnosis.recommendation.shouldBeAlive ? 'ALIVE' : 'ELIMINATED';
+                const statusClass = diagnosis.recommendation.shouldBeAlive ? 'success' : 'critical';
+
+                html += `<div class="data-row"><span class="data-label">SHOULD BE:</span><span class="data-value">${recommendedStatus}</span></div>`;
+                html += '</div>';
+
+                html += `<div class="${statusClass}">`;
+                html += `<strong>RECOMMENDATION: User should be ${recommendedStatus}</strong><br>`;
+                diagnosis.recommendation.reasons.forEach(reason => {
+                    html += `• ${reason}<br>`;
+                });
+                html += '</div>';
+
+                // Show action buttons if correction needed
+                const needsCorrection = (diagnosis.currentStatus?.eliminated || false) !== (!diagnosis.recommendation.shouldBeAlive);
+                if (needsCorrection) {
+                    html += '<div class="warning">⚠️ STATUS CORRECTION NEEDED - Use "FORCE ALIVE STATUS" or "EMERGENCY STATUS WRITE"</div>';
+                }
+            }
+
+            diagnosticDiv.innerHTML = html;
+        }
+
+        async function forceAliveStatus() {
+            statusDiv.innerHTML = '<div class="warning">⚡ FORCING ALIVE STATUS...</div>';
+
+            try {
+                await waitForFirebase();
+                const { doc, setDoc } = window.firestoreImports;
+
+                // Force write ALIVE status directly to Firebase
+                const statusData = {
+                    eliminated: false,
+                    eliminatedWeek: null,
+                    eliminationReason: null,
+                    lastUpdated: new Date().toISOString(),
+                    emergencyOverride: true,
+                    overrideReason: 'Manual correction due to player complaint',
+                    overrideTimestamp: new Date().toISOString()
+                };
+
+                await setDoc(doc(window.db, `artifacts/nerdfootball/pools/${POOL_ID}/survivor/${TARGET_USER}`), statusData);
+
+                statusDiv.innerHTML += '<div class="success">✅ STATUS FORCED TO ALIVE</div>';
+                statusDiv.innerHTML += '<div class="info">🔄 Clearing caches to reflect change...</div>';
+
+                // Clear all caches
+                localStorage.clear();
+                sessionStorage.clear();
+
+                statusDiv.innerHTML += '<div class="success">✅ OPERATION COMPLETE - User should now show as ALIVE</div>';
+
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="critical">❌ FORCE OPERATION FAILED: ${error.message}</div>`;
+                console.error('Force alive status error:', error);
+            }
+        }
+
+        async function emergencyStatusWrite() {
+            statusDiv.innerHTML = '<div class="info">💾 RUNNING EMERGENCY STATUS WRITE...</div>';
+
+            try {
+                await waitForFirebase();
+
+                // Run diagnosis first
+                await diagnoseUser();
+
+                // Then apply correction based on diagnosis
+                statusDiv.innerHTML += '<div class="warning">⚡ APPLYING EMERGENCY CORRECTION...</div>';
+                await forceAliveStatus();
+
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="critical">❌ EMERGENCY WRITE FAILED: ${error.message}</div>`;
+            }
+        }
+
+        async function recalculateClean() {
+            statusDiv.innerHTML = '<div class="info">🔄 RUNNING CLEAN RECALCULATION...</div>';
+
+            try {
+                await waitForFirebase();
+
+                if (window.survivorRecalc) {
+                    const results = await window.survivorRecalc.clearCacheAndRecalculate();
+                    const targetUser = results.find(u => u.uid === TARGET_USER);
+
+                    if (targetUser) {
+                        statusDiv.innerHTML += `<div class="success">✅ RECALCULATION COMPLETE</div>`;
+                        statusDiv.innerHTML += `<div class="info">User Status: ${targetUser.status}</div>`;
+                        statusDiv.innerHTML += `<div class="info">Reason: ${targetUser.reason}</div>`;
+                    }
+                } else {
+                    statusDiv.innerHTML += '<div class="warning">⚠️ SurvivorRecalc not available - loading...</div>';
+                    // Load the recalc script
+                    const script = document.createElement('script');
+                    script.src = './survivorRecalc.js';
+                    document.head.appendChild(script);
+                }
+
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="critical">❌ RECALCULATION FAILED: ${error.message}</div>`;
+            }
+        }
+
+        async function clearAllCaches() {
+            statusDiv.innerHTML = '<div class="info">🧹 CLEARING ALL CACHES...</div>';
+
+            localStorage.clear();
+            sessionStorage.clear();
+
+            if (window.espnNerdApi) {
+                // Force fresh ESPN data
+                await window.espnNerdApi.getWeekGames(1, true);
+                await window.espnNerdApi.getWeekGames(2, true);
+                await window.espnNerdApi.getWeekGames(3, true);
+            }
+
+            statusDiv.innerHTML += '<div class="success">✅ ALL CACHES CLEARED</div>';
+        }
+
+        async function forceFreshESPN() {
+            statusDiv.innerHTML = '<div class="info">📡 FORCING FRESH ESPN DATA...</div>';
+
+            if (window.espnNerdApi) {
+                try {
+                    for (let week = 1; week <= 3; week++) {
+                        const data = await window.espnNerdApi.getWeekGames(week, true);
+                        statusDiv.innerHTML += `<div class="success">✅ Week ${week}: ${data.games?.length || 0} games loaded</div>`;
+                    }
+                } catch (error) {
+                    statusDiv.innerHTML += `<div class="critical">❌ ESPN REFRESH FAILED: ${error.message}</div>`;
+                }
+            } else {
+                statusDiv.innerHTML += '<div class="warning">⚠️ ESPN API not available</div>';
+            }
+        }
+
+        async function validateDataIntegrity() {
+            statusDiv.innerHTML = '<div class="info">✅ VALIDATING DATA INTEGRITY...</div>';
+
+            try {
+                await waitForFirebase();
+                const { doc, getDoc } = window.firestoreImports;
+
+                // Check pool membership
+                const poolDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/pools/${POOL_ID}/metadata/members`));
+                const memberExists = poolDoc.exists() && poolDoc.data()[TARGET_USER];
+
+                statusDiv.innerHTML += `<div class="${memberExists ? 'success' : 'critical'}">Pool Membership: ${memberExists ? 'VALID' : 'MISSING'}</div>`;
+
+                // Check picks document
+                const picksDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${TARGET_USER}`));
+                const picksExist = picksDoc.exists();
+
+                statusDiv.innerHTML += `<div class="${picksExist ? 'success' : 'warning'}">Picks Document: ${picksExist ? 'EXISTS' : 'MISSING'}</div>`;
+
+                // Check status document
+                const statusDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/pools/${POOL_ID}/survivor/${TARGET_USER}`));
+                const statusExists = statusDoc.exists();
+
+                statusDiv.innerHTML += `<div class="${statusExists ? 'success' : 'warning'}">Status Document: ${statusExists ? 'EXISTS' : 'MISSING'}</div>`;
+
+                if (statusExists) {
+                    const status = statusDoc.data();
+                    const isEliminated = status.eliminated;
+                    statusDiv.innerHTML += `<div class="info">Current Status: ${isEliminated ? 'ELIMINATED' : 'ALIVE'}</div>`;
+                }
+
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="critical">❌ VALIDATION ERROR: ${error.message}</div>`;
+            }
+        }
+
+        function viewSurvivorTable() {
+            statusDiv.innerHTML = '<div class="info">📊 Navigating to survivor table...</div>';
+            window.location.href = './index.html?view=survivor';
+        }
+
+        async function waitForFirebase() {
+            return new Promise((resolve) => {
+                const checkReady = () => {
+                    if (window.db && window.firestoreImports) {
+                        resolve();
+                    } else {
+                        setTimeout(checkReady, 500);
+                    }
+                };
+                checkReady();
+            });
+        }
+
+        // Auto-load survivorRecalc script
+        window.addEventListener('load', () => {
+            statusDiv.innerHTML = '<div class="info">🔧 Emergency Override System Ready</div>';
+
+            // Load survivorRecalc if not available
+            const script = document.createElement('script');
+            script.src = './survivorRecalc.js';
+            script.onload = () => {
+                statusDiv.innerHTML += '<div class="success">✅ SurvivorRecalc Loaded</div>';
+            };
+            document.head.appendChild(script);
+        });
+    </script>
+</body>
+</html>

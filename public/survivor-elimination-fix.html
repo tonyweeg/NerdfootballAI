@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor Elimination Bug Fix Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .button.danger {
+            background-color: #f44336;
+        }
+        .issue {
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .success {
+            background-color: #e8f5e8;
+            border-left: 4px solid #4CAF50;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .log {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .user-card {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .user-card.issue {
+            border-color: #f44336;
+            background-color: #ffebee;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Survivor Elimination Bug Fix Tool</h1>
+
+    <div class="container">
+        <h2>Authentication Status</h2>
+        <div id="authStatus" class="loading">Checking authentication...</div>
+        <button id="loginBtn" class="button" style="display: none;">Login with Google</button>
+        <button id="logoutBtn" class="button" style="display: none;">Logout</button>
+    </div>
+
+    <div class="container" id="toolsContainer" style="display: none;">
+        <h2>Bug Fix Tools</h2>
+        <p>Use these tools to analyze and fix survivor elimination status issues.</p>
+
+        <button id="analyzeBtn" class="button">🔍 Analyze Elimination Issues</button>
+        <button id="fixAllBtn" class="button danger" disabled>🔧 Fix All Issues</button>
+
+        <div id="analysisResults" style="display: none;">
+            <h3>Analysis Results</h3>
+            <div id="analysisData"></div>
+        </div>
+
+        <div id="fixResults" style="display: none;">
+            <h3>Fix Results</h3>
+            <div id="fixData"></div>
+        </div>
+
+        <div id="operationLog" class="log" style="display: none;"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC5iSqY8vfKWJHm6BLsXQQ8kGjQHU-7G6s",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseapp.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:7d23e32ad5c86c5b4c6dd8"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const functions = firebase.functions();
+
+        // DOM elements
+        const authStatus = document.getElementById('authStatus');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const toolsContainer = document.getElementById('toolsContainer');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const fixAllBtn = document.getElementById('fixAllBtn');
+        const analysisResults = document.getElementById('analysisResults');
+        const analysisData = document.getElementById('analysisData');
+        const fixResults = document.getElementById('fixResults');
+        const fixData = document.getElementById('fixData');
+        const operationLog = document.getElementById('operationLog');
+
+        let currentAnalysis = null;
+
+        // Log function
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            operationLog.style.display = 'block';
+            operationLog.innerHTML += `[${timestamp}] ${message}\n`;
+            operationLog.scrollTop = operationLog.scrollHeight;
+            console.log(message);
+        }
+
+        // Authentication state observer
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                authStatus.innerHTML = `<div class="success">✅ Authenticated as: ${user.email}</div>`;
+                loginBtn.style.display = 'none';
+                logoutBtn.style.display = 'inline-block';
+
+                // Check if user is admin
+                const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+                if (ADMIN_UIDS.includes(user.uid)) {
+                    toolsContainer.style.display = 'block';
+                    log(`Admin access granted for user: ${user.email}`);
+                } else {
+                    authStatus.innerHTML += `<div class="issue">❌ Admin access required</div>`;
+                }
+            } else {
+                authStatus.innerHTML = '<div class="issue">❌ Not authenticated</div>';
+                loginBtn.style.display = 'inline-block';
+                logoutBtn.style.display = 'none';
+                toolsContainer.style.display = 'none';
+            }
+        });
+
+        // Login with Google
+        loginBtn.addEventListener('click', () => {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider);
+        });
+
+        // Logout
+        logoutBtn.addEventListener('click', () => {
+            auth.signOut();
+        });
+
+        // Analyze elimination issues
+        analyzeBtn.addEventListener('click', async () => {
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '🔍 Analyzing...';
+            log('Starting survivor elimination analysis...');
+
+            try {
+                const analyzeSurvivorEliminations = functions.httpsCallable('analyzeSurvivorEliminations');
+                const result = await analyzeSurvivorEliminations();
+
+                currentAnalysis = result.data;
+                log(`Analysis complete: Found ${currentAnalysis.analysis.usersWithIssues} issues out of ${currentAnalysis.analysis.totalUsers} users`);
+
+                // Display results
+                displayAnalysisResults(currentAnalysis);
+
+                // Enable fix button if issues found
+                if (currentAnalysis.issues.length > 0) {
+                    fixAllBtn.disabled = false;
+                    fixAllBtn.textContent = `🔧 Fix ${currentAnalysis.issues.length} Issues`;
+                } else {
+                    fixAllBtn.textContent = '✅ No Issues Found';
+                }
+
+            } catch (error) {
+                log(`❌ Analysis failed: ${error.message}`);
+                console.error('Analysis error:', error);
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🔍 Analyze Elimination Issues';
+            }
+        });
+
+        // Fix all issues
+        fixAllBtn.addEventListener('click', async () => {
+            if (!currentAnalysis || currentAnalysis.issues.length === 0) {
+                alert('No issues to fix. Run analysis first.');
+                return;
+            }
+
+            const confirmed = confirm(`Are you sure you want to fix ${currentAnalysis.issues.length} elimination issues? This will modify user data in the database.`);
+            if (!confirmed) return;
+
+            fixAllBtn.disabled = true;
+            fixAllBtn.textContent = '🔧 Fixing...';
+            log('Starting batch fix operation...');
+
+            try {
+                const userIdsToFix = currentAnalysis.issues
+                    .filter(issue => issue.issue === 'ELIMINATED_WITHOUT_WEEK')
+                    .map(issue => issue.userId);
+
+                if (userIdsToFix.length === 0) {
+                    log('No fixable issues found');
+                    return;
+                }
+
+                log(`Fixing ${userIdsToFix.length} users: ${userIdsToFix.join(', ')}`);
+
+                const fixSurvivorEliminations = functions.httpsCallable('fixSurvivorEliminations');
+                const result = await fixSurvivorEliminations({
+                    userIds: userIdsToFix,
+                    fixType: 'auto'
+                });
+
+                log(`Fix operation complete: ${result.data.successCount} successful, ${result.data.failureCount} failed`);
+
+                // Display fix results
+                displayFixResults(result.data);
+
+                // Suggest re-analysis
+                if (result.data.successCount > 0) {
+                    log('✅ Fixes applied successfully. Consider running analysis again to verify.');
+                }
+
+            } catch (error) {
+                log(`❌ Fix operation failed: ${error.message}`);
+                console.error('Fix error:', error);
+            } finally {
+                fixAllBtn.disabled = false;
+                fixAllBtn.textContent = '🔧 Fix All Issues';
+            }
+        });
+
+        // Display analysis results
+        function displayAnalysisResults(analysis) {
+            analysisResults.style.display = 'block';
+
+            let html = `
+                <div class="container">
+                    <h4>📊 Analysis Summary</h4>
+                    <p><strong>Total Users:</strong> ${analysis.analysis.totalUsers}</p>
+                    <p><strong>Users with Issues:</strong> ${analysis.analysis.usersWithIssues}</p>
+                    <p><strong>Valid Users:</strong> ${analysis.analysis.validUsers}</p>
+                    <p><strong>Timestamp:</strong> ${new Date(analysis.timestamp).toLocaleString()}</p>
+                </div>
+            `;
+
+            if (analysis.issues.length > 0) {
+                html += `
+                    <div class="container">
+                        <h4>🚨 Issues Found</h4>
+                        <div class="user-grid">
+                `;
+
+                analysis.issues.forEach(issue => {
+                    html += `
+                        <div class="user-card issue">
+                            <strong>User ID:</strong> ${issue.userId}<br>
+                            <strong>Issue:</strong> ${issue.issue}<br>
+                            <strong>Severity:</strong> ${issue.severity}<br>
+                            <strong>Description:</strong> ${issue.description}<br>
+                            <strong>Current Status:</strong> Eliminated: ${issue.eliminated}, Week: ${issue.eliminatedWeek || 'N/A'}
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (analysis.validUsers.length > 0) {
+                html += `
+                    <div class="container">
+                        <h4>✅ Valid Users (Sample)</h4>
+                        <p>Showing first 5 users with correct status:</p>
+                        <div class="user-grid">
+                `;
+
+                analysis.validUsers.slice(0, 5).forEach(user => {
+                    html += `
+                        <div class="user-card">
+                            <strong>User ID:</strong> ${user.userId}<br>
+                            <strong>Eliminated:</strong> ${user.eliminated}<br>
+                            <strong>Week:</strong> ${user.eliminatedWeek || 'N/A'}<br>
+                            <strong>Has Picks:</strong> ${user.hasValidPicks}
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            analysisData.innerHTML = html;
+        }
+
+        // Display fix results
+        function displayFixResults(fixData) {
+            fixResults.style.display = 'block';
+
+            let html = `
+                <div class="container">
+                    <h4>🔧 Fix Operation Summary</h4>
+                    <p><strong>Successful Fixes:</strong> ${fixData.successCount}</p>
+                    <p><strong>Failed Fixes:</strong> ${fixData.failureCount}</p>
+                    <p><strong>Timestamp:</strong> ${new Date(fixData.timestamp).toLocaleString()}</p>
+                </div>
+            `;
+
+            if (fixData.successful.length > 0) {
+                html += `
+                    <div class="container">
+                        <h4>✅ Successful Fixes</h4>
+                        <div class="user-grid">
+                `;
+
+                fixData.successful.forEach(fix => {
+                    html += `
+                        <div class="user-card">
+                            <strong>User ID:</strong> ${fix.userId}<br>
+                            <strong>Action:</strong> ${fix.action}<br>
+                            <strong>Previous State:</strong> Eliminated: ${fix.previousState.eliminated}<br>
+                            <strong>New State:</strong> ${JSON.stringify(fix.updateData)}
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (fixData.failed.length > 0) {
+                html += `
+                    <div class="container">
+                        <h4>❌ Failed Fixes</h4>
+                        <div class="user-grid">
+                `;
+
+                fixData.failed.forEach(failure => {
+                    html += `
+                        <div class="user-card issue">
+                            <strong>User ID:</strong> ${failure.userId}<br>
+                            <strong>Error:</strong> ${failure.error}
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            fixData.innerHTML = html;
+        }
+
+        // Initialize
+        log('Survivor Elimination Bug Fix Tool initialized');
+        log('Please authenticate to access admin tools');
+    </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refresh Survivor Cache</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .error { background: #ffe6e6; color: #d00; border: 1px solid #ff9999; }
+        .success { background: #e6ffe6; color: #060; border: 1px solid #99ff99; }
+        .info { background: #e6f3ff; color: #006; border: 1px solid #99ccff; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button { background: #007cba; color: white; padding: 15px 30px; border: none; border-radius: 4px; cursor: pointer; margin: 10px 5px; font-size: 16px; }
+        button:hover { background: #005a8b; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .step { margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Refresh Survivor Cache & Recalculate</h1>
+        <p>This will force the survivor system to recalculate with the fixed week-isolation logic.</p>
+
+        <div class="step">
+            <h3>Step 1: Clear All Cache Data</h3>
+            <p class="info">✅ ESPN cache cleared via Firebase CLI</p>
+            <p class="info">✅ Survivor status cache cleared via Firebase CLI</p>
+            <p class="info">✅ Game results cache cleared via Firebase CLI</p>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Force Fresh ESPN Data Fetch</h3>
+            <button onclick="refreshEspnData()" id="espnBtn">Refresh ESPN Data</button>
+            <div id="espnResults"></div>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Recalculate Survivor Status</h3>
+            <button onclick="recalculateSurvivor()" id="survivorBtn">Recalculate Survivor</button>
+            <div id="survivorResults"></div>
+        </div>
+
+        <div class="step">
+            <h3>Step 4: Verify Target User</h3>
+            <button onclick="checkTargetUser()" id="checkBtn">Check User: aaG5Wc2JZkZJD1r7ozfJG04QRrf1</button>
+            <div id="checkResults"></div>
+        </div>
+    </div>
+
+    <!-- Load Firebase from main app -->
+    <script src="firebase-config.js"></script>
+    <script src="espnNerdApi.js"></script>
+    <script src="survivorSystem.js"></script>
+    <script src="core-bundle.js"></script>
+
+    <script>
+        let isReady = false;
+
+        // Wait for Firebase and ESPN API to be ready
+        async function waitForReady() {
+            return new Promise((resolve) => {
+                const checkReady = () => {
+                    if (window.db && window.espnNerdApi && window.SurvivorSystem) {
+                        isReady = true;
+                        resolve();
+                    } else {
+                        setTimeout(checkReady, 500);
+                    }
+                };
+                checkReady();
+            });
+        }
+
+        async function refreshEspnData() {
+            const resultsDiv = document.getElementById('espnResults');
+            const btn = document.getElementById('espnBtn');
+
+            try {
+                btn.disabled = true;
+                resultsDiv.innerHTML = '<div class="result info">🔄 Refreshing ESPN data...</div>';
+
+                if (!isReady) await waitForReady();
+
+                // Force fresh ESPN data for multiple weeks
+                const weeks = [1, 2, 3]; // Current weeks
+
+                for (const week of weeks) {
+                    resultsDiv.innerHTML += `<div class="result info">📡 Fetching Week ${week} data...</div>`;
+
+                    try {
+                        const data = await window.espnNerdApi.getWeekGames(week, true); // Force refresh
+                        if (data && data.games) {
+                            resultsDiv.innerHTML += `<div class="result success">✅ Week ${week}: ${data.games.length} games fetched</div>`;
+                        } else {
+                            resultsDiv.innerHTML += `<div class="result warning">⚠️ Week ${week}: No games data</div>`;
+                        }
+                    } catch (error) {
+                        resultsDiv.innerHTML += `<div class="result error">❌ Week ${week}: ${error.message}</div>`;
+                    }
+                }
+
+                resultsDiv.innerHTML += '<div class="result success">🎯 ESPN data refresh complete!</div>';
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="result error">❌ Error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function recalculateSurvivor() {
+            const resultsDiv = document.getElementById('survivorResults');
+            const btn = document.getElementById('survivorBtn');
+
+            try {
+                btn.disabled = true;
+                resultsDiv.innerHTML = '<div class="result info">🔄 Recalculating survivor status...</div>';
+
+                if (!isReady) await waitForReady();
+
+                // Initialize survivor system
+                const survivorSystem = new window.SurvivorSystem();
+
+                resultsDiv.innerHTML += '<div class="result info">📊 Loading pool members...</div>';
+
+                // Force recalculation of all users
+                resultsDiv.innerHTML += '<div class="result info">🔄 Recalculating with fixed week-isolation logic...</div>';
+
+                // This will use the fixed getWeekGames(week) method instead of getCurrentWeekScores()
+                await survivorSystem.refreshSurvivorData();
+
+                resultsDiv.innerHTML += '<div class="result success">✅ Survivor recalculation complete!</div>';
+                resultsDiv.innerHTML += '<div class="result info">🎯 All users now calculated with week-specific logic</div>';
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="result error">❌ Error: ${error.message}</div>`;
+                console.error('Survivor recalculation error:', error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function checkTargetUser() {
+            const resultsDiv = document.getElementById('checkResults');
+            const btn = document.getElementById('checkBtn');
+            const userId = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+
+            try {
+                btn.disabled = true;
+                resultsDiv.innerHTML = '<div class="result info">🔍 Checking target user status...</div>';
+
+                if (!isReady) await waitForReady();
+
+                const { doc, getDoc } = window.firestoreImports;
+
+                // Check pool membership
+                const poolDoc = await getDoc(doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+                const poolMembers = poolDoc.data();
+                const userInfo = poolMembers[userId];
+
+                if (!userInfo) {
+                    resultsDiv.innerHTML += '<div class="result error">❌ User not found in pool</div>';
+                    return;
+                }
+
+                resultsDiv.innerHTML += `<div class="result success">✅ User: ${userInfo.displayName || userInfo.email}</div>`;
+
+                // Check current status after recalculation
+                const statusDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/${userId}`));
+
+                if (statusDoc.exists()) {
+                    const status = statusDoc.data();
+                    const isActive = !status.eliminated;
+
+                    resultsDiv.innerHTML += `<div class="result ${isActive ? 'success' : 'error'}">
+                        🏆 Status: ${isActive ? 'ACTIVE SURVIVOR' : 'ELIMINATED'}
+                    </div>`;
+
+                    if (status.eliminated) {
+                        resultsDiv.innerHTML += `<div class="result info">📅 Eliminated Week: ${status.eliminatedWeek}</div>`;
+                        resultsDiv.innerHTML += `<div class="result info">📝 Reason: ${status.eliminationReason}</div>`;
+                    }
+                } else {
+                    resultsDiv.innerHTML += '<div class="result warning">⚠️ No status document found - may still be calculating</div>';
+                }
+
+                // Check user picks
+                const picksDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`));
+                if (picksDoc.exists()) {
+                    const picks = picksDoc.data().picks || {};
+                    const pickCount = Object.keys(picks).length;
+                    resultsDiv.innerHTML += `<div class="result info">📋 User has ${pickCount} picks</div>`;
+
+                    // Show recent picks
+                    for (let week = 1; week <= 3; week++) {
+                        if (picks[week]) {
+                            resultsDiv.innerHTML += `<div class="result info">Week ${week}: ${picks[week].team}</div>`;
+                        }
+                    }
+                }
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="result error">❌ Error: ${error.message}</div>`;
+                console.error('User check error:', error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            await waitForReady();
+            document.body.insertAdjacentHTML('afterbegin',
+                '<div class="result success">✅ Firebase and ESPN API ready. You can now run the refresh steps.</div>'
+            );
+        });
+    </script>
+</body>
+</html>

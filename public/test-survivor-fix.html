@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Survivor Elimination Fix</title>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBPbH8xb7PbQKy9LIbAoV4W0j2O6tOZRQo",
+            authDomain: "nerdfootball-aa4d0.firebaseapp.com",
+            projectId: "nerdfootball-aa4d0",
+            storageBucket: "nerdfootball-aa4d0.appspot.com",
+            messagingSenderId: "306039020266",
+            appId: "1:306039020266:web:b1e2c8a4f5e8b9f1a2b3c4"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Make Firestore functions globally available
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+
+        // Load the diagnostic system
+        const script = document.createElement('script');
+        script.src = './survivorDiagnostic.js';
+        script.onload = function() {
+            console.log('✅ Survivor diagnostic system loaded');
+            window.diagnostic = new window.SurvivorDiagnostic(db);
+
+            // Enable buttons
+            document.getElementById('analyzeBtn').disabled = false;
+            document.getElementById('fixBtn').disabled = false;
+        };
+        document.head.appendChild(script);
+
+        // Analysis functions
+        window.runAnalysis = async function() {
+            console.log('🚀 Starting survivor analysis...');
+            document.getElementById('status').textContent = 'Running analysis...';
+
+            try {
+                const result = await window.diagnostic.analyzeAllUsers();
+
+                document.getElementById('status').textContent = 'Analysis complete';
+                document.getElementById('results').innerHTML = `
+                    <h3>Analysis Results:</h3>
+                    <p>✅ Correctly eliminated: ${result.correctlyEliminated.length}</p>
+                    <p>❌ Incorrectly eliminated: ${result.incorrectlyEliminated.length}</p>
+                    <p>✅ Correctly alive: ${result.correctlyAlive.length}</p>
+                    <p>⚠️ Should be eliminated: ${result.shouldBeEliminated.length}</p>
+
+                    ${result.incorrectlyEliminated.length > 0 ? `
+                        <h4>Users incorrectly eliminated:</h4>
+                        <ul>
+                            ${result.incorrectlyEliminated.map(u => `<li>${u.userId}</li>`).join('')}
+                        </ul>
+                    ` : ''}
+
+                    ${result.shouldBeEliminated.length > 0 ? `
+                        <h4>Users who should be eliminated:</h4>
+                        <ul>
+                            ${result.shouldBeEliminated.map(u => `<li>${u.userId} (Week ${u.eliminationWeek})</li>`).join('')}
+                        </ul>
+                    ` : ''}
+                `;
+
+                window.lastAnalysis = result;
+
+            } catch (error) {
+                console.error('❌ Analysis failed:', error);
+                document.getElementById('status').textContent = 'Analysis failed: ' + error.message;
+            }
+        };
+
+        window.runFix = async function() {
+            if (!window.lastAnalysis) {
+                alert('Please run analysis first');
+                return;
+            }
+
+            console.log('🔧 Starting survivor fixes...');
+            document.getElementById('status').textContent = 'Applying fixes...';
+
+            try {
+                const result = await window.diagnostic.fixIncorrectEliminations(window.lastAnalysis);
+
+                document.getElementById('status').textContent = 'Fixes complete';
+                document.getElementById('results').innerHTML += `
+                    <h3>Fix Results:</h3>
+                    <p>Fixes applied: ${result.fixesApplied}</p>
+                    ${result.fixes.length > 0 ? `
+                        <h4>Changes made:</h4>
+                        <ul>
+                            ${result.fixes.map(fix => `<li>${fix}</li>`).join('')}
+                        </ul>
+                    ` : '<p>No fixes needed</p>'}
+                `;
+
+            } catch (error) {
+                console.error('❌ Fix failed:', error);
+                document.getElementById('status').textContent = 'Fix failed: ' + error.message;
+            }
+        };
+
+        window.runComplete = async function() {
+            console.log('🚀 Starting complete analysis and fix...');
+            document.getElementById('status').textContent = 'Running complete analysis...';
+
+            try {
+                const result = await window.diagnostic.runCompleteAnalysis();
+
+                if (result.success) {
+                    document.getElementById('status').textContent = 'Complete analysis finished';
+                    document.getElementById('results').innerHTML = `
+                        <h3>Complete Analysis Results:</h3>
+                        <p>Total users: ${result.analysis.totalUsers}</p>
+                        <p>Fixes applied: ${result.fixes.fixesApplied}</p>
+
+                        <h4>Analysis Breakdown:</h4>
+                        <p>✅ Correctly eliminated: ${result.analysis.correctlyEliminated.length}</p>
+                        <p>❌ Incorrectly eliminated: ${result.analysis.incorrectlyEliminated.length}</p>
+                        <p>✅ Correctly alive: ${result.analysis.correctlyAlive.length}</p>
+                        <p>⚠️ Should be eliminated: ${result.analysis.shouldBeEliminated.length}</p>
+
+                        ${result.fixes.fixes.length > 0 ? `
+                            <h4>Changes Applied:</h4>
+                            <ul>
+                                ${result.fixes.fixes.map(fix => `<li>${fix}</li>`).join('')}
+                            </ul>
+                        ` : '<p>✅ No fixes needed - all eliminations were correct</p>'}
+                    `;
+                } else {
+                    document.getElementById('status').textContent = 'Analysis failed: ' + result.error;
+                }
+
+            } catch (error) {
+                console.error('❌ Complete analysis failed:', error);
+                document.getElementById('status').textContent = 'Complete analysis failed: ' + error.message;
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>🏈 Survivor Elimination Fix System</h1>
+
+    <div style="margin: 20px 0;">
+        <button id="analyzeBtn" onclick="runAnalysis()" disabled>1. Run Analysis</button>
+        <button id="fixBtn" onclick="runFix()" disabled>2. Apply Fixes</button>
+        <button onclick="runComplete()">🚀 Complete Fix (All-in-One)</button>
+    </div>
+
+    <div id="status">Loading diagnostic system...</div>
+
+    <div id="results" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;">
+        Results will appear here...
+    </div>
+
+    <div style="margin-top: 20px; font-size: 12px; color: #666;">
+        <p>This tool:</p>
+        <ul>
+            <li>Reads actual Firestore game results from nerdfootball_games/{week}</li>
+            <li>Validates each user's picks against correct week results</li>
+            <li>Identifies incorrectly eliminated users</li>
+            <li>Fixes survivor status to restore incorrectly eliminated users</li>
+        </ul>
+    </div>
+</body>
+</html>

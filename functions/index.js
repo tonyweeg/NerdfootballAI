@@ -561,6 +561,250 @@ const {
 exports.clearESPNCache = clearESPNCache;
 exports.forceFreshESPNData = forceFreshESPNData;
 
+// === SURVIVOR ELIMINATION BUG FIX FUNCTIONS ===
+
+// Analyze and fix survivor elimination status issues
+exports.analyzeSurvivorEliminations = functions.https.onCall(async (data, context) => {
+    // Check if user is authenticated
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    // Check if user is admin
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+    const userUid = context.auth.uid;
+
+    if (!ADMIN_UIDS.includes(userUid)) {
+        throw new functions.https.HttpsError('permission-denied', 'User must be an admin');
+    }
+
+    try {
+        const db = admin.firestore();
+        const results = {
+            poolMembers: [],
+            issues: [],
+            validUsers: [],
+            analysis: {}
+        };
+
+        console.log('🔍 Starting survivor elimination analysis...');
+
+        // Step 1: Get pool members
+        const poolMembersRef = db.doc('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+        const poolDoc = await poolMembersRef.get();
+
+        if (!poolDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Pool members document not found');
+        }
+
+        const poolData = poolDoc.data();
+        let userIds = [];
+
+        if (poolData.users) {
+            userIds = Object.keys(poolData.users);
+            results.poolMembers = userIds;
+        } else {
+            throw new functions.https.HttpsError('internal', 'Could not find users in pool data');
+        }
+
+        console.log(`✅ Found ${userIds.length} pool members`);
+
+        // Step 2: Analyze each user's survivor status
+        for (const userId of userIds) {
+            try {
+                const userRef = db.doc(`artifacts/nerdfootball/public/data/nerd_survivor/${userId}`);
+                const userDoc = await userRef.get();
+
+                if (!userDoc.exists) {
+                    console.log(`⚠️ No survivor data for user: ${userId}`);
+                    continue;
+                }
+
+                const userData = userDoc.data();
+                const eliminated = userData.eliminated || false;
+                const eliminatedWeek = userData.eliminatedWeek || null;
+                const hasValidPicks = userData.picks && Object.keys(userData.picks).length > 0;
+
+                const userStatus = {
+                    userId,
+                    eliminated,
+                    eliminatedWeek,
+                    hasValidPicks
+                };
+
+                // Identify issues
+                if (eliminated && !eliminatedWeek) {
+                    results.issues.push({
+                        ...userStatus,
+                        issue: 'ELIMINATED_WITHOUT_WEEK',
+                        severity: 'HIGH',
+                        description: 'User marked as eliminated but no elimination week specified'
+                    });
+                    console.log(`🚨 ISSUE: ${userId} - Eliminated without week`);
+                } else if (eliminated && eliminatedWeek) {
+                    console.log(`✅ ${userId} - Eliminated in week ${eliminatedWeek} (may be correct)`);
+                    results.validUsers.push(userStatus);
+                } else {
+                    console.log(`✅ ${userId} - Status appears correct`);
+                    results.validUsers.push(userStatus);
+                }
+
+            } catch (error) {
+                console.error(`❌ Error processing user ${userId}:`, error.message);
+                results.issues.push({
+                    userId,
+                    issue: 'PROCESSING_ERROR',
+                    severity: 'MEDIUM',
+                    description: `Error processing user data: ${error.message}`
+                });
+            }
+        }
+
+        // Step 3: Generate analysis summary
+        results.analysis = {
+            totalUsers: userIds.length,
+            usersWithIssues: results.issues.length,
+            validUsers: results.validUsers.length,
+            issueBreakdown: {
+                eliminatedWithoutWeek: results.issues.filter(i => i.issue === 'ELIMINATED_WITHOUT_WEEK').length,
+                processingErrors: results.issues.filter(i => i.issue === 'PROCESSING_ERROR').length
+            }
+        };
+
+        console.log('📊 Analysis complete:', results.analysis);
+
+        return {
+            success: true,
+            ...results,
+            timestamp: new Date().toISOString(),
+            analyzedBy: userUid
+        };
+
+    } catch (error) {
+        console.error('❌ Survivor elimination analysis failed:', error);
+        throw new functions.https.HttpsError('internal', `Analysis failed: ${error.message}`);
+    }
+});
+
+// Fix survivor elimination status issues
+exports.fixSurvivorEliminations = functions.https.onCall(async (data, context) => {
+    // Check if user is authenticated
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    // Check if user is admin
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+    const userUid = context.auth.uid;
+
+    if (!ADMIN_UIDS.includes(userUid)) {
+        throw new functions.https.HttpsError('permission-denied', 'User must be an admin');
+    }
+
+    const { userIds, fixType = 'auto' } = data;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        throw new functions.https.HttpsError('invalid-argument', 'Must provide array of user IDs to fix');
+    }
+
+    try {
+        const db = admin.firestore();
+        const results = {
+            successful: [],
+            failed: [],
+            operations: []
+        };
+
+        console.log(`🔧 Starting survivor elimination fixes for ${userIds.length} users...`);
+
+        // Process each user
+        for (const userId of userIds) {
+            try {
+                const userRef = db.doc(`artifacts/nerdfootball/public/data/nerd_survivor/${userId}`);
+                const userDoc = await userRef.get();
+
+                if (!userDoc.exists) {
+                    results.failed.push({
+                        userId,
+                        error: 'User document not found'
+                    });
+                    continue;
+                }
+
+                const userData = userDoc.data();
+                const eliminated = userData.eliminated || false;
+                const eliminatedWeek = userData.eliminatedWeek || null;
+
+                // Determine fix action
+                let fixAction = null;
+                let updateData = {};
+
+                if (eliminated && !eliminatedWeek) {
+                    if (fixType === 'auto' || fixType === 'clear_elimination') {
+                        // Fix: Set eliminated to false since no elimination week
+                        fixAction = 'CLEAR_ELIMINATION';
+                        updateData = { eliminated: false };
+                    }
+                }
+
+                if (fixAction) {
+                    // Apply the fix
+                    await userRef.update(updateData);
+
+                    results.successful.push({
+                        userId,
+                        action: fixAction,
+                        updateData,
+                        previousState: {
+                            eliminated: userData.eliminated,
+                            eliminatedWeek: userData.eliminatedWeek
+                        }
+                    });
+
+                    results.operations.push({
+                        userId,
+                        operation: 'UPDATE',
+                        path: `artifacts/nerdfootball/public/data/nerd_survivor/${userId}`,
+                        data: updateData,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    console.log(`✅ Fixed ${userId}: ${fixAction}`);
+                } else {
+                    results.failed.push({
+                        userId,
+                        error: 'No fix action determined for this user'
+                    });
+                }
+
+            } catch (error) {
+                console.error(`❌ Failed to fix user ${userId}:`, error.message);
+                results.failed.push({
+                    userId,
+                    error: error.message
+                });
+            }
+        }
+
+        console.log(`🎉 Fix operation complete: ${results.successful.length} successful, ${results.failed.length} failed`);
+
+        return {
+            success: true,
+            successCount: results.successful.length,
+            failureCount: results.failed.length,
+            successful: results.successful,
+            failed: results.failed,
+            operations: results.operations,
+            timestamp: new Date().toISOString(),
+            fixedBy: userUid
+        };
+
+    } catch (error) {
+        console.error('❌ Survivor elimination fix failed:', error);
+        throw new functions.https.HttpsError('internal', `Fix operation failed: ${error.message}`);
+    }
+});
+
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
 // Will be enabled once client-side integration is verified
 // const {

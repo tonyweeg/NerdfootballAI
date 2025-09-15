@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check User Survivor Status</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #00ff00; }
+        .result { margin: 10px 0; padding: 10px; background: #2a2a2a; border-radius: 5px; }
+        .error { color: #ff6666; }
+        .success { color: #66ff66; }
+        .info { color: #6666ff; }
+        .week { border-left: 3px solid #00ff00; padding-left: 10px; margin: 5px 0; }
+        .eliminated { border-left-color: #ff6666; }
+        .active { border-left-color: #66ff66; }
+    </style>
+</head>
+<body>
+    <h1>🔍 User Survivor Status Check</h1>
+    <p>Checking status for user: <strong>aaG5Wc2JZkZJD1r7ozfJG04QRrf1</strong></p>
+
+    <div id="results">
+        <p>Loading Firebase...</p>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBNdSTHnmJ7b3GsyB2bKLQ1Lz9JLNnK9ZI",
+            authDomain: "nerdfootball-project.firebaseapp.com",
+            databaseURL: "https://nerdfootball-project-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball-project",
+            storageBucket: "nerdfootball-project.appspot.com",
+            messagingSenderId: "147326956986",
+            appId: "1:147326956986:web:ff61a86e57d9c6074bb7dc",
+            measurementId: "G-FG6E2Q2MJW"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const resultsDiv = document.getElementById('results');
+
+        async function checkUserStatus() {
+            const userId = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+
+            try {
+                resultsDiv.innerHTML = '<p class="info">🔍 Checking user status...</p>';
+
+                // 1. Check pool membership
+                console.log('Checking pool membership...');
+                const poolDoc = await getDoc(doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+
+                if (!poolDoc.exists()) {
+                    resultsDiv.innerHTML = '<p class="error">❌ Pool not found</p>';
+                    return;
+                }
+
+                const poolMembers = poolDoc.data();
+                const userInfo = poolMembers[userId];
+
+                if (!userInfo) {
+                    resultsDiv.innerHTML = '<p class="error">❌ User not found in pool</p>';
+                    return;
+                }
+
+                resultsDiv.innerHTML += `<div class="result success">✅ User found: ${userInfo.displayName || userInfo.email}</div>`;
+
+                // 2. Get user picks
+                console.log('Getting user picks...');
+                const picksDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`));
+
+                if (!picksDoc.exists()) {
+                    resultsDiv.innerHTML += '<div class="result error">❌ No picks found</div>';
+                    return;
+                }
+
+                const userPicks = picksDoc.data().picks || {};
+                resultsDiv.innerHTML += '<div class="result info">📋 User Picks by Week:</div>';
+
+                // Display picks
+                for (let week = 1; week <= 18; week++) {
+                    const pick = userPicks[week];
+                    if (pick) {
+                        resultsDiv.innerHTML += `<div class="week">Week ${week}: <strong>${pick.team}</strong> (Game ${pick.gameId})</div>`;
+                    }
+                }
+
+                // 3. Check current survivor status
+                console.log('Checking current status...');
+                const statusDoc = await getDoc(doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/${userId}`));
+
+                if (statusDoc.exists()) {
+                    const status = statusDoc.data();
+                    const isEliminated = status.eliminated;
+                    const eliminatedWeek = status.eliminatedWeek;
+                    const eliminationReason = status.eliminationReason;
+
+                    if (isEliminated) {
+                        resultsDiv.innerHTML += `<div class="result error eliminated">❌ Status: ELIMINATED in Week ${eliminatedWeek}</div>`;
+                        resultsDiv.innerHTML += `<div class="result error">Reason: ${eliminationReason}</div>`;
+                    } else {
+                        resultsDiv.innerHTML += '<div class="result success active">✅ Status: ACTIVE SURVIVOR</div>';
+                    }
+                } else {
+                    resultsDiv.innerHTML += '<div class="result info">⚠️ No status document found - checking legacy format</div>';
+
+                    // Check legacy status format
+                    try {
+                        const legacyDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_status/${userId}`));
+                        if (legacyDoc.exists()) {
+                            const legacyStatus = legacyDoc.data();
+                            resultsDiv.innerHTML += `<div class="result info">📊 Legacy Status: ${JSON.stringify(legacyStatus, null, 2)}</div>`;
+                        }
+                    } catch (e) {
+                        console.log('No legacy status found');
+                    }
+                }
+
+                // 4. Team usage analysis
+                resultsDiv.innerHTML += '<div class="result info">📈 Team Usage Analysis:</div>';
+                const teamUsage = {};
+
+                for (let week = 1; week <= 18; week++) {
+                    const pick = userPicks[week];
+                    if (pick) {
+                        if (!teamUsage[pick.team]) {
+                            teamUsage[pick.team] = [];
+                        }
+                        teamUsage[pick.team].push(week);
+                    }
+                }
+
+                for (const [team, weeks] of Object.entries(teamUsage)) {
+                    if (weeks.length > 1) {
+                        resultsDiv.innerHTML += `<div class="week error">⚠️ ${team} used in weeks: ${weeks.join(', ')} - POTENTIAL ISSUE</div>`;
+                    } else {
+                        resultsDiv.innerHTML += `<div class="week success">✅ ${team} used in week: ${weeks[0]} - OK</div>`;
+                    }
+                }
+
+                resultsDiv.innerHTML += '<div class="result success">🎯 Analysis complete!</div>';
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML += `<div class="result error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // Run the check
+        checkUserStatus();
+    </script>
+</body>
+</html>

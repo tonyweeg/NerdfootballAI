@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 EMERGENCY SURVIVOR FIX</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #ff1a1a; color: white; }
+        .emergency { background: #cc0000; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .success { background: #006600; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .info { background: #0066cc; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        button { background: #ffff00; color: #cc0000; padding: 15px 30px; border: none; border-radius: 4px; cursor: pointer; margin: 10px 5px; font-size: 18px; font-weight: bold; }
+        button:hover { background: #ffcc00; }
+        .code { background: #333; padding: 15px; border-radius: 5px; font-family: monospace; color: #00ff00; margin: 10px 0; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="emergency">
+        <h1>🚨 EMERGENCY SURVIVOR STATUS FIX</h1>
+        <h2>PLAYERS REPORTING INCORRECT ELIMINATION STATUS</h2>
+        <p><strong>ISSUE:</strong> Survivor table showing "everyone alive" instead of correct eliminations</p>
+        <p><strong>CAUSE:</strong> Cache contamination from cross-week data bug</p>
+        <p><strong>SOLUTION:</strong> Force immediate recalculation with fixed logic</p>
+    </div>
+
+    <button onclick="runEmergencyFix()">🚨 RUN EMERGENCY FIX NOW</button>
+    <button onclick="checkTargetUser()">🔍 CHECK TARGET USER</button>
+    <button onclick="navigateToSurvivor()">📊 VIEW SURVIVOR TABLE</button>
+
+    <div id="status"></div>
+
+    <div class="emergency">
+        <h3>🎯 TARGET USER: aaG5Wc2JZkZJD1r7ozfJG04QRrf1</h3>
+        <p>This user reported the issue. After fix, they should show correct status.</p>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script>
+        let statusDiv = document.getElementById('status');
+
+        async function runEmergencyFix() {
+            statusDiv.innerHTML = '<div class="info">🚨 RUNNING EMERGENCY FIX...</div>';
+
+            try {
+                // Wait for Firebase to be ready
+                await waitForFirebase();
+
+                statusDiv.innerHTML += '<div class="success">✅ Firebase ready</div>';
+
+                // Clear all cache
+                localStorage.clear();
+                sessionStorage.clear();
+                statusDiv.innerHTML += '<div class="success">✅ Cache cleared</div>';
+
+                // Force fresh ESPN data with fixed logic
+                await window.espnNerdApi.getWeekGames(1, true);
+                statusDiv.innerHTML += '<div class="success">✅ Week 1 data refreshed</div>';
+
+                await window.espnNerdApi.getWeekGames(2, true);
+                statusDiv.innerHTML += '<div class="success">✅ Week 2 data refreshed</div>';
+
+                await window.espnNerdApi.getWeekGames(3, true);
+                statusDiv.innerHTML += '<div class="success">✅ Week 3 data refreshed</div>';
+
+                // Navigate to survivor view to trigger recalculation
+                statusDiv.innerHTML += '<div class="info">🔄 Navigating to survivor pool to trigger recalculation...</div>';
+
+                setTimeout(() => {
+                    window.location.href = './index.html?view=survivor';
+                }, 2000);
+
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="status" style="background: #cc0000">❌ ERROR: ${error.message}</div>`;
+                console.error('Emergency fix error:', error);
+            }
+        }
+
+        async function checkTargetUser() {
+            statusDiv.innerHTML = '<div class="info">🔍 Checking target user status...</div>';
+
+            try {
+                await waitForFirebase();
+
+                const userId = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+                const { doc, getDoc } = window.firestoreImports;
+
+                // Check pool membership
+                const poolDoc = await getDoc(doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+                const poolMembers = poolDoc.data();
+                const userInfo = poolMembers[userId];
+
+                if (!userInfo) {
+                    statusDiv.innerHTML += '<div class="status" style="background: #cc0000">❌ Target user not found in pool</div>';
+                    return;
+                }
+
+                statusDiv.innerHTML += `<div class="success">✅ Target user: ${userInfo.displayName || userInfo.email}</div>`;
+
+                // Check current status
+                const statusDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/${userId}`));
+
+                if (statusDoc.exists()) {
+                    const status = statusDoc.data();
+                    const isActive = !status.eliminated;
+
+                    statusDiv.innerHTML += `<div class="status" style="background: ${isActive ? '#006600' : '#cc0000'}">
+                        🏆 Current Status: ${isActive ? 'ACTIVE SURVIVOR' : 'ELIMINATED'}
+                    </div>`;
+
+                    if (status.eliminated) {
+                        statusDiv.innerHTML += `<div class="info">📅 Eliminated Week: ${status.eliminatedWeek}</div>`;
+                        statusDiv.innerHTML += `<div class="info">📝 Reason: ${status.eliminationReason}</div>`;
+                    }
+                } else {
+                    statusDiv.innerHTML += '<div class="info">⚠️ No status document found - may need recalculation</div>';
+                }
+
+                // Check picks
+                const picksDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`));
+                if (picksDoc.exists()) {
+                    const picks = picksDoc.data().picks || {};
+                    const pickCount = Object.keys(picks).length;
+                    statusDiv.innerHTML += `<div class="info">📋 User has ${pickCount} picks</div>`;
+
+                    // Show picks
+                    for (let week = 1; week <= 3; week++) {
+                        if (picks[week]) {
+                            statusDiv.innerHTML += `<div class="info">Week ${week}: ${picks[week].team}</div>`;
+                        }
+                    }
+                }
+
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="status" style="background: #cc0000">❌ ERROR: ${error.message}</div>`;
+                console.error('User check error:', error);
+            }
+        }
+
+        function navigateToSurvivor() {
+            statusDiv.innerHTML = '<div class="info">📊 Navigating to survivor table...</div>';
+            window.location.href = './index.html?view=survivor';
+        }
+
+        async function waitForFirebase() {
+            return new Promise((resolve) => {
+                const checkReady = () => {
+                    if (window.db && window.espnNerdApi && window.firestoreImports) {
+                        resolve();
+                    } else {
+                        setTimeout(checkReady, 500);
+                    }
+                };
+                checkReady();
+            });
+        }
+
+        // Auto-display instructions
+        window.addEventListener('load', () => {
+            statusDiv.innerHTML = `
+                <div class="emergency">
+                    <h3>🚨 EMERGENCY INSTRUCTIONS</h3>
+                    <p><strong>1. Click "RUN EMERGENCY FIX NOW"</strong> - This will clear cache and refresh data</p>
+                    <p><strong>2. Wait for redirect to survivor table</strong> - System will recalculate automatically</p>
+                    <p><strong>3. Check if statuses are now correct</strong> - Should show proper eliminations</p>
+                    <p><strong>4. Use "CHECK TARGET USER" to verify specific user</strong></p>
+                </div>
+                <div class="info">🔧 Fix is ready. Firebase initializing...</div>
+            `;
+
+            // Check Firebase readiness
+            const checkInterval = setInterval(() => {
+                if (window.db && window.espnNerdApi) {
+                    clearInterval(checkInterval);
+                    statusDiv.innerHTML += '<div class="success">✅ Firebase ready - Emergency fix can run</div>';
+                }
+            }, 1000);
+
+            // Timeout after 10 seconds
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                if (!window.db) {
+                    statusDiv.innerHTML += '<div class="status" style="background: #cc0000">⚠️ Firebase taking longer than expected. Try refreshing page.</div>';
+                }
+            }, 10000);
+        });
+    </script>
+</body>
+</html>

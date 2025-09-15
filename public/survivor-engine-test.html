@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🏈 Survivor Elimination Engine - Diamond Level Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .button { padding: 10px 20px; margin: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .button:disabled { background: #ccc; cursor: not-allowed; }
+        .button.danger { background: #f44336; }
+        .button.warning { background: #ff9800; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .status.loading { background: #e3f2fd; }
+        .status.success { background: #e8f5e8; }
+        .status.error { background: #ffebee; }
+        .results { border: 1px solid #ddd; padding: 15px; margin: 20px 0; border-radius: 5px; background: #f9f9f9; }
+        .user-debug { margin: 10px 0; padding: 10px; border-left: 3px solid #2196F3; background: #f5f5f5; }
+        .week-result { margin: 5px 0; padding: 5px; font-size: 12px; }
+        .week-result.eliminated { background: #ffcdd2; }
+        .week-result.survived { background: #c8e6c9; }
+        .week-result.pending { background: #fff3e0; }
+    </style>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBPbH8xb7PbQKy9LIbAoV4W0j2O6tOZRQo",
+            authDomain: "nerdfootball-aa4d0.firebaseapp.com",
+            projectId: "nerdfootball-aa4d0",
+            storageBucket: "nerdfootball-aa4d0.appspot.com",
+            messagingSenderId: "306039020266",
+            appId: "1:306039020266:web:b1e2c8a4f5e8b9f1a2b3c4"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Make Firestore functions globally available
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+
+        // Load the elimination engine
+        const script = document.createElement('script');
+        script.src = './survivorEliminationEngine.js';
+        script.onload = function() {
+            console.log('✅ Survivor Elimination Engine loaded');
+            window.engine = new window.SurvivorEliminationEngine(db);
+
+            // Enable all buttons
+            document.querySelectorAll('.button').forEach(btn => btn.disabled = false);
+            updateStatus('✅ Survivor Elimination Engine loaded and ready', 'success');
+        };
+        document.head.appendChild(script);
+
+        // Status management
+        window.updateStatus = function(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        };
+
+        // Clear results
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = 'Results will appear here...';
+        };
+
+        // Display results helper
+        window.displayResults = function(content) {
+            document.getElementById('results').innerHTML = content;
+        };
+
+        // Analyze specific user
+        window.debugUser = async function() {
+            const userId = document.getElementById('userIdInput').value.trim();
+            if (!userId) {
+                alert('Please enter a user ID');
+                return;
+            }
+
+            updateStatus(`🔍 Debugging user ${userId}...`, 'loading');
+
+            try {
+                const result = await window.engine.debugUser(userId);
+
+                let html = `<h3>🔍 Debug Results for User: ${userId}</h3>`;
+
+                html += `<div class="user-debug">`;
+                html += `<p><strong>Should be eliminated:</strong> ${result.shouldBeEliminated ? 'YES' : 'NO'}</p>`;
+
+                if (result.shouldBeEliminated) {
+                    html += `<p><strong>Elimination Week:</strong> ${result.eliminationWeek}</p>`;
+                    html += `<p><strong>Reason:</strong> ${result.eliminationReason}</p>`;
+                }
+
+                html += `<h4>Week-by-Week Analysis:</h4>`;
+                result.weekResults.forEach(week => {
+                    if (week.status !== 'NO_PICK') {
+                        const cssClass = week.status === 'ELIMINATED' ? 'eliminated' :
+                                        week.status === 'SURVIVED' ? 'survived' : 'pending';
+
+                        html += `<div class="week-result ${cssClass}">`;
+                        html += `<strong>Week ${week.week}:</strong> ${week.status} - ${week.reason}`;
+                        if (week.pickedTeam) {
+                            html += ` (Picked: ${week.pickedTeam}, Winner: ${week.winner})`;
+                        }
+                        html += `</div>`;
+                    }
+                });
+                html += `</div>`;
+
+                displayResults(html);
+                updateStatus('✅ User debug complete', 'success');
+
+            } catch (error) {
+                console.error('❌ Debug failed:', error);
+                updateStatus(`❌ Debug failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Run analysis only
+        window.runAnalysis = async function() {
+            updateStatus('🔍 Running comprehensive elimination analysis...', 'loading');
+            clearResults();
+
+            try {
+                const analysis = await window.engine.analyzeAllEliminations();
+
+                let html = `<h3>📊 Comprehensive Elimination Analysis</h3>`;
+                html += `<p><strong>Total Users:</strong> ${analysis.totalUsers}</p>`;
+                html += `<p style="color: green;"><strong>✅ Correct Eliminations:</strong> ${analysis.correctEliminations.length}</p>`;
+                html += `<p style="color: red;"><strong>❌ Incorrect Eliminations:</strong> ${analysis.incorrectEliminations.length}</p>`;
+                html += `<p style="color: green;"><strong>✅ Correct Survivors:</strong> ${analysis.correctSurvivors.length}</p>`;
+                html += `<p style="color: orange;"><strong>⚠️ Missed Eliminations:</strong> ${analysis.missedEliminations.length}</p>`;
+
+                if (analysis.incorrectEliminations.length > 0) {
+                    html += `<h4 style="color: red;">Users Incorrectly Eliminated:</h4><ul>`;
+                    analysis.incorrectEliminations.forEach(user => {
+                        html += `<li>${user.userId} (Currently marked eliminated)</li>`;
+                    });
+                    html += `</ul>`;
+                }
+
+                if (analysis.missedEliminations.length > 0) {
+                    html += `<h4 style="color: orange;">Users Who Should Be Eliminated:</h4><ul>`;
+                    analysis.missedEliminations.forEach(user => {
+                        html += `<li>${user.userId} (Week ${user.eliminationWeek}: ${user.reason})</li>`;
+                    });
+                    html += `</ul>`;
+                }
+
+                // Store analysis for potential fixes
+                window.lastAnalysis = analysis;
+
+                displayResults(html);
+                updateStatus('✅ Analysis complete', 'success');
+
+            } catch (error) {
+                console.error('❌ Analysis failed:', error);
+                updateStatus(`❌ Analysis failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Apply fixes only
+        window.applyFixes = async function() {
+            if (!window.lastAnalysis) {
+                alert('Please run analysis first');
+                return;
+            }
+
+            const incorrectCount = window.lastAnalysis.incorrectEliminations.length;
+            const missedCount = window.lastAnalysis.missedEliminations.length;
+
+            if (incorrectCount === 0 && missedCount === 0) {
+                alert('No fixes needed - all eliminations are correct!');
+                return;
+            }
+
+            if (!confirm(`This will:\n- Restore ${incorrectCount} incorrectly eliminated users\n- Eliminate ${missedCount} users who should be eliminated\n\nContinue?`)) {
+                return;
+            }
+
+            updateStatus('🔧 Applying elimination fixes...', 'loading');
+
+            try {
+                const fixes = await window.engine.applyEliminationFixes(window.lastAnalysis);
+
+                let html = `<h3>🔧 Fix Results</h3>`;
+                html += `<p><strong>Fixes Applied:</strong> ${fixes.fixesApplied}</p>`;
+
+                if (fixes.changes.length > 0) {
+                    html += `<h4>Changes Made:</h4><ul>`;
+                    fixes.changes.forEach(change => {
+                        html += `<li>${change}</li>`;
+                    });
+                    html += `</ul>`;
+                } else {
+                    html += `<p>✅ No fixes were needed</p>`;
+                }
+
+                document.getElementById('results').innerHTML += html;
+                updateStatus('✅ Fixes applied successfully', 'success');
+
+            } catch (error) {
+                console.error('❌ Fix failed:', error);
+                updateStatus(`❌ Fix failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Complete fix (analysis + fixes)
+        window.runCompleteFix = async function() {
+            if (!confirm('This will analyze ALL users and automatically fix any incorrect eliminations. Continue?')) {
+                return;
+            }
+
+            updateStatus('🚀 Running complete elimination fix...', 'loading');
+            clearResults();
+
+            try {
+                const report = await window.engine.fixAllSurvivorEliminations();
+
+                if (report.success) {
+                    let html = `<h3>🏆 Complete Survivor Elimination Fix - COMPLETE</h3>`;
+                    html += `<div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 10px 0;">`;
+                    html += `<p><strong>📊 Final Results:</strong></p>`;
+                    html += `<p>Total Users: ${report.totalUsers}</p>`;
+                    html += `<p>Fixes Applied: <strong>${report.fixesApplied}</strong></p>`;
+                    html += `<p>✅ Correct Eliminations: ${report.correctEliminations}</p>`;
+                    html += `<p>❌ Incorrect Eliminations (Fixed): ${report.incorrectEliminations}</p>`;
+                    html += `<p>✅ Correct Survivors: ${report.correctSurvivors}</p>`;
+                    html += `<p>⚠️ Missed Eliminations (Fixed): ${report.missedEliminations}</p>`;
+                    html += `</div>`;
+
+                    if (report.changes.length > 0) {
+                        html += `<h4>🔧 Changes Applied:</h4><ul>`;
+                        report.changes.forEach(change => {
+                            html += `<li>${change}</li>`;
+                        });
+                        html += `</ul>`;
+                    } else {
+                        html += `<div style="background: #e3f2fd; padding: 10px; border-radius: 5px;">`;
+                        html += `<p>✅ <strong>No fixes were needed - all eliminations were already correct!</strong></p>`;
+                        html += `</div>`;
+                    }
+
+                    displayResults(html);
+                    updateStatus('🏆 Complete fix successful - all eliminations are now correct', 'success');
+
+                } else {
+                    updateStatus(`❌ Complete fix failed: ${report.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('❌ Complete fix failed:', error);
+                updateStatus(`❌ Complete fix failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Target specific user fix
+        window.runTargetUserFix = async function() {
+            const targetUserId = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+
+            updateStatus(`🎯 Analyzing target user ${targetUserId}...`, 'loading');
+
+            try {
+                const analysis = await window.engine.debugUser(targetUserId);
+
+                let html = `<h3>🎯 Target User Analysis: ${targetUserId}</h3>`;
+                html += `<div class="user-debug">`;
+
+                if (analysis.shouldBeEliminated) {
+                    html += `<p style="color: red;"><strong>❌ This user SHOULD be eliminated</strong></p>`;
+                    html += `<p>Elimination Week: ${analysis.eliminationWeek}</p>`;
+                    html += `<p>Reason: ${analysis.eliminationReason}</p>`;
+                } else {
+                    html += `<p style="color: green;"><strong>✅ This user should be ALIVE</strong></p>`;
+                }
+
+                // Show week results
+                html += `<h4>Week-by-Week Results:</h4>`;
+                analysis.weekResults.forEach(week => {
+                    if (week.status !== 'NO_PICK') {
+                        const color = week.status === 'ELIMINATED' ? 'red' :
+                                     week.status === 'SURVIVED' ? 'green' : 'orange';
+                        html += `<p style="color: ${color};">Week ${week.week}: ${week.status} - ${week.reason}</p>`;
+                    }
+                });
+                html += `</div>`;
+
+                displayResults(html);
+                updateStatus('✅ Target user analysis complete', 'success');
+
+            } catch (error) {
+                console.error('❌ Target user analysis failed:', error);
+                updateStatus(`❌ Target user analysis failed: ${error.message}`, 'error');
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>🏈 Survivor Elimination Engine - Diamond Level Fix</h1>
+    <p><strong>Pharoah's Bulletproof Architecture:</strong> Direct Firestore access with week-specific validation</p>
+
+    <div class="status loading" id="status">Loading Survivor Elimination Engine...</div>
+
+    <div style="margin: 20px 0; padding: 15px; background: #f0f0f0; border-radius: 5px;">
+        <h3>🎯 Target User Debug</h3>
+        <input type="text" id="userIdInput" placeholder="Enter User ID (e.g., aaG5Wc2JZkZJD1r7ozfJG04QRrf1)"
+               style="width: 400px; padding: 8px;" value="aaG5Wc2JZkZJD1r7ozfJG04QRrf1">
+        <button class="button" onclick="debugUser()" disabled>🔍 Debug This User</button>
+        <button class="button warning" onclick="runTargetUserFix()" disabled>🎯 Analyze Problem User</button>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h3>🚀 Complete Fix Operations</h3>
+        <button class="button" onclick="runAnalysis()" disabled>1. 📊 Run Analysis</button>
+        <button class="button warning" onclick="applyFixes()" disabled>2. 🔧 Apply Fixes</button>
+        <button class="button danger" onclick="runCompleteFix()" disabled>🚀 COMPLETE FIX (All-in-One)</button>
+    </div>
+
+    <div class="results" id="results">
+        Results will appear here...
+    </div>
+
+    <div style="margin-top: 30px; font-size: 14px; color: #666; border-top: 1px solid #ddd; padding-top: 20px;">
+        <h4>🏗️ Architecture Features:</h4>
+        <ul>
+            <li><strong>Week-Specific Validation:</strong> Each week's picks validated only against that week's results</li>
+            <li><strong>Direct Firestore Access:</strong> Bypasses browser permission issues with direct database reads</li>
+            <li><strong>Chronological Analysis:</strong> Finds the exact week when elimination should have occurred</li>
+            <li><strong>Bulletproof Winner Determination:</strong> Handles all game status variations and score comparisons</li>
+            <li><strong>Cross-Week Contamination Prevention:</strong> Eliminates logic that mixes data from different weeks</li>
+        </ul>
+
+        <h4>🎯 Target User Issue:</h4>
+        <p>User <code>aaG5Wc2JZkZJD1r7ozfJG04QRrf1</code> and others are incorrectly eliminated due to cross-week contamination in the lookup logic. This engine fixes the root cause.</p>
+    </div>
+</body>
+</html>

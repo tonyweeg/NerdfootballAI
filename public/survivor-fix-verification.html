@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✅ SURVIVOR FIX VERIFICATION - Post-Fix Validation System</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #001a00;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .verification-header {
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            background: #002200;
+        }
+        .verification-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .verification-button {
+            background: #004400;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 12px 24px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        .verification-button:hover {
+            background: #006600;
+        }
+        .verification-button.critical {
+            background: #440000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        .verification-button.critical:hover {
+            background: #660000;
+        }
+        #verification-output {
+            background: #000;
+            border: 1px solid #333;
+            padding: 15px;
+            margin-top: 20px;
+            min-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .status {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        .status.loading {
+            background: #333;
+            color: #fff;
+        }
+        .status.error {
+            background: #600;
+            color: #fff;
+        }
+        .status.success {
+            background: #060;
+            color: #fff;
+        }
+        .verification-result {
+            background: #002200;
+            border: 1px solid #004400;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .verification-success {
+            background: #003300;
+            border-color: #00ff00;
+        }
+        .verification-failure {
+            background: #330000;
+            border-color: #ff0000;
+            color: #ffcccc;
+        }
+        .verification-stats {
+            background: #001100;
+            border: 1px solid #003300;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="verification-header">
+        <h1>✅ SURVIVOR FIX VERIFICATION</h1>
+        <h2>Post-Fix Validation & Quality Assurance System</h2>
+        <p>Comprehensive verification that all fixes were applied correctly</p>
+    </div>
+
+    <div class="verification-buttons">
+        <button class="verification-button" onclick="verifyAllFixes()">🔍 Verify All Fixes</button>
+        <button class="verification-button" onclick="validateEliminations()">📊 Validate Eliminations</button>
+        <button class="verification-button" onclick="checkConsistency()">🧠 Check Consistency</button>
+        <button class="verification-button" onclick="generateReport()">📋 Generate Report</button>
+        <button class="verification-button critical" onclick="emergencyRollback()">🚨 Emergency Rollback</button>
+        <button class="verification-button" onclick="clearOutput()">🗑️ Clear</button>
+    </div>
+
+    <div id="status" class="status loading">Loading verification system...</div>
+    <div id="verification-output"></div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFunctions } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDWY_kkn9KQB3RKN8gPnbW6fYzSGJmTgGk",
+            authDomain: "nerd-football.firebaseapp.com",
+            projectId: "nerd-football",
+            storageBucket: "nerd-football.appspot.com",
+            messagingSenderId: "166734047728",
+            appId: "1:166734047728:web:5f6e150b4f1d7c6e896dc1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const functions = getFunctions(app);
+
+        // Make globally available
+        window.db = db;
+        window.functions = functions;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+
+        console.log('✅ Firebase initialized');
+        document.getElementById('status').textContent = 'Firebase loaded. Loading verification tools...';
+
+        // Load required scripts
+        Promise.all([
+            loadScript('/espnCacheManager.js'),
+            loadScript('/batch-survivor-verification.js')
+        ]).then(() => {
+            console.log('✅ All verification tools loaded');
+            document.getElementById('status').className = 'status success';
+            document.getElementById('status').textContent = 'Verification system ready!';
+        }).catch(error => {
+            console.error('❌ Failed to load verification tools:', error);
+            document.getElementById('status').className = 'status error';
+            document.getElementById('status').textContent = 'Error loading tools: ' + error.message;
+        });
+    </script>
+
+    <script>
+        const TARGET_USER_ID = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+        let verificationResults = {};
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        function log(message) {
+            const output = document.getElementById('verification-output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('verification-output').textContent = '';
+        }
+
+        async function verifyAllFixes() {
+            log('✅ STARTING COMPREHENSIVE FIX VERIFICATION');
+            log('='.repeat(80));
+
+            try {
+                // Step 1: Verify the target user fix
+                log('🎯 STEP 1: Verifying target user fix...');
+                const targetVerification = await verifyTargetUserFix();
+
+                // Step 2: Verify all other fixes using the batch system
+                log('\n🔍 STEP 2: Running batch verification...');
+                const batchResults = await runBatchVerification();
+
+                // Step 3: Cross-verify with survivor system
+                log('\n🧠 STEP 3: Cross-verifying with survivor system...');
+                const systemVerification = await verifySurvivorSystem();
+
+                // Step 4: Generate comprehensive verification report
+                log('\n📊 STEP 4: Generating verification report...');
+                verificationResults = {
+                    timestamp: new Date().toISOString(),
+                    targetUser: targetVerification,
+                    batchResults: batchResults,
+                    systemVerification: systemVerification,
+                    overall: {
+                        success: targetVerification.success && batchResults.success && systemVerification.success,
+                        issues: []
+                    }
+                };
+
+                // Collect any issues
+                if (!targetVerification.success) {
+                    verificationResults.overall.issues.push('Target user fix failed verification');
+                }
+                if (!batchResults.success) {
+                    verificationResults.overall.issues.push('Batch fix verification failed');
+                }
+                if (!systemVerification.success) {
+                    verificationResults.overall.issues.push('System consistency check failed');
+                }
+
+                // Display results
+                if (verificationResults.overall.success) {
+                    log('\n✅ ALL VERIFICATIONS PASSED');
+                    log('🎉 Fix was successful and all users have correct statuses');
+                } else {
+                    log('\n❌ VERIFICATION ISSUES DETECTED');
+                    verificationResults.overall.issues.forEach(issue => {
+                        log(`🚨 ${issue}`);
+                    });
+                }
+
+                log('\nVerification complete. Use "Generate Report" for detailed results.');
+
+            } catch (error) {
+                log(`❌ Comprehensive verification failed: ${error.message}`);
+                console.error('Verification error:', error);
+            }
+        }
+
+        async function verifyTargetUserFix() {
+            log('🎯 Verifying target user fix...');
+
+            try {
+                // Get current status
+                const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+                const targetStatus = allStatuses[TARGET_USER_ID];
+
+                log(`📊 Target user current status:`);
+                log(`  Eliminated: ${targetStatus?.eliminated || false}`);
+                log(`  Week: ${targetStatus?.eliminatedWeek || 'N/A'}`);
+                log(`  Fixed: ${targetStatus?.fixedDate ? 'YES' : 'NO'}`);
+
+                // Get user picks to verify correctness
+                const picksDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${TARGET_USER_ID}`));
+                const userPicksData = picksDoc.exists() ? picksDoc.data() : {};
+                const userPicks = userPicksData.picks || {};
+
+                // Verify each pick result
+                let shouldBeEliminated = false;
+                let eliminationWeek = null;
+
+                for (const [week, pick] of Object.entries(userPicks)) {
+                    const weekNum = parseInt(week);
+                    const gameResult = await getActualGameResult(weekNum, pick.gameId, pick.team);
+
+                    if (gameResult && !gameResult.userWon && gameResult.status === 'Final') {
+                        shouldBeEliminated = true;
+                        eliminationWeek = weekNum;
+                        log(`📅 Week ${weekNum}: User lost (${pick.team} lost to ${gameResult.winner})`);
+                        break;
+                    } else if (gameResult) {
+                        log(`📅 Week ${weekNum}: User won (${pick.team} beat ${gameResult.winner === pick.team ? 'opponent' : gameResult.winner})`);
+                    }
+                }
+
+                const currentlyEliminated = targetStatus?.eliminated || false;
+
+                // Determine if fix is correct
+                const fixIsCorrect = (shouldBeEliminated === currentlyEliminated);
+
+                if (fixIsCorrect) {
+                    log(`✅ Target user fix is CORRECT`);
+                    if (shouldBeEliminated) {
+                        log(`   User correctly eliminated in Week ${targetStatus.eliminatedWeek}`);
+                    } else {
+                        log(`   User correctly marked as ALIVE`);
+                    }
+                } else {
+                    log(`❌ Target user fix is INCORRECT`);
+                    log(`   Should be eliminated: ${shouldBeEliminated}`);
+                    log(`   Currently eliminated: ${currentlyEliminated}`);
+                }
+
+                return {
+                    success: fixIsCorrect,
+                    userId: TARGET_USER_ID,
+                    shouldBeEliminated,
+                    currentlyEliminated,
+                    eliminationWeek,
+                    status: targetStatus
+                };
+
+            } catch (error) {
+                log(`❌ Target user verification failed: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function runBatchVerification() {
+            log('🔍 Running batch verification...');
+
+            try {
+                if (!window.batchSurvivorVerification) {
+                    throw new Error('Batch verification system not loaded');
+                }
+
+                // Run the analysis again to see current state
+                const analysisResults = await window.batchSurvivorVerification.runCompleteAnalysis();
+
+                if (!analysisResults.success) {
+                    throw new Error('Batch analysis failed: ' + analysisResults.error);
+                }
+
+                log(`📊 Batch verification results:`);
+                log(`   Target user analyzed: ${analysisResults.targetAnalysis ? 'YES' : 'NO'}`);
+                log(`   Bug patterns found: ${analysisResults.bugPatterns.length}`);
+                log(`   Affected users found: ${analysisResults.affectedUsers.length}`);
+                log(`   Verified users: ${analysisResults.verificationResults.verified?.length || 0}`);
+
+                // If we still find affected users, the fix was incomplete
+                const stillAffected = analysisResults.affectedUsers.length > 0;
+
+                if (stillAffected) {
+                    log(`❌ Batch verification FAILED: ${analysisResults.affectedUsers.length} users still affected`);
+                    analysisResults.affectedUsers.forEach(user => {
+                        log(`   🚨 Still affected: ${user.displayName} - ${user.bugPattern.type}`);
+                    });
+                } else {
+                    log(`✅ Batch verification PASSED: No remaining affected users`);
+                }
+
+                return {
+                    success: !stillAffected,
+                    analysisResults: analysisResults,
+                    remainingIssues: analysisResults.affectedUsers.length
+                };
+
+            } catch (error) {
+                log(`❌ Batch verification failed: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function verifySurvivorSystem() {
+            log('🧠 Verifying survivor system consistency...');
+
+            try {
+                // Get all pool members
+                const poolDoc = await getDoc(doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+                const poolMembers = poolDoc.exists() ? poolDoc.data() : {};
+
+                // Get all statuses
+                const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+
+                log(`📊 Checking ${Object.keys(poolMembers).length} pool members...`);
+
+                let consistentUsers = 0;
+                let inconsistentUsers = 0;
+                const inconsistencies = [];
+
+                for (const [uid, member] of Object.entries(poolMembers)) {
+                    try {
+                        // Get user picks
+                        const picksDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`));
+                        const userPicksData = picksDoc.exists() ? picksDoc.data() : {};
+                        const userPicks = userPicksData.picks || {};
+                        const userStatus = allStatuses[uid];
+
+                        // Determine what status should be
+                        let shouldBeEliminated = false;
+                        let eliminationWeek = null;
+
+                        for (const [week, pick] of Object.entries(userPicks)) {
+                            const weekNum = parseInt(week);
+                            const gameResult = await getActualGameResult(weekNum, pick.gameId, pick.team);
+
+                            if (gameResult && !gameResult.userWon && gameResult.status === 'Final') {
+                                shouldBeEliminated = true;
+                                eliminationWeek = weekNum;
+                                break;
+                            }
+                        }
+
+                        const currentlyEliminated = userStatus?.eliminated || false;
+
+                        if (shouldBeEliminated === currentlyEliminated) {
+                            consistentUsers++;
+                        } else {
+                            inconsistentUsers++;
+                            inconsistencies.push({
+                                uid,
+                                displayName: member.displayName || member.email,
+                                shouldBeEliminated,
+                                currentlyEliminated,
+                                eliminationWeek
+                            });
+
+                            log(`❌ Inconsistent: ${member.displayName || member.email}`);
+                            log(`   Should be eliminated: ${shouldBeEliminated}`);
+                            log(`   Currently eliminated: ${currentlyEliminated}`);
+                        }
+
+                    } catch (error) {
+                        log(`⚠️ Error checking ${uid}: ${error.message}`);
+                    }
+
+                    // Small delay
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+
+                log(`📊 System consistency check complete:`);
+                log(`   ✅ Consistent users: ${consistentUsers}`);
+                log(`   ❌ Inconsistent users: ${inconsistentUsers}`);
+
+                const isConsistent = inconsistentUsers === 0;
+
+                return {
+                    success: isConsistent,
+                    consistentUsers,
+                    inconsistentUsers,
+                    inconsistencies
+                };
+
+            } catch (error) {
+                log(`❌ System verification failed: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function validateEliminations() {
+            log('📊 VALIDATING ALL ELIMINATIONS');
+            log('='.repeat(80));
+
+            try {
+                // Get all pool members and statuses
+                const poolDoc = await getDoc(doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+                const poolMembers = poolDoc.exists() ? poolDoc.data() : {};
+
+                const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+
+                let totalUsers = 0;
+                let eliminatedUsers = 0;
+                let aliveUsers = 0;
+                let correctEliminations = 0;
+                let incorrectEliminations = 0;
+
+                log('📋 Detailed elimination validation:');
+
+                for (const [uid, member] of Object.entries(poolMembers)) {
+                    totalUsers++;
+                    const userStatus = allStatuses[uid];
+                    const isEliminated = userStatus?.eliminated || false;
+
+                    if (isEliminated) {
+                        eliminatedUsers++;
+                    } else {
+                        aliveUsers++;
+                    }
+
+                    // Verify elimination correctness
+                    const verification = await verifyUserElimination(uid, member, userStatus);
+
+                    if (verification.correct) {
+                        correctEliminations++;
+                        log(`✅ ${member.displayName || member.email}: ${verification.status}`);
+                    } else {
+                        incorrectEliminations++;
+                        log(`❌ ${member.displayName || member.email}: ${verification.issue}`);
+                    }
+                }
+
+                log('\n📊 VALIDATION SUMMARY:');
+                log(`Total users: ${totalUsers}`);
+                log(`Eliminated: ${eliminatedUsers}`);
+                log(`Alive: ${aliveUsers}`);
+                log(`Correct eliminations: ${correctEliminations}`);
+                log(`Incorrect eliminations: ${incorrectEliminations}`);
+
+                const accuracy = totalUsers > 0 ? ((correctEliminations / totalUsers) * 100).toFixed(1) : 0;
+                log(`Accuracy: ${accuracy}%`);
+
+                if (incorrectEliminations === 0) {
+                    log('\n🎉 ALL ELIMINATIONS ARE CORRECT!');
+                } else {
+                    log(`\n🚨 ${incorrectEliminations} INCORRECT ELIMINATIONS DETECTED`);
+                }
+
+            } catch (error) {
+                log(`❌ Elimination validation failed: ${error.message}`);
+                console.error('Validation error:', error);
+            }
+        }
+
+        async function verifyUserElimination(uid, member, userStatus) {
+            try {
+                // Get user picks
+                const picksDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`));
+                const userPicksData = picksDoc.exists() ? picksDoc.data() : {};
+                const userPicks = userPicksData.picks || {};
+
+                // Determine what status should be
+                let shouldBeEliminated = false;
+                let eliminationWeek = null;
+                let eliminationReason = null;
+
+                for (const [week, pick] of Object.entries(userPicks)) {
+                    const weekNum = parseInt(week);
+                    const gameResult = await getActualGameResult(weekNum, pick.gameId, pick.team);
+
+                    if (gameResult && !gameResult.userWon && gameResult.status === 'Final') {
+                        shouldBeEliminated = true;
+                        eliminationWeek = weekNum;
+                        eliminationReason = `${pick.team} lost to ${gameResult.winner}`;
+                        break;
+                    }
+                }
+
+                const currentlyEliminated = userStatus?.eliminated || false;
+
+                if (shouldBeEliminated === currentlyEliminated) {
+                    if (shouldBeEliminated) {
+                        return {
+                            correct: true,
+                            status: `Correctly eliminated in Week ${eliminationWeek}`
+                        };
+                    } else {
+                        return {
+                            correct: true,
+                            status: 'Correctly alive'
+                        };
+                    }
+                } else {
+                    return {
+                        correct: false,
+                        issue: `Should ${shouldBeEliminated ? 'be eliminated' : 'be alive'} but ${currentlyEliminated ? 'eliminated' : 'alive'}`
+                    };
+                }
+
+            } catch (error) {
+                return {
+                    correct: false,
+                    issue: `Verification error: ${error.message}`
+                };
+            }
+        }
+
+        async function checkConsistency() {
+            log('🧠 CHECKING SYSTEM CONSISTENCY');
+            log('='.repeat(80));
+
+            // This runs the same as verifySurvivorSystem but with more detailed output
+            await verifySurvivorSystem();
+        }
+
+        async function generateReport() {
+            log('📋 GENERATING COMPREHENSIVE VERIFICATION REPORT');
+            log('='.repeat(80));
+
+            if (!verificationResults.timestamp) {
+                log('❌ No verification results available. Run "Verify All Fixes" first.');
+                return;
+            }
+
+            log(`📊 VERIFICATION REPORT`);
+            log(`Generated: ${verificationResults.timestamp}`);
+            log(`Target User: ${TARGET_USER_ID}`);
+            log('');
+
+            log('🎯 TARGET USER VERIFICATION:');
+            if (verificationResults.targetUser.success) {
+                log('   ✅ Target user fix verified successfully');
+            } else {
+                log('   ❌ Target user fix verification failed');
+            }
+
+            log('\n🔍 BATCH VERIFICATION:');
+            if (verificationResults.batchResults.success) {
+                log('   ✅ Batch verification passed');
+                log(`   Remaining issues: ${verificationResults.batchResults.remainingIssues}`);
+            } else {
+                log('   ❌ Batch verification failed');
+            }
+
+            log('\n🧠 SYSTEM CONSISTENCY:');
+            if (verificationResults.systemVerification.success) {
+                log('   ✅ System is consistent');
+                log(`   Consistent users: ${verificationResults.systemVerification.consistentUsers}`);
+            } else {
+                log('   ❌ System inconsistencies detected');
+                log(`   Inconsistent users: ${verificationResults.systemVerification.inconsistentUsers}`);
+            }
+
+            log('\n📊 OVERALL STATUS:');
+            if (verificationResults.overall.success) {
+                log('   🎉 ALL VERIFICATIONS PASSED');
+                log('   The fix was successful and the system is in a correct state');
+            } else {
+                log('   🚨 VERIFICATION ISSUES DETECTED');
+                verificationResults.overall.issues.forEach(issue => {
+                    log(`   - ${issue}`);
+                });
+            }
+
+            log('\n✅ Report generation complete');
+        }
+
+        async function emergencyRollback() {
+            log('🚨 EMERGENCY ROLLBACK SYSTEM');
+            log('='.repeat(80));
+
+            const confirmed = confirm(
+                '🚨 EMERGENCY ROLLBACK WARNING 🚨\n\n' +
+                'This will attempt to rollback ALL changes made by the fix system.\n' +
+                'This action cannot be undone.\n\n' +
+                'Are you absolutely sure you want to proceed?'
+            );
+
+            if (!confirmed) {
+                log('❌ Emergency rollback cancelled');
+                return;
+            }
+
+            log('🚨 Starting emergency rollback...');
+            log('⚠️ WARNING: This is a destructive operation');
+
+            try {
+                // Get all statuses with fix markers
+                const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+
+                let rollbackCount = 0;
+
+                for (const [uid, status] of Object.entries(allStatuses)) {
+                    if (status.fixedBy && (status.fixedBy.includes('pattern-analysis') || status.fixedBy.includes('batch-survivor-verification'))) {
+                        log(`🔄 Rolling back: ${uid}`);
+
+                        // Create rollback data (remove all fix-related fields)
+                        const rollbackData = {};
+                        rollbackData[`${uid}.fixedDate`] = null;
+                        rollbackData[`${uid}.fixedBy`] = null;
+                        rollbackData[`${uid}.fixReason`] = null;
+
+                        // If this was a restoration (eliminated -> alive), re-eliminate
+                        if (status.fixReason && status.fixReason.includes('Incorrectly eliminated')) {
+                            rollbackData[`${uid}.eliminated`] = true;
+                            rollbackData[`${uid}.eliminatedWeek`] = status.eliminatedWeek || 1;
+                            rollbackData[`${uid}.eliminationReason`] = 'Rollback: Restored previous elimination';
+                            rollbackData[`${uid}.eliminatedDate`] = new Date().toISOString();
+                        }
+
+                        // If this was an elimination (alive -> eliminated), restore to alive
+                        if (status.fixReason && status.fixReason.includes('Should have been eliminated')) {
+                            rollbackData[`${uid}.eliminated`] = false;
+                            rollbackData[`${uid}.eliminatedWeek`] = null;
+                            rollbackData[`${uid}.eliminationReason`] = null;
+                            rollbackData[`${uid}.eliminatedDate`] = null;
+                        }
+
+                        // Apply rollback
+                        await setDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'), rollbackData, { merge: true });
+                        rollbackCount++;
+
+                        // Delay to avoid overwhelming Firebase
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    }
+                }
+
+                log(`\n📊 Emergency rollback complete:`);
+                log(`Users rolled back: ${rollbackCount}`);
+                log('🔄 Please refresh the survivor page to see changes');
+
+                if (rollbackCount > 0) {
+                    log('\n⚠️ IMPORTANT: Review all user statuses manually');
+                    log('The system has been restored to pre-fix state');
+                }
+
+            } catch (error) {
+                log(`❌ Emergency rollback failed: ${error.message}`);
+                console.error('Rollback error:', error);
+            }
+        }
+
+        // Helper function to get actual game result
+        async function getActualGameResult(week, gameId, userTeam) {
+            try {
+                // Get schedule data
+                const scheduleResponse = await fetch('/nfl_2025_schedule_raw.json');
+                const scheduleData = await scheduleResponse.json();
+                const weekGames = scheduleData.weeks.find(w => w.week === week)?.games || [];
+                const internalGame = weekGames.find(g => g.id == gameId);
+
+                if (!internalGame) {
+                    return null;
+                }
+
+                // Get ESPN data
+                if (window.espnNerdApi) {
+                    await window.espnNerdApi.ensureReady();
+                    const espnData = await window.espnNerdApi.getWeekGames(week);
+
+                    if (espnData && espnData.games) {
+                        const espnGame = espnData.games.find(game => {
+                            if (!game.home_team || !game.away_team) return false;
+
+                            const homeMatch = normalizeTeam(game.home_team) === normalizeTeam(internalGame.h);
+                            const awayMatch = normalizeTeam(game.away_team) === normalizeTeam(internalGame.a);
+
+                            return homeMatch && awayMatch;
+                        });
+
+                        if (espnGame) {
+                            const winner = determineWinner(espnGame);
+                            const normalizedUserTeam = normalizeTeam(userTeam);
+                            const normalizedWinner = normalizeTeam(winner);
+                            const userWon = winner !== 'TBD' && normalizedUserTeam === normalizedWinner;
+
+                            return {
+                                homeTeam: espnGame.home_team,
+                                awayTeam: espnGame.away_team,
+                                homeScore: espnGame.home_score || 0,
+                                awayScore: espnGame.away_score || 0,
+                                status: espnGame.status,
+                                winner: winner,
+                                userWon: userWon
+                            };
+                        }
+                    }
+                }
+
+                return null;
+            } catch (error) {
+                console.error(`Error getting game result:`, error);
+                return null;
+            }
+        }
+
+        function determineWinner(game) {
+            if (!game.status || game.status === 'Not Started' || game.status.includes('Q') || game.status.includes('Half') || game.status.includes('Scheduled')) {
+                return 'TBD';
+            }
+
+            if (game.status === 'Final' || game.status === 'FINAL' || game.status === 'F') {
+                const homeScore = parseInt(game.home_score) || 0;
+                const awayScore = parseInt(game.away_score) || 0;
+
+                if (homeScore > awayScore) {
+                    return game.home_team;
+                } else if (awayScore > homeScore) {
+                    return game.away_team;
+                } else {
+                    return 'TIE';
+                }
+            }
+
+            return 'TBD';
+        }
+
+        function normalizeTeam(teamName) {
+            if (!teamName) return null;
+
+            const teamMappings = {
+                'LA Rams': 'Los Angeles Rams',
+                'LA Chargers': 'Los Angeles Chargers',
+                'LV Raiders': 'Las Vegas Raiders',
+                'Vegas Raiders': 'Las Vegas Raiders',
+                'NY Giants': 'New York Giants',
+                'NY Jets': 'New York Jets',
+                'TB Buccaneers': 'Tampa Bay Buccaneers',
+                'NE Patriots': 'New England Patriots',
+                'GB Packers': 'Green Bay Packers',
+                'NO Saints': 'New Orleans Saints',
+                'KC Chiefs': 'Kansas City Chiefs',
+                'SF 49ers': 'San Francisco 49ers'
+            };
+
+            return teamMappings[teamName] || teamName;
+        }
+    </script>
+</body>
+</html>

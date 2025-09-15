@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 INSTANT USER FIX</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #ff0000; color: white; }
+        .fix-button { background: #ffff00; color: #ff0000; padding: 20px 40px; border: none; border-radius: 8px; cursor: pointer; font-size: 24px; font-weight: bold; margin: 20px 0; }
+        .status { padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #00aa00; }
+        .error { background: #aa0000; }
+        .info { background: #0066aa; }
+    </style>
+</head>
+<body>
+    <h1>🚨 INSTANT FIX FOR USER: aaG5Wc2JZkZJD1r7ozfJG04QRrf1</h1>
+
+    <button class="fix-button" onclick="fixUserNow()">⚡ FIX USER NOW - MAKE THEM ALIVE</button>
+
+    <div id="results"></div>
+
+    <!-- Firebase v9 SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBNdSTHnmJ7b3GsyB2bKLQ1Lz9JLNnK9ZI",
+            authDomain: "nerdfootball-project.firebaseapp.com",
+            databaseURL: "https://nerdfootball-project-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball-project",
+            storageBucket: "nerdfootball-project.appspot.com",
+            messagingSenderId: "147326956986",
+            appId: "1:147326956986:web:ff61a86e57d9c6074bb7dc",
+            measurementId: "G-FG6E2Q2MJW"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.fixUserNow = async function() {
+            const results = document.getElementById('results');
+            const userId = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+
+            results.innerHTML = '<div class="info">🚨 FIXING USER STATUS NOW...</div>';
+
+            try {
+                // 1. Check current status
+                results.innerHTML += '<div class="info">🔍 Checking current status...</div>';
+
+                const poolMembersRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                const poolMembersSnap = await getDoc(poolMembersRef);
+
+                if (!poolMembersSnap.exists()) {
+                    results.innerHTML += '<div class="error">❌ Pool members not found</div>';
+                    return;
+                }
+
+                const poolMembers = poolMembersSnap.data();
+                const userInfo = poolMembers[userId];
+
+                if (!userInfo) {
+                    results.innerHTML += '<div class="error">❌ User not found in pool</div>';
+                    return;
+                }
+
+                results.innerHTML += `<div class="success">✅ Found user: ${userInfo.displayName || userInfo.email}</div>`;
+
+                // 2. Force user to ALIVE status in pool members
+                results.innerHTML += '<div class="info">⚡ Setting user to ALIVE in pool members...</div>';
+
+                const updatedMembers = { ...poolMembers };
+                updatedMembers[userId] = {
+                    ...userInfo,
+                    eliminated: false,
+                    eliminatedWeek: null,
+                    eliminationReason: null,
+                    status: 'active',
+                    lastUpdated: new Date().toISOString()
+                };
+
+                await updateDoc(poolMembersRef, updatedMembers);
+                results.innerHTML += '<div class="success">✅ User set to ALIVE in pool members</div>';
+
+                // 3. Update survivor status document
+                results.innerHTML += '<div class="info">⚡ Updating survivor status document...</div>';
+
+                const survivorStatusRef = doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/${userId}`);
+                await setDoc(survivorStatusRef, {
+                    eliminated: false,
+                    eliminatedWeek: null,
+                    eliminationReason: null,
+                    status: 'active',
+                    lastUpdated: new Date().toISOString(),
+                    manualOverride: true,
+                    overrideReason: 'Emergency fix - user should be alive'
+                }, { merge: true });
+
+                results.innerHTML += '<div class="success">✅ Survivor status updated</div>';
+
+                // 4. Clear any legacy status
+                results.innerHTML += '<div class="info">⚡ Clearing legacy status...</div>';
+
+                try {
+                    const legacyStatusRef = doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_status/${userId}`);
+                    await setDoc(legacyStatusRef, {
+                        eliminated: false,
+                        eliminatedWeek: null,
+                        eliminationReason: null,
+                        status: 'active',
+                        lastUpdated: new Date().toISOString()
+                    }, { merge: true });
+                    results.innerHTML += '<div class="success">✅ Legacy status cleared</div>';
+                } catch (e) {
+                    results.innerHTML += '<div class="info">ℹ️ No legacy status to clear</div>';
+                }
+
+                // 5. Success message
+                results.innerHTML += '<div class="success">🎉 USER aaG5Wc2JZkZJD1r7ozfJG04QRrf1 IS NOW ALIVE!</div>';
+                results.innerHTML += '<div class="info">📊 Go check the survivor table - they should show as ACTIVE</div>';
+
+                // 6. Provide navigation button
+                results.innerHTML += '<button class="fix-button" onclick="window.location.href=\'./index.html?view=survivor\'">📊 VIEW SURVIVOR TABLE</button>';
+
+            } catch (error) {
+                results.innerHTML += `<div class="error">❌ ERROR: ${error.message}</div>`;
+                console.error('Fix error:', error);
+            }
+        };
+    </script>
+</body>
+</html>

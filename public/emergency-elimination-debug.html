@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Elimination Debug</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .debug-header {
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .run-button {
+            background: #ff0000;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 10px;
+        }
+        .run-button:hover {
+            background: #cc0000;
+        }
+        #debug-output {
+            background: #111;
+            border: 1px solid #333;
+            padding: 15px;
+            margin-top: 20px;
+            height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .status {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        .status.loading {
+            background: #444;
+            color: #fff;
+        }
+        .status.error {
+            background: #600;
+            color: #fff;
+        }
+        .status.success {
+            background: #060;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-header">
+        <h1>🚨 EMERGENCY ELIMINATION DEBUG</h1>
+        <h2>User: aaG5Wc2JZkZJD1r7ozfJG04QRrf1</h2>
+        <p>This tool will investigate why the user is incorrectly showing as eliminated</p>
+    </div>
+
+    <div>
+        <button class="run-button" onclick="runInvestigation()">🔍 Run Investigation</button>
+        <button class="run-button" onclick="clearOutput()">🗑️ Clear Output</button>
+        <button class="run-button" onclick="fixElimination()">🔧 Fix Elimination Status</button>
+    </div>
+
+    <div id="status" class="status loading">Loading Firebase and ESPN API...</div>
+    <div id="debug-output"></div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFunctions } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDWY_kkn9KQB3RKN8gPnbW6fYzSGJmTgGk",
+            authDomain: "nerd-football.firebaseapp.com",
+            projectId: "nerd-football",
+            storageBucket: "nerd-football.appspot.com",
+            messagingSenderId: "166734047728",
+            appId: "1:166734047728:web:5f6e150b4f1d7c6e896dc1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const functions = getFunctions(app);
+
+        // Make globally available
+        window.db = db;
+        window.functions = functions;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+
+        console.log('✅ Firebase initialized');
+        document.getElementById('status').textContent = 'Firebase loaded. Loading ESPN API...';
+
+        // Load ESPN API
+        loadScript('/espnCacheManager.js').then(() => {
+            console.log('✅ ESPN API loaded');
+            document.getElementById('status').className = 'status success';
+            document.getElementById('status').textContent = 'Ready for investigation!';
+        }).catch(error => {
+            console.error('❌ Failed to load ESPN API:', error);
+            document.getElementById('status').className = 'status error';
+            document.getElementById('status').textContent = 'Error loading ESPN API: ' + error.message;
+        });
+    </script>
+
+    <script>
+        const targetUserId = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        function log(message) {
+            const output = document.getElementById('debug-output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('debug-output').textContent = '';
+        }
+
+        async function runInvestigation() {
+            log('🚨 STARTING EMERGENCY INVESTIGATION');
+            log(`🔍 Target User: ${targetUserId}`);
+            log('='.repeat(60));
+
+            try {
+                // Check Firebase availability
+                if (typeof window.db === 'undefined') {
+                    throw new Error('Firebase not available');
+                }
+
+                log('✅ Firebase connected');
+
+                // Get current user status
+                log('📊 Fetching current elimination status...');
+                const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+                const userStatus = allStatuses[targetUserId];
+
+                log(`Current status: ${JSON.stringify(userStatus, null, 2)}`);
+
+                // Get user picks
+                log('📋 Fetching user picks...');
+                const picksDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${targetUserId}`));
+                const userPicksData = picksDoc.exists() ? picksDoc.data() : {};
+                const userPicks = userPicksData.picks || {};
+
+                log(`Found ${Object.keys(userPicks).length} picks`);
+
+                // Get pool member info
+                const poolDoc = await getDoc(doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+                const poolMembers = poolDoc.exists() ? poolDoc.data() : {};
+                const userInfo = poolMembers[targetUserId];
+
+                log(`User info: ${userInfo?.displayName || userInfo?.email || 'Unknown'}`);
+
+                // Analyze each week
+                let shouldBeEliminated = false;
+                let eliminationWeek = null;
+                let eliminationReason = null;
+
+                log('\n🔍 ANALYZING PICKS WEEK BY WEEK:');
+                log('='.repeat(60));
+
+                for (const [week, pick] of Object.entries(userPicks)) {
+                    const weekNum = parseInt(week);
+                    log(`\n📅 Week ${weekNum}: ${pick.team} (Game ${pick.gameId})`);
+
+                    try {
+                        // Get ESPN data for this week
+                        if (window.espnNerdApi) {
+                            await window.espnNerdApi.ensureReady();
+                            const espnData = await window.espnNerdApi.getWeekGames(weekNum);
+
+                            if (espnData && espnData.games) {
+                                log(`  ESPN: ${espnData.games.length} games available`);
+
+                                // Find the game result
+                                let gameResult = null;
+
+                                // Method 1: Find by team match
+                                const scheduleResponse = await fetch('/nfl_2025_schedule_raw.json');
+                                const scheduleData = await scheduleResponse.json();
+                                const weekGames = scheduleData.weeks.find(w => w.week === weekNum)?.games || [];
+                                const internalGame = weekGames.find(g => g.id == pick.gameId);
+
+                                if (internalGame) {
+                                    log(`  Internal: ${internalGame.a} @ ${internalGame.h}`);
+
+                                    // Find ESPN game by teams
+                                    gameResult = espnData.games.find(game => {
+                                        if (!game.home_team || !game.away_team) return false;
+
+                                        const homeMatch = normalizeTeam(game.home_team) === normalizeTeam(internalGame.h);
+                                        const awayMatch = normalizeTeam(game.away_team) === normalizeTeam(internalGame.a);
+
+                                        return homeMatch && awayMatch;
+                                    });
+
+                                    if (gameResult) {
+                                        log(`  Found: ${gameResult.away_team} @ ${gameResult.home_team}`);
+                                        log(`  Score: ${gameResult.away_score || 0} - ${gameResult.home_score || 0}`);
+                                        log(`  Status: ${gameResult.status}`);
+
+                                        // Determine winner
+                                        const winner = determineWinner(gameResult);
+                                        log(`  Winner: ${winner}`);
+
+                                        if (winner !== 'TBD' && gameResult.status === 'Final') {
+                                            const normalizedPick = normalizeTeam(pick.team);
+                                            const normalizedWinner = normalizeTeam(winner);
+                                            const userWon = normalizedPick === normalizedWinner;
+
+                                            log(`  Pick vs Winner: "${normalizedPick}" vs "${normalizedWinner}"`);
+                                            log(`  Result: ${userWon ? '✅ WIN' : '❌ LOSS'}`);
+
+                                            if (!userWon && !shouldBeEliminated) {
+                                                shouldBeEliminated = true;
+                                                eliminationWeek = weekNum;
+                                                eliminationReason = `${pick.team} lost to ${winner}`;
+                                                log(`  🚨 ELIMINATION POINT: ${eliminationReason}`);
+                                            }
+                                        } else {
+                                            log(`  ⏳ Game not final or no winner`);
+                                        }
+                                    } else {
+                                        log(`  ❌ No ESPN result found for this game`);
+                                    }
+                                } else {
+                                    log(`  ❌ Internal game not found in schedule`);
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        log(`  ❌ Error: ${error.message}`);
+                    }
+                }
+
+                log('\n📊 FINAL ANALYSIS:');
+                log('='.repeat(60));
+                log(`Should be eliminated: ${shouldBeEliminated}`);
+                if (shouldBeEliminated) {
+                    log(`Elimination week: ${eliminationWeek}`);
+                    log(`Elimination reason: ${eliminationReason}`);
+                }
+
+                const currentlyEliminated = userStatus?.eliminated || false;
+                log(`Currently marked as eliminated: ${currentlyEliminated}`);
+
+                if (currentlyEliminated && !shouldBeEliminated) {
+                    log('🚨 BUG CONFIRMED: User is incorrectly eliminated!');
+                    log('💡 Suggested fix: Remove elimination status');
+                } else if (!currentlyEliminated && shouldBeEliminated) {
+                    log('🚨 BUG CONFIRMED: User should be eliminated but is not!');
+                    log('💡 Suggested fix: Add elimination status');
+                } else {
+                    log('✅ Status appears correct based on analysis');
+                }
+
+                log('\n🎯 Investigation complete.');
+
+            } catch (error) {
+                log(`❌ INVESTIGATION FAILED: ${error.message}`);
+                console.error('Investigation error:', error);
+            }
+        }
+
+        async function fixElimination() {
+            log('🔧 ATTEMPTING TO FIX ELIMINATION STATUS...');
+
+            try {
+                const statusRef = doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status');
+
+                // Remove elimination status
+                await setDoc(statusRef, {
+                    [`${targetUserId}.eliminated`]: false,
+                    [`${targetUserId}.eliminatedWeek`]: null,
+                    [`${targetUserId}.eliminationReason`]: null,
+                    [`${targetUserId}.eliminatedDate`]: null,
+                    [`${targetUserId}.fixedDate`]: new Date().toISOString(),
+                    [`${targetUserId}.fixedBy`]: 'emergency-debug-tool'
+                }, { merge: true });
+
+                log('✅ Elimination status reset to ACTIVE');
+                log('🔄 Please refresh the survivor page to see the change');
+
+            } catch (error) {
+                log(`❌ Fix failed: ${error.message}`);
+                console.error('Fix error:', error);
+            }
+        }
+
+        // Helper functions
+        function determineWinner(game) {
+            if (!game.status || game.status === 'Not Started' || game.status.includes('Q') || game.status.includes('Half') || game.status.includes('Scheduled')) {
+                return 'TBD';
+            }
+
+            if (game.status === 'Final' || game.status === 'FINAL' || game.status === 'F') {
+                const homeScore = parseInt(game.home_score) || 0;
+                const awayScore = parseInt(game.away_score) || 0;
+
+                if (homeScore > awayScore) {
+                    return game.home_team;
+                } else if (awayScore > homeScore) {
+                    return game.away_team;
+                } else {
+                    return 'TIE';
+                }
+            }
+
+            return 'TBD';
+        }
+
+        function normalizeTeam(teamName) {
+            if (!teamName) return null;
+
+            const teamMappings = {
+                'LA Rams': 'Los Angeles Rams',
+                'LA Chargers': 'Los Angeles Chargers',
+                'LV Raiders': 'Las Vegas Raiders',
+                'Vegas Raiders': 'Las Vegas Raiders',
+                'NY Giants': 'New York Giants',
+                'NY Jets': 'New York Jets',
+                'TB Buccaneers': 'Tampa Bay Buccaneers',
+                'NE Patriots': 'New England Patriots',
+                'GB Packers': 'Green Bay Packers',
+                'NO Saints': 'New Orleans Saints',
+                'KC Chiefs': 'Kansas City Chiefs',
+                'SF 49ers': 'San Francisco 49ers'
+            };
+
+            return teamMappings[teamName] || teamName;
+        }
+    </script>
+</body>
+</html>

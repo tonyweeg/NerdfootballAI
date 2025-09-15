@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 COMPREHENSIVE PATTERN ANALYSIS - Survivor Bug Investigation</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+        .analysis-header {
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .action-button {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        .action-button:hover {
+            background: #cc3333;
+        }
+        .action-button.fix {
+            background: #44ff44;
+            color: #000;
+        }
+        .action-button.fix:hover {
+            background: #33cc33;
+        }
+        #analysis-output {
+            background: #111;
+            border: 1px solid #333;
+            padding: 15px;
+            margin-top: 20px;
+            min-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .status {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        .status.loading {
+            background: #444;
+            color: #fff;
+        }
+        .status.error {
+            background: #600;
+            color: #fff;
+        }
+        .status.success {
+            background: #060;
+            color: #fff;
+        }
+        .bug-pattern {
+            background: #330;
+            border: 1px solid #660;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .affected-user {
+            background: #300;
+            border-left: 3px solid #f00;
+            padding: 8px;
+            margin: 5px 0;
+        }
+        .fixed-user {
+            background: #030;
+            border-left: 3px solid #0f0;
+            padding: 8px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="analysis-header">
+        <h1>🔍 COMPREHENSIVE PATTERN ANALYSIS</h1>
+        <h2>Survivor Bug Investigation & Mass Fix System</h2>
+        <p>This tool will find ALL users incorrectly eliminated due to the same bug pattern</p>
+    </div>
+
+    <div class="action-buttons">
+        <button class="action-button" onclick="analyzeTargetUser()">1️⃣ Analyze Target User</button>
+        <button class="action-button" onclick="identifyBugPattern()">2️⃣ Identify Bug Pattern</button>
+        <button class="action-button" onclick="findAllAffected()">3️⃣ Find All Affected</button>
+        <button class="action-button" onclick="verifyPatterns()">4️⃣ Verify Patterns</button>
+        <button class="action-button fix" onclick="batchFixAll()">🔧 BATCH FIX ALL</button>
+        <button class="action-button" onclick="preventFuture()">🛡️ Prevent Future</button>
+        <button class="action-button" onclick="clearOutput()">🗑️ Clear</button>
+    </div>
+
+    <div id="status" class="status loading">Loading Firebase and ESPN API...</div>
+    <div id="analysis-output"></div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDWY_kkn9KQB3RKN8gPnbW6fYzSGJmTgGk",
+            authDomain: "nerd-football.firebaseapp.com",
+            projectId: "nerd-football",
+            storageBucket: "nerd-football.appspot.com",
+            messagingSenderId: "166734047728",
+            appId: "1:166734047728:web:5f6e150b4f1d7c6e896dc1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const functions = getFunctions(app);
+
+        // Make globally available
+        window.db = db;
+        window.functions = functions;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.updateDoc = updateDoc;
+        window.httpsCallable = httpsCallable;
+
+        console.log('✅ Firebase initialized');
+        document.getElementById('status').textContent = 'Firebase loaded. Loading ESPN API...';
+
+        // Load ESPN API
+        loadScript('/espnCacheManager.js').then(() => {
+            console.log('✅ ESPN API loaded');
+            document.getElementById('status').className = 'status success';
+            document.getElementById('status').textContent = 'Ready for comprehensive analysis!';
+        }).catch(error => {
+            console.error('❌ Failed to load ESPN API:', error);
+            document.getElementById('status').className = 'status error';
+            document.getElementById('status').textContent = 'Error loading ESPN API: ' + error.message;
+        });
+    </script>
+
+    <script>
+        const TARGET_USER_ID = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+        let bugPattern = null;
+        let affectedUsers = [];
+        let analysisData = {};
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        function log(message) {
+            const output = document.getElementById('analysis-output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('analysis-output').textContent = '';
+        }
+
+        async function analyzeTargetUser() {
+            log('🎯 STEP 1: ANALYZING TARGET USER');
+            log(`Target: ${TARGET_USER_ID}`);
+            log('='.repeat(80));
+
+            try {
+                // Get user info
+                const poolDoc = await getDoc(doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+                const poolMembers = poolDoc.exists() ? poolDoc.data() : {};
+                const userInfo = poolMembers[TARGET_USER_ID];
+
+                if (!userInfo) {
+                    throw new Error('Target user not found in pool members');
+                }
+
+                log(`✅ User found: ${userInfo.displayName || userInfo.email}`);
+
+                // Get elimination status
+                const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+                const userStatus = allStatuses[TARGET_USER_ID];
+
+                log(`📊 Current elimination status:`);
+                log(`  Eliminated: ${userStatus?.eliminated || false}`);
+                log(`  Week: ${userStatus?.eliminatedWeek || 'N/A'}`);
+                log(`  Reason: ${userStatus?.eliminationReason || 'N/A'}`);
+                log(`  Date: ${userStatus?.eliminatedDate || 'N/A'}`);
+
+                // Get user picks
+                const picksDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${TARGET_USER_ID}`));
+                const userPicksData = picksDoc.exists() ? picksDoc.data() : {};
+                const userPicks = userPicksData.picks || {};
+
+                log(`\n📋 User picks (${Object.keys(userPicks).length} total):`);
+
+                // Store analysis data
+                analysisData.targetUser = {
+                    uid: TARGET_USER_ID,
+                    info: userInfo,
+                    status: userStatus,
+                    picks: userPicks
+                };
+
+                // Analyze each pick for correctness
+                for (const [week, pick] of Object.entries(userPicks)) {
+                    const weekNum = parseInt(week);
+                    log(`\n📅 Week ${weekNum}: ${pick.team} (Game ${pick.gameId})`);
+
+                    try {
+                        // Get actual game result
+                        const gameResult = await getActualGameResult(weekNum, pick.gameId, pick.team);
+
+                        if (gameResult) {
+                            log(`  📊 Game Result: ${gameResult.awayTeam} ${gameResult.awayScore} - ${gameResult.homeScore} ${gameResult.homeTeam}`);
+                            log(`  🏆 Winner: ${gameResult.winner}`);
+                            log(`  ✅ User picked correctly: ${gameResult.userWon ? 'YES' : 'NO'}`);
+
+                            if (!gameResult.userWon && gameResult.status === 'Final') {
+                                log(`  🚨 Should be eliminated here: Week ${weekNum}`);
+
+                                // Check if this matches current elimination
+                                if (userStatus?.eliminated && userStatus.eliminatedWeek === weekNum) {
+                                    log(`  ✅ Elimination status matches this loss`);
+                                } else if (userStatus?.eliminated && userStatus.eliminatedWeek !== weekNum) {
+                                    log(`  ⚠️  MISMATCH: Eliminated in Week ${userStatus.eliminatedWeek}, but lost in Week ${weekNum}`);
+                                } else if (!userStatus?.eliminated) {
+                                    log(`  🚨 BUG: Should be eliminated but marked as ALIVE`);
+                                }
+                            }
+                        } else {
+                            log(`  ❌ Could not verify game result`);
+                        }
+                    } catch (error) {
+                        log(`  ❌ Error analyzing week ${weekNum}: ${error.message}`);
+                    }
+                }
+
+                log('\n✅ Target user analysis complete');
+
+            } catch (error) {
+                log(`❌ Target user analysis failed: ${error.message}`);
+                console.error('Target analysis error:', error);
+            }
+        }
+
+        async function identifyBugPattern() {
+            log('\n🔍 STEP 2: IDENTIFYING BUG PATTERN');
+            log('='.repeat(80));
+
+            if (!analysisData.targetUser) {
+                log('❌ Must analyze target user first');
+                return;
+            }
+
+            try {
+                const { status, picks } = analysisData.targetUser;
+
+                log('🧠 Analyzing elimination pattern...');
+
+                // Pattern 1: Week mismatch - eliminated in wrong week
+                if (status?.eliminated) {
+                    log(`📊 User eliminated in Week ${status.eliminatedWeek}`);
+                    log(`📊 Reason: ${status.eliminationReason}`);
+
+                    // Check if user actually lost in the elimination week
+                    const eliminationWeekPick = picks[status.eliminatedWeek];
+                    if (eliminationWeekPick) {
+                        const gameResult = await getActualGameResult(status.eliminatedWeek, eliminationWeekPick.gameId, eliminationWeekPick.team);
+
+                        if (gameResult) {
+                            if (gameResult.userWon) {
+                                log('🚨 BUG PATTERN IDENTIFIED: User eliminated in week they WON');
+                                bugPattern = {
+                                    type: 'incorrect_elimination_week',
+                                    description: 'User eliminated in week they actually won',
+                                    eliminationWeek: status.eliminatedWeek,
+                                    actualResult: 'WIN',
+                                    shouldBeEliminated: false
+                                };
+                            } else {
+                                log('✅ Elimination appears correct for this week');
+
+                                // Check if user lost in an earlier week but wasn't eliminated then
+                                for (const [week, pick] of Object.entries(picks)) {
+                                    const weekNum = parseInt(week);
+                                    if (weekNum < status.eliminatedWeek) {
+                                        const earlierResult = await getActualGameResult(weekNum, pick.gameId, pick.team);
+                                        if (earlierResult && !earlierResult.userWon && earlierResult.status === 'Final') {
+                                            log(`🚨 BUG PATTERN: User lost in Week ${weekNum} but eliminated in Week ${status.eliminatedWeek}`);
+                                            bugPattern = {
+                                                type: 'delayed_elimination',
+                                                description: 'User eliminated in wrong week, should have been eliminated earlier',
+                                                actualLossWeek: weekNum,
+                                                recordedEliminationWeek: status.eliminatedWeek
+                                            };
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    log('📊 User currently marked as ALIVE');
+
+                    // Check if user should actually be eliminated
+                    for (const [week, pick] of Object.entries(picks)) {
+                        const weekNum = parseInt(week);
+                        const gameResult = await getActualGameResult(weekNum, pick.gameId, pick.team);
+
+                        if (gameResult && !gameResult.userWon && gameResult.status === 'Final') {
+                            log(`🚨 BUG PATTERN: User lost in Week ${weekNum} but marked as ALIVE`);
+                            bugPattern = {
+                                type: 'missing_elimination',
+                                description: 'User should be eliminated but marked as alive',
+                                actualLossWeek: weekNum,
+                                lossReason: `${pick.team} lost to ${gameResult.winner}`
+                            };
+                            break;
+                        }
+                    }
+                }
+
+                if (bugPattern) {
+                    log('\n🎯 BUG PATTERN IDENTIFIED:');
+                    log(`Type: ${bugPattern.type}`);
+                    log(`Description: ${bugPattern.description}`);
+                    log(`Details: ${JSON.stringify(bugPattern, null, 2)}`);
+                } else {
+                    log('\n❓ No clear bug pattern identified');
+                }
+
+            } catch (error) {
+                log(`❌ Pattern identification failed: ${error.message}`);
+                console.error('Pattern identification error:', error);
+            }
+        }
+
+        async function findAllAffected() {
+            log('\n🔍 STEP 3: FINDING ALL AFFECTED USERS');
+            log('='.repeat(80));
+
+            if (!bugPattern) {
+                log('❌ Must identify bug pattern first');
+                return;
+            }
+
+            try {
+                // Get all pool members
+                const poolDoc = await getDoc(doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+                const poolMembers = poolDoc.exists() ? poolDoc.data() : {};
+
+                // Get all elimination statuses
+                const statusDoc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status'));
+                const allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+
+                log(`📊 Checking ${Object.keys(poolMembers).length} pool members...`);
+
+                affectedUsers = [];
+
+                for (const [uid, member] of Object.entries(poolMembers)) {
+                    if (uid === TARGET_USER_ID) continue; // Skip target user
+
+                    try {
+                        // Get user picks
+                        const picksDoc = await getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`));
+                        const userPicksData = picksDoc.exists() ? picksDoc.data() : {};
+                        const userPicks = userPicksData.picks || {};
+                        const userStatus = allStatuses[uid];
+
+                        // Apply pattern matching based on identified bug
+                        let isAffected = false;
+                        let affectedDetails = {};
+
+                        if (bugPattern.type === 'incorrect_elimination_week') {
+                            // Look for users eliminated in weeks they actually won
+                            if (userStatus?.eliminated) {
+                                const eliminationWeekPick = userPicks[userStatus.eliminatedWeek];
+                                if (eliminationWeekPick) {
+                                    const gameResult = await getActualGameResult(userStatus.eliminatedWeek, eliminationWeekPick.gameId, eliminationWeekPick.team);
+                                    if (gameResult && gameResult.userWon) {
+                                        isAffected = true;
+                                        affectedDetails = {
+                                            type: 'incorrect_elimination_week',
+                                            eliminatedWeek: userStatus.eliminatedWeek,
+                                            actualResult: 'WIN',
+                                            shouldBeAlive: true
+                                        };
+                                    }
+                                }
+                            }
+                        }
+
+                        if (bugPattern.type === 'missing_elimination') {
+                            // Look for users who should be eliminated but are alive
+                            if (!userStatus?.eliminated) {
+                                for (const [week, pick] of Object.entries(userPicks)) {
+                                    const weekNum = parseInt(week);
+                                    const gameResult = await getActualGameResult(weekNum, pick.gameId, pick.team);
+
+                                    if (gameResult && !gameResult.userWon && gameResult.status === 'Final') {
+                                        isAffected = true;
+                                        affectedDetails = {
+                                            type: 'missing_elimination',
+                                            shouldBeEliminatedWeek: weekNum,
+                                            lossReason: `${pick.team} lost to ${gameResult.winner}`
+                                        };
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (isAffected) {
+                            affectedUsers.push({
+                                uid,
+                                displayName: member.displayName || member.email,
+                                currentStatus: userStatus,
+                                picks: userPicks,
+                                bugDetails: affectedDetails
+                            });
+
+                            log(`🚨 AFFECTED: ${member.displayName || member.email}`);
+                            log(`   Pattern: ${affectedDetails.type}`);
+                            log(`   Details: ${JSON.stringify(affectedDetails, null, 2)}`);
+                        }
+
+                    } catch (error) {
+                        log(`❌ Error checking user ${uid}: ${error.message}`);
+                    }
+
+                    // Small delay to avoid overwhelming the system
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                log(`\n📊 ANALYSIS COMPLETE:`);
+                log(`Total users checked: ${Object.keys(poolMembers).length}`);
+                log(`Users affected by bug: ${affectedUsers.length}`);
+                log(`Target user: ${TARGET_USER_ID}`);
+                log(`Bug pattern: ${bugPattern.type}`);
+
+                if (affectedUsers.length > 0) {
+                    log('\n🚨 AFFECTED USERS SUMMARY:');
+                    affectedUsers.forEach((user, index) => {
+                        log(`${index + 1}. ${user.displayName} (${user.uid})`);
+                        log(`   Bug: ${user.bugDetails.type}`);
+                    });
+                }
+
+            } catch (error) {
+                log(`❌ Finding affected users failed: ${error.message}`);
+                console.error('Finding affected users error:', error);
+            }
+        }
+
+        async function verifyPatterns() {
+            log('\n🔍 STEP 4: VERIFYING PATTERNS');
+            log('='.repeat(80));
+
+            if (affectedUsers.length === 0) {
+                log('❌ No affected users to verify');
+                return;
+            }
+
+            log(`🧪 Verifying bug patterns for ${affectedUsers.length} users...`);
+
+            for (const user of affectedUsers) {
+                log(`\n👤 Verifying: ${user.displayName}`);
+
+                try {
+                    if (user.bugDetails.type === 'incorrect_elimination_week') {
+                        // Re-verify they won in elimination week
+                        const week = user.bugDetails.eliminatedWeek;
+                        const pick = user.picks[week];
+
+                        if (pick) {
+                            const gameResult = await getActualGameResult(week, pick.gameId, pick.team);
+                            if (gameResult && gameResult.userWon) {
+                                log(`   ✅ Confirmed: Won in Week ${week}, incorrectly eliminated`);
+                            } else {
+                                log(`   ❌ Verification failed: Did not win in Week ${week}`);
+                            }
+                        }
+                    }
+
+                    if (user.bugDetails.type === 'missing_elimination') {
+                        // Re-verify they lost in earlier week
+                        const week = user.bugDetails.shouldBeEliminatedWeek;
+                        const pick = user.picks[week];
+
+                        if (pick) {
+                            const gameResult = await getActualGameResult(week, pick.gameId, pick.team);
+                            if (gameResult && !gameResult.userWon && gameResult.status === 'Final') {
+                                log(`   ✅ Confirmed: Lost in Week ${week}, should be eliminated`);
+                            } else {
+                                log(`   ❌ Verification failed: Did not lose in Week ${week}`);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    log(`   ❌ Verification error: ${error.message}`);
+                }
+            }
+
+            log('\n✅ Pattern verification complete');
+        }
+
+        async function batchFixAll() {
+            log('\n🔧 STEP 5: BATCH FIX ALL AFFECTED USERS');
+            log('='.repeat(80));
+
+            if (affectedUsers.length === 0) {
+                log('❌ No affected users to fix');
+                return;
+            }
+
+            log(`🚨 PREPARING TO FIX ${affectedUsers.length} USERS`);
+            log('This will modify elimination statuses in Firebase');
+
+            // Confirm action
+            const confirmed = confirm(`Are you sure you want to fix ${affectedUsers.length} users?\n\nThis will:\n- Update elimination statuses\n- Correct survivor standings\n- Cannot be easily undone\n\nProceed?`);
+
+            if (!confirmed) {
+                log('❌ Batch fix cancelled by user');
+                return;
+            }
+
+            log('🔄 Starting batch fix...');
+
+            const statusRef = doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status');
+            let fixedCount = 0;
+            let failedCount = 0;
+
+            for (const user of affectedUsers) {
+                try {
+                    log(`\n🔧 Fixing: ${user.displayName}`);
+
+                    const fixData = {};
+                    const timestamp = new Date().toISOString();
+
+                    if (user.bugDetails.type === 'incorrect_elimination_week') {
+                        // User was incorrectly eliminated - restore to alive
+                        fixData[`${user.uid}.eliminated`] = false;
+                        fixData[`${user.uid}.eliminatedWeek`] = null;
+                        fixData[`${user.uid}.eliminationReason`] = null;
+                        fixData[`${user.uid}.eliminatedDate`] = null;
+                        fixData[`${user.uid}.fixedDate`] = timestamp;
+                        fixData[`${user.uid}.fixedBy`] = 'comprehensive-pattern-analysis';
+                        fixData[`${user.uid}.fixReason`] = 'Incorrectly eliminated in week they won';
+
+                        log(`   ✅ Restored to ALIVE (was incorrectly eliminated in Week ${user.bugDetails.eliminatedWeek})`);
+                    }
+
+                    if (user.bugDetails.type === 'missing_elimination') {
+                        // User should be eliminated - eliminate them
+                        fixData[`${user.uid}.eliminated`] = true;
+                        fixData[`${user.uid}.eliminatedWeek`] = user.bugDetails.shouldBeEliminatedWeek;
+                        fixData[`${user.uid}.eliminationReason`] = user.bugDetails.lossReason;
+                        fixData[`${user.uid}.eliminatedDate`] = timestamp;
+                        fixData[`${user.uid}.fixedDate`] = timestamp;
+                        fixData[`${user.uid}.fixedBy`] = 'comprehensive-pattern-analysis';
+                        fixData[`${user.uid}.fixReason`] = 'Should have been eliminated but was marked as alive';
+
+                        log(`   ✅ Eliminated in Week ${user.bugDetails.shouldBeEliminatedWeek} (${user.bugDetails.lossReason})`);
+                    }
+
+                    // Apply the fix
+                    await setDoc(statusRef, fixData, { merge: true });
+                    fixedCount++;
+
+                } catch (error) {
+                    log(`   ❌ Failed to fix ${user.displayName}: ${error.message}`);
+                    failedCount++;
+                }
+
+                // Small delay to avoid overwhelming Firebase
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            log(`\n📊 BATCH FIX COMPLETE:`);
+            log(`✅ Successfully fixed: ${fixedCount} users`);
+            log(`❌ Failed to fix: ${failedCount} users`);
+            log(`🎯 Total processed: ${affectedUsers.length} users`);
+
+            if (fixedCount > 0) {
+                log('\n🔄 Please refresh the survivor page to see the changes');
+            }
+        }
+
+        async function preventFuture() {
+            log('\n🛡️ STEP 6: PREVENTING FUTURE OCCURRENCES');
+            log('='.repeat(80));
+
+            log('🔍 Analyzing root causes...');
+
+            if (bugPattern) {
+                log(`📊 Bug pattern identified: ${bugPattern.type}`);
+
+                if (bugPattern.type === 'incorrect_elimination_week') {
+                    log('💡 PREVENTION STRATEGY:');
+                    log('   1. Strengthen game result verification');
+                    log('   2. Add double-checking before elimination');
+                    log('   3. Implement cross-validation with ESPN data');
+                    log('   4. Add automated verification alerts');
+                }
+
+                if (bugPattern.type === 'missing_elimination') {
+                    log('💡 PREVENTION STRATEGY:');
+                    log('   1. Implement weekly elimination batch processing');
+                    log('   2. Add automated status consistency checks');
+                    log('   3. Create weekly validation reports');
+                    log('   4. Add elimination verification workflows');
+                }
+
+                log('\n🛠️ IMPLEMENTATION RECOMMENDATIONS:');
+                log('   1. Add comprehensive unit tests for elimination logic');
+                log('   2. Implement daily status validation jobs');
+                log('   3. Create elimination audit trail');
+                log('   4. Add real-time consistency monitoring');
+                log('   5. Implement rollback mechanisms for incorrect eliminations');
+            }
+
+            log('\n✅ Prevention analysis complete');
+        }
+
+        // Helper function to get actual game result
+        async function getActualGameResult(week, gameId, userTeam) {
+            try {
+                // Get schedule data
+                const scheduleResponse = await fetch('/nfl_2025_schedule_raw.json');
+                const scheduleData = await scheduleResponse.json();
+                const weekGames = scheduleData.weeks.find(w => w.week === week)?.games || [];
+                const internalGame = weekGames.find(g => g.id == gameId);
+
+                if (!internalGame) {
+                    console.warn(`Internal game ${gameId} not found in Week ${week}`);
+                    return null;
+                }
+
+                // Get ESPN data for this week
+                if (window.espnNerdApi) {
+                    await window.espnNerdApi.ensureReady();
+                    const espnData = await window.espnNerdApi.getWeekGames(week);
+
+                    if (espnData && espnData.games) {
+                        // Find ESPN game by teams
+                        const espnGame = espnData.games.find(game => {
+                            if (!game.home_team || !game.away_team) return false;
+
+                            const homeMatch = normalizeTeam(game.home_team) === normalizeTeam(internalGame.h);
+                            const awayMatch = normalizeTeam(game.away_team) === normalizeTeam(internalGame.a);
+
+                            return homeMatch && awayMatch;
+                        });
+
+                        if (espnGame) {
+                            const winner = determineWinner(espnGame);
+                            const normalizedUserTeam = normalizeTeam(userTeam);
+                            const normalizedWinner = normalizeTeam(winner);
+                            const userWon = winner !== 'TBD' && normalizedUserTeam === normalizedWinner;
+
+                            return {
+                                homeTeam: espnGame.home_team,
+                                awayTeam: espnGame.away_team,
+                                homeScore: espnGame.home_score || 0,
+                                awayScore: espnGame.away_score || 0,
+                                status: espnGame.status,
+                                winner: winner,
+                                userWon: userWon,
+                                userTeam: userTeam,
+                                normalizedUserTeam: normalizedUserTeam,
+                                normalizedWinner: normalizedWinner
+                            };
+                        }
+                    }
+                }
+
+                return null;
+            } catch (error) {
+                console.error(`Error getting game result for Week ${week}, Game ${gameId}:`, error);
+                return null;
+            }
+        }
+
+        function determineWinner(game) {
+            if (!game.status || game.status === 'Not Started' || game.status.includes('Q') || game.status.includes('Half') || game.status.includes('Scheduled')) {
+                return 'TBD';
+            }
+
+            if (game.status === 'Final' || game.status === 'FINAL' || game.status === 'F') {
+                const homeScore = parseInt(game.home_score) || 0;
+                const awayScore = parseInt(game.away_score) || 0;
+
+                if (homeScore > awayScore) {
+                    return game.home_team;
+                } else if (awayScore > homeScore) {
+                    return game.away_team;
+                } else {
+                    return 'TIE';
+                }
+            }
+
+            return 'TBD';
+        }
+
+        function normalizeTeam(teamName) {
+            if (!teamName) return null;
+
+            const teamMappings = {
+                'LA Rams': 'Los Angeles Rams',
+                'LA Chargers': 'Los Angeles Chargers',
+                'LV Raiders': 'Las Vegas Raiders',
+                'Vegas Raiders': 'Las Vegas Raiders',
+                'NY Giants': 'New York Giants',
+                'NY Jets': 'New York Jets',
+                'TB Buccaneers': 'Tampa Bay Buccaneers',
+                'NE Patriots': 'New England Patriots',
+                'GB Packers': 'Green Bay Packers',
+                'NO Saints': 'New Orleans Saints',
+                'KC Chiefs': 'Kansas City Chiefs',
+                'SF 49ers': 'San Francisco 49ers'
+            };
+
+            return teamMappings[teamName] || teamName;
+        }
+    </script>
+</body>
+</html>

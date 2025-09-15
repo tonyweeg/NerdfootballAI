@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin: Force Survivor Refresh</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .step { margin: 20px 0; padding: 20px; background: #2a2a2a; border-radius: 8px; border-left: 4px solid #00ff00; }
+        .info { color: #00ffff; }
+        .success { color: #00ff00; }
+        .error { color: #ff6666; }
+        .warning { color: #ffaa00; }
+        button {
+            background: #007cba;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+        }
+        button:hover { background: #005a8b; }
+        .code { background: #333; padding: 10px; border-radius: 4px; font-family: monospace; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Admin: Force Survivor System Refresh</h1>
+        <p class="info">Cache has been cleared via Firebase CLI. Now we need to force a refresh in the main app.</p>
+
+        <div class="step">
+            <h3>🔄 Current Status</h3>
+            <p class="success">✅ ESPN cache cleared</p>
+            <p class="success">✅ Survivor status cache cleared</p>
+            <p class="success">✅ Game results cache cleared</p>
+            <p class="warning">⚠️ Need to trigger recalculation with fixed logic</p>
+        </div>
+
+        <div class="step">
+            <h3>🎯 Manual Refresh Steps</h3>
+            <p class="info">Since Firebase isn't loading properly on this standalone page, use the main app:</p>
+
+            <ol>
+                <li><strong>Go to main app:</strong> <a href="https://nerdfootball.web.app" target="_blank" style="color: #00ffff;">https://nerdfootball.web.app</a></li>
+                <li><strong>Sign in as admin</strong></li>
+                <li><strong>Open browser console</strong> (F12 → Console)</li>
+                <li><strong>Run these commands:</strong></li>
+            </ol>
+
+            <div class="code">
+// 1. Force ESPN data refresh for current weeks<br>
+await window.espnNerdApi.getWeekGames(1, true);<br>
+await window.espnNerdApi.getWeekGames(2, true);<br>
+await window.espnNerdApi.getWeekGames(3, true);<br><br>
+
+// 2. Clear any cached survivor data<br>
+localStorage.clear();<br><br>
+
+// 3. Navigate to survivor pool to trigger recalculation<br>
+window.location.href = './index.html?view=survivor';<br>
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>🔍 Check Target User</h3>
+            <p class="info">After the refresh, check user: <strong>aaG5Wc2JZkZJD1r7ozfJG04QRrf1</strong></p>
+
+            <div class="code">
+// In browser console after survivor pool loads:<br>
+// Check if user shows correct status<br>
+console.log('Target user ID: aaG5Wc2JZkZJD1r7ozfJG04QRrf1');<br><br>
+
+// Look for the user in the survivor table<br>
+// With fixed logic, they should show correct elimination status
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>🧪 Alternative: Force Database Update</h3>
+            <p class="info">If the above doesn't work, we can manually trigger a database refresh:</p>
+
+            <button onclick="goToMainApp()">Go to Main App</button>
+
+            <div class="code">
+// In main app console:<br>
+// Force survivor system to recalculate all users<br>
+const survivorSystem = new SurvivorSystem();<br>
+await survivorSystem.initializeAndProcess();<br><br>
+
+// Or reload the survivor page after clearing cache<br>
+window.location.reload();
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>✅ Expected Result</h3>
+            <p class="success">After refresh, the survivor table should show:</p>
+            <ul>
+                <li>Correct elimination statuses (not "everyone alive")</li>
+                <li>Week-specific wins preserved</li>
+                <li>No cross-week contamination</li>
+                <li>User aaG5Wc2JZkZJD1r7ozfJG04QRrf1 with accurate status</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>🔧 Technical Fix Applied</h3>
+            <p class="info">The core issue was fixed in these files:</p>
+            <ul>
+                <li><strong>survivorSystem.js</strong>: Line 71 - <code>getCurrentWeekScores()</code> → <code>getWeekGames(week)</code></li>
+                <li><strong>survivor-bundle.js</strong>: getESPNWeekResults() now uses week parameter</li>
+                <li><strong>Cache cleared</strong>: All contaminated data removed</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function goToMainApp() {
+            window.open('https://nerdfootball.web.app', '_blank');
+        }
+
+        // Show instructions
+        console.log('🔧 SURVIVOR REFRESH INSTRUCTIONS:');
+        console.log('1. Go to https://nerdfootball.web.app');
+        console.log('2. Sign in as admin');
+        console.log('3. Open console (F12)');
+        console.log('4. Run: await window.espnNerdApi.getWeekGames(1, true);');
+        console.log('5. Run: await window.espnNerdApi.getWeekGames(2, true);');
+        console.log('6. Run: await window.espnNerdApi.getWeekGames(3, true);');
+        console.log('7. Run: localStorage.clear();');
+        console.log('8. Navigate to survivor pool');
+        console.log('9. Check user: aaG5Wc2JZkZJD1r7ozfJG04QRrf1');
+    </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor Verification Test</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        .output { white-space: pre-wrap; }
+        .button { background: #0f0; color: #000; padding: 10px; border: none; cursor: pointer; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🚨 SURVIVOR VERIFICATION SYSTEM</h1>
+    <p>Open browser console to see detailed output</p>
+
+    <button class="button" onclick="runVerification()">Run Verification</button>
+    <button class="button" onclick="fixAllUsers()">Fix All Users</button>
+
+    <div id="output" class="output"></div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-functions-compat.js"></script>
+
+    <!-- Initialize Firebase -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKAc4O52e9Z9Rh_UxrLxTsONOixMEcWBI",
+            authDomain: "nerdfootball-dd237.firebaseapp.com",
+            projectId: "nerdfootball-dd237",
+            storageBucket: "nerdfootball-dd237.appspot.com",
+            messagingSenderId: "134341434799",
+            appId: "1:134341434799:web:b79f23e1ad24a7b0d15983"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.functions = firebase.functions();
+
+        console.log('✅ Firebase initialized');
+    </script>
+
+    <!-- Load required scripts -->
+    <script src="espnNerdApi.js"></script>
+    <script src="batch-survivor-verification.js"></script>
+    <script src="run-survivor-verification.js"></script>
+
+    <script>
+        function log(message) {
+            const output = document.getElementById('output');
+            output.textContent += message + '\n';
+            console.log(message);
+        }
+
+        async function runVerification() {
+            log('🚨 Starting verification...');
+
+            // Wait for dependencies
+            let retries = 0;
+            while ((!window.batchSurvivorVerification || !window.espnNerdApi) && retries < 10) {
+                log(`⏳ Waiting for dependencies... (${retries + 1}/10)`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                retries++;
+            }
+
+            if (!window.batchSurvivorVerification) {
+                log('❌ BatchSurvivorVerification not loaded');
+                return;
+            }
+
+            try {
+                const results = await runSurvivorVerification();
+                if (results) {
+                    log('✅ Verification complete - check console for details');
+                    window.verificationResults = results;
+                } else {
+                    log('❌ Verification failed');
+                }
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+            }
+        }
+
+        async function fixAllUsers() {
+            if (!window.verificationResults) {
+                log('❌ Run verification first');
+                return;
+            }
+
+            log('🔧 Starting batch fix...');
+            try {
+                const fixResults = await window.batchSurvivorVerification.batchFixAllUsers();
+                if (fixResults.success) {
+                    log(`✅ Fixed ${fixResults.summary.fixed} users`);
+                } else {
+                    log('❌ Fix failed');
+                }
+            } catch (error) {
+                log('❌ Fix error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

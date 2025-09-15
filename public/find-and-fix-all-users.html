@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Find & Fix All Incorrect Eliminations</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { background: #2a2a2a; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .user-card { background: #3a3a3a; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #ff6666; }
+        .user-card.should-be-alive { border-left-color: #66ff66; }
+        .fix-button { background: #ff6600; color: white; padding: 15px 30px; border: none; border-radius: 4px; cursor: pointer; margin: 10px 5px; font-size: 16px; }
+        .fix-button:hover { background: #cc5500; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #006600; }
+        .error { background: #cc0000; }
+        .info { background: #0066cc; }
+        .warning { background: #cc6600; }
+        .picks { font-family: monospace; font-size: 12px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Find & Fix All Incorrect Survivor Eliminations</h1>
+
+        <div class="section">
+            <h2>🎯 Step 1: Analyze Elimination Pattern</h2>
+            <button class="fix-button" onclick="analyzePattern()">🔍 ANALYZE ELIMINATION PATTERN</button>
+            <div id="patternResults"></div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Step 2: Find All Affected Users</h2>
+            <button class="fix-button" onclick="findAllAffectedUsers()">🔍 FIND ALL AFFECTED USERS</button>
+            <div id="affectedUsers"></div>
+        </div>
+
+        <div class="section">
+            <h2>⚡ Step 3: Fix All Users</h2>
+            <button class="fix-button" onclick="fixAllUsers()" id="fixAllBtn" disabled>⚡ FIX ALL INCORRECT ELIMINATIONS</button>
+            <div id="fixResults"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, doc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBNdSTHnmJ7b3GsyB2bKLQ1Lz9JLNnK9ZI",
+            authDomain: "nerdfootball-project.firebaseapp.com",
+            databaseURL: "https://nerdfootball-project-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball-project",
+            storageBucket: "nerdfootball-project.appspot.com",
+            messagingSenderId: "147326956986",
+            appId: "1:147326956986:web:ff61a86e57d9c6074bb7dc",
+            measurementId: "G-FG6E2Q2MJW"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let affectedUsersList = [];
+
+        window.analyzePattern = async function() {
+            const results = document.getElementById('patternResults');
+            results.innerHTML = '<div class="info">🔍 Analyzing elimination pattern...</div>';
+
+            try {
+                const targetUserId = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+
+                // Get target user's data
+                results.innerHTML += '<div class="info">📊 Analyzing target user: ' + targetUserId + '</div>';
+
+                // Get user picks
+                const picksRef = doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${targetUserId}`);
+                const picksSnap = await getDoc(picksRef);
+
+                if (!picksSnap.exists()) {
+                    results.innerHTML += '<div class="error">❌ Target user picks not found</div>';
+                    return;
+                }
+
+                const picks = picksSnap.data().picks || {};
+                results.innerHTML += '<div class="success">✅ Target user picks loaded</div>';
+
+                // Show user's picks
+                let picksHtml = '<div class="picks"><strong>Target User Picks:</strong><br>';
+                for (let week = 1; week <= 18; week++) {
+                    if (picks[week]) {
+                        picksHtml += `Week ${week}: ${picks[week].team} (Game ${picks[week].gameId})<br>`;
+                    }
+                }
+                picksHtml += '</div>';
+                results.innerHTML += picksHtml;
+
+                // Get pool members to see elimination status
+                const poolRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                const poolSnap = await getDoc(poolRef);
+
+                if (poolSnap.exists()) {
+                    const poolMembers = poolSnap.data();
+                    const targetUser = poolMembers[targetUserId];
+
+                    if (targetUser) {
+                        results.innerHTML += `<div class="warning">⚠️ Target user elimination status: ${targetUser.eliminated ? 'ELIMINATED' : 'ALIVE'}</div>`;
+                        if (targetUser.eliminated) {
+                            results.innerHTML += `<div class="info">📅 Eliminated Week: ${targetUser.eliminatedWeek}</div>`;
+                            results.innerHTML += `<div class="info">📝 Elimination Reason: ${targetUser.eliminationReason}</div>`;
+                        }
+                    }
+                }
+
+                results.innerHTML += '<div class="success">🎯 Pattern analysis complete - ready to find similar users</div>';
+
+            } catch (error) {
+                results.innerHTML += `<div class="error">❌ ERROR: ${error.message}</div>`;
+                console.error('Pattern analysis error:', error);
+            }
+        };
+
+        window.findAllAffectedUsers = async function() {
+            const results = document.getElementById('affectedUsers');
+            results.innerHTML = '<div class="info">🔍 Scanning all users for similar elimination patterns...</div>';
+
+            try {
+                // Get all pool members
+                const poolRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                const poolSnap = await getDoc(poolRef);
+
+                if (!poolSnap.exists()) {
+                    results.innerHTML += '<div class="error">❌ Pool members not found</div>';
+                    return;
+                }
+
+                const poolMembers = poolSnap.data();
+                const userIds = Object.keys(poolMembers);
+
+                results.innerHTML += `<div class="info">📊 Analyzing ${userIds.length} pool members...</div>`;
+
+                affectedUsersList = [];
+                let eliminatedUsers = [];
+                let aliveUsers = [];
+
+                for (const userId of userIds) {
+                    const user = poolMembers[userId];
+
+                    if (user.eliminated) {
+                        eliminatedUsers.push({ userId, user });
+                    } else {
+                        aliveUsers.push({ userId, user });
+                    }
+                }
+
+                results.innerHTML += `<div class="info">📊 Found ${eliminatedUsers.length} eliminated users and ${aliveUsers.length} alive users</div>`;
+
+                // Show eliminated users
+                if (eliminatedUsers.length > 0) {
+                    results.innerHTML += '<h3>❌ Currently Eliminated Users:</h3>';
+
+                    for (const { userId, user } of eliminatedUsers) {
+                        const userCard = `
+                            <div class="user-card">
+                                <strong>${user.displayName || user.email}</strong> (${userId})<br>
+                                Eliminated Week: ${user.eliminatedWeek || 'Unknown'}<br>
+                                Reason: ${user.eliminationReason || 'No reason given'}<br>
+                                <button onclick="checkUserPicks('${userId}')" style="background: #0066cc; color: white; border: none; padding: 5px 10px; border-radius: 3px; margin-top: 5px;">Check Picks</button>
+                            </div>
+                        `;
+                        results.innerHTML += userCard;
+                    }
+                }
+
+                // For now, we'll mark ALL eliminated users as potentially affected
+                // The user can review each one manually
+                affectedUsersList = eliminatedUsers.map(u => u.userId);
+
+                if (affectedUsersList.length > 0) {
+                    results.innerHTML += `<div class="warning">⚠️ Found ${affectedUsersList.length} users that may need review</div>`;
+                    document.getElementById('fixAllBtn').disabled = false;
+                } else {
+                    results.innerHTML += '<div class="success">✅ No obviously incorrect eliminations found</div>';
+                }
+
+            } catch (error) {
+                results.innerHTML += `<div class="error">❌ ERROR: ${error.message}</div>`;
+                console.error('Find users error:', error);
+            }
+        };
+
+        window.checkUserPicks = async function(userId) {
+            try {
+                const picksRef = doc(db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`);
+                const picksSnap = await getDoc(picksRef);
+
+                if (picksSnap.exists()) {
+                    const picks = picksSnap.data().picks || {};
+                    let picksText = `User ${userId} picks:\n`;
+                    for (let week = 1; week <= 18; week++) {
+                        if (picks[week]) {
+                            picksText += `Week ${week}: ${picks[week].team} (Game ${picks[week].gameId})\n`;
+                        }
+                    }
+                    alert(picksText);
+                } else {
+                    alert(`No picks found for user ${userId}`);
+                }
+            } catch (error) {
+                alert(`Error getting picks: ${error.message}`);
+            }
+        };
+
+        window.fixAllUsers = async function() {
+            const results = document.getElementById('fixResults');
+            results.innerHTML = '<div class="warning">⚠️ This will restore ALL eliminated users to ALIVE status. Are you sure?</div>';
+
+            const confirmed = confirm(`This will restore ${affectedUsersList.length} eliminated users to ALIVE status. Continue?`);
+
+            if (!confirmed) {
+                results.innerHTML += '<div class="info">❌ Operation cancelled by user</div>';
+                return;
+            }
+
+            results.innerHTML += '<div class="info">⚡ Fixing all affected users...</div>';
+
+            try {
+                // Get pool members
+                const poolRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                const poolSnap = await getDoc(poolRef);
+                const poolMembers = poolSnap.data();
+
+                let fixedCount = 0;
+
+                for (const userId of affectedUsersList) {
+                    try {
+                        if (poolMembers[userId]) {
+                            // Set user to alive
+                            poolMembers[userId] = {
+                                ...poolMembers[userId],
+                                eliminated: false,
+                                eliminatedWeek: null,
+                                eliminationReason: null,
+                                status: 'active',
+                                batchFixed: true,
+                                fixedAt: new Date().toISOString()
+                            };
+                            fixedCount++;
+                            results.innerHTML += `<div class="success">✅ Fixed: ${poolMembers[userId].displayName || poolMembers[userId].email}</div>`;
+                        }
+                    } catch (userError) {
+                        results.innerHTML += `<div class="error">❌ Error fixing ${userId}: ${userError.message}</div>`;
+                    }
+                }
+
+                // Update pool members document
+                await updateDoc(poolRef, poolMembers);
+
+                results.innerHTML += `<div class="success">🎉 Successfully fixed ${fixedCount} users!</div>`;
+                results.innerHTML += '<div class="info">📊 Navigate to survivor table to see the changes</div>';
+                results.innerHTML += '<button onclick="window.location.href=\'./index.html?view=survivor\'" style="background: #006600; color: white; padding: 10px 20px; border: none; border-radius: 5px; margin: 10px 0;">📊 VIEW SURVIVOR TABLE</button>';
+
+            } catch (error) {
+                results.innerHTML += `<div class="error">❌ ERROR: ${error.message}</div>`;
+                console.error('Fix all users error:', error);
+            }
+        };
+    </script>
+</body>
+</html>

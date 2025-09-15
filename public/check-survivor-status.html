@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor Status Check</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .error { background: #ffe6e6; color: #d00; border: 1px solid #ff9999; }
+        .success { background: #e6ffe6; color: #060; border: 1px solid #99ff99; }
+        .info { background: #e6f3ff; color: #006; border: 1px solid #99ccff; }
+        .week { margin: 5px 0; padding: 8px; border-left: 3px solid #ccc; }
+        .eliminated { border-left-color: #ff6666; background: #ffe6e6; }
+        .active { border-left-color: #66ff66; background: #f0fff0; }
+        button { background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #005a8b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Survivor Status Check</h1>
+        <p>User ID: <strong>aaG5Wc2JZkZJD1r7ozfJG04QRrf1</strong></p>
+
+        <button onclick="checkStatus()">Check Status</button>
+
+        <div id="results"></div>
+    </div>
+
+    <!-- Use existing Firebase setup -->
+    <script type="module">
+        // Import Firebase configuration from the main app
+        window.checkSurvivorStatus = async function() {
+            const resultsDiv = document.getElementById('results');
+            const userId = 'aaG5Wc2JZkZJD1r7ozfJG04QRrf1';
+
+            try {
+                resultsDiv.innerHTML = '<div class="result info">🔍 Checking user status...</div>';
+
+                // Wait for Firebase to be ready
+                if (typeof window.db === 'undefined') {
+                    resultsDiv.innerHTML += '<div class="result error">❌ Firebase not ready. Please wait and try again.</div>';
+                    return;
+                }
+
+                const { doc, getDoc } = window.firestoreImports;
+
+                // 1. Check pool membership
+                const poolDoc = await getDoc(doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+
+                if (!poolDoc.exists()) {
+                    resultsDiv.innerHTML += '<div class="result error">❌ Pool not found</div>';
+                    return;
+                }
+
+                const poolMembers = poolDoc.data();
+                const userInfo = poolMembers[userId];
+
+                if (!userInfo) {
+                    resultsDiv.innerHTML += '<div class="result error">❌ User not found in pool</div>';
+                    return;
+                }
+
+                resultsDiv.innerHTML += `<div class="result success">✅ User found: ${userInfo.displayName || userInfo.email}</div>`;
+
+                // 2. Get user picks
+                const picksDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`));
+
+                if (!picksDoc.exists()) {
+                    resultsDiv.innerHTML += '<div class="result error">❌ No picks found</div>';
+                    return;
+                }
+
+                const userPicks = picksDoc.data().picks || {};
+                resultsDiv.innerHTML += '<div class="result info">📋 User Picks by Week:</div>';
+
+                // Display picks
+                let pickCount = 0;
+                for (let week = 1; week <= 18; week++) {
+                    const pick = userPicks[week];
+                    if (pick) {
+                        pickCount++;
+                        resultsDiv.innerHTML += `<div class="week">Week ${week}: <strong>${pick.team}</strong> (Game ${pick.gameId})</div>`;
+                    }
+                }
+
+                if (pickCount === 0) {
+                    resultsDiv.innerHTML += '<div class="result info">📋 No picks found</div>';
+                }
+
+                // 3. Check current survivor status in various locations
+                const statusLocations = [
+                    `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/${userId}`,
+                    `artifacts/nerdfootball/public/data/nerdSurvivor_status/${userId}`,
+                    `artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members`
+                ];
+
+                resultsDiv.innerHTML += '<div class="result info">🏆 Checking Status...</div>';
+
+                for (const path of statusLocations) {
+                    try {
+                        const statusDoc = await getDoc(doc(window.db, path));
+
+                        if (statusDoc.exists()) {
+                            const data = statusDoc.data();
+
+                            if (path.includes('members')) {
+                                // Check elimination status in pool members
+                                const member = data[userId];
+                                if (member && member.eliminated !== undefined) {
+                                    const status = member.eliminated ? 'ELIMINATED' : 'ACTIVE';
+                                    resultsDiv.innerHTML += `<div class="result ${member.eliminated ? 'error' : 'success'}">📍 Pool Status: ${status}</div>`;
+                                    if (member.eliminatedWeek) {
+                                        resultsDiv.innerHTML += `<div class="result info">🗓️ Eliminated Week: ${member.eliminatedWeek}</div>`;
+                                    }
+                                    if (member.eliminationReason) {
+                                        resultsDiv.innerHTML += `<div class="result info">📝 Reason: ${member.eliminationReason}</div>`;
+                                    }
+                                }
+                            } else {
+                                // Individual status document
+                                resultsDiv.innerHTML += `<div class="result info">📄 Found status in: ${path}</div>`;
+                                resultsDiv.innerHTML += `<div class="result info">📊 Data: ${JSON.stringify(data, null, 2)}</div>`;
+                            }
+                        }
+                    } catch (e) {
+                        // Skip missing documents
+                    }
+                }
+
+                // 4. Team usage analysis
+                resultsDiv.innerHTML += '<div class="result info">📈 Team Usage Analysis:</div>';
+                const teamUsage = {};
+
+                for (let week = 1; week <= 18; week++) {
+                    const pick = userPicks[week];
+                    if (pick) {
+                        if (!teamUsage[pick.team]) {
+                            teamUsage[pick.team] = [];
+                        }
+                        teamUsage[pick.team].push(week);
+                    }
+                }
+
+                if (Object.keys(teamUsage).length === 0) {
+                    resultsDiv.innerHTML += '<div class="result info">📈 No team usage found</div>';
+                } else {
+                    for (const [team, weeks] of Object.entries(teamUsage)) {
+                        if (weeks.length > 1) {
+                            resultsDiv.innerHTML += `<div class="week error">⚠️ ${team} used in weeks: ${weeks.join(', ')} - RULE VIOLATION</div>`;
+                        } else {
+                            resultsDiv.innerHTML += `<div class="week success">✅ ${team} used in week: ${weeks[0]} - OK</div>`;
+                        }
+                    }
+                }
+
+                resultsDiv.innerHTML += '<div class="result success">🎯 Analysis complete!</div>';
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML += `<div class="result error">❌ Error: ${error.message}</div>`;
+            }
+        };
+
+        // Make it available to the button
+        window.checkStatus = window.checkSurvivorStatus;
+    </script>
+
+    <!-- Load Firebase from main app -->
+    <script src="firebase-config.js"></script>
+    <script>
+        // Wait for Firebase to initialize
+        let checkInterval = setInterval(() => {
+            if (typeof window.db !== 'undefined') {
+                clearInterval(checkInterval);
+                document.getElementById('results').innerHTML = '<div class="result success">✅ Firebase ready. Click "Check Status" to analyze user.</div>';
+            }
+        }, 500);
+
+        // Timeout after 10 seconds
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            if (typeof window.db === 'undefined') {
+                document.getElementById('results').innerHTML = '<div class="result error">❌ Firebase not ready after 10 seconds. Please refresh and try again.</div>';
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
