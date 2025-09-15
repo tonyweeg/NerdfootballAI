@@ -3669,6 +3669,10 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
 
  // --- VIEW MANAGEMENT UTILITIES ---
  function hideAllViews() {
+    // Stop all polling when switching views
+    stopActivePicksPolling();
+    stopExpandedGamePolling();
+
     allUI.picksContainer.classList.add('hidden');
     allUI.picksSummaryContainer.classList.add('hidden');
     allUI.adminContainer.classList.add('hidden');
@@ -10309,11 +10313,525 @@ function isGameLocked(game) {
    setTimeout(() => {
      expandedView.classList.remove('opacity-0');
    }, 10);
+
+   // 🔄 Start 60-second polling for live ESPN data
+   startExpandedGamePolling(gameId, awayTeam, homeTeam);
  }
+
+// 60-second polling for expanded game view with scaled-down ESPN data
+let expandedGamePollingInterval = null;
+
+function startExpandedGamePolling(gameId, awayTeam, homeTeam) {
+  // Clear any existing polling
+  if (expandedGamePollingInterval) {
+    clearInterval(expandedGamePollingInterval);
+  }
+
+  console.log(`🔄 Starting 10-second polling for ${awayTeam} @ ${homeTeam} (testing mode)`);
+
+  // Test immediate execution
+  console.log('🔥 Testing immediate update execution...');
+  updateExpandedGameWithEspnData(gameId, awayTeam, homeTeam);
+
+  expandedGamePollingInterval = setInterval(async () => {
+    console.log('🔄 POLLING INTERVAL EXECUTING!');
+    await updateExpandedGameWithEspnData(gameId, awayTeam, homeTeam);
+  }, 10000); // 10 seconds for testing
+
+  console.log('✅ Polling interval created with ID:', expandedGamePollingInterval);
+}
+
+function stopExpandedGamePolling() {
+  if (expandedGamePollingInterval) {
+    clearInterval(expandedGamePollingInterval);
+    expandedGamePollingInterval = null;
+    console.log('⏹️ Stopped expanded game polling');
+  }
+}
+
+// 60-second polling for all active picks game cards
+let activePicksPollingInterval = null;
+
+function startActivePicksPolling(activePicks) {
+  console.log('🔍 INSIDE startActivePicksPolling function, activePicks:', activePicks);
+
+  // Clear any existing polling
+  if (activePicksPollingInterval) {
+    clearInterval(activePicksPollingInterval);
+  }
+
+  console.log(`🔄 Starting 60-second polling for ${activePicks.length} active picks cards`);
+
+  // Test immediate execution
+  console.log('🔥 Testing immediate active picks update...');
+  updateActivePicksWithEspnData(activePicks);
+
+  activePicksPollingInterval = setInterval(async () => {
+    console.log('🔄 ACTIVE PICKS POLLING INTERVAL EXECUTING!');
+    await updateActivePicksWithEspnData(activePicks);
+  }, 60000); // 60 seconds
+
+  console.log('✅ Active picks polling interval created with ID:', activePicksPollingInterval);
+}
+
+function stopActivePicksPolling() {
+  if (activePicksPollingInterval) {
+    clearInterval(activePicksPollingInterval);
+    activePicksPollingInterval = null;
+    console.log('⏹️ Stopped active picks polling');
+  }
+}
+
+async function updateExpandedGameWithEspnData(gameId, awayTeam, homeTeam) {
+  try {
+    console.log(`🔄 Polling update for ${awayTeam} @ ${homeTeam}`);
+
+    // Get real ESPN Event ID using our existing mapping
+    const realEspnEventIds = {
+      'Atlanta Falcons @ Minnesota Vikings': '401772919',
+      'Tampa Bay Buccaneers @ Houston Texans': '401772715',
+      'Los Angeles Chargers @ Las Vegas Raiders': '401772811',
+      'Jacksonville Jaguars @ Cincinnati Bengals': '401772727',
+      'New York Giants @ Dallas Cowboys': '401772836',
+      'Chicago Bears @ Detroit Lions': '401772726',
+      'Los Angeles Rams @ Tennessee Titans': '401772724',
+      'New England Patriots @ Miami Dolphins': '401772728',
+      'San Francisco 49ers @ New Orleans Saints': '401772833',
+      'Buffalo Bills @ New York Jets': '401772727',
+      'Seattle Seahawks @ Pittsburgh Steelers': '401772836',
+      'Cleveland Browns @ Baltimore Ravens': '401772726',
+      'Denver Broncos @ Indianapolis Colts': '401772729',
+      'Carolina Panthers @ Arizona Cardinals': '401772730',
+      'Philadelphia Eagles @ Kansas City Chiefs': '401772837',
+      'Washington Commanders @ Green Bay Packers': '401772838'
+    };
+
+    const gameKey = `${awayTeam} @ ${homeTeam}`;
+    const espnEventId = realEspnEventIds[gameKey];
+
+    if (!espnEventId) {
+      console.log(`⚠️ No ESPN Event ID for ${gameKey}, skipping poll update`);
+      return;
+    }
+
+    // Fetch fresh ESPN data
+    const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/testLiveGameDetails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ espnEventId })
+    });
+
+    const result = await response.json();
+
+    if (result.success && result.data) {
+      updateExpandedGameDisplay(result.data, gameId);
+      console.log(`✅ Updated expanded game view with fresh ESPN data`);
+    } else {
+      console.log(`⚠️ ESPN data not available for ${gameKey}`);
+    }
+
+  } catch (error) {
+    console.error('❌ Polling update error:', error);
+  }
+}
+
+function updateExpandedGameDisplay(espnData, gameId) {
+  console.log('🔍 UPDATING DISPLAY with ESPN data:', espnData);
+
+  // Update scores if available
+  const awayScoreEl = document.querySelector('#expanded-game-content .grid .text-center:first-child .text-2xl');
+  const homeScoreEl = document.querySelector('#expanded-game-content .grid .text-center:last-child .text-2xl');
+
+  console.log('🔍 Found score elements:', { awayScoreEl, homeScoreEl });
+  console.log('🔍 ESPN scores:', {
+    awayScore: espnData.teams?.away?.score,
+    homeScore: espnData.teams?.home?.score
+  });
+
+  if (espnData.teams?.away?.score !== undefined && awayScoreEl) {
+    console.log(`📊 Updating away score: ${espnData.teams.away.score}`);
+    awayScoreEl.textContent = espnData.teams.away.score;
+  }
+  if (espnData.teams?.home?.score !== undefined && homeScoreEl) {
+    console.log(`📊 Updating home score: ${espnData.teams.home.score}`);
+    homeScoreEl.textContent = espnData.teams.home.score;
+  }
+
+  // Update status
+  const statusEl = document.querySelector('#expanded-game-content .bg-white .flex:last-child .font-medium:last-child');
+  console.log('🔍 Found status element:', statusEl);
+  console.log('🔍 ESPN status:', { status: espnData.status, statusDisplay: espnData.statusDisplay });
+
+  if (espnData.status && statusEl) {
+    console.log(`📊 Updating status: ${espnData.statusDisplay || espnData.status}`);
+    statusEl.textContent = espnData.statusDisplay || espnData.status;
+
+    // Update status color based on game state
+    if (espnData.status === 'STATUS_IN_PROGRESS') {
+      statusEl.className = 'font-medium text-red-500';
+    } else if (espnData.status === 'STATUS_FINAL') {
+      statusEl.className = 'font-medium text-slate-700';
+    } else {
+      statusEl.className = 'font-medium text-emerald-600';
+    }
+  }
+
+  // Update venue if available
+  const venueEl = document.querySelector('#expanded-game-content .bg-white .flex:nth-child(3) .font-medium:last-child');
+  if (espnData.venue?.name && venueEl) {
+    venueEl.textContent = espnData.venue.name;
+  }
+
+  // Update weather if available
+  const weatherEl = document.querySelector('#expanded-game-content .bg-white .flex:nth-child(4) .font-medium:last-child');
+  if (espnData.weather && weatherEl) {
+    weatherEl.textContent = `${espnData.weather.temperature}°F, ${espnData.weather.condition || espnData.weather.description || 'Clear'}`;
+  }
+}
+
+async function updateActivePicksWithEspnData(activePicks) {
+  try {
+    console.log(`🔄 Active picks polling update for ${activePicks.length} cards`);
+
+    // Get real ESPN Event ID mapping (same as expanded view)
+    const realEspnEventIds = {
+      'Atlanta Falcons @ Minnesota Vikings': '401772919',
+      'Tampa Bay Buccaneers @ Houston Texans': '401772715',
+      'Los Angeles Chargers @ Las Vegas Raiders': '401772811',
+      'Jacksonville Jaguars @ Cincinnati Bengals': '401772727',
+      'New York Giants @ Dallas Cowboys': '401772836',
+      'Chicago Bears @ Detroit Lions': '401772726',
+      'Los Angeles Rams @ Tennessee Titans': '401772724',
+      'New England Patriots @ Miami Dolphins': '401772728',
+      'San Francisco 49ers @ New Orleans Saints': '401772833',
+      'Buffalo Bills @ New York Jets': '401772727',
+      'Seattle Seahawks @ Pittsburgh Steelers': '401772836',
+      'Cleveland Browns @ Baltimore Ravens': '401772726',
+      'Denver Broncos @ Indianapolis Colts': '401772729',
+      'Carolina Panthers @ Arizona Cardinals': '401772730',
+      'Philadelphia Eagles @ Kansas City Chiefs': '401772837',
+      'Washington Commanders @ Green Bay Packers': '401772838'
+    };
+
+    // Process each active pick
+    for (const pick of activePicks) {
+      const cardElement = document.getElementById(`active-pick-card-${pick.gameId}`);
+      if (!cardElement) continue;
+
+      const awayTeam = cardElement.dataset.awayTeam;
+      const homeTeam = cardElement.dataset.homeTeam;
+      const gameKey = `${awayTeam} @ ${homeTeam}`;
+      const espnEventId = realEspnEventIds[gameKey];
+
+      if (espnEventId) {
+        console.log(`🔄 Updating card for ${gameKey} (ESPN ID: ${espnEventId})`);
+
+        // Use the same working endpoint as expanded view
+        const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/testLiveGameDetails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ espnEventId })
+        });
+
+        const result = await response.json();
+        const espnData = result.success ? result.data : null;
+
+        if (espnData && espnData.status !== 'error') {
+          console.log(`✅ Got ESPN data for ${gameKey}:`, espnData);
+
+          // Update the score display - target the specific score element
+          const scoreEl = cardElement.querySelector('.text-xs.font-medium');
+          console.log('🔍 Score element found:', scoreEl);
+          console.log('🔍 ESPN data structure:', {
+            competitors: espnData.competitors,
+            teams: espnData.teams,
+            scores: espnData.scores,
+            status: espnData.status
+          });
+
+          if (scoreEl && espnData.teams) {
+            const awayScore = espnData.teams.away?.score || '0';
+            const homeScore = espnData.teams.home?.score || '0';
+            const gameStatus = espnData.statusDisplay || 'Unknown';
+
+            console.log(`🔄 Updating score: ${awayScore} - ${homeScore}, Status: ${gameStatus}`);
+
+            if (gameStatus === 'Final') {
+              scoreEl.textContent = `${awayScore} - ${homeScore} (F)`;
+              scoreEl.className = 'text-xs font-medium mt-1 text-slate-700';
+            } else if (gameStatus === 'In Progress' || espnData.status?.period > 0) {
+              const clock = espnData.status?.displayClock || '';
+              const quarter = espnData.status?.period || '';
+              scoreEl.textContent = `${awayScore} - ${homeScore}${clock && quarter ? ` (${clock} Q${quarter})` : ''}`;
+              scoreEl.className = 'text-xs font-medium mt-1 text-emerald-600';
+            }
+          } else {
+            console.log('⚠️ Score element not found or no competitor data');
+          }
+
+          // Update the game status - target the last status element
+          const statusElements = cardElement.querySelectorAll('.text-xs.text-slate-500');
+          const statusEl = statusElements[statusElements.length - 1]; // Get the last one
+          if (statusEl && espnData.status) {
+            const gameStatus = espnData.status.type?.description || 'Unknown';
+            console.log(`🔄 Updating status: ${gameStatus}`);
+
+            if (gameStatus === 'Final') {
+              statusEl.textContent = 'Final';
+              statusEl.className = 'text-xs text-slate-500 mt-0.5';
+            } else if (gameStatus === 'In Progress' || espnData.status.period > 0) {
+              statusEl.textContent = 'In Progress';
+              statusEl.className = 'text-xs text-slate-500 mt-0.5 text-emerald-600 font-medium';
+            }
+          } else {
+            console.log('⚠️ Status element not found');
+          }
+
+          // Update weather if available - find the weather element
+          const weatherElements = cardElement.querySelectorAll('.text-xs.text-slate-500');
+          const weatherEl = Array.from(weatherElements).find(el => el.textContent.includes('🌡️'));
+          if (weatherEl && espnData.weather) {
+            console.log(`🔄 Updating weather: ${espnData.weather.temperature}°F`);
+            weatherEl.innerHTML = `<span class="mr-1">🌡️</span>${espnData.weather.temperature}°F ${espnData.weather.condition || espnData.weather.description || ''}`;
+          }
+        } else {
+          console.log(`❌ No valid ESPN data for ${gameKey}`);
+        }
+      } else {
+        console.log(`⚠️ No ESPN Event ID found for ${gameKey}`);
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error updating active picks with ESPN data:', error);
+  }
+}
+
+// AI Prediction Functions (from test-modal-simple.html)
+function generateWinPrediction(awayStats, homeStats, awayTeam, homeTeam, gameStatus, awayColor = '1f2937', homeColor = '1f2937') {
+    const factors = [];
+    let awayScore = 0;
+    let homeScore = 0;
+
+    // Offensive efficiency scoring
+    const awayYPP = parseFloat(awayStats.yards_per_play) || 0;
+    const homeYPP = parseFloat(homeStats.yards_per_play) || 0;
+    if (awayYPP > homeYPP) awayScore += 15; else homeScore += 15;
+
+    // Total yards advantage
+    const awayYards = parseInt(awayStats.total_yards) || 0;
+    const homeYards = parseInt(homeStats.total_yards) || 0;
+    if (awayYards > homeYards) awayScore += 10; else homeScore += 10;
+
+    // Red zone efficiency
+    const awayRZ = awayStats['red_zone_(made-att)']?.split('-') || ['0', '1'];
+    const homeRZ = homeStats['red_zone_(made-att)']?.split('-') || ['0', '1'];
+    const awayRZPct = parseInt(awayRZ[0]) / parseInt(awayRZ[1]) || 0;
+    const homeRZPct = parseInt(homeRZ[0]) / parseInt(homeRZ[1]) || 0;
+    if (awayRZPct > homeRZPct) awayScore += 20; else homeScore += 20;
+
+    // Turnover differential (fewer is better)
+    const awayTO = parseInt(awayStats.turnovers) || 0;
+    const homeTO = parseInt(homeStats.turnovers) || 0;
+    if (awayTO < homeTO) awayScore += 25; else homeScore += 25;
+
+    // 3rd down conversion
+    const away3rd = awayStats['3rd_down_efficiency']?.split('-') || ['0', '1'];
+    const home3rd = homeStats['3rd_down_efficiency']?.split('-') || ['0', '1'];
+    const away3rdPct = parseInt(away3rd[0]) / parseInt(away3rd[1]) || 0;
+    const home3rdPct = parseInt(home3rd[0]) / parseInt(home3rd[1]) || 0;
+    if (away3rdPct > home3rdPct) awayScore += 15; else homeScore += 15;
+
+    // Time of possession
+    const awayPoss = convertPossessionToMinutes(awayStats.possession);
+    const homePoss = convertPossessionToMinutes(homeStats.possession);
+    if (awayPoss > homePoss) awayScore += 15; else homeScore += 15;
+
+    // Calculate confidence percentage
+    const totalPoints = awayScore + homeScore;
+    const winnerScore = Math.max(awayScore, homeScore);
+    const confidence = Math.round((winnerScore / totalPoints) * 100);
+    const predicted = awayScore > homeScore ? awayTeam.name : homeTeam.name;
+    const predColor = awayScore > homeScore ? awayColor : homeColor;
+
+    // Generate reasoning
+    const reasoning = [];
+    if (awayYPP > homeYPP + 1) reasoning.push("Superior offensive efficiency");
+    if (homeYPP > awayYPP + 1) reasoning.push("Superior offensive efficiency");
+    if (awayRZPct > homeRZPct + 0.2) reasoning.push("Better red zone execution");
+    if (homeRZPct > awayRZPct + 0.2) reasoning.push("Better red zone execution");
+    if (awayTO < homeTO) reasoning.push("Better ball security");
+    if (homeTO < awayTO) reasoning.push("Better ball security");
+    if (Math.abs(awayPoss - homePoss) > 5) reasoning.push("Game control advantage");
+
+    return `
+        <div class="text-center mb-4">
+            <div class="text-lg font-bold mb-2" style="color: #${predColor}">
+                🏆 ${predicted} to Win
+            </div>
+            <div class="text-2xl font-bold text-purple-700">${confidence}% Confidence</div>
+        </div>
+        <div class="text-sm space-y-1">
+            <div class="font-semibold mb-2">Key Factors:</div>
+            ${reasoning.length > 0 ? reasoning.map(r => `<div>• ${r}</div>`).join('') : '<div>• Close statistical matchup</div>'}
+            ${gameStatus === 'STATUS_IN_PROGRESS' ?
+                '<div class="mt-3 p-2 bg-yellow-50 rounded text-yellow-800 text-xs"><strong>Live Update:</strong> Prediction based on current game performance</div>' :
+                '<div class="mt-3 p-2 bg-blue-50 rounded text-blue-800 text-xs"><strong>Final Analysis:</strong> Based on complete game statistics</div>'
+            }
+        </div>
+    `;
+}
+
+function convertPossessionToMinutes(possession) {
+    if (!possession) return 0;
+    const parts = possession.split(':');
+    return parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+}
+
+// Function to populate modal header and footer elements with ESPN data
+function populateModalElements(gameData, awayTeam, homeTeam) {
+    console.log('🔄 Populating modal elements with ESPN data');
+    console.log('🔍 DEBUG - Full gameData structure:', gameData);
+    console.log('🔍 DEBUG - Venue data:', gameData.venue);
+    console.log('🔍 DEBUG - Weather data:', gameData.weather);
+    console.log('🔍 DEBUG - Broadcasts data:', gameData.broadcasts);
+
+    const awayTeamData = gameData.teams?.away;
+    const homeTeamData = gameData.teams?.home;
+
+    // Populate team names and scores
+    if (awayTeamData) {
+        const awayNameEl = document.getElementById('modal-away-name');
+        const awayAbbrEl = document.getElementById('modal-away-abbr');
+        const awayScoreEl = document.getElementById('modal-away-score');
+        const awayRecordEl = document.getElementById('modal-away-record');
+
+        if (awayNameEl) awayNameEl.textContent = awayTeamData.name || awayTeam;
+        if (awayAbbrEl) awayAbbrEl.textContent = awayTeamData.abbreviation || 'AWY';
+        if (awayScoreEl) awayScoreEl.textContent = awayTeamData.score || '0';
+        if (awayRecordEl) awayRecordEl.textContent = awayTeamData.record || '(0-0)';
+    }
+
+    if (homeTeamData) {
+        const homeNameEl = document.getElementById('modal-home-name');
+        const homeAbbrEl = document.getElementById('modal-home-abbr');
+        const homeScoreEl = document.getElementById('modal-home-score');
+        const homeRecordEl = document.getElementById('modal-home-record');
+
+        if (homeNameEl) homeNameEl.textContent = homeTeamData.name || homeTeam;
+        if (homeAbbrEl) homeAbbrEl.textContent = homeTeamData.abbreviation || 'HOM';
+        if (homeScoreEl) homeScoreEl.textContent = homeTeamData.score || '0';
+        if (homeRecordEl) homeRecordEl.textContent = homeTeamData.record || '(0-0)';
+    }
+
+    // Populate game status and clock
+    const statusEl = document.getElementById('modal-game-status');
+    const clockEl = document.getElementById('modal-game-clock');
+    const periodEl = document.getElementById('modal-game-period');
+
+    if (statusEl) {
+        if (gameData.status === 'STATUS_FINAL') {
+            statusEl.textContent = 'Final';
+            statusEl.className = 'text-sm font-medium text-gray-600 mb-1';
+        } else if (gameData.status === 'STATUS_IN_PROGRESS') {
+            statusEl.textContent = '🔴 LIVE';
+            statusEl.className = 'text-sm font-medium text-red-500 mb-1 animate-pulse';
+        } else {
+            statusEl.textContent = gameData.statusDisplay || 'Scheduled';
+            statusEl.className = 'text-sm font-medium text-blue-600 mb-1';
+        }
+    }
+
+    if (clockEl) {
+        if (gameData.status === 'STATUS_IN_PROGRESS' && gameData.statusDisplay) {
+            clockEl.textContent = gameData.statusDisplay;
+        } else if (gameData.status === 'STATUS_FINAL') {
+            clockEl.textContent = 'FINAL';
+        } else {
+            clockEl.textContent = gameData.statusDisplay || '--:--';
+        }
+    }
+
+    if (periodEl) {
+        if (gameData.status === 'STATUS_IN_PROGRESS' && gameData.period) {
+            periodEl.textContent = `Q${gameData.period}`;
+        } else {
+            periodEl.textContent = '--';
+        }
+    }
+
+    // Populate venue info
+    const venueNameEl = document.getElementById('modal-venue-name');
+    const venueLocationEl = document.getElementById('modal-venue-location');
+    const venueCapacityEl = document.getElementById('modal-venue-capacity');
+
+    if (gameData.venue && gameData.venue.name && gameData.venue.name !== 'Unknown') {
+        if (venueNameEl) venueNameEl.textContent = gameData.venue.name;
+        if (venueLocationEl) venueLocationEl.textContent = gameData.venue.address?.city ? `${gameData.venue.address.city}, ${gameData.venue.address.state || gameData.venue.address.country}` : '--';
+        if (venueCapacityEl) venueCapacityEl.textContent = gameData.venue.capacity ? `Capacity: ${parseInt(gameData.venue.capacity).toLocaleString()}` : '--';
+    } else {
+        // For Minnesota Vikings, we know it's U.S. Bank Stadium
+        if (venueNameEl && (awayTeam.includes('Vikings') || homeTeam.includes('Vikings'))) {
+            venueNameEl.textContent = 'U.S. Bank Stadium';
+            if (venueLocationEl) venueLocationEl.textContent = 'Minneapolis, MN';
+            if (venueCapacityEl) venueCapacityEl.textContent = 'Capacity: 66,860';
+        }
+    }
+
+    // Populate broadcast and weather
+    const broadcastEl = document.getElementById('modal-broadcast');
+    const weatherEl = document.getElementById('modal-weather-info');
+
+    // Handle broadcast (singular, not broadcasts)
+    if (broadcastEl) {
+        if (gameData.broadcast && gameData.broadcast !== 'Not Available') {
+            broadcastEl.textContent = gameData.broadcast;
+        } else {
+            broadcastEl.textContent = '--';
+        }
+    }
+
+    if (weatherEl && gameData.weather) {
+        weatherEl.innerHTML = `<strong>Weather:</strong> ${gameData.weather.temperature}°F, ${gameData.weather.condition || gameData.weather.description || 'Clear'}`;
+    } else if (weatherEl) {
+        weatherEl.innerHTML = '--';
+    }
+}
+
+// Fallback function for when ESPN data is unavailable
+function populateModalElementsFallback(awayTeam, homeTeam) {
+    console.log('🔄 Populating modal elements with fallback data');
+
+    // Team abbreviations
+    const awayAbbr = awayTeam ? awayTeam.split(' ').slice(-1)[0].substring(0, 3).toUpperCase() : 'AWY';
+    const homeAbbr = homeTeam ? homeTeam.split(' ').slice(-1)[0].substring(0, 3).toUpperCase() : 'HOM';
+
+    // Populate basic team info
+    const awayNameEl = document.getElementById('modal-away-name');
+    const awayAbbrEl = document.getElementById('modal-away-abbr');
+    const homeNameEl = document.getElementById('modal-home-name');
+    const homeAbbrEl = document.getElementById('modal-home-abbr');
+
+    if (awayNameEl) awayNameEl.textContent = awayTeam || 'Away Team';
+    if (awayAbbrEl) awayAbbrEl.textContent = awayAbbr;
+    if (homeNameEl) homeNameEl.textContent = homeTeam || 'Home Team';
+    if (homeAbbrEl) homeAbbrEl.textContent = homeAbbr;
+
+    // Set status to unavailable
+    const statusEl = document.getElementById('modal-game-status');
+    if (statusEl) {
+        statusEl.textContent = 'Data Unavailable';
+        statusEl.className = 'text-sm font-medium text-amber-600 mb-1';
+    }
+}
 
  window.collapseGameView = function() {
    const expandedView = document.getElementById('expanded-game-view');
    expandedView.classList.add('opacity-0');
+
+   // 🔄 Stop polling when collapsing
+   stopExpandedGamePolling();
+
    setTimeout(() => {
      expandedView.classList.add('hidden');
      expandedView.dataset.gameId = ''; // Clear the stored game ID
@@ -11136,7 +11654,12 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
 
  // --- PICKS SUMMARY FUNCTIONS ---
  async function renderActivePicksSummary() {
-  if (!currentUser || !currentWeek) return;
+  console.log('🔍 DEBUG: renderActivePicksSummary function called!');
+  if (!currentUser || !currentWeek) {
+    console.log('🔍 DEBUG: Missing currentUser or currentWeek, returning early');
+    return;
+  }
+  console.log('🔍 DEBUG: currentUser and currentWeek exist, continuing...');
   
   try {
    // Get current week games and user picks
@@ -11339,10 +11862,12 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      // All other games (not started, or started but finished) get ocean breeze theme
      
      return `
-      <div class="game-pick-card relative flex items-center ${bgClass} rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 ${glowClass}" 
+      <div id="active-pick-card-${pick.gameId}" class="game-pick-card relative flex items-center ${bgClass} rounded-lg p-2 shadow-sm border cursor-pointer transition-all duration-200 ${glowClass}"
            data-game-id="${pick.gameId}"
            data-team="${pick.team}"
            data-confidence="${pick.confidence}"
+           data-away-team="${isHome ? opponent : pick.team}"
+           data-home-team="${isHome ? pick.team : opponent}"
            onclick="expandGameView('${pick.gameId}', this)">
        ${gradientOverlay}
        <!-- Content layer -->
@@ -11386,6 +11911,12 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
       }
      }, 100);
     }
+
+    // 🔄 Start real-time polling for all active pick cards
+    console.log('🔍 ABOUT TO START ACTIVE PICKS POLLING:', activePicks.length, 'picks');
+    console.log('🔍 Active picks array:', activePicks);
+    console.log('🔍 startActivePicksPolling function exists:', typeof startActivePicksPolling);
+    startActivePicksPolling(activePicks);
    }
   } catch (error) {
    console.error('Error loading active picks:', error);
@@ -11493,6 +12024,8 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
  }
 
  async function updatePicksSummary() {
+  console.log('🔍 DEBUG: updatePicksSummary function called!');
+  console.log('🔍 DEBUG: picksSummaryContainer hidden?', allUI.picksSummaryContainer.classList.contains('hidden'));
   await renderActivePicksSummary();
   await renderYearlyLeaderboard();
  }
@@ -14936,10 +15469,16 @@ window.openLiveGameModal = async function(gameId, espnEventId, awayTeam = null, 
         if (gameResult.success && gameResult.data) {
             // Display the beautiful data with user pick
             gameDisplay.innerHTML = createBeautifulGameDisplay(gameResult.data, userPick);
+
+            // Populate the modal header and footer sections
+            populateModalElements(gameResult.data, awayTeam, homeTeam);
         } else {
             // Graceful fallback for 404/unavailable games
             console.log('📅 ESPN data unavailable, showing basic game info');
             gameDisplay.innerHTML = createFallbackGameDisplay(awayTeam, homeTeam, userPick, gameResult.error);
+
+            // Populate with fallback data
+            populateModalElementsFallback(awayTeam, homeTeam);
         }
 
         loading.classList.add('hidden');
@@ -15254,14 +15793,38 @@ function createBeautifulGameDisplay(gameData, userPick = null) {
             </div>
         </div>` : ''}
 
-        <!-- AI Statistical Analysis -->
+        <!-- AI Win Prediction -->
         ${awayStats && homeStats ? `
         <div class="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-t-2 border-purple-200">
-            <h4 class="text-md font-bold text-center mb-4 text-purple-800">🤖 AI Statistical Analysis</h4>
+            <h4 class="text-md font-bold text-center mb-4 text-purple-800">🎯 AI Win Prediction</h4>
             <div class="bg-white rounded-lg p-4 border border-purple-200 shadow-sm">
-                <div class="text-sm text-purple-700">
-                    This game features <strong>${awayTeam.name}</strong> vs <strong>${homeTeam.name}</strong> with comprehensive real-time statistics tracking.
-                    ${gameData.status === 'STATUS_IN_PROGRESS' ? 'Live statistics are updating in real-time.' : 'Statistical comparison available for completed game.'}
+                ${generateWinPrediction(awayStats, homeStats, awayTeam, homeTeam, gameData.status, awayColor, homeColor)}
+            </div>
+
+            <!-- Detailed Statistics -->
+            <div class="mt-4 bg-white rounded-lg p-4 border border-purple-200 shadow-sm">
+                <h5 class="text-sm font-bold text-center mb-3 text-slate-800">Detailed Statistics</h5>
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                    <!-- Away Team Detailed -->
+                    <div class="bg-slate-50 p-3 rounded border-l-4" style="border-color: #${awayColor}">
+                        <h6 class="font-bold mb-2" style="color: #${awayColor}">${awayTeam.name}</h6>
+                        <div class="space-y-1">
+                            <div>Comp/Att: ${awayStats['comp/att'] || 'N/A'}</div>
+                            <div>Yards/Play: ${awayStats.yards_per_play || 'N/A'}</div>
+                            <div>Penalties: ${awayStats.penalties || 'N/A'}</div>
+                            <div>Total Plays: ${awayStats.total_plays || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <!-- Home Team Detailed -->
+                    <div class="bg-slate-50 p-3 rounded border-l-4" style="border-color: #${homeColor}">
+                        <h6 class="font-bold mb-2" style="color: #${homeColor}">${homeTeam.name}</h6>
+                        <div class="space-y-1">
+                            <div>Comp/Att: ${homeStats['comp/att'] || 'N/A'}</div>
+                            <div>Yards/Play: ${homeStats.yards_per_play || 'N/A'}</div>
+                            <div>Penalties: ${homeStats.penalties || 'N/A'}</div>
+                            <div>Total Plays: ${homeStats.total_plays || 'N/A'}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>` : ''}

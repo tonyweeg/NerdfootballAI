@@ -68,7 +68,7 @@ class SurvivorSystem {
             // Ensure ESPN API is ready
             if (typeof window.espnNerdApi !== 'undefined') {
                 await window.espnNerdApi.ensureReady();
-                const espnData = await window.espnNerdApi.getCurrentWeekScores();
+                const espnData = await window.espnNerdApi.getWeekGames(week);
                 
                 if (espnData && espnData.games) {
                     const weekResults = {};
