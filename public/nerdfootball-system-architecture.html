@@ -1314,51 +1314,84 @@
         // Admin Authentication Functions
         async function checkAdminAuthentication() {
             try {
-                // Get admin UID from URL parameter
+                const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
+
+                // PRIMARY: Try URL parameters (initial hamburger menu access)
                 const urlParams = new URLSearchParams(window.location.search);
                 const adminUID = urlParams.get('admin');
                 const timestamp = urlParams.get('timestamp');
 
-                if (!adminUID) {
-                    log('No admin UID provided', 'error');
-                    return false;
-                }
-
-                // Verify against known admin UIDs
-                const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
-
-                if (!ADMIN_UIDS.includes(adminUID)) {
-                    log(`Unauthorized access attempt: ${adminUID}`, 'error');
-                    return false;
-                }
-
-                // Check timestamp (5 minute expiry)
-                if (timestamp) {
-                    const currentTime = Date.now();
-                    const fiveMinutes = 5 * 60 * 1000;
-                    if ((currentTime - parseInt(timestamp)) > fiveMinutes) {
-                        log('Dashboard link expired', 'error');
+                if (adminUID) {
+                    // Validate URL-provided admin UID
+                    if (!ADMIN_UIDS.includes(adminUID)) {
+                        log(`Unauthorized access attempt: ${adminUID}`, 'error');
                         return false;
                     }
+
+                    // Check timestamp (5 minute expiry for URL access)
+                    if (timestamp) {
+                        const currentTime = Date.now();
+                        const fiveMinutes = 5 * 60 * 1000;
+                        if ((currentTime - parseInt(timestamp)) > fiveMinutes) {
+                            log('Dashboard link expired', 'error');
+                            return false;
+                        }
+                    }
+
+                    // Wait for Firebase to be ready
+                    if (!window.db) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+
+                    // Clear URL parameters for security
+                    if (window.history.replaceState) {
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+
+                    log(`Admin authenticated via URL: ${adminUID}`, 'success');
+                    return true;
                 }
 
-                // Wait for Firebase to be ready
-                if (!window.db) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                // FALLBACK: Try Firebase Auth (refresh/direct access)
+                log('No URL params found, checking Firebase Auth...', 'info');
+
+                // Wait for Firebase Auth to be ready
+                await waitForFirebaseAuth();
+
+                const currentUser = window.auth.currentUser;
+                if (currentUser && ADMIN_UIDS.includes(currentUser.uid)) {
+                    log(`Admin authenticated via Firebase: ${currentUser.uid}`, 'success');
+                    return true;
                 }
 
-                // Clear URL parameters for security
-                if (window.history.replaceState) {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                }
-
-                log(`Admin authenticated: ${adminUID}`, 'success');
-                return true;
+                log('No valid authentication found', 'error');
+                return false;
 
             } catch (error) {
                 log(`Authentication error: ${error.message}`, 'error');
                 return false;
             }
+        }
+
+        // Helper function to wait for Firebase Auth state
+        async function waitForFirebaseAuth() {
+            return new Promise((resolve) => {
+                if (window.auth.currentUser !== null) {
+                    resolve(); // Already determined (logged in or out)
+                } else {
+                    // Wait for auth state to be determined
+                    const unsubscribe = window.auth.onAuthStateChanged((user) => {
+                        unsubscribe();
+                        resolve();
+                    });
+
+                    // Timeout after 3 seconds
+                    setTimeout(() => {
+                        unsubscribe();
+                        resolve();
+                    }, 3000);
+                }
+            });
         }
 
         function showAdminAccessRequired() {
