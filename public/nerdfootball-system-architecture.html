@@ -1376,21 +1376,18 @@
         // Helper function to wait for Firebase Auth state
         async function waitForFirebaseAuth() {
             return new Promise((resolve) => {
-                if (window.auth.currentUser !== null) {
-                    resolve(); // Already determined (logged in or out)
-                } else {
-                    // Wait for auth state to be determined
-                    const unsubscribe = window.auth.onAuthStateChanged((user) => {
-                        unsubscribe();
-                        resolve();
-                    });
+                // ALWAYS wait for Firebase Auth to determine state
+                // (don't assume null means undetermined vs logged-out)
+                const unsubscribe = window.auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    resolve(); // Auth state determined (user OR null)
+                });
 
-                    // Timeout after 3 seconds
-                    setTimeout(() => {
-                        unsubscribe();
-                        resolve();
-                    }, 3000);
-                }
+                // Timeout after 5 seconds (increased for hard refresh)
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve();
+                }, 5000);
             });
         }
 
