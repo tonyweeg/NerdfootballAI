@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💀 DEAD-MANS-TALE Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .story {
+            background: #111;
+            border: 1px solid #0f0;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        .success { background: #003300; color: #00ff00; }
+        .error { background: #330000; color: #ff0000; }
+        .pending { background: #333300; color: #ffff00; }
+        button {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 5px;
+            cursor: pointer;
+            font-family: monospace;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>💀 DEAD-MANS-TALE Function Testing</h1>
+    <p>Testing the new elimination storytelling functions</p>
+
+    <button onclick="runTests()">🧪 Run Tests</button>
+    <button onclick="clearResults()">🧹 Clear Results</button>
+
+    <div id="test-results"></div>
+
+    <!-- Mock Firebase for testing -->
+    <script>
+        // Mock ESPN API for testing
+        window.espnNerdApi = {
+            ensureReady: async () => true,
+            getWeekGames: async (week) => {
+                // Mock game data for testing
+                return {
+                    games: [
+                        {
+                            competitions: [{
+                                status: { type: { completed: true } },
+                                competitors: [
+                                    {
+                                        homeAway: 'home',
+                                        team: { displayName: 'Dallas Cowboys' },
+                                        score: 21,
+                                        winner: false
+                                    },
+                                    {
+                                        homeAway: 'away',
+                                        team: { displayName: 'Philadelphia Eagles' },
+                                        score: 24,
+                                        winner: true
+                                    }
+                                ]
+                            }]
+                        },
+                        {
+                            competitions: [{
+                                status: { type: { completed: true } },
+                                competitors: [
+                                    {
+                                        homeAway: 'home',
+                                        team: { displayName: 'New England Patriots' },
+                                        score: 17,
+                                        winner: false
+                                    },
+                                    {
+                                        homeAway: 'away',
+                                        team: { displayName: 'Buffalo Bills' },
+                                        score: 20,
+                                        winner: true
+                                    }
+                                ]
+                            }]
+                        }
+                    ]
+                };
+            }
+        };
+
+        // Copy the functions from index.html for testing
+        // 💀 DEAD-MANS-TALE: Enhanced game details for elimination storytelling
+        async function getGameDetails(week, teamName) {
+            try {
+                if (!window.espnNerdApi) return null;
+                await window.espnNerdApi.ensureReady();
+                const weekGames = await window.espnNerdApi.getWeekGames(week);
+
+                if (!weekGames?.games) return null;
+
+                // Find the game where the team played
+                const teamGame = weekGames.games.find(game => {
+                    const competitors = game.competitions?.[0]?.competitors || [];
+                    return competitors.some(comp => comp.team?.displayName === teamName);
+                });
+
+                if (!teamGame || !teamGame.competitions?.[0]?.status?.type?.completed) return null;
+
+                const competition = teamGame.competitions[0];
+                const competitors = competition.competitors;
+                const homeTeam = competitors.find(c => c.homeAway === 'home');
+                const awayTeam = competitors.find(c => c.homeAway === 'away');
+                const winner = competitors.find(c => c.winner);
+
+                return {
+                    homeTeam: homeTeam?.team?.displayName,
+                    awayTeam: awayTeam?.team?.displayName,
+                    homeScore: homeTeam?.score || 0,
+                    awayScore: awayTeam?.score || 0,
+                    winner: winner?.team?.displayName,
+                    pickedTeam: teamName,
+                    opponent: competitors.find(c => c.team?.displayName !== teamName)?.team?.displayName
+                };
+            } catch (error) {
+                console.warn(`Could not get game details for week ${week}, team ${teamName}:`, error);
+                return null;
+            }
+        }
+
+        // 💀 DEAD-MANS-TALE: Generate detailed elimination stories
+        async function generateDetailedEliminationStory(userStatus, memberData) {
+            const displayName = memberData?.displayName || userStatus.displayName || 'Player';
+
+            // Handle different elimination types
+            if (!userStatus.eliminatedWeek) {
+                return userStatus.status === 'eliminated' ? '💀 Eliminated' : '✅ Alive';
+            }
+
+            const week = userStatus.eliminatedWeek;
+
+            // Handle no pick elimination
+            if (userStatus.reason && userStatus.reason.includes('Failed to make pick')) {
+                return `💀 ${displayName} failed to make a pick in Week ${week}`;
+            }
+
+            // Handle duplicate team elimination
+            if (userStatus.reason && userStatus.reason.includes('multiple times')) {
+                const teamMatch = userStatus.reason.match(/Picked (\\w+)/);
+                const team = teamMatch ? teamMatch[1] : 'same team';
+                return `💀 ${displayName} tried to pick ${team} again in Week ${week} (not allowed)`;
+            }
+
+            // Handle game loss elimination - get detailed story
+            if (userStatus.eliminationTeam || userStatus.teamPicked) {
+                const pickedTeam = userStatus.eliminationTeam || userStatus.teamPicked;
+
+                try {
+                    const gameDetails = await getGameDetails(week, pickedTeam);
+
+                    if (gameDetails && gameDetails.opponent) {
+                        const score = `${gameDetails.homeScore}-${gameDetails.awayScore}`;
+                        return `💀 ${displayName}'s ${pickedTeam} lost to ${gameDetails.opponent} ${score} in Week ${week}`;
+                    }
+
+                    // Basic fallback
+                    return `💀 ${displayName}'s ${pickedTeam} lost in Week ${week}`;
+
+                } catch (error) {
+                    console.warn('Error generating elimination story:', error);
+                    return `💀 ${displayName} eliminated in Week ${week}`;
+                }
+            }
+
+            // Ultimate fallback
+            return `💀 ${displayName} eliminated in Week ${week}`;
+        }
+
+        function logResult(message, type = 'pending') {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '';
+        }
+
+        async function runTests() {
+            clearResults();
+            logResult('🚀 Starting DEAD-MANS-TALE function tests...', 'pending');
+
+            // Test 1: Game loss with score
+            try {
+                const testUser1 = {
+                    eliminatedWeek: 1,
+                    eliminationTeam: 'Dallas Cowboys',
+                    teamPicked: 'Dallas Cowboys'
+                };
+                const memberData1 = { displayName: 'John' };
+
+                const story1 = await generateDetailedEliminationStory(testUser1, memberData1);
+                logResult(`Test 1 - Game Loss: "${story1}"`, 'success');
+            } catch (error) {
+                logResult(`Test 1 Failed: ${error.message}`, 'error');
+            }
+
+            // Test 2: No pick elimination
+            try {
+                const testUser2 = {
+                    eliminatedWeek: 1,
+                    reason: 'Failed to make pick for Week 1'
+                };
+                const memberData2 = { displayName: 'Sarah' };
+
+                const story2 = await generateDetailedEliminationStory(testUser2, memberData2);
+                logResult(`Test 2 - No Pick: "${story2}"`, 'success');
+            } catch (error) {
+                logResult(`Test 2 Failed: ${error.message}`, 'error');
+            }
+
+            // Test 3: Duplicate team elimination
+            try {
+                const testUser3 = {
+                    eliminatedWeek: 2,
+                    reason: 'Picked Cowboys multiple times (not allowed)'
+                };
+                const memberData3 = { displayName: 'Mike' };
+
+                const story3 = await generateDetailedEliminationStory(testUser3, memberData3);
+                logResult(`Test 3 - Duplicate Team: "${story3}"`, 'success');
+            } catch (error) {
+                logResult(`Test 3 Failed: ${error.message}`, 'error');
+            }
+
+            // Test 4: Game details function
+            try {
+                const gameDetails = await getGameDetails(1, 'Dallas Cowboys');
+                logResult(`Test 4 - Game Details: ${JSON.stringify(gameDetails, null, 2)}`, 'success');
+            } catch (error) {
+                logResult(`Test 4 Failed: ${error.message}`, 'error');
+            }
+
+            logResult('✅ All tests completed!', 'success');
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            logResult('💀 DEAD-MANS-TALE test page loaded. Click "Run Tests" to begin.', 'pending');
+        });
+    </script>
+</body>
+</html>
