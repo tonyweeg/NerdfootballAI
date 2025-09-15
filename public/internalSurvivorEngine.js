@@ -39,7 +39,7 @@ class InternalSurvivorEngine {
     // Get user's pick for specific week
     async getUserPick(userId, weekNumber) {
         try {
-            const pickPath = `artifacts/nerdfootball/pools/${this.poolId}/data/nerdSurvivor_picks/${userId}`;
+            const pickPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
             const pickDoc = await getDoc(doc(this.db, pickPath));
 
             if (pickDoc.exists()) {

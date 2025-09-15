@@ -69,17 +69,21 @@ class SurvivorSystem {
     // Get user's pick for specific week - INTERNAL DATA ONLY
     async getUserPick(userId, weekNumber) {
         try {
-            const pickPath = `artifacts/nerdfootball/pools/${this.poolId}/picks/survivor/${userId}/week${weekNumber}`;
+            const pickPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
             const pickDoc = await getDoc(doc(this.db, pickPath));
 
             if (pickDoc.exists()) {
                 const pickData = pickDoc.data();
-                return {
-                    team: pickData.team || null,
-                    confidence: pickData.confidence || 0,
-                    timestamp: pickData.timestamp,
-                    exists: true
-                };
+                const weekPick = pickData.picks && pickData.picks[weekNumber];
+
+                if (weekPick) {
+                    return {
+                        team: weekPick.team || null,
+                        confidence: weekPick.confidence || 0,
+                        timestamp: weekPick.timestamp,
+                        exists: true
+                    };
+                }
             }
 
             return { team: null, exists: false };
