@@ -42,10 +42,10 @@ class WeekManager {
 
     // Main week detection with multiple data sources
     async detectCurrentWeek() {
-        // TEMPORARY FIX: Force Week 1 until data sources align
-        // User picks are in Week 1 (game IDs 101, 103, 111) so we need Week 1
-        console.log('🏈 WeekManager: TEMPORARY - Forcing Week 1 for user pick alignment');
-        return 1;
+        // UPDATED: Week 2 is now current (Week 1 completed and eliminations processed)
+        // Survivor eliminations from Week 1 determine who is DEAD OR ALIVE
+        console.log('🏈 WeekManager: Current NFL Week 2 - Week 1 eliminations processed');
+        return 2;
     }
 
     // Detect week from live/in-progress games

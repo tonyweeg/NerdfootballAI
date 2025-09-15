@@ -675,10 +675,10 @@ class SimpleSurvivorSystem {
             };
 
             const statusText = {
-                'won': 'Won',
-                'lost': 'Lost',
-                'not_started': 'Not Started', 
-                'eliminated': 'Eliminated',
+                'won': 'ALIVE',
+                'lost': 'DEAD',
+                'not_started': 'ALIVE',
+                'eliminated': 'DEAD',
                 'error': 'Error'
             };
 
@@ -936,7 +936,7 @@ class SurvivorCacheManager {
                         } else {
                             status = 'eliminated';
                             eliminatedWeek = week;
-                            eliminationReason = `Lost to ${gameResult.winner}`;
+                            eliminationReason = `DEAD Week ${week} by ${gameResult.winner}`;
                         }
                     }
                 }
@@ -1306,10 +1306,10 @@ class OptimizedSurvivorLoader {
             };
 
             const statusText = {
-                'won': 'Won',
-                'lost': 'Lost',
-                'not_started': 'Not Started',
-                'eliminated': 'Eliminated',
+                'won': 'ALIVE',
+                'lost': 'DEAD',
+                'not_started': 'ALIVE',
+                'eliminated': 'DEAD',
                 'error': 'Error'
             };
 
@@ -2194,13 +2194,13 @@ class ESPNSurvivorIntegration {
                     if (normalizedWinner === normalizedUserTeam) {
                         processedUser.status = 'survived';
                         processedUser.eliminated = false;
-                        processedUser.gameStatus = 'Won';
+                        processedUser.gameStatus = 'ALIVE';
                     } else {
                         processedUser.status = 'eliminated';
                         processedUser.eliminated = true;
                         processedUser.eliminatedWeek = week;
-                        processedUser.eliminationReason = `Lost to ${gameResult.winner}`;
-                        processedUser.gameStatus = 'Lost';
+                        processedUser.eliminationReason = `DEAD Week ${week} by ${gameResult.winner}`;
+                        processedUser.gameStatus = 'DEAD';
                     }
                 }
             }

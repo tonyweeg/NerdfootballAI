@@ -1,10 +1,10 @@
 // SIMPLE SURVIVOR SYSTEM - Fast & Reliable
-// Shows: User | Team Picked | Status (Won/Lost/Not Started)
+// Shows: User | Team Picked | Status (ALIVE/DEAD)
 
 class SimpleSurvivorSystem {
     constructor(db) {
         this.db = db;
-        this.currentWeek = 1;
+        this.currentWeek = window.currentWeek || 1;
         
         // 💎 LIGHTNING FAST ELIMINATION LOOKUP - No API calls needed!
         // Based on actual elimination data from console logs
@@ -58,6 +58,7 @@ class SimpleSurvivorSystem {
 
     // ⚡ LIGHTNING FAST elimination status calculation - 90x performance improvement
     async calculateUserStatus(uid, member) {
+        console.log(`🔍 Calculating status for ${member.displayName || member.email} (${uid})`);
         try {
             // 💎 INSTANT ELIMINATION LOOKUP - No API calls!
             const eliminationData = this.ELIMINATED_USERS[uid];
@@ -101,16 +102,55 @@ class SimpleSurvivorSystem {
                 };
             }
 
-            // ⚡ ZERO API CALLS - All active users show as "not_started" until manually added to elimination list
-            // This gives instant <100ms performance with zero ESPN API calls
+            // Check if their pick lost using our game data (same logic we just fixed)
             let status = 'not_started';
             let reason = `Picked ${currentWeekPick.team} - Game pending`;
+
+            try {
+                // Use our stored game winners/losers data
+                const gamesDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${this.currentWeek}`));
+
+                if (gamesDoc.exists()) {
+                    const weekGames = gamesDoc.data();
+
+                    // Look through all games to find where user's team played
+                    for (const [gameKey, gameData] of Object.entries(weekGames)) {
+                        if (gameData.home_team === currentWeekPick.team || gameData.away_team === currentWeekPick.team) {
+                            // Found the user's game
+                            if (gameData.winner) {
+                                if (gameData.winner === currentWeekPick.team) {
+                                    status = 'won';
+                                    reason = `${currentWeekPick.team} won`;
+                                } else {
+                                    // This user is DEAD
+                                    return {
+                                        uid,
+                                        displayName: member.displayName || member.email,
+                                        teamPicked: currentWeekPick.team,
+                                        status: 'eliminated',
+                                        reason: `DEAD Week ${this.currentWeek} by ${gameData.winner}`,
+                                        week: this.currentWeek,
+                                        eliminationWeek: this.currentWeek,
+                                        eliminationDetails: `${currentWeekPick.team} lost to ${gameData.winner}`,
+                                        eliminationTeam: gameData.winner,
+                                        weeksActive: this.currentWeek - 1,
+                                        cached: false
+                                    };
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn(`Could not check game result for ${currentWeekPick.team}:`, error);
+            }
             
             // 💎 ADMIN WORKFLOW: When games finish, run:
             // simpleSurvivorSystem.addEliminatedUser(uid, week, team, "Team lost to Opponent")
             // for any users whose teams lost
 
-            return {
+            const result = {
                 uid,
                 displayName: member.displayName || member.email,
                 teamPicked: currentWeekPick.team,
@@ -123,6 +163,9 @@ class SimpleSurvivorSystem {
                 weeksActive: this.currentWeek, // Survived all weeks so far
                 cached: false
             };
+
+            console.log(`📊 Status result for ${member.displayName}:`, result);
+            return result;
 
         } catch (error) {
             return {
@@ -272,10 +315,10 @@ class SimpleSurvivorSystem {
             };
 
             const statusText = {
-                'won': 'Won',
-                'lost': 'Lost',
-                'not_started': 'Not Started', 
-                'eliminated': 'Eliminated',
+                'won': 'ALIVE',
+                'lost': 'DEAD',
+                'not_started': 'ALIVE',
+                'eliminated': 'DEAD',
                 'error': 'Error'
             };
 
@@ -290,7 +333,9 @@ class SimpleSurvivorSystem {
                     <td class="px-4 py-3">${user.teamPicked}</td>
                     <td class="px-4 py-3">
                         <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusClass[user.status] || 'text-gray-700 bg-gray-100'}">
-                            ${statusText[user.status] || user.status}
+                            ${(user.status === 'eliminated' || user.status === 'lost') ?
+                                (user.eliminationWeek ? `DEAD Week ${user.eliminationWeek}` : 'DEAD') :
+                                (statusText[user.status] || user.status)}
                         </span>
                         ${user.cached ? '<span class="text-xs text-gray-400 ml-2">(cached)</span>' : ''}
                     </td>

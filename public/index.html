@@ -30,6 +30,7 @@
  <meta http-equiv="Expires" content="0">
  <meta name="version" content="3.0">
  
+ <!-- CDN for rapid development - TODO: Replace with PostCSS build in production -->
  <script src="https://cdn.tailwindcss.com/3.4.0"></script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -47,6 +48,7 @@
  <script src="./emergencyCacheRefresh.js"></script>
  <script src="./core-bundle.js"></script>
  <script src="./survivor-bundle.js"></script>
+ <script src="./bulletproofSurvivorChecker.js"></script>
  <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
  <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
@@ -5481,9 +5483,38 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
 let survivorSortField = 'role'; // Start by sorting by role (admins first)
 let survivorSortDirection = 'desc'; // desc = admins first, asc = regular users first
 
+// Helper function to get the team that eliminated a user
+async function getEliminatingTeam(week, pickedTeam) {
+    try {
+        if (!window.espnNerdApi) return null;
+        await window.espnNerdApi.ensureReady();
+        const weekGames = await window.espnNerdApi.getWeekGames(week);
+
+        if (!weekGames?.games) return null;
+
+        // Find the game where the picked team played
+        const userGame = weekGames.games.find(game => {
+            const competitors = game.competitions?.[0]?.competitors || [];
+            return competitors.some(comp => comp.team?.displayName === pickedTeam);
+        });
+
+        if (!userGame || !userGame.competitions?.[0]?.status?.type?.completed) return null;
+
+        // Find the winner
+        const competitors = userGame.competitions[0].competitors;
+        const winner = competitors.find(c => c.winner)?.team?.displayName;
+
+        // Return the winner if it's not the picked team (i.e., the eliminating team)
+        return (winner && winner !== pickedTeam) ? winner : null;
+    } catch (error) {
+        console.warn(`Could not get eliminating team for week ${week}, team ${pickedTeam}:`, error);
+        return null;
+    }
+}
+
 async function renderSurvivorStatus(weekNumber) {
     allUI.survivorStatusBody.innerHTML = `<tr><td colspan="5" class="text-center py-4"><div class="loader"></div></td></tr>`;
-    
+
     const statusDocRef = doc(db, survivorStatusPath());
     const statusSnap = await getDoc(statusDocRef);
     const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
@@ -5496,12 +5527,33 @@ async function renderSurvivorStatus(weekNumber) {
     });
 
     // Create enhanced user objects with role and additional data for sorting
-    const enhancedUsers = allUsers.map(user => {
+    const enhancedUsers = await Promise.all(allUsers.map(async user => {
         const userStatus = allStatuses[user.id] || { eliminated: false };
         const userPicks = allPicks[user.id];
         const hasPick = userPicks && userPicks.picks && userPicks.picks[weekNumber] && userPicks.picks[weekNumber].team;
         const thisWeekPickStatus = hasPick ? 'Pick Made' : 'No Pick';
-        
+
+        // Survivor status display - DEAD with week and eliminating team
+        let status = 'ALIVE';
+        if (userStatus.eliminated) {
+            if (userStatus.eliminatedWeek && userPicks?.picks) {
+                const eliminationWeekPick = userPicks.picks[userStatus.eliminatedWeek];
+                if (eliminationWeekPick?.team) {
+                    // Get the eliminating team by looking up the game result
+                    const eliminatingTeam = await getEliminatingTeam(userStatus.eliminatedWeek, eliminationWeekPick.team);
+                    if (eliminatingTeam) {
+                        status = `DEAD Week ${userStatus.eliminatedWeek} by ${eliminatingTeam}`;
+                    } else {
+                        status = `DEAD Week ${userStatus.eliminatedWeek} (picked ${eliminationWeekPick.team})`;
+                    }
+                } else {
+                    status = `DEAD Week ${userStatus.eliminatedWeek}`;
+                }
+            } else {
+                status = 'DEAD';
+            }
+        }
+
         return {
             ...user,
             role: ADMIN_UIDS.includes(user.id) ? 'admin' : 'user',
@@ -5509,9 +5561,9 @@ async function renderSurvivorStatus(weekNumber) {
             eliminatedWeek: userStatus.eliminatedWeek,
             thisWeekPick: thisWeekPickStatus,
             currentWeekPick: hasPick ? userPicks.picks[weekNumber].team : '',
-            status: userStatus.eliminated ? `Eliminated (Week ${userStatus.eliminatedWeek})` : 'Active'
+            status
         };
-    });
+    }));
 
     // Sort users based on current sort field and direction
     enhancedUsers.sort((a, b) => {
@@ -14060,16 +14112,38 @@ const SurvivorView = {
             let loadResult = null;
             
             
-            if (window.simpleSurvivorSystem) {
-                console.log('💎 Using simple survivor system (PROVEN WORKING)');
+            if (window.bulletproofSurvivorChecker) {
+                console.log('💎 Using BULLETPROOF DEAD OR ALIVE checker (ESPN-based)');
+                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
+                const results = await window.bulletproofSurvivorChecker.getSurvivorTable(currentPool);
+
+                // Calculate stats
+                const total = results.length;
+                const eliminated = results.filter(r => r.status === 'eliminated').length;
+                const alive = results.filter(r => r.status === 'alive').length;
+                const errors = results.filter(r => r.status === 'error').length;
+
+                loadResult = {
+                    results,
+                    stats: {
+                        totalPlayers: total,
+                        activePlayers: alive,
+                        eliminatedPlayers: eliminated,
+                        pendingPlayers: errors
+                    },
+                    loadTime: performance.now() - loadStartTime,
+                    source: 'bulletproof-espn'
+                };
+            } else if (window.simpleSurvivorSystem) {
+                console.log('💎 Fallback to simple survivor system');
                 const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
                 const results = await window.simpleSurvivorSystem.getSurvivorTable(currentPool);
-                
+
                 // Simple stats calculation
                 const total = results.length;
                 const eliminated = results.filter(r => r.status === 'lost' || r.status === 'eliminated').length;
                 const alive = total - eliminated;
-                
+
                 loadResult = {
                     results,
                     stats: {
