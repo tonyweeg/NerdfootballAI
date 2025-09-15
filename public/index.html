@@ -48,7 +48,7 @@
  <script src="./emergencyCacheRefresh.js"></script>
  <script src="./core-bundle.js"></script>
  <script src="./survivor-bundle.js"></script>
- <script src="./bulletproofSurvivorChecker.js"></script>
+ <script src="./internalSurvivorEngine.js"></script>
  <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
  <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
@@ -6778,7 +6778,22 @@ function downloadAnalyticsCSV(data, weekNumber) {
  }
 
  // PHAROAH FIX: Signal that Firebase globals are ready for bundle system
- window.firebaseReady = true;
+ // Initialize ESPN Cache Manager for game results
+if (typeof initializeESPNCache === 'function' && window.db) {
+    initializeESPNCache().then(() => {
+        console.log('⚡ ESPN Cache Manager initialized for survivor game results');
+    }).catch(error => {
+        console.warn('ESPN Cache Manager initialization failed:', error);
+    });
+}
+
+// Initialize Internal Survivor Engine
+if (window.initInternalSurvivorEngine && window.db) {
+    window.internalSurvivorEngine = window.initInternalSurvivorEngine(window.db);
+    console.log('💎 Internal Survivor Engine initialized with Firestore');
+}
+
+window.firebaseReady = true;
  console.log('🔥 Firebase globals ready, dispatching event for bundle system');
 
  // Dispatch event for bundle dependency gate
@@ -14112,8 +14127,36 @@ const SurvivorView = {
             let loadResult = null;
             
             
-            if (window.bulletproofSurvivorChecker) {
-                console.log('💎 Using BULLETPROOF DEAD OR ALIVE checker (ESPN-based)');
+            if (window.internalSurvivorEngine) {
+                console.log('💎 Using INTERNAL SURVIVOR ENGINE (Pure Firestore)');
+                const engine = window.internalSurvivorEngine;
+                const summary = await engine.getSurvivorSummary();
+
+                // Convert to expected format
+                const results = summary.players.map(player => ({
+                    userId: player.userId,
+                    displayName: player.displayName,
+                    email: player.email,
+                    status: player.status.toLowerCase(), // DEAD -> dead, ALIVE -> alive
+                    reason: player.reason,
+                    isEliminated: !player.isAlive,
+                    eliminatedWeek: player.eliminatedWeek,
+                    eliminationType: player.eliminationType
+                }));
+
+                loadResult = {
+                    results,
+                    stats: {
+                        totalPlayers: summary.totalPlayers,
+                        activePlayers: summary.alive,
+                        eliminatedPlayers: summary.dead,
+                        pendingPlayers: 0
+                    },
+                    loadTime: performance.now() - loadStartTime,
+                    source: 'internal-engine'
+                };
+            } else if (window.bulletproofSurvivorChecker) {
+                console.log('💎 Fallback to bulletproof checker');
                 const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
                 const results = await window.bulletproofSurvivorChecker.getSurvivorTable(currentPool);
 

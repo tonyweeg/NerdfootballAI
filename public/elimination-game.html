@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🏈 Elimination Game - Debug Logic</title>
+    <style>
+        body { font-family: monospace; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; }
+        .winner { color: green; font-weight: bold; }
+        .loser { color: red; font-weight: bold; }
+        .eliminated { background: #ffcccc; padding: 5px; }
+        .alive { background: #ccffcc; padding: 5px; }
+    </style>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCBl-yUpfPJNM-H6rUuCk0oI7R3Pf5R6a4",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.firebasestorage.app",
+            messagingSenderId: "412879972468",
+            appId: "1:412879972468:web:f20be37d2bb6a5e6f8c7e1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Sign in anonymously to access Firestore
+        try {
+            await signInAnonymously(auth);
+            console.log('🔓 Authenticated successfully');
+        } catch (error) {
+            console.error('❌ Authentication failed:', error);
+        }
+
+        window.db = db;
+        window.getDoc = getDoc;
+        window.doc = doc;
+    </script>
+</head>
+<body>
+    <h1>🏈 ELIMINATION GAME - Show Me The Logic Errors!</h1>
+
+    <div id="week1-results" class="section">
+        <h2>📊 Week 1 Game Results</h2>
+        <div id="week1-games">Loading...</div>
+        <div id="week1-losers"></div>
+    </div>
+
+    <div id="week2-results" class="section">
+        <h2>📊 Week 2 Game Results</h2>
+        <div id="week2-games">Loading...</div>
+        <div id="week2-losers"></div>
+    </div>
+
+    <div id="user-picks" class="section">
+        <h2>👥 User Picks and Eliminations</h2>
+        <div id="user-analysis">Loading...</div>
+    </div>
+
+    <div id="target-user" class="section">
+        <h2>🎯 Target User: BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2</h2>
+        <div id="target-analysis">Loading...</div>
+    </div>
+
+    <script>
+        async function showEliminationGame() {
+            console.log('🏈 Starting elimination game analysis...');
+
+            try {
+                // Get Week 1 results
+                const week1Doc = await window.getDoc(window.doc(window.db, 'artifacts/nerdfootball/public/data/nerdfootball_games/1'));
+                const week1Losers = [];
+
+                if (week1Doc.exists()) {
+                    const week1Games = week1Doc.data();
+                    let week1Html = `<p><strong>Found ${Object.keys(week1Games).length} Week 1 games:</strong></p>`;
+
+                    Object.entries(week1Games).forEach(([gameId, game]) => {
+                        if (game.winner) {
+                            const loser = game.winner === game.home_team ? game.away_team : game.home_team;
+                            week1Losers.push(loser);
+                            week1Html += `<div>⚡ <span class="winner">${game.winner}</span> beat <span class="loser">${loser}</span></div>`;
+                        } else {
+                            week1Html += `<div>⏳ ${game.home_team} vs ${game.away_team} - No winner yet</div>`;
+                        }
+                    });
+
+                    week1Html += `<p><strong>💀 Week 1 Losing Teams (${week1Losers.length}):</strong></p>`;
+                    week1Losers.forEach(team => {
+                        week1Html += `<div class="loser">- ${team}</div>`;
+                    });
+
+                    document.getElementById('week1-games').innerHTML = week1Html;
+                    document.getElementById('week1-losers').innerHTML = `<strong>Total Week 1 eliminations possible: ${week1Losers.length} teams lost</strong>`;
+                } else {
+                    document.getElementById('week1-games').innerHTML = '❌ No Week 1 data found';
+                }
+
+                // Get Week 2 results
+                const week2Doc = await window.getDoc(window.doc(window.db, 'artifacts/nerdfootball/public/data/nerdfootball_games/2'));
+                const week2Losers = [];
+
+                if (week2Doc.exists()) {
+                    const week2Games = week2Doc.data();
+                    let week2Html = `<p><strong>Found ${Object.keys(week2Games).length} Week 2 games:</strong></p>`;
+
+                    Object.entries(week2Games).forEach(([gameId, game]) => {
+                        if (game.winner) {
+                            const loser = game.winner === game.home_team ? game.away_team : game.home_team;
+                            week2Losers.push(loser);
+                            week2Html += `<div>⚡ <span class="winner">${game.winner}</span> beat <span class="loser">${loser}</span></div>`;
+                        } else {
+                            week2Html += `<div>⏳ ${game.home_team} vs ${game.away_team} - No winner yet</div>`;
+                        }
+                    });
+
+                    week2Html += `<p><strong>💀 Week 2 Losing Teams (${week2Losers.length}):</strong></p>`;
+                    week2Losers.forEach(team => {
+                        week2Html += `<div class="loser">- ${team}</div>`;
+                    });
+
+                    document.getElementById('week2-games').innerHTML = week2Html;
+                    document.getElementById('week2-losers').innerHTML = `<strong>Total Week 2 eliminations possible: ${week2Losers.length} teams lost</strong>`;
+                } else {
+                    document.getElementById('week2-games').innerHTML = '❌ No Week 2 data found';
+                }
+
+                // Get pool members and check picks
+                const poolDoc = await window.getDoc(window.doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+
+                if (poolDoc.exists()) {
+                    const poolMembers = poolDoc.data();
+                    let userHtml = `<p><strong>Found ${Object.keys(poolMembers).length} pool members</strong></p>`;
+
+                    // Check first 10 users
+                    const userIds = Object.keys(poolMembers).slice(0, 10);
+                    let totalEliminated = 0;
+                    let totalAlive = 0;
+
+                    for (const uid of userIds) {
+                        const member = poolMembers[uid];
+                        const displayName = member.displayName || member.email;
+
+                        try {
+                            const picksDoc = await window.getDoc(window.doc(window.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`));
+
+                            if (picksDoc.exists()) {
+                                const picks = picksDoc.data().picks || {};
+                                const week1Pick = picks[1]?.team;
+                                const week2Pick = picks[2]?.team;
+
+                                let status = '';
+                                let statusClass = '';
+
+                                if (!week1Pick) {
+                                    status = '💀 ELIMINATED - No Week 1 pick';
+                                    statusClass = 'eliminated';
+                                    totalEliminated++;
+                                } else if (week1Losers.includes(week1Pick)) {
+                                    status = `💀 ELIMINATED Week 1 - ${week1Pick} lost`;
+                                    statusClass = 'eliminated';
+                                    totalEliminated++;
+                                } else if (week2Pick && week2Losers.includes(week2Pick)) {
+                                    status = `💀 ELIMINATED Week 2 - ${week2Pick} lost`;
+                                    statusClass = 'eliminated';
+                                    totalEliminated++;
+                                } else {
+                                    status = '✅ ALIVE';
+                                    statusClass = 'alive';
+                                    totalAlive++;
+                                }
+
+                                userHtml += `
+                                    <div class="${statusClass}" style="margin: 5px 0; padding: 5px;">
+                                        <strong>${displayName}</strong><br>
+                                        Week 1: ${week1Pick || 'NO PICK'}<br>
+                                        Week 2: ${week2Pick || 'NO PICK'}<br>
+                                        Status: ${status}
+                                    </div>
+                                `;
+                            } else {
+                                userHtml += `
+                                    <div class="eliminated" style="margin: 5px 0; padding: 5px;">
+                                        <strong>${displayName}</strong><br>
+                                        ❌ No picks found - ELIMINATED
+                                    </div>
+                                `;
+                                totalEliminated++;
+                            }
+                        } catch (error) {
+                            userHtml += `
+                                <div style="margin: 5px 0; padding: 5px; background: #ffeecc;">
+                                    <strong>${displayName}</strong><br>
+                                    ❌ Error getting picks: ${error.message}
+                                </div>
+                            `;
+                        }
+                    }
+
+                    userHtml += `<p><strong>SAMPLE RESULTS: ${totalEliminated} eliminated, ${totalAlive} alive (from first 10 users)</strong></p>`;
+                    document.getElementById('user-analysis').innerHTML = userHtml;
+
+                    // Check target user
+                    const targetUser = 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2';
+                    if (poolMembers[targetUser]) {
+                        const targetMember = poolMembers[targetUser];
+                        let targetHtml = `<p><strong>${targetMember.displayName || targetMember.email}</strong></p>`;
+
+                        try {
+                            const picksDoc = await window.getDoc(window.doc(window.db, `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${targetUser}`));
+
+                            if (picksDoc.exists()) {
+                                const picks = picksDoc.data().picks || {};
+                                const week1Pick = picks[1]?.team;
+                                const week2Pick = picks[2]?.team;
+
+                                targetHtml += `<p>Week 1 pick: <strong>${week1Pick || 'NO PICK'}</strong></p>`;
+                                targetHtml += `<p>Week 2 pick: <strong>${week2Pick || 'NO PICK'}</strong></p>`;
+
+                                if (!week1Pick) {
+                                    targetHtml += `<div class="eliminated">💀 TARGET USER ELIMINATED - No Week 1 pick</div>`;
+                                } else if (week1Losers.includes(week1Pick)) {
+                                    targetHtml += `<div class="eliminated">💀 TARGET USER ELIMINATED Week 1 - ${week1Pick} lost!</div>`;
+                                } else if (week2Pick && week2Losers.includes(week2Pick)) {
+                                    targetHtml += `<div class="eliminated">💀 TARGET USER ELIMINATED Week 2 - ${week2Pick} lost!</div>`;
+                                } else {
+                                    targetHtml += `<div class="alive">✅ TARGET USER ALIVE</div>`;
+                                }
+                            } else {
+                                targetHtml += `<div class="eliminated">❌ No picks found - TARGET USER ELIMINATED</div>`;
+                            }
+                        } catch (error) {
+                            targetHtml += `<p>❌ Error getting target user picks: ${error.message}</p>`;
+                        }
+
+                        document.getElementById('target-analysis').innerHTML = targetHtml;
+                    } else {
+                        document.getElementById('target-analysis').innerHTML = '❌ Target user not found in pool';
+                    }
+
+                } else {
+                    document.getElementById('user-analysis').innerHTML = '❌ No pool members found';
+                }
+
+            } catch (error) {
+                console.error('❌ Error:', error);
+                document.body.innerHTML += `<div class="section"><h2>❌ Error</h2><p>${error.message}</p></div>`;
+            }
+        }
+
+        // Start analysis when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(showEliminationGame, 1000);
+        });
+    </script>
+</body>
+</html>

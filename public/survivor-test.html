@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Survivor System Speed Test</title>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCBl-yUpfPJNM-H6rUuCk0oI7R3Pf5R6a4",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.firebasestorage.app",
+            messagingSenderId: "412879972468",
+            appId: "1:412879972468:web:f20be37d2bb6a5e6f8c7e1"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Sign in anonymously to access Firestore
+        try {
+            await signInAnonymously(auth);
+            console.log('🔓 Authenticated successfully');
+        } catch (error) {
+            console.error('❌ Authentication failed:', error);
+        }
+
+        // Make globals available
+        window.db = db;
+        window.getDoc = getDoc;
+        window.doc = doc;
+
+        // Also make them globally available without window prefix
+        globalThis.getDoc = getDoc;
+        globalThis.doc = doc;
+
+        console.log('🚀 Firebase initialized for SURVIVOR TEST');
+    </script>
+    <script src="./simpleSurvivor.js"></script>
+</head>
+<body>
+    <h1>🏈 Survivor System Speed Test</h1>
+    <div id="results"></div>
+    <div id="timing"></div>
+
+    <script>
+        async function testSurvivorSpeed() {
+            const startTime = Date.now();
+            console.log('🚀 Testing PURE SURVIVOR system speed...');
+
+            try {
+                // Wait for simpleSurvivorSystem to be available
+                while (!window.simpleSurvivorSystem) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                console.log('⚡ SimpleSurvivorSystem loaded!');
+
+                const poolId = 'nerduniverse-2025';
+                console.log(`🔍 Fetching pool data for: ${poolId}`);
+
+                // Debug: Check if pool exists
+                try {
+                    const poolDoc = await window.getDoc(window.doc(window.db, `artifacts/nerdfootball/pools/${poolId}/metadata/members`));
+                    console.log(`📊 Pool document exists: ${poolDoc.exists()}`);
+                    if (poolDoc.exists()) {
+                        const poolData = poolDoc.data();
+                        console.log(`👥 Pool members found: ${Object.keys(poolData).length}`);
+                        console.log('📋 First few members:', Object.keys(poolData).slice(0, 3));
+                    } else {
+                        console.error('❌ Pool document does not exist!');
+                    }
+                } catch (error) {
+                    console.error('❌ Error checking pool:', error);
+                }
+
+                const results = await window.simpleSurvivorSystem.getSurvivorTable(poolId);
+
+                const totalTime = Date.now() - startTime;
+
+                console.log(`🏁 SURVIVOR TEST COMPLETE: ${totalTime}ms`);
+                console.log(`📊 Results: ${results.length} users`);
+
+                const eliminated = results.filter(r => r.status === 'eliminated').length;
+                const alive = results.filter(r => r.status === 'alive').length;
+
+                document.getElementById('results').innerHTML = `
+                    <h2>✅ SUCCESS!</h2>
+                    <p><strong>Total Time:</strong> ${totalTime}ms</p>
+                    <p><strong>Total Users:</strong> ${results.length}</p>
+                    <p><strong>Eliminated:</strong> ${eliminated}</p>
+                    <p><strong>Alive:</strong> ${alive}</p>
+                `;
+
+                // Check for specific user
+                const targetUser = results.find(r => r.uid === 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2');
+                if (targetUser) {
+                    console.log(`🎯 User BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2: ${targetUser.status} - ${targetUser.reason}`);
+                    document.getElementById('timing').innerHTML = `
+                        <h3>🎯 Target User Status:</h3>
+                        <p><strong>BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2:</strong> ${targetUser.status.toUpperCase()}</p>
+                        <p><strong>Reason:</strong> ${targetUser.reason}</p>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('❌ Test failed:', error);
+                document.getElementById('results').innerHTML = `<h2>❌ Error: ${error.message}</h2>`;
+            }
+        }
+
+        // Start test when page loads
+        document.addEventListener('DOMContentLoaded', testSurvivorSpeed);
+    </script>
+</body>
+</html>
