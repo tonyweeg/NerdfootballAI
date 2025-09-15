@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Internal Survivor System</title>
+</head>
+<body>
+    <h1>Testing Internal-Only Survivor System</h1>
+    <div id="test-results"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKPYCQ4a-FJtNNGEHZhq10VlH8f_xd8QY",
+            authDomain: "nerdfootball.firebaseapp.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "506935665572",
+            appId: "1:506935665572:web:7ef4df8e3f1b8c1d8f2b9a",
+            measurementId: "G-7GNBXL0WXT"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Make Firebase functions available globally for survivor system
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+
+        async function testInternalSurvivor() {
+            const resultsDiv = document.getElementById('test-results');
+
+            try {
+                resultsDiv.innerHTML = '<p>🔍 Testing internal survivor system...</p>';
+
+                // Test internal game data access
+                const week1Doc = await getDoc(doc(db, 'artifacts/nerdfootball/public/data/nerdfootball_games/1'));
+
+                if (week1Doc.exists()) {
+                    const week1Data = week1Doc.data();
+                    resultsDiv.innerHTML += `<p>✅ Week 1 internal data loaded: ${Object.keys(week1Data).length} games</p>`;
+
+                    // Show first game as example
+                    const firstGame = Object.values(week1Data)[0];
+                    if (firstGame) {
+                        resultsDiv.innerHTML += `<p>📊 Example game: ${firstGame.away_team} @ ${firstGame.home_team}</p>`;
+                        if (firstGame.winner) {
+                            resultsDiv.innerHTML += `<p>🏆 Winner: ${firstGame.winner}</p>`;
+                        }
+                    }
+                } else {
+                    resultsDiv.innerHTML += '<p>❌ No Week 1 internal data found</p>';
+                }
+
+                // Test survivor system initialization
+                const survivorSystem = new SurvivorSystem(db);
+                resultsDiv.innerHTML += '<p>✅ SurvivorSystem initialized successfully</p>';
+
+                // Test pool member loading
+                const statuses = await survivorSystem.getAllSurvivorStatuses();
+                resultsDiv.innerHTML += `<p>✅ Pool members loaded: ${statuses.length} users</p>`;
+
+                // Display results
+                statuses.forEach(status => {
+                    const statusIcon = status.status === 'ALIVE' ? '✅' : '💀';
+                    resultsDiv.innerHTML += `<p>${statusIcon} ${status.displayName}: ${status.teamPicked} - ${status.status}</p>`;
+                });
+
+                resultsDiv.innerHTML += '<p>🎉 Internal survivor system test complete!</p>';
+
+            } catch (error) {
+                resultsDiv.innerHTML += `<p>❌ Error: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+        }
+
+        // Load survivor system and run test
+        window.onload = function() {
+            const script = document.createElement('script');
+            script.src = './survivor-bundle.js';
+            script.onload = testInternalSurvivor;
+            document.head.appendChild(script);
+        };
+    </script>
+</body>
+</html>

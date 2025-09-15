@@ -39,17 +39,21 @@ class InternalSurvivorEngine {
     // Get user's pick for specific week
     async getUserPick(userId, weekNumber) {
         try {
-            const pickPath = `artifacts/nerdfootball/pools/${this.poolId}/picks/survivor/${userId}/week${weekNumber}`;
+            const pickPath = `artifacts/nerdfootball/pools/${this.poolId}/data/nerdSurvivor_picks/${userId}`;
             const pickDoc = await getDoc(doc(this.db, pickPath));
 
             if (pickDoc.exists()) {
                 const pickData = pickDoc.data();
-                return {
-                    team: pickData.team || null,
-                    confidence: pickData.confidence || 0,
-                    timestamp: pickData.timestamp,
-                    exists: true
-                };
+                const weekPick = pickData.picks && pickData.picks[weekNumber];
+
+                if (weekPick) {
+                    return {
+                        team: weekPick.team || null,
+                        confidence: weekPick.confidence || 0,
+                        timestamp: weekPick.timestamp,
+                        exists: true
+                    };
+                }
             }
 
             return { team: null, exists: false };
@@ -129,57 +133,55 @@ class InternalSurvivorEngine {
         };
     }
 
-    // Get game result for team in specific week
+    // Get game result for team in specific week - INTERNAL DATA ONLY
     async getGameResult(teamName, weekNumber) {
         try {
-            // DIAMOND FIX: Use ESPN Cache Manager for team results
-            if (window.espnCacheManager) {
-                const cacheResult = await window.espnCacheManager.getCachedTeamResult(teamName, weekNumber);
+            // Load internal game data from Firestore - NO ESPN CACHE
+            const gamesDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`));
 
-                if (cacheResult) {
-                    // Determine if team won or lost based on cache data
-                    const normalizedTeam = this.normalizeTeamName(teamName);
-                    const homeTeam = this.normalizeTeamName(cacheResult.homeTeam);
-                    const awayTeam = this.normalizeTeamName(cacheResult.awayTeam);
-                    const homeScore = parseInt(cacheResult.homeScore) || 0;
-                    const awayScore = parseInt(cacheResult.awayScore) || 0;
+            if (!gamesDoc.exists()) {
+                console.warn(`No internal game data found for Week ${weekNumber}`);
+                return null;
+            }
 
-                    // Only return result if game is final
-                    if (cacheResult.status !== 'FINAL') {
+            const weekGames = gamesDoc.data();
+
+            // Find the game where this team played
+            for (const [gameKey, gameData] of Object.entries(weekGames)) {
+                if (gameData.home_team === teamName || gameData.away_team === teamName) {
+                    // Found the team's game
+                    if (gameData.winner) {
+                        const teamResult = gameData.winner === teamName ? 'WIN' : 'LOSS';
+
+                        console.log(`📊 Internal Game Result: ${teamName} ${teamResult} (Week ${weekNumber})`);
+
+                        return {
+                            result: teamResult,
+                            homeTeam: gameData.home_team,
+                            awayTeam: gameData.away_team,
+                            homeScore: gameData.home_score || 0,
+                            awayScore: gameData.away_score || 0,
+                            winner: gameData.winner,
+                            status: 'FINAL'
+                        };
+                    } else {
+                        // Game not finished yet
+                        console.log(`⚠️ Game not finished yet: ${teamName} Week ${weekNumber}`);
                         return null;
                     }
-
-                    let teamResult = 'UNKNOWN';
-
-                    if (normalizedTeam === homeTeam) {
-                        teamResult = homeScore > awayScore ? 'WIN' : 'LOSS';
-                    } else if (normalizedTeam === awayTeam) {
-                        teamResult = awayScore > homeScore ? 'WIN' : 'LOSS';
-                    }
-
-                    console.log(`📊 ESPN Cache Result: ${teamName} ${teamResult} (Week ${weekNumber})`);
-
-                    return {
-                        result: teamResult,
-                        homeTeam: cacheResult.homeTeam,
-                        awayTeam: cacheResult.awayTeam,
-                        homeScore,
-                        awayScore,
-                        status: cacheResult.status
-                    };
                 }
             }
 
-            console.log(`⚠️ No ESPN cache result for ${teamName} Week ${weekNumber} - game may not be final`);
-            return null; // Game not found or not completed
+            console.warn(`No game found for team ${teamName} in Week ${weekNumber}`);
+            return null;
 
         } catch (error) {
-            console.error(`Error getting game result for ${teamName} week ${weekNumber}:`, error);
+            console.error(`Error getting internal game result for ${teamName} week ${weekNumber}:`, error);
             return null;
         }
     }
 
-    // Normalize team names to match ESPN cache system
+    // Normalize team names for consistent matching
     normalizeTeamName(teamName) {
         if (!teamName) return '';
 

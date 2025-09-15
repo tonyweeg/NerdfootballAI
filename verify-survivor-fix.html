@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Survivor Fix</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .log { margin: 5px 0; padding: 5px; background: #f0f0f0; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>Survivor Fix Verification</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        // Import Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js';
+
+        const results = document.getElementById('results');
+
+        function log(message, type = 'log') {
+            console.log(message);
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = new Date().toISOString() + ': ' + message;
+            results.appendChild(div);
+        }
+
+        async function verifyFix() {
+            try {
+                log('🔍 Starting survivor fix verification...', 'info');
+
+                // Initialize Firebase
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDHhTmOFJr-4QXdPyYVy6KUgtlp3nOy5s4",
+                    authDomain: "nerdfootball.firebaseapp.com",
+                    projectId: "nerdfootball",
+                    storageBucket: "nerdfootball.firebasestorage.app",
+                    messagingSenderId: "659059332973",
+                    appId: "1:659059332973:web:6c0f3d5c30f5b8c5dbb8fb",
+                    measurementId: "G-PGXJZMW2DP"
+                };
+
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+                window.db = db;
+
+                log('✅ Firebase initialized', 'success');
+
+                // Check if ESPN Cache Manager can be loaded
+                try {
+                    const response = await fetch('https://nerdfootball.web.app/espnCacheManager.js');
+                    if (response.ok) {
+                        log('✅ ESPN Cache Manager script accessible', 'success');
+
+                        // Load the script content and check if it defines the class
+                        const script = await response.text();
+                        if (script.includes('class ESPNCacheManager')) {
+                            log('✅ ESPN Cache Manager class definition found', 'success');
+                        } else {
+                            log('❌ ESPN Cache Manager class not found in script', 'error');
+                        }
+
+                        if (script.includes('initializeESPNCache')) {
+                            log('✅ initializeESPNCache function found', 'success');
+                        } else {
+                            log('❌ initializeESPNCache function not found', 'error');
+                        }
+
+                    } else {
+                        log('❌ Cannot access ESPN Cache Manager script', 'error');
+                    }
+                } catch (error) {
+                    log('❌ Error loading ESPN Cache Manager: ' + error.message, 'error');
+                }
+
+                // Check if Internal Survivor Engine can be loaded
+                try {
+                    const response = await fetch('https://nerdfootball.web.app/internalSurvivorEngine.js');
+                    if (response.ok) {
+                        log('✅ Internal Survivor Engine script accessible', 'success');
+
+                        const script = await response.text();
+                        if (script.includes('class InternalSurvivorEngine')) {
+                            log('✅ InternalSurvivorEngine class definition found', 'success');
+                        } else {
+                            log('❌ InternalSurvivorEngine class not found', 'error');
+                        }
+
+                        if (script.includes('window.espnCacheManager')) {
+                            log('✅ ESPN Cache Manager integration found', 'success');
+                        } else {
+                            log('❌ ESPN Cache Manager integration not found', 'error');
+                        }
+
+                        if (script.includes('getCachedTeamResult')) {
+                            log('✅ getCachedTeamResult usage found', 'success');
+                        } else {
+                            log('❌ getCachedTeamResult usage not found', 'error');
+                        }
+
+                    } else {
+                        log('❌ Cannot access Internal Survivor Engine script', 'error');
+                    }
+                } catch (error) {
+                    log('❌ Error loading Internal Survivor Engine: ' + error.message, 'error');
+                }
+
+                // Test survivorStatus fetch
+                try {
+                    const response = await fetch('https://nerdfootball.web.app/index.html?view=survivor');
+                    if (response.ok) {
+                        const html = await response.text();
+
+                        if (html.includes('initializeESPNCache()')) {
+                            log('✅ ESPN Cache initialization found in main page', 'success');
+                        } else {
+                            log('❌ ESPN Cache initialization missing from main page', 'error');
+                        }
+
+                        if (html.includes('window.internalSurvivorEngine')) {
+                            log('✅ Internal Survivor Engine initialization found', 'success');
+                        } else {
+                            log('❌ Internal Survivor Engine initialization missing', 'error');
+                        }
+
+                        if (html.includes('survivor-container')) {
+                            log('✅ Survivor container HTML structure present', 'success');
+                        } else {
+                            log('❌ Survivor container HTML structure missing', 'error');
+                        }
+
+                    } else {
+                        log('❌ Cannot access survivor page', 'error');
+                    }
+                } catch (error) {
+                    log('❌ Error accessing survivor page: ' + error.message, 'error');
+                }
+
+                log('🎯 Verification complete. Check logs above for any issues.', 'info');
+
+            } catch (error) {
+                log('❌ Critical error during verification: ' + error.message, 'error');
+            }
+        }
+
+        // Start verification
+        verifyFix();
+    </script>
+</body>
+</html>
