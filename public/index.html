@@ -5512,6 +5512,98 @@ async function getEliminatingTeam(week, pickedTeam) {
     }
 }
 
+// 💀 DEAD-MANS-TALE: Enhanced game details for elimination storytelling
+async function getGameDetails(week, teamName) {
+    try {
+        if (!window.espnNerdApi) return null;
+        await window.espnNerdApi.ensureReady();
+        const weekGames = await window.espnNerdApi.getWeekGames(week);
+
+        if (!weekGames?.games) return null;
+
+        // Find the game where the team played
+        const teamGame = weekGames.games.find(game => {
+            const competitors = game.competitions?.[0]?.competitors || [];
+            return competitors.some(comp => comp.team?.displayName === teamName);
+        });
+
+        if (!teamGame || !teamGame.competitions?.[0]?.status?.type?.completed) return null;
+
+        const competition = teamGame.competitions[0];
+        const competitors = competition.competitors;
+        const homeTeam = competitors.find(c => c.homeAway === 'home');
+        const awayTeam = competitors.find(c => c.homeAway === 'away');
+        const winner = competitors.find(c => c.winner);
+
+        return {
+            homeTeam: homeTeam?.team?.displayName,
+            awayTeam: awayTeam?.team?.displayName,
+            homeScore: homeTeam?.score || 0,
+            awayScore: awayTeam?.score || 0,
+            winner: winner?.team?.displayName,
+            pickedTeam: teamName,
+            opponent: competitors.find(c => c.team?.displayName !== teamName)?.team?.displayName
+        };
+    } catch (error) {
+        console.warn(`Could not get game details for week ${week}, team ${teamName}:`, error);
+        return null;
+    }
+}
+
+// 💀 DEAD-MANS-TALE: Generate detailed elimination stories
+async function generateDetailedEliminationStory(userStatus, memberData) {
+    const displayName = memberData?.displayName || userStatus.displayName || 'Player';
+
+    // Handle different elimination types
+    if (!userStatus.eliminatedWeek) {
+        return userStatus.status === 'eliminated' ? '💀 Eliminated' : '✅ Alive';
+    }
+
+    const week = userStatus.eliminatedWeek;
+
+    // Handle no pick elimination
+    if (userStatus.reason && userStatus.reason.includes('Failed to make pick')) {
+        return `💀 ${displayName} failed to make a pick in Week ${week}`;
+    }
+
+    // Handle duplicate team elimination
+    if (userStatus.reason && userStatus.reason.includes('multiple times')) {
+        const teamMatch = userStatus.reason.match(/Picked (\w+)/);
+        const team = teamMatch ? teamMatch[1] : 'same team';
+        return `💀 ${displayName} tried to pick ${team} again in Week ${week} (not allowed)`;
+    }
+
+    // Handle game loss elimination - get detailed story
+    if (userStatus.eliminationTeam || userStatus.teamPicked) {
+        const pickedTeam = userStatus.eliminationTeam || userStatus.teamPicked;
+
+        try {
+            const gameDetails = await getGameDetails(week, pickedTeam);
+
+            if (gameDetails && gameDetails.opponent) {
+                const score = `${gameDetails.homeScore}-${gameDetails.awayScore}`;
+                return `💀 ${displayName}'s ${pickedTeam} lost to ${gameDetails.opponent} ${score} in Week ${week}`;
+            }
+
+            // Fallback to eliminating team from existing function
+            const eliminatingTeam = await getEliminatingTeam(week, pickedTeam);
+            if (eliminatingTeam) {
+                return `💀 ${displayName}'s ${pickedTeam} lost to ${eliminatingTeam} in Week ${week}`;
+            }
+
+            // Basic fallback
+            return `💀 ${displayName}'s ${pickedTeam} lost in Week ${week}`;
+
+        } catch (error) {
+            console.warn('Error generating elimination story:', error);
+            return `💀 ${displayName} eliminated in Week ${week}`;
+        }
+    }
+
+    // Ultimate fallback
+    return `💀 ${displayName} eliminated in Week ${week}`;
+}
+
 async function renderSurvivorStatus(weekNumber) {
     allUI.survivorStatusBody.innerHTML = `<tr><td colspan="5" class="text-center py-4"><div class="loader"></div></td></tr>`;
 
@@ -5533,24 +5625,36 @@ async function renderSurvivorStatus(weekNumber) {
         const hasPick = userPicks && userPicks.picks && userPicks.picks[weekNumber] && userPicks.picks[weekNumber].team;
         const thisWeekPickStatus = hasPick ? 'Pick Made' : 'No Pick';
 
-        // Survivor status display - DEAD with week and eliminating team
-        let status = 'ALIVE';
+        // 💀 DEAD-MANS-TALE: Enhanced survivor status with detailed elimination stories
+        let status = '✅ ALIVE';
         if (userStatus.eliminated) {
-            if (userStatus.eliminatedWeek && userPicks?.picks) {
-                const eliminationWeekPick = userPicks.picks[userStatus.eliminatedWeek];
-                if (eliminationWeekPick?.team) {
-                    // Get the eliminating team by looking up the game result
-                    const eliminatingTeam = await getEliminatingTeam(userStatus.eliminatedWeek, eliminationWeekPick.team);
-                    if (eliminatingTeam) {
-                        status = `DEAD Week ${userStatus.eliminatedWeek} by ${eliminatingTeam}`;
+            // Use new detailed elimination storytelling
+            const enhancedUserStatus = {
+                ...userStatus,
+                eliminationTeam: userPicks?.picks?.[userStatus.eliminatedWeek]?.team,
+                teamPicked: userPicks?.picks?.[userStatus.eliminatedWeek]?.team
+            };
+
+            try {
+                status = await generateDetailedEliminationStory(enhancedUserStatus, user);
+            } catch (error) {
+                console.warn('Failed to generate detailed elimination story, using fallback:', error);
+                // Fallback to existing logic
+                if (userStatus.eliminatedWeek && userPicks?.picks) {
+                    const eliminationWeekPick = userPicks.picks[userStatus.eliminatedWeek];
+                    if (eliminationWeekPick?.team) {
+                        const eliminatingTeam = await getEliminatingTeam(userStatus.eliminatedWeek, eliminationWeekPick.team);
+                        if (eliminatingTeam) {
+                            status = `DEAD Week ${userStatus.eliminatedWeek} by ${eliminatingTeam}`;
+                        } else {
+                            status = `DEAD Week ${userStatus.eliminatedWeek} (picked ${eliminationWeekPick.team})`;
+                        }
                     } else {
-                        status = `DEAD Week ${userStatus.eliminatedWeek} (picked ${eliminationWeekPick.team})`;
+                        status = `DEAD Week ${userStatus.eliminatedWeek}`;
                     }
                 } else {
-                    status = `DEAD Week ${userStatus.eliminatedWeek}`;
+                    status = 'DEAD';
                 }
-            } else {
-                status = 'DEAD';
             }
         }
 
