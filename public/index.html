@@ -14121,12 +14121,28 @@ const SurvivorView = {
     loadSurvivorResults: async function() {
         this.showLoading();
         const loadStartTime = performance.now();
-        
+
         try {
+            // CRITICAL: Check authentication first
+            if (!window.auth || !window.auth.currentUser) {
+                console.log('⚠️ User not authenticated - showing auth required message');
+                this.showError('Please sign in to view survivor results');
+                return;
+            }
+
+            // Verify Firebase is ready
+            if (!window.db || !window.internalSurvivorEngine) {
+                console.log('⚠️ Firebase or survivor engine not ready');
+                this.showError('System not ready - please refresh the page');
+                return;
+            }
+
+            console.log('✅ Authentication verified, loading survivor data...');
+
             // DIAMOND PERFORMANCE: Use ESPN-integrated survivor data
             let loadResult = null;
-            
-            
+
+
             if (window.internalSurvivorEngine) {
                 console.log('💎 Using INTERNAL SURVIVOR ENGINE (Pure Firestore)');
                 const engine = window.internalSurvivorEngine;
@@ -14276,7 +14292,29 @@ const SurvivorView = {
 
         } catch (error) {
             console.error('❌ Survivor loading error:', error);
-            this.showError(`Failed to load survivor results: ${error.message}`);
+
+            // Provide specific error messages based on error type
+            let errorMessage = 'Failed to load survivor results';
+
+            if (error.message.includes('Pool members not found')) {
+                errorMessage = 'Pool data not found. Please check your access permissions or contact the administrator.';
+            } else if (error.message.includes('permission-denied') || error.message.includes('PERMISSION_DENIED')) {
+                errorMessage = 'Access denied. Please sign in and ensure you have permission to view survivor data.';
+            } else if (error.message.includes('offline') || error.message.includes('network')) {
+                errorMessage = 'Network error. Please check your internet connection and try again.';
+            } else if (error.message) {
+                errorMessage = `System error: ${error.message}`;
+            }
+
+            console.log('🔧 Detailed error context:', {
+                authUser: window.auth?.currentUser?.uid || 'Not authenticated',
+                dbReady: !!window.db,
+                engineReady: !!window.internalSurvivorEngine,
+                errorType: error.name,
+                errorMessage: error.message
+            });
+
+            this.showError(errorMessage);
         }
     },
     
