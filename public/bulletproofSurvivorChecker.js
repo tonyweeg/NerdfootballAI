@@ -2,6 +2,8 @@
 // Automatically determines elimination status from ESPN results
 // Replaces manual elimination tracking with real-time calculation
 
+console.log('🚨 BULLETPROOF SCRIPT LOADING: bulletproofSurvivorChecker.js started executing');
+
 class BulletproofSurvivorChecker {
     constructor(db) {
         this.db = db;
@@ -51,7 +53,14 @@ class BulletproofSurvivorChecker {
             const teamsUsed = new Set();
 
             // Check each COMPLETED week chronologically to find elimination point
+            // Since we're in Week 2, Week 1 is completed and should be checked for eliminations
+            const completedWeeks = [];
             for (let week = 1; week < this.currentWeek; week++) {
+                completedWeeks.push(week);
+            }
+            console.log(`📊 BULLETPROOF: Checking ${completedWeeks.length} completed weeks: ${completedWeeks.join(', ')}`);
+
+            for (const week of completedWeeks) {
                 const weekPick = allPicks[week];
 
                 // No pick for completed week = DEAD
@@ -71,17 +80,17 @@ class BulletproofSurvivorChecker {
                 // Check if their team WON or LOST that week (completed weeks only)
                 const teamResult = await this.getTeamResult(weekPick.team, week);
 
-                if (teamResult.status === 'lost') {
+                if (teamResult && teamResult.status === 'lost') {
                     console.log(`💀 ${member.displayName}: ELIMINATED - ${weekPick.team} lost in Week ${week}`);
                     return this.createDeadStatus(uid, member, week, weekPick.team, teamResult.reason);
-                } else if (teamResult.status === 'won') {
+                } else if (teamResult && teamResult.status === 'won') {
                     console.log(`✅ ${member.displayName}: Survived Week ${week} with ${weekPick.team}`);
                 } else {
                     console.log(`⚠️ ${member.displayName}: Week ${week} ${weekPick.team} result unclear - assuming survived`);
                 }
             }
 
-            // Check current week pick (Week 2) for validation but not elimination yet
+            // Check current week pick (Week 2) for validation AND elimination if game finished
             const currentWeekPick = allPicks[this.currentWeek];
             let currentPickInfo = 'No current pick';
 
@@ -92,6 +101,20 @@ class BulletproofSurvivorChecker {
                 if (teamsUsed.has(normalizedCurrentTeam)) {
                     console.log(`💀 ${member.displayName}: ELIMINATED - Trying to reuse ${currentWeekPick.team} in Week ${this.currentWeek}`);
                     return this.createDeadStatus(uid, member, this.currentWeek, currentWeekPick.team, `Picked ${currentWeekPick.team} multiple times (not allowed)`);
+                }
+
+                // ADD CURRENT TEAM TO USED SET
+                teamsUsed.add(normalizedCurrentTeam);
+
+                // CHECK IF CURRENT WEEK GAME HAS FINISHED AND TEAM LOST
+                const currentTeamResult = await this.getTeamResult(currentWeekPick.team, this.currentWeek);
+                if (currentTeamResult && currentTeamResult.status === 'lost') {
+                    console.log(`💀 ${member.displayName}: ELIMINATED - ${currentWeekPick.team} lost in Week ${this.currentWeek}`);
+                    return this.createDeadStatus(uid, member, this.currentWeek, currentWeekPick.team, currentTeamResult.reason);
+                } else if (currentTeamResult && currentTeamResult.status === 'won') {
+                    console.log(`✅ ${member.displayName}: Survived Week ${this.currentWeek} with ${currentWeekPick.team}`);
+                } else {
+                    console.log(`⚠️ ${member.displayName}: Week ${this.currentWeek} ${currentWeekPick.team} result unclear - game may be pending`);
                 }
 
                 currentPickInfo = `Week ${this.currentWeek}: ${currentWeekPick.team}`;
@@ -324,6 +347,16 @@ async function initializeBulletproofChecker() {
     // Quick test function for VibeDaddy to verify system is working
     window.testSurvivorSystem = async function() {
         console.log('🧪 TESTING BULLETPROOF SURVIVOR SYSTEM');
+
+        if (!window.bulletproofSurvivorChecker) {
+            console.log('⚠️ Bulletproof checker not found, attempting to initialize...');
+            if (window.db) {
+                await initializeBulletproofChecker();
+            } else {
+                return { error: 'Firebase database not ready' };
+            }
+        }
+
         console.log('Current Week:', window.bulletproofSurvivorChecker.currentWeek);
 
         const poolId = 'nerduniverse-2025';
@@ -356,15 +389,85 @@ async function initializeBulletproofChecker() {
             return { error: error.message };
         }
     };
+
+    // EMERGENCY MANUAL INIT FUNCTION
+    window.initBulletproofSurvivor = async function() {
+        console.log('🚨 MANUAL: Forcing bulletproof survivor initialization');
+        window.currentWeek = 2;
+        if (window.db) {
+            await initializeBulletproofChecker();
+            console.log('✅ MANUAL: Bulletproof survivor should now be initialized');
+            return 'Initialization complete - try testSurvivorSystem() now';
+        } else {
+            console.log('❌ MANUAL: Firebase database not ready');
+            return 'Firebase database not ready';
+        }
+    };
 }
 
-// Auto-initialize when Firebase is ready
+// IMMEDIATE GLOBAL FUNCTION AVAILABILITY (outside async)
+window.initBulletproofSurvivor = async function() {
+    console.log('🚨 MANUAL: Forcing bulletproof survivor initialization');
+    window.currentWeek = 2;
+    if (window.db) {
+        if (typeof initializeBulletproofChecker === 'function') {
+            await initializeBulletproofChecker();
+            console.log('✅ MANUAL: Bulletproof survivor should now be initialized');
+            return 'Initialization complete - try testSurvivorSystem() now';
+        } else {
+            return 'Error: initializeBulletproofChecker function not found';
+        }
+    } else {
+        console.log('❌ MANUAL: Firebase database not ready');
+        return 'Firebase database not ready';
+    }
+};
+
+window.checkBulletproofStatus = function() {
+    console.log('🔍 BULLETPROOF STATUS CHECK:');
+    console.log('- Script loaded:', true);
+    console.log('- initBulletproofSurvivor available:', typeof window.initBulletproofSurvivor);
+    console.log('- testSurvivorSystem available:', typeof window.testSurvivorSystem);
+    console.log('- bulletproofSurvivorChecker exists:', !!window.bulletproofSurvivorChecker);
+    console.log('- Firebase db ready:', !!window.db);
+    console.log('- Current week:', window.currentWeek);
+    return 'Status check complete - see console output above';
+};
+
+// AGGRESSIVE INITIALIZATION - Try multiple approaches
 if (typeof window !== 'undefined') {
+    // FORCE Week 2 immediately
+    window.currentWeek = 2;
+    console.log('🔄 FORCED: Set currentWeek to 2 for survivor logic');
+
+    // Try immediate initialization if db exists
     if (window.db) {
         initializeBulletproofChecker();
-    } else {
-        document.addEventListener('DOMContentLoaded', initializeBulletproofChecker);
-        // Also try after a delay in case Firebase loads later
-        setTimeout(initializeBulletproofChecker, 2000);
     }
+
+    // Try on DOM ready
+    document.addEventListener('DOMContentLoaded', initializeBulletproofChecker);
+
+    // Try every 500ms for up to 10 seconds
+    let attempts = 0;
+    const maxAttempts = 20;
+    const initInterval = setInterval(() => {
+        attempts++;
+        if (window.db && !window.bulletproofSurvivorChecker) {
+            console.log(`🔄 RETRY: Bulletproof init attempt ${attempts}/${maxAttempts}`);
+            initializeBulletproofChecker();
+            clearInterval(initInterval);
+        } else if (attempts >= maxAttempts) {
+            console.log('❌ TIMEOUT: Bulletproof checker initialization failed after 10 seconds');
+            clearInterval(initInterval);
+        }
+    }, 500);
+
+    // Final fallback after 3 seconds
+    setTimeout(() => {
+        if (!window.bulletproofSurvivorChecker && window.db) {
+            console.log('🚨 EMERGENCY: Final attempt to initialize bulletproof checker');
+            initializeBulletproofChecker();
+        }
+    }, 3000);
 }
