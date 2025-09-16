@@ -421,6 +421,9 @@
             <button onclick="showTab('performance')" class="tab-btn" data-tab="performance">
                 📊 Performance
             </button>
+            <button onclick="showTab('email')" class="tab-btn" data-tab="email">
+                📧 Pool Email
+            </button>
             <button onclick="showTab('logs')" class="tab-btn" data-tab="logs">
                 📋 System Logs
             </button>
@@ -719,6 +722,100 @@
         </div>
     </div>
 
+    <!-- Pool Email Tab -->
+    <div id="tab-email" class="tab-content hidden">
+        <div class="dashboard-grid">
+            <!-- Email Composer -->
+            <div class="glass-effect ocean-card rounded-xl p-6 col-span-2">
+                <h3 class="text-xl font-700 ocean-text mb-4">📧 Pool Email Composer</h3>
+
+                <!-- Recipient Selection -->
+                <div class="mb-4">
+                    <label class="block text-sm font-600 ocean-text mb-2">Recipients</label>
+                    <select id="email-recipients" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent">
+                        <option value="all">All Pool Members</option>
+                        <option value="admins">Admins Only</option>
+                        <option value="specific">Select Specific Members</option>
+                    </select>
+                </div>
+
+                <!-- Specific User Selection (hidden by default) -->
+                <div id="specific-users-section" class="mb-4 hidden">
+                    <label class="block text-sm font-600 ocean-text mb-2">Select Members</label>
+                    <div id="user-checkboxes" class="max-h-32 overflow-y-auto border border-gray-200 rounded p-2"></div>
+                </div>
+
+                <!-- Subject -->
+                <div class="mb-4">
+                    <label class="block text-sm font-600 ocean-text mb-2">Subject</label>
+                    <input type="text" id="email-subject" placeholder="Email subject line"
+                           class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                           maxlength="200">
+                </div>
+
+                <!-- Email Body -->
+                <div class="mb-4">
+                    <label class="block text-sm font-600 ocean-text mb-2">Message</label>
+                    <textarea id="email-body" placeholder="Email message (use {displayName} for personalization)"
+                              class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent h-32"
+                              maxlength="5000"></textarea>
+                    <div class="text-xs text-gray-500 mt-1">Use {displayName} to personalize emails</div>
+                </div>
+
+                <!-- Send Controls -->
+                <div class="flex gap-2 mb-4">
+                    <button id="preview-email-btn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 disabled:opacity-50">
+                        Preview Email
+                    </button>
+                    <button id="send-email-btn" class="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 disabled:opacity-50">
+                        Send Email
+                    </button>
+                    <button id="load-recipients-btn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                        Load Recipients
+                    </button>
+                </div>
+
+                <!-- Email Status -->
+                <div id="email-status" class="hidden"></div>
+            </div>
+
+            <!-- Recipients List -->
+            <div class="glass-effect ocean-card rounded-xl p-6">
+                <h3 class="text-xl font-700 ocean-text mb-4">👥 Pool Members</h3>
+                <div id="recipients-list" class="space-y-2">
+                    <div class="text-sm text-gray-500">Click "Load Recipients" to view pool members</div>
+                </div>
+            </div>
+
+            <!-- Email Templates -->
+            <div class="glass-effect ocean-card rounded-xl p-6 col-span-full">
+                <h3 class="text-xl font-700 ocean-text mb-4">📝 Email Templates</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="template-card bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100" onclick="useTemplate('welcome')">
+                        <h4 class="font-600 text-gray-800">🎉 Welcome Message</h4>
+                        <p class="text-sm text-gray-600 mt-1">Welcome new members to the pool</p>
+                    </div>
+                    <div class="template-card bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100" onclick="useTemplate('weekly')">
+                        <h4 class="font-600 text-gray-800">⏰ Weekly Reminder</h4>
+                        <p class="text-sm text-gray-600 mt-1">Remind members to make their picks</p>
+                    </div>
+                    <div class="template-card bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100" onclick="useTemplate('results')">
+                        <h4 class="font-600 text-gray-800">🏆 Game Results</h4>
+                        <p class="text-sm text-gray-600 mt-1">Share weekly results and standings</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Email History -->
+            <div class="glass-effect ocean-card rounded-xl p-6 col-span-full">
+                <h3 class="text-xl font-700 ocean-text mb-4">📋 Email History</h3>
+                <div id="email-history" class="space-y-2">
+                    <div class="text-sm text-gray-500">Recent pool emails will appear here</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- System Logs Tab -->
     <div id="tab-logs" class="tab-content hidden">
         <div class="dashboard-grid">
@@ -886,9 +983,14 @@
         let endpointTests = {};
         let refreshInterval;
 
+        // Pool Email System Variables
+        let poolMembers = [];
+        let selectedUserIds = [];
+
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
             initializeDashboard();
+            initializeEmailSystem();
 
             // Animate cards
             const cards = document.querySelectorAll('.system-card');
@@ -1449,6 +1551,265 @@
             } catch (error) {
                 log(`Error clearing cache: ${error.message}`, 'error');
             }
+        }
+
+        // Pool Email System Functions
+        async function loadPoolMembers() {
+            try {
+                log('Loading pool members for email system...', 'info');
+
+                const { httpsCallable } = window.firebaseUtils;
+                const getPoolMembersEmails = httpsCallable(window.functions, 'getPoolMembersEmails');
+                const result = await getPoolMembersEmails({ poolId: 'nerduniverse-2025' });
+
+                if (result.data.success) {
+                    poolMembers = result.data.members;
+                    updateRecipientsDisplay();
+                    log(`Loaded ${poolMembers.length} pool members`, 'info');
+                } else {
+                    throw new Error('Failed to load pool members');
+                }
+            } catch (error) {
+                log(`Error loading pool members: ${error.message}`, 'error');
+                showEmailStatus('error', `Failed to load pool members: ${error.message}`);
+            }
+        }
+
+        function updateRecipientsDisplay() {
+            const recipientsList = document.getElementById('recipients-list');
+            if (!recipientsList || poolMembers.length === 0) return;
+
+            recipientsList.innerHTML = `
+                <div class="space-y-2">
+                    <div class="text-sm font-600 ocean-text">Total Members: ${poolMembers.length}</div>
+                    ${poolMembers.map(member => `
+                        <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                            <div>
+                                <span class="font-500">${member.displayName}</span>
+                                <span class="text-xs text-gray-500 ml-2">${member.email}</span>
+                                ${member.role === 'admin' ? '<span class="text-xs bg-blue-100 text-blue-800 px-1 rounded ml-2">Admin</span>' : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            updateSpecificUserCheckboxes();
+        }
+
+        function updateSpecificUserCheckboxes() {
+            const userCheckboxes = document.getElementById('user-checkboxes');
+            if (!userCheckboxes || poolMembers.length === 0) return;
+
+            userCheckboxes.innerHTML = poolMembers.map(member => `
+                <label class="flex items-center p-1 hover:bg-gray-50">
+                    <input type="checkbox" class="mr-2" value="${member.uid}" onchange="updateSelectedUsers()">
+                    <span class="text-sm">${member.displayName}</span>
+                    ${member.role === 'admin' ? '<span class="text-xs bg-blue-100 text-blue-800 px-1 rounded ml-1">Admin</span>' : ''}
+                </label>
+            `).join('');
+        }
+
+        function updateSelectedUsers() {
+            const checkboxes = document.querySelectorAll('#user-checkboxes input[type="checkbox"]:checked');
+            selectedUserIds = Array.from(checkboxes).map(cb => cb.value);
+            log(`Selected ${selectedUserIds.length} specific users`, 'info');
+        }
+
+        function handleRecipientChange() {
+            const recipientSelect = document.getElementById('email-recipients');
+            const specificSection = document.getElementById('specific-users-section');
+
+            if (recipientSelect.value === 'specific') {
+                specificSection.classList.remove('hidden');
+            } else {
+                specificSection.classList.add('hidden');
+                selectedUserIds = [];
+            }
+        }
+
+        function previewEmail() {
+            const subject = document.getElementById('email-subject').value;
+            const body = document.getElementById('email-body').value;
+            const recipients = document.getElementById('email-recipients').value;
+
+            if (!subject || !body) {
+                showEmailStatus('error', 'Subject and message are required');
+                return;
+            }
+
+            let recipientCount = 0;
+            if (recipients === 'all') {
+                recipientCount = poolMembers.length;
+            } else if (recipients === 'admins') {
+                recipientCount = poolMembers.filter(m => m.role === 'admin').length;
+            } else {
+                recipientCount = selectedUserIds.length;
+            }
+
+            const sampleName = poolMembers[0]?.displayName || 'John Doe';
+            const previewBody = body.replace(/{displayName}/g, sampleName);
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+                    <h3 class="text-lg font-600 mb-4">📧 Email Preview</h3>
+                    <div class="mb-4">
+                        <strong>Recipients:</strong> ${recipientCount} members (${recipients})
+                    </div>
+                    <div class="mb-4">
+                        <strong>Subject:</strong> ${subject}
+                    </div>
+                    <div class="border p-4 bg-gray-50 rounded">
+                        <div class="whitespace-pre-wrap">${previewBody}</div>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-500 text-white rounded">Close</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        async function sendPoolEmail() {
+            const subject = document.getElementById('email-subject').value;
+            const body = document.getElementById('email-body').value;
+            const recipients = document.getElementById('email-recipients').value;
+
+            if (!subject || !body) {
+                showEmailStatus('error', 'Subject and message are required');
+                return;
+            }
+
+            if (recipients === 'specific' && selectedUserIds.length === 0) {
+                showEmailStatus('error', 'Please select at least one member for specific recipients');
+                return;
+            }
+
+            if (!confirm(`Send email "${subject}" to ${recipients === 'all' ? 'all pool members' : recipients === 'admins' ? 'admin members' : selectedUserIds.length + ' selected members'}?`)) {
+                return;
+            }
+
+            try {
+                showEmailStatus('info', 'Sending email...');
+                document.getElementById('send-email-btn').disabled = true;
+
+                const { httpsCallable } = window.firebaseUtils;
+                const sendPoolEmailFunction = httpsCallable(window.functions, 'sendPoolEmail');
+                const result = await sendPoolEmailFunction({
+                    subject: subject,
+                    body: body,
+                    recipients: recipients,
+                    poolId: 'nerduniverse-2025',
+                    specificUserIds: recipients === 'specific' ? selectedUserIds : []
+                });
+
+                if (result.data.success) {
+                    showEmailStatus('success',
+                        `Email sent successfully! ${result.data.successfulDeliveries}/${result.data.totalRecipients} delivered`
+                    );
+
+                    document.getElementById('email-subject').value = '';
+                    document.getElementById('email-body').value = '';
+                    document.getElementById('email-recipients').value = 'all';
+                    handleRecipientChange();
+
+                    log(`Pool email sent: ${result.data.successfulDeliveries}/${result.data.totalRecipients} delivered`, 'info');
+                } else {
+                    throw new Error('Email sending failed');
+                }
+
+            } catch (error) {
+                log(`Error sending pool email: ${error.message}`, 'error');
+                showEmailStatus('error', `Failed to send email: ${error.message}`);
+            } finally {
+                document.getElementById('send-email-btn').disabled = false;
+            }
+        }
+
+        function showEmailStatus(type, message) {
+            const statusDiv = document.getElementById('email-status');
+            statusDiv.className = `p-3 rounded-lg mb-4 ${
+                type === 'success' ? 'bg-green-100 text-green-800' :
+                type === 'error' ? 'bg-red-100 text-red-800' :
+                'bg-blue-100 text-blue-800'
+            }`;
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden');
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.classList.add('hidden');
+                }, 5000);
+            }
+        }
+
+        function useTemplate(templateType) {
+            const subjectField = document.getElementById('email-subject');
+            const bodyField = document.getElementById('email-body');
+
+            const templates = {
+                welcome: {
+                    subject: 'Welcome to NerdFootball Pool!',
+                    body: `Hello {displayName},
+
+Welcome to the NerdFootball pool! We're excited to have you join us for this season.
+
+Here's what you need to know:
+• Make your picks each week before games start
+• Check the leaderboard to see how you're doing
+• Have fun and may the best nerd win!
+
+If you have any questions, don't hesitate to reach out.
+
+Good luck this season!`
+                },
+                weekly: {
+                    subject: 'Weekly Reminder: Make Your Picks!',
+                    body: `Hey {displayName},
+
+This is a friendly reminder to make your picks for this week if you haven't already.
+
+Don't forget:
+• Picks must be submitted before the first game starts
+• Check the schedule for any early games
+• Review your confidence rankings carefully
+
+Visit the app now to make your picks: https://nerdfootball.web.app
+
+Good luck this week!`
+                },
+                results: {
+                    subject: 'Weekly Results Are In!',
+                    body: `Hi {displayName},
+
+The results for this week are now available!
+
+Check out:
+• Your weekly score and performance
+• Updated season standings
+• This week's biggest winners and surprises
+
+Head to the app to see all the details: https://nerdfootball.web.app
+
+Thanks for playing and see you next week!`
+                }
+            };
+
+            if (templates[templateType]) {
+                subjectField.value = templates[templateType].subject;
+                bodyField.value = templates[templateType].body;
+                showEmailStatus('info', `${templateType.charAt(0).toUpperCase() + templateType.slice(1)} template loaded`);
+            }
+        }
+
+        function initializeEmailSystem() {
+            document.getElementById('email-recipients').addEventListener('change', handleRecipientChange);
+            document.getElementById('load-recipients-btn').addEventListener('click', loadPoolMembers);
+            document.getElementById('preview-email-btn').addEventListener('click', previewEmail);
+            document.getElementById('send-email-btn').addEventListener('click', sendPoolEmail);
+            handleRecipientChange();
         }
 
         // Utility functions
