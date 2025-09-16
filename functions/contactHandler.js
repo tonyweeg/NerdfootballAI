@@ -1,3 +1,6 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
@@ -7,14 +10,11 @@ let transporter = null;
 
 const setupEmailTransport = () => {
     try {
-        // Check for Gmail configuration in Firebase config first, then environment variables
-        const functions = require('firebase-functions');
-        const gmailEmail = functions.config().gmail?.email || process.env.GMAIL_EMAIL;
-        const gmailPassword = functions.config().gmail?.password || process.env.GMAIL_PASSWORD;
+        // Use environment variables for email credentials
+        const gmailEmail = process.env.GMAIL_EMAIL;
+        const gmailPassword = process.env.GMAIL_PASSWORD;
 
         console.log('=== EMAIL TRANSPORT DEBUG ===');
-        console.log('Firebase config email:', functions.config().gmail?.email ? 'SET' : 'NOT SET');
-        console.log('Firebase config password:', functions.config().gmail?.password ? 'SET' : 'NOT SET');
         console.log('Environment GMAIL_EMAIL:', process.env.GMAIL_EMAIL ? 'SET' : 'NOT SET');
         console.log('Environment GMAIL_PASSWORD:', process.env.GMAIL_PASSWORD ? 'SET' : 'NOT SET');
 
@@ -236,9 +236,8 @@ Submission ID: ${submissionId}`;
             console.log('Admin emails to send to:', adminEmails);
 
             if (transporter) {
-                // Get sender email from Firebase config or environment variables
-                const functions = require('firebase-functions');
-                const gmailEmail = functions.config().gmail?.email || process.env.GMAIL_EMAIL;
+                // Get sender email from environment variables
+                const gmailEmail = process.env.GMAIL_EMAIL;
 
                 console.log('Using sender email:', gmailEmail);
                 console.log('Attempting to send emails to', adminEmails.length, 'admins');
