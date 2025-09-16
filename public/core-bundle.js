@@ -42,10 +42,24 @@ class WeekManager {
 
     // Main week detection with multiple data sources
     async detectCurrentWeek() {
-        // TEMPORARY FIX: Force Week 1 until data sources align
-        // User picks are in Week 1 (game IDs 101, 103, 111) so we need Week 1
-        console.log('🏈 WeekManager: TEMPORARY - Forcing Week 1 for user pick alignment');
-        return 1;
+        // Try live game detection first
+        const liveWeek = await this.detectLiveGameWeek();
+        if (liveWeek) {
+            console.log(`🏈 WeekManager: Using live game detection - Week ${liveWeek}`);
+            return liveWeek;
+        }
+
+        // Try ESPN API detection
+        const espnWeek = await this.getEspnCurrentWeek();
+        if (espnWeek) {
+            console.log(`🏈 WeekManager: Using ESPN API detection - Week ${espnWeek}`);
+            return espnWeek;
+        }
+
+        // Fallback to calendar calculation
+        const calendarWeek = this.calculateWeekFromDate();
+        console.log(`🏈 WeekManager: Using calendar calculation - Week ${calendarWeek}`);
+        return calendarWeek;
     }
 
     // Detect week from live/in-progress games
