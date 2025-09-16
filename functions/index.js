@@ -562,14 +562,19 @@ exports.forceFreshESPNData = forceFreshESPNData;
 
 // Pool Email System - Get all pool members with emails
 exports.getPoolMembersEmails = functions.https.onCall(async (data, context) => {
+    // For Firebase Functions v2, auth context is in data.auth instead of context.auth
+    const authContext = context.auth || data.auth;
+
     // Check if user is authenticated
-    if (!context.auth) {
+    if (!authContext) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
 
     // Check if user is admin
     const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
-    if (!ADMIN_UIDS.includes(context.auth.uid)) {
+    const userUid = authContext.uid || authContext.token?.uid;
+
+    if (!ADMIN_UIDS.includes(userUid)) {
         throw new functions.https.HttpsError('permission-denied', 'Admin access required');
     }
 
@@ -626,14 +631,19 @@ exports.getPoolMembersEmails = functions.https.onCall(async (data, context) => {
 
 // Pool Email System - Send emails to pool members
 exports.sendPoolEmail = functions.https.onCall(async (data, context) => {
+    // For Firebase Functions v2, auth context is in data.auth instead of context.auth
+    const authContext = context.auth || data.auth;
+
     // Check if user is authenticated
-    if (!context.auth) {
+    if (!authContext) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
 
     // Check if user is admin
     const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
-    if (!ADMIN_UIDS.includes(context.auth.uid)) {
+    const userUid = authContext.uid || authContext.token?.uid;
+
+    if (!ADMIN_UIDS.includes(userUid)) {
         throw new functions.https.HttpsError('permission-denied', 'Admin access required');
     }
 
@@ -765,7 +775,7 @@ Reply to: tonyweeg@gmail.com`;
         // Log email activity to Firestore
         const emailLogRef = admin.firestore().collection('pool_email_logs').doc();
         await emailLogRef.set({
-            adminUid: context.auth.uid,
+            adminUid: userUid,
             poolId: poolId,
             subject: subject,
             body: body,
