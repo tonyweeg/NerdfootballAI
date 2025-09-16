@@ -6674,6 +6674,8 @@ function downloadAnalyticsCSV(data, weekNumber) {
  window.updateDoc = updateDoc;
  window.deleteDoc = deleteDoc;
  window.runTransaction = runTransaction;
+ window.collection = collection;
+ window.getDocs = getDocs;
  
  // PHAROAH'S REALTIME INTEGRATION - Initialize Firebase RTDB for WebSocket features
  const rtdb = getDatabase(app);
@@ -13469,30 +13471,50 @@ const SurvivorView = {
         const loadStartTime = performance.now();
         
         try {
-            // DIAMOND PERFORMANCE: Use ESPN-integrated survivor data
+            // DIAMOND LEVEL: Use clean survivor system with enhanced team normalization
             let loadResult = null;
-            
-            
-            if (window.simpleSurvivorSystem) {
-                console.log('💎 Using simple survivor system (PROVEN WORKING)');
+
+
+            if (window.survivorSystem) {
+                console.log('💎 Using CLEAN DIAMOND survivor system (84.5% optimized + team normalization fixes)');
+                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
+                const results = await window.survivorSystem.getPoolSurvivalStatus(currentPool);
+                const summaryStats = window.survivorSystem.getSummaryStats(results);
+
+                // Professional stats with correct terminology
+                const pendingPlayers = results.filter(r => r.status === 'pending').length;
+
+                loadResult = {
+                    results,
+                    stats: {
+                        totalPlayers: summaryStats.total,
+                        activePlayers: summaryStats.active,
+                        eliminatedPlayers: summaryStats.eliminated,
+                        pendingPlayers: pendingPlayers
+                    },
+                    loadTime: performance.now() - loadStartTime,
+                    source: 'clean-diamond-survivor'
+                };
+            } else if (window.simpleSurvivorSystem) {
+                console.log('⚠️ Fallback to old survivor system (needs cleanup)');
                 const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
                 const results = await window.simpleSurvivorSystem.getSurvivorTable(currentPool);
-                
+
                 // Simple stats calculation
                 const total = results.length;
                 const eliminated = results.filter(r => r.status === 'lost' || r.status === 'eliminated').length;
-                const alive = total - eliminated;
-                
+                const active = total - eliminated;
+
                 loadResult = {
                     results,
                     stats: {
                         totalPlayers: total,
-                        activePlayers: alive,
+                        activePlayers: active,
                         eliminatedPlayers: eliminated,
                         pendingPlayers: 0
                     },
                     loadTime: performance.now() - loadStartTime,
-                    source: 'simple-survivor'
+                    source: 'simple-survivor-fallback'
                 };
             } else if (window.espnSurvivorIntegration) {
                 console.log('⚡ Fallback to ESPN-integrated survivor data');
@@ -14917,6 +14939,22 @@ function showUserDiagnostics() {
 }
 
  });
+
+// 🧪 SURVIVOR LOGIC TEST VIEW - Load test architecture on demand
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('test') === 'survivor' || urlParams.get('debug') === 'true') {
+    console.log('🧪 Loading Survivor Architecture Test...');
+    const testScript = document.createElement('script');
+    testScript.src = './test-survivor-diamond-architecture.js';
+    testScript.onload = () => {
+        console.log('✅ Survivor test architecture loaded!');
+        console.log('📋 Check console for detailed test results');
+    };
+    testScript.onerror = () => {
+        console.error('❌ Failed to load survivor test architecture');
+    };
+    document.head.appendChild(testScript);
+}
  </script>
 </body>
 </html>
