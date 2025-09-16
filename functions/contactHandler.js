@@ -7,13 +7,16 @@ let transporter = null;
 
 const setupEmailTransport = () => {
     try {
-        // Use environment variables for Firebase Functions v2 compatibility
-        const gmailEmail = process.env.GMAIL_EMAIL;
-        const gmailPassword = process.env.GMAIL_PASSWORD;
+        // Check for Gmail configuration in Firebase config first, then environment variables
+        const functions = require('firebase-functions');
+        const gmailEmail = functions.config().gmail?.email || process.env.GMAIL_EMAIL;
+        const gmailPassword = functions.config().gmail?.password || process.env.GMAIL_PASSWORD;
 
         console.log('=== EMAIL TRANSPORT DEBUG ===');
-        console.log('Environment GMAIL_EMAIL:', gmailEmail ? 'SET' : 'NOT SET');
-        console.log('Environment GMAIL_PASSWORD:', gmailPassword ? 'SET' : 'NOT SET');
+        console.log('Firebase config email:', functions.config().gmail?.email ? 'SET' : 'NOT SET');
+        console.log('Firebase config password:', functions.config().gmail?.password ? 'SET' : 'NOT SET');
+        console.log('Environment GMAIL_EMAIL:', process.env.GMAIL_EMAIL ? 'SET' : 'NOT SET');
+        console.log('Environment GMAIL_PASSWORD:', process.env.GMAIL_PASSWORD ? 'SET' : 'NOT SET');
 
         if (gmailEmail && gmailPassword) {
             console.log('Creating nodemailer transporter with email:', gmailEmail);
@@ -233,8 +236,9 @@ Submission ID: ${submissionId}`;
             console.log('Admin emails to send to:', adminEmails);
 
             if (transporter) {
-                // Get sender email from environment variables (Functions v2 compatible)
-                const gmailEmail = process.env.GMAIL_EMAIL;
+                // Get sender email from Firebase config or environment variables
+                const functions = require('firebase-functions');
+                const gmailEmail = functions.config().gmail?.email || process.env.GMAIL_EMAIL;
 
                 console.log('Using sender email:', gmailEmail);
                 console.log('Attempting to send emails to', adminEmails.length, 'admins');
