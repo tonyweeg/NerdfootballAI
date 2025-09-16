@@ -14,11 +14,8 @@ window.espnGameMapping = {
     "209": "401772836", "210": "401772726", "211": "401772729", "212": "401772730",
     "213": "401772837", "214": "401772919", "215": "401772715", "216": "401772811",
 
-    // Week 3 Games (301-316) - To be populated
-    "301": "TBD", "302": "TBD", "303": "TBD", "304": "TBD",
-    "305": "TBD", "306": "TBD", "307": "TBD", "308": "TBD",
-    "309": "TBD", "310": "TBD", "311": "TBD", "312": "TBD",
-    "313": "TBD", "314": "TBD", "315": "TBD", "316": "TBD"
+    // Weeks 3-18 use positional mapping (no static ESPN IDs needed)
+    // The sync system will map by position: Week X Game Y = ESPN games[Y-1]
 };
 
 // Automated ESPN Winner Sync System
@@ -96,28 +93,125 @@ window.espnWinnerSync = {
     // Auto-sync all current weeks
     async autoSyncCurrentWeeks() {
         try {
-            console.log('🚀 Starting auto-sync of current weeks...');
+            console.log('🚀 Starting auto-sync of all 18 weeks...');
 
             const results = {};
 
-            // Sync weeks 1-3 (current season status)
-            for (let week = 1; week <= 3; week++) {
+            // Sync all 18 weeks of the season
+            for (let week = 1; week <= 18; week++) {
+                console.log(`📡 Syncing Week ${week}...`);
                 results[week] = await this.syncWeekWinners(week);
 
                 // Small delay between weeks to avoid rate limiting
-                if (week < 3) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                if (week < 18) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
 
             const totalSynced = Object.values(results).reduce((sum, result) => sum + (result.synced || 0), 0);
-            console.log(`🎯 Auto-sync complete: ${totalSynced} total games synced`);
+            const weeksWithData = Object.values(results).filter(result => result.synced > 0).length;
+            console.log(`🎯 Auto-sync complete: ${totalSynced} total games synced across ${weeksWithData} weeks`);
 
             return results;
 
         } catch (error) {
             console.error('❌ Auto-sync failed:', error);
             return { error: error.message };
+        }
+    },
+
+    // Clean contaminated ESPN IDs from existing data
+    async cleanContaminatedData(week) {
+        try {
+            console.log(`🧹 Cleaning contaminated ESPN IDs from Week ${week}...`);
+
+            const primaryPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`;
+            const legacyPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`;
+
+            // Read current data
+            const doc = await getDoc(doc(db, primaryPath));
+            if (!doc.exists()) {
+                console.log(`📅 No data found for Week ${week}`);
+                return { success: true, cleaned: 0 };
+            }
+
+            const currentData = doc.data();
+            const cleanData = {};
+            let cleanedCount = 0;
+
+            // Keep only our clean game IDs (week + 01-16 format)
+            Object.entries(currentData).forEach(([gameId, gameData]) => {
+                if (gameId.match(/^[1-9]\d{2}$/)) { // Our format: 101, 102, 201, etc.
+                    cleanData[gameId] = gameData;
+                } else {
+                    console.log(`🗑️ Removing contaminated game ID: ${gameId}`);
+                    cleanedCount++;
+                }
+            });
+
+            if (cleanedCount > 0) {
+                // Save clean data to both paths
+                await setDoc(doc(db, primaryPath), cleanData);
+                await setDoc(doc(db, legacyPath), cleanData);
+
+                console.log(`✅ Cleaned ${cleanedCount} contaminated IDs from Week ${week}`);
+                return { success: true, cleaned: cleanedCount };
+            } else {
+                console.log(`✨ Week ${week} already clean`);
+                return { success: true, cleaned: 0 };
+            }
+
+        } catch (error) {
+            console.error(`❌ Clean failed for Week ${week}:`, error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Clean and sync all weeks
+    async cleanAndSyncAllWeeks() {
+        try {
+            console.log('🧹 Starting clean and sync of all 18 weeks...');
+
+            const results = {};
+            let totalCleaned = 0;
+            let totalSynced = 0;
+
+            // First pass: Clean contaminated data
+            for (let week = 1; week <= 18; week++) {
+                console.log(`🧹 Cleaning Week ${week}...`);
+                const cleanResult = await this.cleanContaminatedData(week);
+                if (cleanResult.success) {
+                    totalCleaned += cleanResult.cleaned;
+                }
+
+                // Small delay
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            console.log(`✅ Cleaning complete: ${totalCleaned} contaminated IDs removed`);
+
+            // Second pass: Sync clean ESPN data
+            for (let week = 1; week <= 18; week++) {
+                console.log(`📡 Syncing Week ${week}...`);
+                results[week] = await this.syncWeekWinners(week);
+                if (results[week].success) {
+                    totalSynced += results[week].synced;
+                }
+
+                // Small delay
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            const weeksWithData = Object.values(results).filter(result => result.synced > 0).length;
+            console.log(`🎯 Clean and sync complete!`);
+            console.log(`🧹 Cleaned: ${totalCleaned} contaminated IDs`);
+            console.log(`📡 Synced: ${totalSynced} games across ${weeksWithData} weeks`);
+
+            return { success: true, totalCleaned, totalSynced, results };
+
+        } catch (error) {
+            console.error('❌ Clean and sync failed:', error);
+            return { success: false, error: error.message };
         }
     }
 };

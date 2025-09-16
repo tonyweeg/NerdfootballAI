@@ -991,7 +991,8 @@
 
      <div class="flex gap-3 mb-4">
          <button id="sync-current-week-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Sync Current Week</button>
-         <button id="sync-all-weeks-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Auto-Sync All Weeks</button>
+         <button id="sync-all-weeks-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Auto-Sync All 18 Weeks</button>
+         <button id="clean-and-sync-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">🧹 Clean & Sync All</button>
          <button id="check-espn-status-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Check ESPN Status</button>
      </div>
 
@@ -14636,6 +14637,7 @@ function initializeESPNSync() {
 function bindESPNSyncEventListeners() {
     const syncCurrentBtn = document.getElementById('sync-current-week-btn');
     const syncAllBtn = document.getElementById('sync-all-weeks-btn');
+    const cleanAndSyncBtn = document.getElementById('clean-and-sync-btn');
     const checkStatusBtn = document.getElementById('check-espn-status-btn');
     const manualSyncBtn = document.getElementById('manual-sync-btn');
 
@@ -14685,6 +14687,34 @@ function bindESPNSyncEventListeners() {
                 }
             } else {
                 logToESPNStatus('❌ ESPN sync system not available');
+            }
+        });
+    }
+
+    if (cleanAndSyncBtn) {
+        cleanAndSyncBtn.addEventListener('click', async () => {
+            logToESPNStatus('🧹 Starting clean and sync of all 18 weeks...');
+            logToESPNStatus('⚠️ This will remove ESPN ID contamination and rebuild all data');
+
+            if (window.espnWinnerSync && window.espnWinnerSync.cleanAndSyncAllWeeks) {
+                const result = await window.espnWinnerSync.cleanAndSyncAllWeeks();
+
+                if (result.success) {
+                    logToESPNStatus(`🎉 Clean and sync complete!`);
+                    logToESPNStatus(`🧹 Cleaned: ${result.totalCleaned} contaminated IDs`);
+                    logToESPNStatus(`📡 Synced: ${result.totalSynced} games`);
+
+                    // Trigger survivor pool refresh
+                    if (window.survivorSystem && window.survivorSystem.refreshStats) {
+                        logToESPNStatus('🔄 Refreshing survivor pool...');
+                        await window.survivorSystem.refreshStats();
+                        logToESPNStatus('✅ Survivor pool refreshed');
+                    }
+                } else {
+                    logToESPNStatus(`❌ Clean and sync failed: ${result.error}`);
+                }
+            } else {
+                logToESPNStatus('❌ Clean and sync function not available');
             }
         });
     }
