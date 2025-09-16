@@ -50,11 +50,19 @@ class SurvivorSystem {
             const userTeam = userPick.team;
             console.log(`🏈 Checking if ${userTeam} won any game this week`);
 
+            // Get all winners for debug
+            const allWinners = Object.values(weekResults)
+                .filter(game => game && game.winner && game.winner !== 'TBD')
+                .map(game => game.winner);
+            console.log(`🏆 All winners this week: [${allWinners.join(', ')}]`);
+
             // Check if user's team is in the winners list for this week
             for (const [gameId, gameResult] of Object.entries(weekResults)) {
                 if (!gameResult) continue;
 
                 if (gameResult.status === 'STATUS_FINAL' && gameResult.winner) {
+                    console.log(`🔍 Comparing '${userTeam}' vs '${gameResult.winner}'`);
+
                     // Direct team name comparison
                     if (gameResult.winner === userTeam) {
                         console.log(`✅ ${userTeam} won game ${gameId}`);
@@ -65,6 +73,7 @@ class SurvivorSystem {
                     const normalizedUserTeam = this.normalizeTeamName(userTeam);
                     const normalizedWinner = this.normalizeTeamName(gameResult.winner);
 
+                    console.log(`🔍 Normalized: '${normalizedUserTeam}' vs '${normalizedWinner}'`);
                     if (normalizedWinner === normalizedUserTeam) {
                         console.log(`✅ ${userTeam} won game ${gameId} (normalized match)`);
                         return { status: 'survived', reason: `${userTeam} won their game` };
@@ -255,9 +264,16 @@ class SurvivorSystem {
 
                     // Show ALL games with status and winner info
                     console.log(`🎮 Week ${week} ALL GAMES:`);
+                    const allWinners = [];
                     Object.entries(weekResults).forEach(([gameId, game]) => {
                         console.log(`  ${gameId}: ${game.homeTeam || game.home_team || 'NO_HOME'} vs ${game.awayTeam || game.away_team || 'NO_AWAY'} | Status: ${game.status} | Winner: ${game.winner || 'TBD'}`);
+                        if (game.winner && game.winner !== 'TBD') {
+                            allWinners.push(game.winner);
+                        }
                     });
+                    console.log(`🏆 Week ${week} ALL WINNERS: [${allWinners.join(', ')}]`);
+                    console.log(`🔍 Looking for Denver: ${allWinners.includes('Denver Broncos') ? 'FOUND' : 'NOT FOUND'}`);
+                    console.log(`🔍 Denver variations: ${allWinners.filter(w => w.toLowerCase().includes('denver')).join(', ')}`);
                 } else {
                     console.log(`❌ Week ${week} has NO game data in Firebase`);
                 }
