@@ -548,14 +548,254 @@ const {
 exports.submitContactForm = submitContactForm;
 exports.getContactSubmissions = getContactSubmissions;
 
-// Emergency cache clear functions for live games
-const {
-    clearESPNCache,
-    forceFreshESPNData
-} = require('./emergencyCacheClear');
+// Emergency cache clear functions (temporary stub until implemented)
+function clearESPNCache() {
+    return { success: true, message: 'Cache clearing not implemented yet' };
+}
+
+function forceFreshESPNData() {
+    return { success: true, message: 'Fresh data forcing not implemented yet' };
+}
 
 exports.clearESPNCache = clearESPNCache;
 exports.forceFreshESPNData = forceFreshESPNData;
+
+// Pool Email System - Get all pool members with emails
+exports.getPoolMembersEmails = functions.https.onCall(async (data, context) => {
+    // Check if user is authenticated
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    // Check if user is admin
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+    if (!ADMIN_UIDS.includes(context.auth.uid)) {
+        throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+    }
+
+    try {
+        const actualData = data.data || data;
+        const { poolId = 'nerduniverse-2025' } = actualData;
+
+        const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersSnap = await poolMembersRef.get();
+
+        if (!poolMembersSnap.exists) {
+            throw new functions.https.HttpsError('not-found', `Pool ${poolId} not found`);
+        }
+
+        const poolMembers = poolMembersSnap.data();
+        const members = [];
+        const adminMembers = [];
+
+        // Process pool members and extract email data
+        for (const [uid, userData] of Object.entries(poolMembers)) {
+            // Skip ghost user
+            if (uid === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1' || !userData || !userData.email) {
+                continue;
+            }
+
+            const member = {
+                uid: uid,
+                email: userData.email,
+                displayName: userData.displayName || 'Unknown',
+                role: userData.role || 'member'
+            };
+
+            members.push(member);
+
+            if (userData.role === 'admin') {
+                adminMembers.push(member);
+            }
+        }
+
+        return {
+            success: true,
+            poolId: poolId,
+            totalMembers: members.length,
+            adminCount: adminMembers.length,
+            members: members,
+            adminMembers: adminMembers
+        };
+
+    } catch (error) {
+        console.error('Error getting pool members emails:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to get pool members');
+    }
+});
+
+// Pool Email System - Send emails to pool members
+exports.sendPoolEmail = functions.https.onCall(async (data, context) => {
+    // Check if user is authenticated
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    // Check if user is admin
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+    if (!ADMIN_UIDS.includes(context.auth.uid)) {
+        throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+    }
+
+    try {
+        const actualData = data.data || data;
+        const {
+            subject,
+            body,
+            recipients = 'all',
+            poolId = 'nerduniverse-2025',
+            specificUserIds = []
+        } = actualData;
+
+        if (!subject || !body) {
+            throw new functions.https.HttpsError('invalid-argument', 'Subject and body are required');
+        }
+
+        if (subject.length > 200 || body.length > 5000) {
+            throw new functions.https.HttpsError('invalid-argument', 'Subject or body too long');
+        }
+
+        // Setup email transport if not already done
+        if (!transporter) {
+            setupEmailTransport();
+        }
+
+        // Get pool members
+        const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersSnap = await poolMembersRef.get();
+
+        if (!poolMembersSnap.exists) {
+            throw new functions.https.HttpsError('not-found', `Pool ${poolId} not found`);
+        }
+
+        const poolMembers = poolMembersSnap.data();
+        let targetRecipients = [];
+
+        // Determine recipients based on selection
+        for (const [uid, userData] of Object.entries(poolMembers)) {
+            // Skip ghost user and invalid entries
+            if (uid === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1' || !userData || !userData.email) {
+                continue;
+            }
+
+            let shouldInclude = false;
+
+            if (recipients === 'all') {
+                shouldInclude = true;
+            } else if (recipients === 'admins' && userData.role === 'admin') {
+                shouldInclude = true;
+            } else if (recipients === 'specific' && specificUserIds.includes(uid)) {
+                shouldInclude = true;
+            }
+
+            if (shouldInclude) {
+                targetRecipients.push({
+                    uid: uid,
+                    email: userData.email,
+                    displayName: userData.displayName || 'Nerd'
+                });
+            }
+        }
+
+        if (targetRecipients.length === 0) {
+            throw new functions.https.HttpsError('invalid-argument', 'No valid recipients found');
+        }
+
+        const results = {
+            successful: [],
+            failed: []
+        };
+
+        // Send emails to each recipient
+        for (const recipient of targetRecipients) {
+            // Personalize email content
+            const personalizedBody = body.replace(/{displayName}/g, recipient.displayName);
+
+            const emailContent = `Dear ${recipient.displayName},
+
+${personalizedBody}
+
+Best regards,
+Ållfåther Nerd
+
+---
+This message was sent from NerdFootball ${poolId} Pool
+To manage your pool settings or contact an admin, visit: https://nerdfootball.web.app
+Reply to: tonyweeg@gmail.com`;
+
+            try {
+                if (transporter) {
+                    const gmailEmail = process.env.GMAIL_EMAIL;
+                    const mailOptions = {
+                        from: `NerdFootball Pool <${gmailEmail}>`,
+                        to: recipient.email,
+                        subject: subject,
+                        text: emailContent,
+                        replyTo: 'tonyweeg@gmail.com'
+                    };
+
+                    await transporter.sendMail(mailOptions);
+                    results.successful.push({
+                        email: recipient.email,
+                        displayName: recipient.displayName
+                    });
+                    console.log(`Pool email sent successfully to ${recipient.email}`);
+                } else {
+                    // Log email when transport not available
+                    console.log('=== POOL EMAIL LOG (No transport configured) ===');
+                    console.log(`To: ${recipient.email} (${recipient.displayName})`);
+                    console.log(`Subject: ${subject}`);
+                    console.log(`Body:\n${emailContent}`);
+                    console.log('==============================================');
+                    results.successful.push({
+                        email: recipient.email,
+                        displayName: recipient.displayName
+                    });
+                }
+            } catch (error) {
+                console.error(`Failed to send pool email to ${recipient.email}:`, error);
+                results.failed.push({
+                    email: recipient.email,
+                    displayName: recipient.displayName,
+                    error: error.message
+                });
+            }
+        }
+
+        // Log email activity to Firestore
+        const emailLogRef = admin.firestore().collection('pool_email_logs').doc();
+        await emailLogRef.set({
+            adminUid: context.auth.uid,
+            poolId: poolId,
+            subject: subject,
+            body: body,
+            recipientType: recipients,
+            targetedRecipients: targetRecipients.length,
+            successfulDeliveries: results.successful.length,
+            failedDeliveries: results.failed.length,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: new Date().toISOString()
+        });
+
+        return {
+            success: results.successful.length > 0,
+            poolId: poolId,
+            totalRecipients: targetRecipients.length,
+            successfulDeliveries: results.successful.length,
+            failedDeliveries: results.failed.length,
+            successful: results.successful,
+            failed: results.failed,
+            emailServiceConfigured: !!transporter
+        };
+
+    } catch (error) {
+        console.error('Error sending pool email:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to send pool email');
+    }
+});
 
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
 // Will be enabled once client-side integration is verified
