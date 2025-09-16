@@ -13,41 +13,55 @@ class SurvivorSystem {
             return { status: 'eliminated', reason: 'No pick made' };
         }
 
-        const userTeam = userPick.team;
+        // CORRECT SURVIVOR LOGIC: Use specific gameId-based picks
+        if (userPick.gameId && weekResults[userPick.gameId]) {
+            // Primary method: Check user's SPECIFIC game by gameId
+            const specificGame = weekResults[userPick.gameId];
 
-        // Find game where user's team played by iterating through all games
-        for (const [gameId, gameResult] of Object.entries(weekResults)) {
-            if (!gameResult || !gameResult.winner) continue;
+            if (!specificGame.winner || specificGame.winner === 'TBD') {
+                return { status: 'pending', reason: 'Game not finished' };
+            }
 
-            // Check if user's team played in this game (home or away)
-            const homeTeam = gameResult.homeTeam || gameResult.home_team || gameResult.h;
-            const awayTeam = gameResult.awayTeam || gameResult.away_team || gameResult.a;
+            if (specificGame.status === 'FINAL' && specificGame.winner === userPick.team) {
+                return { status: 'survived', reason: `${userPick.team} won their game` };
+            } else if (specificGame.status === 'FINAL') {
+                return { status: 'eliminated', reason: `Lost: Picked ${userPick.team}, ${specificGame.winner} won` };
+            } else {
+                return { status: 'pending', reason: 'Game in progress' };
+            }
+        } else {
+            // Backward compatibility: Fallback to team name matching for old picks
+            console.warn(`⚠️ Using fallback team matching for pick without gameId: ${userPick.team}`);
 
-            // Team name matching (normalize both)
+            const userTeam = userPick.team;
             const normalizedUserTeam = this.normalizeTeamName(userTeam);
-            const normalizedHome = this.normalizeTeamName(homeTeam);
-            const normalizedAway = this.normalizeTeamName(awayTeam);
 
-            if (normalizedUserTeam === normalizedHome || normalizedUserTeam === normalizedAway) {
-                // Found user's game! Check if they won
-                const normalizedWinner = this.normalizeTeamName(gameResult.winner);
+            for (const [gameId, gameResult] of Object.entries(weekResults)) {
+                if (!gameResult || !gameResult.winner) continue;
 
-                if (gameResult.winner === 'TBD' || !gameResult.winner) {
-                    return { status: 'pending', reason: 'Game not finished' };
-                }
+                const homeTeam = gameResult.homeTeam || gameResult.home_team || gameResult.h;
+                const awayTeam = gameResult.awayTeam || gameResult.away_team || gameResult.a;
 
-                const opponent = (normalizedWinner === normalizedHome) ? awayTeam : homeTeam;
+                const normalizedHome = this.normalizeTeamName(homeTeam);
+                const normalizedAway = this.normalizeTeamName(awayTeam);
 
-                if (normalizedWinner === normalizedUserTeam) {
-                    return { status: 'survived', reason: `${userTeam} won against ${opponent}` };
-                } else {
-                    return { status: 'eliminated', reason: `${userTeam} lost to ${gameResult.winner}` };
+                if (normalizedUserTeam === normalizedHome || normalizedUserTeam === normalizedAway) {
+                    const normalizedWinner = this.normalizeTeamName(gameResult.winner);
+
+                    if (gameResult.winner === 'TBD' || !gameResult.winner) {
+                        return { status: 'pending', reason: 'Game not finished' };
+                    }
+
+                    if (normalizedWinner === normalizedUserTeam) {
+                        return { status: 'survived', reason: `${userTeam} won (fallback match)` };
+                    } else {
+                        return { status: 'eliminated', reason: `${userTeam} lost to ${gameResult.winner} (fallback match)` };
+                    }
                 }
             }
-        }
 
-        // No game found for user's team
-        return { status: 'pending', reason: 'Game not found or not started' };
+            return { status: 'pending', reason: 'Game not found (no gameId provided)' };
+        }
     }
 
     // Pure team normalization - no ESPN dependencies
@@ -198,7 +212,14 @@ class SurvivorSystem {
             const totalTime = performance.now() - startTime;
             console.log(`🏆 PURE FIREBASE COMPLETE: ${totalTime.toFixed(1)}ms total (target: <500ms)`);
 
-            return results;
+            // Return results with summary stats for UI compatibility
+            const stats = this.getSummaryStats(results);
+
+            return {
+                results,
+                stats,
+                source: 'pure-firebase-survivor'
+            };
 
         } catch (error) {
             console.error('❌ Pure Firebase survivor error:', error);
