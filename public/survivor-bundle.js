@@ -30,37 +30,36 @@ class SurvivorSystem {
                 return { status: 'pending', reason: 'Game in progress' };
             }
         } else {
-            // Backward compatibility: Fallback to team name matching for old picks
+            // Fallback: Use survivorAutoElimination.js pattern for team matching
             console.warn(`⚠️ Using fallback team matching for pick without gameId: ${userPick.team}`);
 
             const userTeam = userPick.team;
-            const normalizedUserTeam = this.normalizeTeamName(userTeam);
 
+            // Check each game to find where user's team played
             for (const [gameId, gameResult] of Object.entries(weekResults)) {
-                if (!gameResult || !gameResult.winner) continue;
+                if (!gameResult) continue;
 
                 const homeTeam = gameResult.homeTeam || gameResult.home_team || gameResult.h;
                 const awayTeam = gameResult.awayTeam || gameResult.away_team || gameResult.a;
 
-                const normalizedHome = this.normalizeTeamName(homeTeam);
-                const normalizedAway = this.normalizeTeamName(awayTeam);
+                // Direct team name matching (like survivorAutoElimination.js)
+                if (userTeam === homeTeam || userTeam === awayTeam) {
 
-                if (normalizedUserTeam === normalizedHome || normalizedUserTeam === normalizedAway) {
-                    const normalizedWinner = this.normalizeTeamName(gameResult.winner);
-
-                    if (gameResult.winner === 'TBD' || !gameResult.winner) {
+                    if (!gameResult.winner || gameResult.winner === 'TBD') {
                         return { status: 'pending', reason: 'Game not finished' };
                     }
 
-                    if (normalizedWinner === normalizedUserTeam) {
-                        return { status: 'survived', reason: `${userTeam} won (fallback match)` };
+                    if (gameResult.status === 'FINAL' && gameResult.winner === userTeam) {
+                        return { status: 'survived', reason: `${userTeam} won their game` };
+                    } else if (gameResult.status === 'FINAL') {
+                        return { status: 'eliminated', reason: `${userTeam} lost to ${gameResult.winner}` };
                     } else {
-                        return { status: 'eliminated', reason: `${userTeam} lost to ${gameResult.winner} (fallback match)` };
+                        return { status: 'pending', reason: 'Game in progress' };
                     }
                 }
             }
 
-            return { status: 'pending', reason: 'Game not found (no gameId provided)' };
+            return { status: 'pending', reason: 'Team not found in any game' };
         }
     }
 
