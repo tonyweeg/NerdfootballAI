@@ -225,19 +225,19 @@ class SurvivorSystem {
 
     getSummaryStats(results) {
         const stats = {
-            totalPlayers: results.length,
-            activePlayers: 0,
-            eliminatedPlayers: 0,
-            pendingPlayers: 0
+            total: results.length,
+            active: 0,
+            eliminated: 0,
+            pending: 0
         };
 
         results.forEach(result => {
             if (result.status === 'eliminated') {
-                stats.eliminatedPlayers++;
+                stats.eliminated++;
             } else if (result.status === 'survived') {
-                stats.activePlayers++;
+                stats.active++;
             } else {
-                stats.pendingPlayers++;
+                stats.pending++;
             }
         });
 
