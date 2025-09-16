@@ -4912,9 +4912,27 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         });
     });
 
-    const resultsDocRef = doc(db, resultsPath(weekNumber));
-    const resultsSnap = await getDoc(resultsDocRef);
-    const currentResults = resultsSnap.exists() ? resultsSnap.data() : {};
+    // 🏈 CRITICAL FIX: Check BOTH locations for existing game results
+    let currentResults = {};
+    try {
+        // Try new location first (nerdfootball_games)
+        const newResultsDoc = await getDoc(doc(db, resultsPath(weekNumber)));
+
+        if (newResultsDoc.exists()) {
+            currentResults = newResultsDoc.data();
+            console.log(`📍 Admin found results in NEW location (nerdfootball_games) for Week ${weekNumber}`);
+        } else {
+            // Fallback to old location (nerdfootball_results) for backward compatibility
+            const oldPath = resultsPath(weekNumber).replace('nerdfootball_games', 'nerdfootball_results');
+            const oldResultsDoc = await getDoc(doc(db, oldPath));
+            if (oldResultsDoc.exists()) {
+                currentResults = oldResultsDoc.data();
+                console.log(`📍 Admin found results in OLD location (nerdfootball_results) for Week ${weekNumber}`);
+            }
+        }
+    } catch (error) {
+        console.warn(`Failed to load admin results for Week ${weekNumber}:`, error);
+    }
     allUI.resultsGameList.innerHTML = '';
 
     weekData.games.forEach(game => {
