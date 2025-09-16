@@ -69,7 +69,7 @@ class SurvivorSystem {
         }
     }
 
-    checkUserSurvival(userPick, weekResults) {
+    checkUserSurvival(userPick, weekResults, weekNumber = null) {
         if (!userPick || !userPick.team) {
             return { status: 'eliminated', reason: 'No pick made' };
         }
@@ -83,9 +83,14 @@ class SurvivorSystem {
                 return { status: 'pending', reason: 'Game not finished' };
             }
 
-            if (specificGame.status === 'FINAL' && specificGame.winner === userPick.team) {
+            // Check for various status formats (FINAL, STATUS_FINAL, Final)
+            const isFinal = specificGame.status === 'FINAL' ||
+                           specificGame.status === 'STATUS_FINAL' ||
+                           specificGame.status === 'Final';
+
+            if (isFinal && specificGame.winner === userPick.team) {
                 return { status: 'survived', reason: `${userPick.team} won their game` };
-            } else if (specificGame.status === 'FINAL') {
+            } else if (isFinal) {
                 return { status: 'eliminated', reason: `Lost: Picked ${userPick.team}, ${specificGame.winner} won` };
             } else {
                 return { status: 'pending', reason: 'Game in progress' };
@@ -93,42 +98,43 @@ class SurvivorSystem {
         } else {
             // SIMPLE WINNER CHECK: If user's team is a winner this week, they survive
             const userTeam = userPick.team;
-            console.log(`🏈 Checking if ${userTeam} won any game this week`);
+            const weekLabel = weekNumber ? `Week ${weekNumber}` : 'this week';
+            console.log(`🏈 Checking if ${userTeam} won any game in ${weekLabel}`);
 
             // Get all winners for debug
             const allWinners = Object.values(weekResults)
                 .filter(game => game && game.winner && game.winner !== 'TBD')
                 .map(game => game.winner);
-            console.log(`🏆 All winners this week: [${allWinners.join(', ')}]`);
+            console.log(`🏆 All winners in ${weekLabel}: [${allWinners.join(', ')}]`);
 
             // Check if user's team is in the winners list for this week
             for (const [gameId, gameResult] of Object.entries(weekResults)) {
-                if (!gameResult) continue;
+                if (!gameResult || !gameResult.winner || gameResult.winner === 'TBD') continue;
 
-                if (gameResult.status === 'STATUS_FINAL' && gameResult.winner) {
-                    console.log(`🔍 Comparing '${userTeam}' vs '${gameResult.winner}'`);
+                // If there's a winner set, consider it a valid result regardless of status
+                // This handles cases where admin manually sets winners but status is undefined
+                console.log(`🔍 Comparing '${userTeam}' vs '${gameResult.winner}' in ${weekLabel} (game ${gameId})`);
 
-                    // Direct team name comparison
-                    if (gameResult.winner === userTeam) {
-                        console.log(`✅ ${userTeam} won game ${gameId}`);
-                        return { status: 'survived', reason: `${userTeam} won their game` };
-                    }
+                // Direct team name comparison
+                if (gameResult.winner === userTeam) {
+                    console.log(`✅ ${userTeam} won game ${gameId} in ${weekLabel}`);
+                    return { status: 'survived', reason: `${userTeam} won their game` };
+                }
 
-                    // Also try normalized comparison
-                    const normalizedUserTeam = this.normalizeTeamName(userTeam);
-                    const normalizedWinner = this.normalizeTeamName(gameResult.winner);
+                // Also try normalized comparison
+                const normalizedUserTeam = this.normalizeTeamName(userTeam);
+                const normalizedWinner = this.normalizeTeamName(gameResult.winner);
 
-                    console.log(`🔍 Normalized: '${normalizedUserTeam}' vs '${normalizedWinner}'`);
-                    if (normalizedWinner === normalizedUserTeam) {
-                        console.log(`✅ ${userTeam} won game ${gameId} (normalized match)`);
-                        return { status: 'survived', reason: `${userTeam} won their game` };
-                    }
+                console.log(`🔍 Normalized: '${normalizedUserTeam}' vs '${normalizedWinner}' in ${weekLabel}`);
+                if (normalizedWinner === normalizedUserTeam) {
+                    console.log(`✅ ${userTeam} won game ${gameId} (normalized match) in ${weekLabel}`);
+                    return { status: 'survived', reason: `${userTeam} won their game` };
                 }
             }
 
             // If team didn't win any game, they're eliminated
-            console.log(`❌ ${userTeam} did not win any games this week`);
-            return { status: 'eliminated', reason: `Lost: ${userTeam} did not win any games this week` };
+            console.log(`❌ ${userTeam} did not win any games in ${weekLabel}`);
+            return { status: 'eliminated', reason: `Lost: ${userTeam} did not win any games in ${weekLabel}` };
         }
     }
 
@@ -362,7 +368,7 @@ class SurvivorSystem {
                     }
 
                     // Use the correct survival checking logic
-                    const survivalResult = this.checkUserSurvival(userPick, weekResults);
+                    const survivalResult = this.checkUserSurvival(userPick, weekResults, week);
                     console.log(`👤 User ${uid} Week ${week} survival result:`, survivalResult);
 
                     if (survivalResult.status === 'survived') {
@@ -549,6 +555,35 @@ class SurvivorSystem {
 
         return stats;
     }
+
+    async refreshStats() {
+        console.log('🔄 Refreshing survivor stats after ESPN sync...');
+
+        try {
+            // Re-initialize to pick up latest week and data
+            this.initialized = false;
+            await this.initialize();
+
+            // If on survivor page, refresh the display
+            if (window.location.pathname.includes('nerdSurvivor.html') ||
+                window.location.search.includes('view=survivor')) {
+
+                const results = await this.readSurvivorSheets();
+                const stats = this.getSummaryStats(results);
+                console.log(`📊 Updated stats: ${stats.active} active, ${stats.eliminated} eliminated`);
+
+                // Trigger UI refresh if display function exists
+                if (window.displaySurvivorResults) {
+                    window.displaySurvivorResults(results);
+                }
+            }
+
+            return true;
+        } catch (error) {
+            console.error('❌ Refresh stats failed:', error);
+            return false;
+        }
+    }
 }
 
 // PURE FIREBASE INITIALIZATION: Zero ESPN dependencies
@@ -572,10 +607,18 @@ async function initializePureSurvivorSystem() {
             return;
         }
 
-        // Initialize pure survivor system with zero ESPN dependencies
+        // Initialize pure survivor system with ESPN sync integration
         window.survivorSystem = new SurvivorSystem(window.db);
         await window.survivorSystem.initialize();
         console.log('✅ PURE FIREBASE: Survivor System initialized successfully');
+
+        // Initialize ESPN sync integration if available
+        if (window.espnWinnerSync) {
+            console.log('🔄 ESPN sync system detected - enabling auto-sync...');
+            // Set up auto-refresh when ESPN data syncs
+            window.survivorSystem.enableESPNSync = true;
+        }
+
         return true;
 
     } catch (error) {
