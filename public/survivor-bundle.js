@@ -552,7 +552,7 @@ class SurvivorSystem {
 }
 
 // PURE FIREBASE INITIALIZATION: Zero ESPN dependencies
-function initializePureSurvivorSystem() {
+async function initializePureSurvivorSystem() {
     if (typeof window === 'undefined') {
         console.error('❌ Window not available for pure survivor system');
         return;
@@ -591,8 +591,8 @@ if (typeof window !== 'undefined') {
     let retryCount = 0;
     const maxRetries = 10;
 
-    const tryInit = () => {
-        if (initializePureSurvivorSystem()) {
+    const tryInit = async () => {
+        if (await initializePureSurvivorSystem()) {
             return; // Success!
         }
 
@@ -605,5 +605,7 @@ if (typeof window !== 'undefined') {
         }
     };
 
-    tryInit();
+    tryInit().catch(error => {
+        console.error('❌ Async survivor initialization failed:', error);
+    });
 }
