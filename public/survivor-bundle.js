@@ -14,10 +14,14 @@ class SurvivorSystem {
             return window.currentWeek;
         }
 
-        // ESPN API shows we're in Week 2 - use that directly
-        // The console logs show "ESPN: Fetching Week 2 games" and "Schedule Week 2 cached with state: IN_PROGRESS"
-        console.log(`🏈 SurvivorSystem: Using Week 2 (ESPN indicates current week)`);
-        return 2;
+        // Calculate current week based on date - Week 1 starts Sept 4, 2025
+        const now = new Date();
+        const seasonStart = new Date('2025-09-04');
+        const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+        const currentWeek = Math.min(Math.max(Math.floor(daysSinceStart / 7) + 1, 1), 18);
+
+        console.log(`🏈 SurvivorSystem: Calculated Week ${currentWeek} (${daysSinceStart} days since season start)`);
+        return currentWeek;
     }
 
     checkUserSurvival(userPick, weekResults) {
@@ -51,27 +55,57 @@ class SurvivorSystem {
             for (const [gameId, gameResult] of Object.entries(weekResults)) {
                 if (!gameResult) continue;
 
-                const homeTeam = gameResult.homeTeam || gameResult.home_team || gameResult.h;
-                const awayTeam = gameResult.awayTeam || gameResult.away_team || gameResult.a;
+                // Extract teams from competitors array (ESPN format)
+                let homeTeam = null;
+                let awayTeam = null;
 
-                // Direct team name matching (like survivorAutoElimination.js)
-                if (userTeam === homeTeam || userTeam === awayTeam) {
+                if (gameResult.competitors && Array.isArray(gameResult.competitors)) {
+                    // ESPN format: competitors array with home/away indicators
+                    gameResult.competitors.forEach(competitor => {
+                        if (competitor.homeAway === 'home') {
+                            homeTeam = competitor.team?.displayName || competitor.team?.name;
+                        } else if (competitor.homeAway === 'away') {
+                            awayTeam = competitor.team?.displayName || competitor.team?.name;
+                        }
+                    });
+                } else {
+                    // Fallback to direct fields
+                    homeTeam = gameResult.homeTeam || gameResult.home_team || gameResult.h;
+                    awayTeam = gameResult.awayTeam || gameResult.away_team || gameResult.a;
+                }
+
+                // Normalize team names for comparison
+                const normalizedUserTeam = this.normalizeTeamName(userTeam);
+                const normalizedHomeTeam = this.normalizeTeamName(homeTeam);
+                const normalizedAwayTeam = this.normalizeTeamName(awayTeam);
+
+                // Check if user's team played in this game
+                if (normalizedUserTeam === normalizedHomeTeam || normalizedUserTeam === normalizedAwayTeam) {
+                    console.log(`🏈 Found ${userTeam} in game ${gameId}: ${homeTeam} vs ${awayTeam}`);
 
                     if (!gameResult.winner || gameResult.winner === 'TBD') {
                         return { status: 'pending', reason: 'Game not finished' };
                     }
 
-                    if (gameResult.status === 'FINAL' && gameResult.winner === userTeam) {
-                        return { status: 'survived', reason: `${userTeam} won their game` };
-                    } else if (gameResult.status === 'FINAL') {
-                        return { status: 'eliminated', reason: `${userTeam} lost to ${gameResult.winner}` };
+                    if (gameResult.status === 'FINAL' || gameResult.status === 'STATUS_FINAL') {
+                        const normalizedWinner = this.normalizeTeamName(gameResult.winner);
+
+                        if (normalizedWinner === normalizedUserTeam) {
+                            return { status: 'survived', reason: `${userTeam} won their game` };
+                        } else {
+                            // Find the opponent
+                            const opponent = (normalizedUserTeam === normalizedHomeTeam) ? awayTeam : homeTeam;
+                            return { status: 'eliminated', reason: `Lost: Picked ${userTeam}, ${gameResult.winner} won` };
+                        }
                     } else {
                         return { status: 'pending', reason: 'Game in progress' };
                     }
                 }
             }
 
-            return { status: 'pending', reason: 'Team not found in any game' };
+            // If team not found in any game, check if they had a bye week
+            console.warn(`⚠️ Team ${userTeam} not found in any Week games`);
+            return { status: 'eliminated', reason: `Team ${userTeam} not found in any games this week` };
         }
     }
 
@@ -297,43 +331,11 @@ class SurvivorSystem {
                         continue;
                     }
 
-                    // SIMPLE MATCH: If user picked a team and that team is the winner, they survived
-                    // If user picked a team and that team is NOT the winner of any game, they lost
-                    let userSurvived = false;
-                    let gameResult = null;
+                    // Use the correct survival checking logic
+                    const survivalResult = this.checkUserSurvival(userPick, weekResults);
+                    console.log(`👤 User ${uid} Week ${week} survival result:`, survivalResult);
 
-                    // Check if user's team won ANY game this week
-                    for (const [gameId, game] of Object.entries(weekResults)) {
-                        if (game.status === 'STATUS_FINAL' && game.winner === userPick.team) {
-                            userSurvived = true;
-                            gameResult = game;
-                            break;
-                        }
-                    }
-
-                    // If no game found where their team won, they lost (unless game still in progress)
-                    if (!userSurvived && !gameResult) {
-                        // Check if their team played but lost
-                        for (const [gameId, game] of Object.entries(weekResults)) {
-                            if (game.status === 'STATUS_FINAL' && game.winner && game.winner !== userPick.team) {
-                                // This could be their game - they lost
-                                gameResult = { status: 'STATUS_FINAL', winner: game.winner, userLost: true };
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!gameResult) {
-                        weeklySheet[uid] = {
-                            displayName: member.displayName || member.email,
-                            team: userPick.team,
-                            status: 'pending',
-                            reason: 'Game not found'
-                        };
-                        continue;
-                    }
-
-                    if (userSurvived && gameResult) {
+                    if (survivalResult.status === 'survived') {
                         // WINNER - survived this week - add to winners array
                         const winnerEntry = {
                             week,
@@ -347,16 +349,16 @@ class SurvivorSystem {
                             displayName: member.displayName || member.email,
                             team: userPick.team,
                             status: 'survived',
-                            reason: `Won with ${userPick.team}`
+                            reason: survivalResult.reason
                         };
-                    } else if (gameResult && gameResult.userLost) {
+                    } else if (survivalResult.status === 'eliminated') {
                         // LOSER - eliminated this week - add to losers array
                         const loserEntry = {
                             week,
                             userId: uid,
                             team: userPick.team,
                             displayName: member.displayName || member.email,
-                            reason: `Lost: Picked ${userPick.team}, ${gameResult.winner} won`
+                            reason: survivalResult.reason
                         };
                         losersArray.push(loserEntry);
                         eliminatedUsers.add(uid); // Mark as eliminated
@@ -365,15 +367,15 @@ class SurvivorSystem {
                             displayName: member.displayName || member.email,
                             team: userPick.team,
                             status: 'eliminated',
-                            reason: `Lost: Picked ${userPick.team}, ${gameResult.winner} won`
+                            reason: survivalResult.reason
                         };
                     } else {
-                        // Game in progress or not found
+                        // Game in progress or pending
                         weeklySheet[uid] = {
                             displayName: member.displayName || member.email,
                             team: userPick.team,
                             status: 'pending',
-                            reason: 'Game not final or team not found'
+                            reason: survivalResult.reason
                         };
                     }
                 }

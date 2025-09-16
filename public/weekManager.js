@@ -42,10 +42,14 @@ class WeekManager {
 
     // Main week detection with multiple data sources
     async detectCurrentWeek() {
-        // TEMPORARY FIX: Force Week 1 until data sources align
-        // User picks are in Week 1 (game IDs 101, 103, 111) so we need Week 1
-        console.log('🏈 WeekManager: TEMPORARY - Forcing Week 1 for user pick alignment');
-        return 1;
+        // Calculate current week based on date - Week 1 starts Sept 4, 2025
+        const now = new Date();
+        const seasonStart = new Date('2025-09-04');
+        const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+        const currentWeek = Math.min(Math.max(Math.floor(daysSinceStart / 7) + 1, 1), 18);
+
+        console.log(`🏈 WeekManager: Calculated Week ${currentWeek} (${daysSinceStart} days since season start)`);
+        return currentWeek;
     }
 
     // Detect week from live/in-progress games
