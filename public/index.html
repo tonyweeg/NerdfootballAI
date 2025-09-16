@@ -12171,7 +12171,13 @@ document.getElementById('system-dashboard-btn')?.addEventListener('click', () =>
    }
  });
  
- await setDoc(doc(db, resultsPath(weekNumber)), newResults);
+ // 🏈 CRITICAL FIX: Save to BOTH paths for backward compatibility
+// Save to nerdfootball_games (for survivor system)
+await setDoc(doc(db, resultsPath(weekNumber)), newResults);
+
+// Save to nerdfootball_results (for confidence pool, grid, leaderboard)
+const legacyResultsPath = resultsPath(weekNumber).replace('nerdfootball_games', 'nerdfootball_results');
+await setDoc(doc(db, legacyResultsPath), newResults);
 
  // 💎 CRITICAL: Invalidate all cache affected by game results changes
  window.gameStateCache.invalidateAfterDataUpdate('game_results_updated', weekNumber);
