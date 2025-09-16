@@ -46,66 +46,35 @@ class SurvivorSystem {
                 return { status: 'pending', reason: 'Game in progress' };
             }
         } else {
-            // Fallback: Use survivorAutoElimination.js pattern for team matching
-            console.warn(`⚠️ Using fallback team matching for pick without gameId: ${userPick.team}`);
-
+            // SIMPLE WINNER CHECK: If user's team is a winner this week, they survive
             const userTeam = userPick.team;
+            console.log(`🏈 Checking if ${userTeam} won any game this week`);
 
-            // Check each game to find where user's team played
+            // Check if user's team is in the winners list for this week
             for (const [gameId, gameResult] of Object.entries(weekResults)) {
                 if (!gameResult) continue;
 
-                // Extract teams from competitors array (ESPN format)
-                let homeTeam = null;
-                let awayTeam = null;
-
-                if (gameResult.competitors && Array.isArray(gameResult.competitors)) {
-                    // ESPN format: competitors array with home/away indicators
-                    gameResult.competitors.forEach(competitor => {
-                        if (competitor.homeAway === 'home') {
-                            homeTeam = competitor.team?.displayName || competitor.team?.name;
-                        } else if (competitor.homeAway === 'away') {
-                            awayTeam = competitor.team?.displayName || competitor.team?.name;
-                        }
-                    });
-                } else {
-                    // Fallback to direct fields
-                    homeTeam = gameResult.homeTeam || gameResult.home_team || gameResult.h;
-                    awayTeam = gameResult.awayTeam || gameResult.away_team || gameResult.a;
-                }
-
-                // Normalize team names for comparison
-                const normalizedUserTeam = this.normalizeTeamName(userTeam);
-                const normalizedHomeTeam = this.normalizeTeamName(homeTeam);
-                const normalizedAwayTeam = this.normalizeTeamName(awayTeam);
-
-                // Check if user's team played in this game
-                if (normalizedUserTeam === normalizedHomeTeam || normalizedUserTeam === normalizedAwayTeam) {
-                    console.log(`🏈 Found ${userTeam} in game ${gameId}: ${homeTeam} vs ${awayTeam}`);
-
-                    if (!gameResult.winner || gameResult.winner === 'TBD') {
-                        return { status: 'pending', reason: 'Game not finished' };
+                if (gameResult.status === 'STATUS_FINAL' && gameResult.winner) {
+                    // Direct team name comparison
+                    if (gameResult.winner === userTeam) {
+                        console.log(`✅ ${userTeam} won game ${gameId}`);
+                        return { status: 'survived', reason: `${userTeam} won their game` };
                     }
 
-                    if (gameResult.status === 'FINAL' || gameResult.status === 'STATUS_FINAL') {
-                        const normalizedWinner = this.normalizeTeamName(gameResult.winner);
+                    // Also try normalized comparison
+                    const normalizedUserTeam = this.normalizeTeamName(userTeam);
+                    const normalizedWinner = this.normalizeTeamName(gameResult.winner);
 
-                        if (normalizedWinner === normalizedUserTeam) {
-                            return { status: 'survived', reason: `${userTeam} won their game` };
-                        } else {
-                            // Find the opponent
-                            const opponent = (normalizedUserTeam === normalizedHomeTeam) ? awayTeam : homeTeam;
-                            return { status: 'eliminated', reason: `Lost: Picked ${userTeam}, ${gameResult.winner} won` };
-                        }
-                    } else {
-                        return { status: 'pending', reason: 'Game in progress' };
+                    if (normalizedWinner === normalizedUserTeam) {
+                        console.log(`✅ ${userTeam} won game ${gameId} (normalized match)`);
+                        return { status: 'survived', reason: `${userTeam} won their game` };
                     }
                 }
             }
 
-            // If team not found in any game, check if they had a bye week
-            console.warn(`⚠️ Team ${userTeam} not found in any Week games`);
-            return { status: 'eliminated', reason: `Team ${userTeam} not found in any games this week` };
+            // If team didn't win any game, they're eliminated
+            console.log(`❌ ${userTeam} did not win any games this week`);
+            return { status: 'eliminated', reason: `Lost: ${userTeam} did not win any games this week` };
         }
     }
 
