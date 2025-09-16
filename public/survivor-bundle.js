@@ -215,11 +215,7 @@ class SurvivorSystem {
             // Return results with summary stats for UI compatibility
             const stats = this.getSummaryStats(results);
 
-            return {
-                results,
-                stats,
-                source: 'pure-firebase-survivor'
-            };
+            return results;
 
         } catch (error) {
             console.error('❌ Pure Firebase survivor error:', error);
