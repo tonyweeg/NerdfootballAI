@@ -992,6 +992,7 @@
      <div class="flex gap-3 mb-4">
          <button id="sync-current-week-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Sync Current Week</button>
          <button id="sync-all-weeks-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Auto-Sync All 18 Weeks</button>
+         <button id="emergency-clean-week1-btn" class="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">🚨 Fix Week 1</button>
          <button id="clean-and-sync-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">🧹 Clean & Sync All</button>
          <button id="check-espn-status-btn" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Check ESPN Status</button>
      </div>
@@ -14637,6 +14638,7 @@ function initializeESPNSync() {
 function bindESPNSyncEventListeners() {
     const syncCurrentBtn = document.getElementById('sync-current-week-btn');
     const syncAllBtn = document.getElementById('sync-all-weeks-btn');
+    const emergencyCleanBtn = document.getElementById('emergency-clean-week1-btn');
     const cleanAndSyncBtn = document.getElementById('clean-and-sync-btn');
     const checkStatusBtn = document.getElementById('check-espn-status-btn');
     const manualSyncBtn = document.getElementById('manual-sync-btn');
@@ -14687,6 +14689,32 @@ function bindESPNSyncEventListeners() {
                 }
             } else {
                 logToESPNStatus('❌ ESPN sync system not available');
+            }
+        });
+    }
+
+    if (emergencyCleanBtn) {
+        emergencyCleanBtn.addEventListener('click', async () => {
+            logToESPNStatus('🚨 EMERGENCY: Fixing Week 1 ESPN contamination...');
+
+            if (window.espnWinnerSync && window.espnWinnerSync.emergencyCleanWeek1) {
+                const result = await window.espnWinnerSync.emergencyCleanWeek1();
+
+                if (result.success) {
+                    logToESPNStatus(`✅ Week 1 fixed: Kept ${result.kept} clean games, removed ${result.cleaned} contaminated IDs`);
+                    logToESPNStatus('🎯 Now Denver Broncos picks should work correctly!');
+
+                    // Trigger survivor pool refresh
+                    if (window.survivorSystem && window.survivorSystem.refreshStats) {
+                        logToESPNStatus('🔄 Refreshing survivor pool...');
+                        await window.survivorSystem.refreshStats();
+                        logToESPNStatus('✅ Survivor pool refreshed - check Denver Broncos status');
+                    }
+                } else {
+                    logToESPNStatus(`❌ Week 1 fix failed: ${result.error}`);
+                }
+            } else {
+                logToESPNStatus('❌ Emergency clean function not available');
             }
         });
     }

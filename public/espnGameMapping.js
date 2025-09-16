@@ -31,7 +31,14 @@ window.espnWinnerSync = {
 
             const espnData = await window.espnNerdApi.getCurrentWeekScores(week);
             if (!espnData || !espnData.games) {
-                throw new Error(`No ESPN data for Week ${week}`);
+                console.log(`📅 No ESPN data available for Week ${week}`);
+                return { success: true, synced: 0, updates: {} };
+            }
+
+            // Skip if ESPN is returning cached data from a different week
+            if (espnData.week && espnData.week !== week && week > 2) {
+                console.log(`⚠️ ESPN returned Week ${espnData.week} data when requesting Week ${week} - skipping`);
+                return { success: true, synced: 0, updates: {} };
             }
 
             const updates = {};
@@ -129,13 +136,14 @@ window.espnWinnerSync = {
             const legacyPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`;
 
             // Read current data
-            const doc = await getDoc(doc(db, primaryPath));
-            if (!doc.exists()) {
+            const docRef = doc(db, primaryPath);
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
                 console.log(`📅 No data found for Week ${week}`);
                 return { success: true, cleaned: 0 };
             }
 
-            const currentData = doc.data();
+            const currentData = docSnap.data();
             const cleanData = {};
             let cleanedCount = 0;
 
@@ -211,6 +219,49 @@ window.espnWinnerSync = {
 
         } catch (error) {
             console.error('❌ Clean and sync failed:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Emergency fix for Week 1 ESPN contamination
+    async emergencyCleanWeek1() {
+        try {
+            console.log('🚨 EMERGENCY: Cleaning Week 1 ESPN contamination...');
+
+            const week1Path = `artifacts/nerdfootball/public/data/nerdfootball_games/1`;
+            const docRef = doc(db, week1Path);
+            const docSnap = await getDoc(docRef);
+
+            if (!docSnap.exists()) {
+                console.log('❌ Week 1 data not found');
+                return { success: false, error: 'No Week 1 data' };
+            }
+
+            const currentData = docSnap.data();
+            const cleanData = {};
+            let cleanedCount = 0;
+            let keptCount = 0;
+
+            // Keep only clean game IDs (101-116), remove ESPN IDs (2211-2237)
+            Object.entries(currentData).forEach(([gameId, gameData]) => {
+                if (gameId.match(/^1\d{2}$/)) { // Week 1 format: 101, 102, 103, etc.
+                    cleanData[gameId] = gameData;
+                    keptCount++;
+                    console.log(`✅ Keeping clean game ${gameId}`);
+                } else {
+                    console.log(`🗑️ Removing contaminated game ID: ${gameId}`);
+                    cleanedCount++;
+                }
+            });
+
+            // Save clean data
+            await setDoc(docRef, cleanData);
+            console.log(`🎉 Week 1 cleaned: Kept ${keptCount} clean games, removed ${cleanedCount} contaminated IDs`);
+
+            return { success: true, cleaned: cleanedCount, kept: keptCount };
+
+        } catch (error) {
+            console.error('❌ Emergency clean failed:', error);
             return { success: false, error: error.message };
         }
     }
