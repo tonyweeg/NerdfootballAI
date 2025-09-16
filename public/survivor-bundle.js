@@ -465,16 +465,24 @@ class SurvivorSystem {
                         eliminatedWeek: loserEntry.week,
                         reason: loserEntry.reason,
                         isEliminated: true,
-                        team: loserEntry.team
+                        team: loserEntry.team,
+                        currentPick: loserEntry.team,  // UI compatibility
+                        teamPicked: loserEntry.team    // UI compatibility
                     });
                 } else {
+                    // Find the most recent winner entry for this user to get their team
+                    const winnerEntry = winnersArray.find(winner => winner.userId === uid);
+                    const currentTeam = winnerEntry ? winnerEntry.team : 'No pick';
+
                     results.push({
                         uid,
                         displayName: member.displayName || member.email,
                         status: 'survived',
                         reason: `Still alive in Week ${this.currentWeek}`,
                         isEliminated: false,
-                        team: 'Active'
+                        team: currentTeam,
+                        currentPick: currentTeam,      // UI compatibility
+                        teamPicked: currentTeam        // UI compatibility
                     });
                 }
             }
@@ -545,15 +553,26 @@ function initializePureSurvivorSystem() {
     }
 }
 
-// AUTO-INITIALIZE: Pure Firebase system
+// AUTO-INITIALIZE: Pure Firebase system with robust retry
 if (typeof window !== 'undefined') {
     console.log('🔄 Pure Firebase survivor system initialization attempt...');
 
-    if (!initializePureSurvivorSystem()) {
-        // Delayed retry for Firebase globals
-        setTimeout(() => {
-            console.log('🔄 Delayed pure Firebase survivor system initialization...');
-            initializePureSurvivorSystem();
-        }, 2000);
-    }
+    let retryCount = 0;
+    const maxRetries = 10;
+
+    const tryInit = () => {
+        if (initializePureSurvivorSystem()) {
+            return; // Success!
+        }
+
+        retryCount++;
+        if (retryCount < maxRetries) {
+            console.log(`🔄 Delayed pure Firebase survivor system initialization... (attempt ${retryCount}/${maxRetries})`);
+            setTimeout(tryInit, 1000); // Try every second
+        } else {
+            console.error('❌ Failed to initialize survivor system after maximum retries');
+        }
+    };
+
+    tryInit();
 }

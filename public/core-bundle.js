@@ -34,7 +34,8 @@ class WeekManager {
             console.log(`🏈 WeekManager: Initialized successfully - Week ${this.currentWeek} (Next: ${this.nextWeek}, Previous: ${this.previousWeek})`);
         } catch (error) {
             console.error('🏈 WeekManager: Initialization failed, using fallback:', error);
-            this._currentWeek = 1;
+            // Use date-based calculation instead of hardcoded 1
+            this._currentWeek = this.getDateBasedWeekEstimate();
             this.setGlobalWeekVariables();
             this.initialized = true;
         }
@@ -174,14 +175,24 @@ class WeekManager {
     // Helper: Get date-based week estimate (only for fallback)
     getDateBasedWeekEstimate() {
         const now = new Date();
-        const seasonStart = new Date('2025-09-04');
-        
+        // NFL Week 1 started Sept 5 (Thursday), Week 2 starts Sept 10 (Tuesday after Week 1 games)
+        // Week 3 starts Sept 17 (Tuesday after Week 2 games)
+        // But user says Sept 16 (Monday) is start of Week 3, so adjust accordingly
+        const seasonStart = new Date('2025-09-05'); // Week 1 Thursday start
+
         if (now < seasonStart) {
             return 1; // Pre-season
         }
-        
-        const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000)) + 1;
-        return Math.min(Math.max(weeksDiff, 1), this.maxWeek);
+
+        // Calculate days since season start
+        const daysSince = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+
+        // NFL weeks: Week 1 (Sep 5-8), Week 2 (Sep 9-15), Week 3 (Sep 16-22)
+        // If today is Sep 16, that's 11 days since Sep 5
+        const weekNumber = Math.floor(daysSince / 7) + 1;
+
+        console.log(`🏈 Date calculation: ${daysSince} days since season start = Week ${weekNumber}`);
+        return Math.min(Math.max(weekNumber, 1), this.maxWeek);
     }
 
     // Check if Firestore results indicate recent completed games
