@@ -4,24 +4,69 @@
 class SurvivorSystem {
     constructor(db) {
         this.db = db;
-        this.currentWeek = this.getCurrentWeek();
+        this.currentWeek = 1; // Will be updated by initialization
+        this.initialized = false;
+        console.log(`🏆 PURE FIREBASE Survivor System initializing...`);
+    }
+
+    async initialize() {
+        if (this.initialized) return;
+
+        this.currentWeek = await this.getCurrentWeek();
+        this.initialized = true;
         console.log(`🏆 PURE FIREBASE Survivor System using week ${this.currentWeek}`);
     }
 
-    getCurrentWeek() {
-        // Use global week if available
-        if (window.currentWeek && window.currentWeek >= 1) {
-            return window.currentWeek;
+    async getCurrentWeek() {
+        // 🎯 DYNAMIC WEEK DETECTION: Find current week based on completed game data
+        try {
+            let latestCompletedWeek = 0;
+
+            // Check weeks 1-18 for complete game data
+            for (let week = 1; week <= 18; week++) {
+                const weekResultsDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`));
+
+                if (weekResultsDoc.exists()) {
+                    const weekResults = weekResultsDoc.data();
+                    const games = Object.values(weekResults);
+
+                    // Check if this week has substantial completed games (more than half)
+                    const completedGames = games.filter(game =>
+                        game && game.winner && game.winner !== 'TBD' && game.winner !== null
+                    );
+
+                    if (completedGames.length >= Math.floor(games.length * 0.5)) {
+                        latestCompletedWeek = week;
+                        console.log(`🏈 Week ${week}: ${completedGames.length}/${games.length} games completed`);
+                    } else {
+                        console.log(`🏈 Week ${week}: Only ${completedGames.length}/${games.length} games completed (insufficient)`);
+                        break; // Stop checking once we hit an incomplete week
+                    }
+                } else {
+                    console.log(`🏈 Week ${week}: No game data found`);
+                    break;
+                }
+            }
+
+            // Current survivor week = latest completed week + 1
+            const currentSurvivorWeek = Math.min(latestCompletedWeek + 1, 18);
+
+            console.log(`🎯 DYNAMIC DETECTION: Latest completed week = ${latestCompletedWeek}, Current survivor week = ${currentSurvivorWeek}`);
+
+            return currentSurvivorWeek;
+
+        } catch (error) {
+            console.warn('🏈 Dynamic week detection failed, using fallback:', error);
+
+            // Fallback to date-based calculation
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04');
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const fallbackWeek = Math.min(Math.max(Math.floor(daysSinceStart / 7) + 1, 1), 18);
+
+            console.log(`🏈 SurvivorSystem: Fallback Week ${fallbackWeek} (${daysSinceStart} days since season start)`);
+            return fallbackWeek;
         }
-
-        // Calculate current week based on date - Week 1 starts Sept 4, 2025
-        const now = new Date();
-        const seasonStart = new Date('2025-09-04');
-        const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
-        const currentWeek = Math.min(Math.max(Math.floor(daysSinceStart / 7) + 1, 1), 18);
-
-        console.log(`🏈 SurvivorSystem: Calculated Week ${currentWeek} (${daysSinceStart} days since season start)`);
-        return currentWeek;
     }
 
     checkUserSurvival(userPick, weekResults) {
@@ -529,6 +574,7 @@ function initializePureSurvivorSystem() {
 
         // Initialize pure survivor system with zero ESPN dependencies
         window.survivorSystem = new SurvivorSystem(window.db);
+        await window.survivorSystem.initialize();
         console.log('✅ PURE FIREBASE: Survivor System initialized successfully');
         return true;
 
