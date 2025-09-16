@@ -2975,11 +2975,26 @@ await new Promise(resolve => {
  stadium: game.stadium
  })) : [];
  
- // 💎 CRITICAL FIX: Merge in game results from Firestore
+ // 🏈 CRITICAL FIX: Check BOTH locations for existing game results
  try {
-   const resultsDoc = await getDoc(doc(db, resultsPath(weekNumber)));
-   if (resultsDoc.exists()) {
-     const results = resultsDoc.data();
+   // Try new location first (nerdfootball_games)
+   const newResultsDoc = await getDoc(doc(db, resultsPath(weekNumber)));
+   let results = null;
+
+   if (newResultsDoc.exists()) {
+     results = newResultsDoc.data();
+     console.log(`📍 Found results in NEW location (nerdfootball_games) for Week ${weekNumber}`);
+   } else {
+     // Fallback to old location (nerdfootball_results) for backward compatibility
+     const oldPath = resultsPath(weekNumber).replace('nerdfootball_games', 'nerdfootball_results');
+     const oldResultsDoc = await getDoc(doc(db, oldPath));
+     if (oldResultsDoc.exists()) {
+       results = oldResultsDoc.data();
+       console.log(`📍 Found results in OLD location (nerdfootball_results) for Week ${weekNumber}`);
+     }
+   }
+
+   if (results) {
      games = games.map(game => ({
        ...game,
        winner: results[game.id]?.winner || results[game.id] || undefined
