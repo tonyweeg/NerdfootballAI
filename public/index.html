@@ -6402,8 +6402,22 @@ async function initializeMegatronWithRealData() {
     console.log('🎯 MEGATRON: Auto-initializing with real data...');
 
     try {
+        // Debug current Firebase state
+        console.log('🎯 DEBUG: Firebase state check...');
+        console.log('   window.db exists:', !!window.db);
+        console.log('   db exists:', typeof db !== 'undefined');
+        console.log('   getDoc exists:', typeof getDoc !== 'undefined');
+        console.log('   doc exists:', typeof doc !== 'undefined');
+
+        if (typeof db === 'undefined' || typeof getDoc === 'undefined') {
+            console.log('🎯 Firebase not ready yet, retrying in 2 seconds...');
+            setTimeout(initializeMegatronWithRealData, 2000);
+            return;
+        }
+
         // Auto-refresh dashboard with real data
-        await refreshMegatronDashboard();
+        const result = await refreshMegatronDashboard();
+        console.log('🎯 MEGATRON refresh result:', result);
 
         // Set default week selector to current week
         const weekSelector = document.getElementById('megatron-week-selector');
@@ -6416,8 +6430,22 @@ async function initializeMegatronWithRealData() {
         console.log('🎯 MEGATRON initialized with real data successfully');
     } catch (error) {
         console.error('🎯 MEGATRON real data initialization failed:', error);
+        console.error('🎯 Full error details:', error.stack);
     }
 }
+
+// Force debug refresh function - call this manually from console
+window.debugMegatronRefresh = async function() {
+    console.log('🎯 DEBUG: Manual MEGATRON refresh triggered...');
+    try {
+        const result = await refreshMegatronDashboard();
+        console.log('🎯 DEBUG: Manual refresh result:', result);
+        return result;
+    } catch (error) {
+        console.error('🎯 DEBUG: Manual refresh error:', error);
+        return error;
+    }
+};
 
 // --- SYSTEM MESSENGER FUNCTIONS ---
 async function renderSystemMessenger(weekNumber) {
