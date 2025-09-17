@@ -6249,13 +6249,13 @@ async function exportSurvivorDataToCsv(selectedWeek) {
 }
 
 async function refreshMegatronDashboard() {
-    console.log('🎯 MEGATRON: Refreshing REAL dashboard data...');
+    console.log('🎯 MEGATRON: Analyzing REAL elimination data by week dropoffs...');
 
     try {
         const poolId = 'nerduniverse-2025';
         const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
 
-        console.log('🎯 Step 1: Fetching real pool members data...');
+        console.log('🎯 Step 1: Fetching pool members...');
         const poolDoc = await getDoc(doc(db, poolMembersPath));
 
         if (!poolDoc.exists()) {
@@ -6263,47 +6263,81 @@ async function refreshMegatronDashboard() {
         }
 
         const poolData = poolDoc.data();
-        let totalPlayers = 0;
-        let stillAlive = 0;
-        let eliminated = 0;
-        let withSurvivorFields = 0;
-        let withoutSurvivorFields = 0;
+        const allUserIds = Object.keys(poolData);
 
-        console.log('🎯 Step 2: Analyzing real survivor status for each user...');
+        console.log(`🎯 Step 2: Analyzing REAL pick data across weeks for ${allUserIds.length} users...`);
 
-        Object.entries(poolData).forEach(([userId, userData]) => {
-            totalPlayers++;
+        // Analyze actual picks week by week to determine real eliminations
+        const weekPickCounts = {};
+        const userPicksByWeek = {};
 
-            if (userData.survivor) {
-                withSurvivorFields++;
-                const alive = userData.survivor.alive;
+        for (let week = 1; week <= 6; week++) {
+            weekPickCounts[week] = 0;
+            userPicksByWeek[week] = [];
 
-                if (alive === 18) {
-                    stillAlive++;
-                    console.log(`✅ ${userData.displayName || userId.substring(0,8)}: ALIVE (${alive})`);
-                } else {
-                    eliminated++;
-                    console.log(`💀 ${userData.displayName || userId.substring(0,8)}: ELIMINATED in Week ${alive}`);
+            console.log(`🎯 Checking Week ${week} picks...`);
+
+            for (const userId of allUserIds) {
+                try {
+                    const userPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
+                    const userPicksDoc = await getDoc(doc(db, userPicksPath));
+
+                    if (userPicksDoc.exists()) {
+                        const picksData = userPicksDoc.data();
+                        if (picksData.picks && picksData.picks[week]) {
+                            weekPickCounts[week]++;
+                            userPicksByWeek[week].push({
+                                userId: userId,
+                                name: poolData[userId].displayName || poolData[userId].name || userId.substring(0,8),
+                                email: poolData[userId].email || poolData[userId].emailAddress || 'No email',
+                                team: picksData.picks[week].team
+                            });
+                        }
+                    }
+                } catch (error) {
+                    // Skip users with no picks
                 }
+            }
+
+            console.log(`   Week ${week}: ${weekPickCounts[week]} users made picks`);
+        }
+
+        console.log('🎯 Step 3: REAL Elimination Analysis:');
+        console.log(`   Week 1: ${weekPickCounts[1]} users made picks (TOTAL POOL)`);
+        console.log(`   Week 2: ${weekPickCounts[2]} users made picks (${weekPickCounts[1] - weekPickCounts[2]} eliminated after Week 1)`);
+        console.log(`   Week 3: ${weekPickCounts[3]} users made picks (${weekPickCounts[2] - weekPickCounts[3]} eliminated after Week 2)`);
+        console.log(`   Week 4: ${weekPickCounts[4]} users made picks (${weekPickCounts[3] - weekPickCounts[4]} eliminated after Week 3)`);
+
+        const totalStarters = weekPickCounts[1] || 0;
+        const currentAlive = weekPickCounts[6] || weekPickCounts[5] || weekPickCounts[4] || weekPickCounts[3] || weekPickCounts[2] || 0;
+        const totalEliminated = totalStarters - currentAlive;
+
+        console.log('🎯 Step 4: CORRECTED Dashboard Stats:');
+        console.log(`   📊 Total Starters: ${totalStarters}`);
+        console.log(`   ✅ Still Alive: ${currentAlive}`);
+        console.log(`   💀 Total Eliminated: ${totalEliminated}`);
+
+        // Check for duplicate names (like the two David Dulanys)
+        console.log('🎯 Step 5: Checking for duplicate users...');
+        const nameMap = {};
+        weekPickCounts[1] > 0 && userPicksByWeek[1].forEach(user => {
+            if (nameMap[user.name]) {
+                console.log(`🚨 DUPLICATE DETECTED: "${user.name}" appears multiple times:`);
+                console.log(`   User 1: ${nameMap[user.name].userId} (${nameMap[user.name].email})`);
+                console.log(`   User 2: ${user.userId} (${user.email})`);
             } else {
-                withoutSurvivorFields++;
-                console.log(`❓ ${userData.displayName || userId.substring(0,8)}: NO SURVIVOR FIELD`);
+                nameMap[user.name] = user;
             }
         });
 
-        console.log('🎯 Step 3: REAL Dashboard Stats Summary:');
-        console.log(`   📊 Total Players: ${totalPlayers}`);
-        console.log(`   ✅ Still Alive: ${stillAlive}`);
-        console.log(`   💀 Eliminated: ${eliminated}`);
-        console.log(`   🎯 With Survivor Fields: ${withSurvivorFields}`);
-        console.log(`   ❓ Without Survivor Fields: ${withoutSurvivorFields}`);
+        updateMegatronStatsDisplay(totalStarters, currentAlive, totalEliminated, 'Real Data');
 
-        updateMegatronStatsDisplay(totalPlayers, stillAlive, eliminated, withSurvivorFields);
+        console.log('🎯 REAL elimination analysis completed - showing actual dropoff data!');
 
-        console.log('🎯 REAL dashboard refresh completed');
+        return { totalStarters, currentAlive, totalEliminated, weekPickCounts, userPicksByWeek };
 
     } catch (error) {
-        console.error('🎯 REAL dashboard refresh error:', error);
+        console.error('🎯 REAL elimination analysis error:', error);
         throw error;
     }
 }
