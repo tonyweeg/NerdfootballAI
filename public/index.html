@@ -6032,6 +6032,12 @@ function attachSurvivorEliminationHandlers() {
             }
         });
     }
+
+    // 🎯 Auto-initialize MEGATRON with real data when handlers are attached
+    console.log('🎯 MEGATRON handlers attached - initializing with real data...');
+    setTimeout(() => {
+        initializeMegatronWithRealData();
+    }, 1000); // Small delay to ensure DOM is ready
 }
 
 // --- NFL TEAM HELMETS ---
@@ -6079,13 +6085,13 @@ function getHelmetClass(teamName) {
 // --- 🎯 MEGATRON ENHANCED ADMIN FUNCTIONS ---
 
 async function exportSurvivorDataToCsv(selectedWeek) {
-    console.log('🎯 MEGATRON: Starting CSV export for week:', selectedWeek);
+    console.log('🎯 MEGATRON: Starting REAL DATA CSV export for week:', selectedWeek || 'ALL WEEKS');
 
     try {
         const poolId = 'nerduniverse-2025';
         const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
 
-        console.log('🎯 Fetching pool members data...');
+        console.log('🎯 Step 1: Fetching pool members data...');
         const poolDoc = await getDoc(doc(db, poolMembersPath));
 
         if (!poolDoc.exists()) {
@@ -6094,66 +6100,132 @@ async function exportSurvivorDataToCsv(selectedWeek) {
 
         const poolData = poolDoc.data();
         const csvData = [];
-        const csvHeaders = ['USERID', 'NAME', 'TEAM PICKED', 'WEEK', 'ALIVE STATUS', 'PICK HISTORY'];
+        const csvHeaders = ['USERID', 'EMAIL', 'NAME', 'WEEK', 'TEAM PICKED', 'GAME RESULT', 'PICK RESULT', 'ALIVE STATUS', 'ELIMINATION WEEK'];
 
-        console.log(`🎯 Processing ${Object.keys(poolData).length} users for CSV export`);
+        console.log(`🎯 Step 2: Processing ${Object.keys(poolData).length} real users...`);
 
-        Object.entries(poolData).forEach(([userId, userData]) => {
-            if (userData.survivor) {
-                const survivorField = userData.survivor;
-                const displayName = userData.displayName || userData.name || `User ${userId.substring(0, 8)}`;
+        const weeksToProcess = selectedWeek ? [parseInt(selectedWeek)] : [1, 2]; // Only process weeks with data
 
-                if (survivorField.pickHistory) {
-                    const picks = survivorField.pickHistory.split(', ').filter(p => p.trim());
+        for (const week of weeksToProcess) {
+            console.log(`🎯 Step 3: Processing Week ${week} - Fetching game results...`);
 
-                    if (selectedWeek) {
-                        const weekIndex = parseInt(selectedWeek) - 1;
-                        if (picks[weekIndex]) {
-                            csvData.push({
-                                userId: userId,
-                                displayName: displayName,
-                                teamPicked: picks[weekIndex].trim(),
-                                week: selectedWeek,
-                                aliveStatus: survivorField.alive,
-                                pickHistory: survivorField.pickHistory
-                            });
+            // Get real game results for this week
+            const gameResultsPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`;
+            const gameResultsDoc = await getDoc(doc(db, gameResultsPath));
+            const gameResults = gameResultsDoc.exists() ? gameResultsDoc.data() : {};
+
+            console.log(`🎯 Found ${Object.keys(gameResults).length} game results for Week ${week}`);
+
+            for (const [userId, userData] of Object.entries(poolData)) {
+                try {
+                    console.log(`🎯 Step 4: Processing user ${userData.displayName || userId.substring(0,8)} for Week ${week}...`);
+
+                    // Get real individual picks for this user
+                    const userPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
+                    const userPicksDoc = await getDoc(doc(db, userPicksPath));
+
+                    let userPick = null;
+                    let pickResult = 'NO PICK';
+                    let gameResult = 'NO GAME DATA';
+
+                    if (userPicksDoc.exists()) {
+                        const picksData = userPicksDoc.data();
+                        if (picksData.picks && picksData.picks[week]) {
+                            userPick = picksData.picks[week];
+                            console.log(`🎯 Found real pick for ${userData.displayName}: ${userPick.team} in Week ${week}`);
                         }
-                    } else {
-                        picks.forEach((pick, index) => {
-                            csvData.push({
-                                userId: userId,
-                                displayName: displayName,
-                                teamPicked: pick.trim(),
-                                week: index + 1,
-                                aliveStatus: survivorField.alive,
-                                pickHistory: survivorField.pickHistory
-                            });
-                        });
                     }
-                } else {
+
+                    // Determine real pick result by checking game outcomes
+                    if (userPick && userPick.team) {
+                        const pickedTeam = userPick.team;
+
+                        // Find the game this team played in
+                        let foundGame = false;
+                        for (const [gameId, gameData] of Object.entries(gameResults)) {
+                            if (gameData.homeTeam === pickedTeam || gameData.awayTeam === pickedTeam) {
+                                foundGame = true;
+                                const winner = gameData.winner;
+                                gameResult = `${gameData.awayTeam} ${gameData.awayScore || 0} - ${gameData.homeScore || 0} ${gameData.homeTeam} (Winner: ${winner || 'TBD'})`;
+
+                                if (winner) {
+                                    pickResult = (winner === pickedTeam) ? 'WIN' : 'LOSS';
+                                } else {
+                                    pickResult = 'GAME NOT FINAL';
+                                }
+                                break;
+                            }
+                        }
+
+                        if (!foundGame) {
+                            gameResult = 'GAME NOT FOUND';
+                            pickResult = 'UNKNOWN';
+                        }
+                    }
+
+                    // Get real elimination status
+                    let aliveStatus = 'UNKNOWN';
+                    let eliminationWeek = 'N/A';
+
+                    if (userData.survivor) {
+                        const alive = userData.survivor.alive;
+                        if (alive === 18) {
+                            aliveStatus = 'ALIVE';
+                        } else {
+                            aliveStatus = 'ELIMINATED';
+                            eliminationWeek = alive;
+                        }
+                    }
+
                     csvData.push({
                         userId: userId,
-                        displayName: displayName,
-                        teamPicked: 'No picks yet',
-                        week: selectedWeek || 'All',
-                        aliveStatus: survivorField.alive,
-                        pickHistory: 'No picks yet'
+                        email: userData.email || userData.emailAddress || 'No email',
+                        displayName: userData.displayName || userData.name || `User ${userId.substring(0, 8)}`,
+                        week: week,
+                        teamPicked: userPick ? userPick.team : 'NO PICK',
+                        gameResult: gameResult,
+                        pickResult: pickResult,
+                        aliveStatus: aliveStatus,
+                        eliminationWeek: eliminationWeek
+                    });
+
+                } catch (userError) {
+                    console.error(`🎯 Error processing user ${userId}:`, userError);
+                    csvData.push({
+                        userId: userId,
+                        email: userData.email || 'No email',
+                        displayName: userData.displayName || 'Unknown',
+                        week: week,
+                        teamPicked: 'ERROR',
+                        gameResult: 'ERROR',
+                        pickResult: 'ERROR',
+                        aliveStatus: 'ERROR',
+                        eliminationWeek: 'ERROR'
                     });
                 }
             }
-        });
+        }
 
-        console.log(`🎯 Generated ${csvData.length} CSV entries`);
+        console.log(`🎯 Step 5: Generated ${csvData.length} REAL DATA CSV entries`);
+
+        // Sort by week then by user name
+        csvData.sort((a, b) => {
+            if (a.week !== b.week) return a.week - b.week;
+            return a.displayName.localeCompare(b.displayName);
+        });
 
         const csvContent = [
             csvHeaders.join(','),
             ...csvData.map(row => [
                 `"${row.userId}"`,
+                `"${row.email}"`,
                 `"${row.displayName}"`,
-                `"${row.teamPicked}"`,
                 row.week,
-                row.aliveStatus,
-                `"${row.pickHistory}"`
+                `"${row.teamPicked}"`,
+                `"${row.gameResult}"`,
+                `"${row.pickResult}"`,
+                `"${row.aliveStatus}"`,
+                `"${row.eliminationWeek}"`
             ].join(','))
         ].join('\n');
 
@@ -6161,28 +6233,29 @@ async function exportSurvivorDataToCsv(selectedWeek) {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `survivor_data_${selectedWeek || 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute('download', `REAL_survivor_data_${selectedWeek || 'weeks_1_2'}_${new Date().toISOString().split('T')[0]}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
 
-        console.log('🎯 CSV export completed successfully');
+        console.log('🎯 REAL DATA CSV export completed successfully!');
+        console.log('🎯 CSV contains actual picks, game results, and win/loss determinations');
 
     } catch (error) {
-        console.error('🎯 CSV export error:', error);
+        console.error('🎯 REAL DATA CSV export error:', error);
         throw error;
     }
 }
 
 async function refreshMegatronDashboard() {
-    console.log('🎯 MEGATRON: Refreshing dashboard data...');
+    console.log('🎯 MEGATRON: Refreshing REAL dashboard data...');
 
     try {
         const poolId = 'nerduniverse-2025';
         const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
 
-        console.log('🎯 Fetching fresh pool data...');
+        console.log('🎯 Step 1: Fetching real pool members data...');
         const poolDoc = await getDoc(doc(db, poolMembersPath));
 
         if (!poolDoc.exists()) {
@@ -6193,26 +6266,44 @@ async function refreshMegatronDashboard() {
         let totalPlayers = 0;
         let stillAlive = 0;
         let eliminated = 0;
+        let withSurvivorFields = 0;
+        let withoutSurvivorFields = 0;
 
-        Object.values(poolData).forEach(userData => {
+        console.log('🎯 Step 2: Analyzing real survivor status for each user...');
+
+        Object.entries(poolData).forEach(([userId, userData]) => {
+            totalPlayers++;
+
             if (userData.survivor) {
-                totalPlayers++;
-                if (userData.survivor.alive === 18) {
+                withSurvivorFields++;
+                const alive = userData.survivor.alive;
+
+                if (alive === 18) {
                     stillAlive++;
+                    console.log(`✅ ${userData.displayName || userId.substring(0,8)}: ALIVE (${alive})`);
                 } else {
                     eliminated++;
+                    console.log(`💀 ${userData.displayName || userId.substring(0,8)}: ELIMINATED in Week ${alive}`);
                 }
+            } else {
+                withoutSurvivorFields++;
+                console.log(`❓ ${userData.displayName || userId.substring(0,8)}: NO SURVIVOR FIELD`);
             }
         });
 
-        console.log(`🎯 Dashboard stats: ${totalPlayers} total, ${stillAlive} alive, ${eliminated} eliminated`);
+        console.log('🎯 Step 3: REAL Dashboard Stats Summary:');
+        console.log(`   📊 Total Players: ${totalPlayers}`);
+        console.log(`   ✅ Still Alive: ${stillAlive}`);
+        console.log(`   💀 Eliminated: ${eliminated}`);
+        console.log(`   🎯 With Survivor Fields: ${withSurvivorFields}`);
+        console.log(`   ❓ Without Survivor Fields: ${withoutSurvivorFields}`);
 
-        updateMegatronStatsDisplay(totalPlayers, stillAlive, eliminated);
+        updateMegatronStatsDisplay(totalPlayers, stillAlive, eliminated, withSurvivorFields);
 
-        console.log('🎯 Dashboard refresh completed');
+        console.log('🎯 REAL dashboard refresh completed');
 
     } catch (error) {
-        console.error('🎯 Dashboard refresh error:', error);
+        console.error('🎯 REAL dashboard refresh error:', error);
         throw error;
     }
 }
@@ -6252,17 +6343,46 @@ async function updateMegatronStatsForWeek(weekNumber) {
     }
 }
 
-function updateMegatronStatsDisplay(totalPlayers, stillAlive, eliminated, weekNumber = null) {
+function updateMegatronStatsDisplay(totalPlayers, stillAlive, eliminated, additionalInfo = null) {
     const statContainers = document.querySelectorAll('.grid .bg-gray-50 .text-2xl, .grid .bg-green-50 .text-2xl, .grid .bg-red-50 .text-2xl, .grid .bg-blue-50 .text-2xl');
 
     if (statContainers.length >= 4) {
         statContainers[0].textContent = totalPlayers;
         statContainers[1].textContent = stillAlive;
         statContainers[2].textContent = eliminated;
-        statContainers[3].textContent = weekNumber ? `Week ${weekNumber}` : 'Live';
+
+        if (typeof additionalInfo === 'number') {
+            statContainers[3].textContent = additionalInfo; // Show survivor field count
+        } else if (typeof additionalInfo === 'string') {
+            statContainers[3].textContent = additionalInfo; // Show week number
+        } else {
+            statContainers[3].textContent = 'Live';
+        }
     }
 
-    console.log(`🎯 Updated MEGATRON stats display: ${totalPlayers}/${stillAlive}/${eliminated}${weekNumber ? ` for Week ${weekNumber}` : ''}`);
+    console.log(`🎯 Updated MEGATRON REAL stats display: ${totalPlayers}/${stillAlive}/${eliminated}/${additionalInfo || 'Live'}`);
+}
+
+// Auto-load real data when MEGATRON loads
+async function initializeMegatronWithRealData() {
+    console.log('🎯 MEGATRON: Auto-initializing with real data...');
+
+    try {
+        // Auto-refresh dashboard with real data
+        await refreshMegatronDashboard();
+
+        // Set default week selector to current week
+        const weekSelector = document.getElementById('megatron-week-selector');
+        if (weekSelector) {
+            // Set to week 2 since that's where we have real data
+            weekSelector.value = '2';
+            console.log('🎯 Set default week selector to Week 2 (has real data)');
+        }
+
+        console.log('🎯 MEGATRON initialized with real data successfully');
+    } catch (error) {
+        console.error('🎯 MEGATRON real data initialization failed:', error);
+    }
 }
 
 // --- SYSTEM MESSENGER FUNCTIONS ---
