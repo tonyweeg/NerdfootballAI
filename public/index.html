@@ -5957,6 +5957,81 @@ function attachSurvivorEliminationHandlers() {
             }
         });
     }
+
+    // 🎯 MEGATRON ENHANCED ADMIN BUTTON HANDLERS
+    console.log('🎯 Attaching MEGATRON admin button handlers...');
+
+    const megatronCsvBtn = document.getElementById('megatron-csv-export-btn');
+    const megatronRefreshBtn = document.getElementById('megatron-refresh-data-btn');
+    const megatronWeekSelector = document.getElementById('megatron-week-selector');
+
+    console.log('MEGATRON Button elements found:', {
+        megatronCsvBtn: !!megatronCsvBtn,
+        megatronRefreshBtn: !!megatronRefreshBtn,
+        megatronWeekSelector: !!megatronWeekSelector
+    });
+
+    // CSV Export Button Handler
+    if (megatronCsvBtn && !megatronCsvBtn._handlerAttached) {
+        megatronCsvBtn._handlerAttached = true;
+        megatronCsvBtn.addEventListener('click', async () => {
+            try {
+                console.log('🎯 MEGATRON CSV Export button clicked');
+                megatronCsvBtn.innerHTML = '🔄 Exporting...';
+                megatronCsvBtn.disabled = true;
+
+                const selectedWeek = megatronWeekSelector.value;
+                console.log('Selected week for export:', selectedWeek);
+
+                await exportSurvivorDataToCsv(selectedWeek);
+
+                megatronCsvBtn.innerHTML = '📥 Export CSV';
+                megatronCsvBtn.disabled = false;
+
+            } catch (error) {
+                console.error('🎯 MEGATRON CSV Export error:', error);
+                alert('Export failed: ' + error.message);
+                megatronCsvBtn.innerHTML = '📥 Export CSV';
+                megatronCsvBtn.disabled = false;
+            }
+        });
+    }
+
+    // Refresh Data Button Handler
+    if (megatronRefreshBtn && !megatronRefreshBtn._handlerAttached) {
+        megatronRefreshBtn._handlerAttached = true;
+        megatronRefreshBtn.addEventListener('click', async () => {
+            try {
+                console.log('🎯 MEGATRON Refresh Data button clicked');
+                megatronRefreshBtn.innerHTML = '🔄 Refreshing...';
+                megatronRefreshBtn.disabled = true;
+
+                await refreshMegatronDashboard();
+
+                megatronRefreshBtn.innerHTML = '🔄 Refresh Data';
+                megatronRefreshBtn.disabled = false;
+
+            } catch (error) {
+                console.error('🎯 MEGATRON Refresh error:', error);
+                alert('Refresh failed: ' + error.message);
+                megatronRefreshBtn.innerHTML = '🔄 Refresh Data';
+                megatronRefreshBtn.disabled = false;
+            }
+        });
+    }
+
+    // Week Selector Change Handler
+    if (megatronWeekSelector && !megatronWeekSelector._handlerAttached) {
+        megatronWeekSelector._handlerAttached = true;
+        megatronWeekSelector.addEventListener('change', async () => {
+            const selectedWeek = megatronWeekSelector.value;
+            console.log('🎯 MEGATRON Week selector changed to:', selectedWeek);
+
+            if (selectedWeek) {
+                await updateMegatronStatsForWeek(selectedWeek);
+            }
+        });
+    }
 }
 
 // --- NFL TEAM HELMETS ---
@@ -6000,6 +6075,195 @@ function getHelmetClass(teamName) {
 }
 
 // DEPRECATED: TEAM_HELMETS removed - now using CSS classes with getHelmetClass
+
+// --- 🎯 MEGATRON ENHANCED ADMIN FUNCTIONS ---
+
+async function exportSurvivorDataToCsv(selectedWeek) {
+    console.log('🎯 MEGATRON: Starting CSV export for week:', selectedWeek);
+
+    try {
+        const poolId = 'nerduniverse-2025';
+        const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+
+        console.log('🎯 Fetching pool members data...');
+        const poolDoc = await getDoc(doc(db, poolMembersPath));
+
+        if (!poolDoc.exists()) {
+            throw new Error('Pool members document not found');
+        }
+
+        const poolData = poolDoc.data();
+        const csvData = [];
+        const csvHeaders = ['USERID', 'NAME', 'TEAM PICKED', 'WEEK', 'ALIVE STATUS', 'PICK HISTORY'];
+
+        console.log(`🎯 Processing ${Object.keys(poolData).length} users for CSV export`);
+
+        Object.entries(poolData).forEach(([userId, userData]) => {
+            if (userData.survivor) {
+                const survivorField = userData.survivor;
+                const displayName = userData.displayName || userData.name || `User ${userId.substring(0, 8)}`;
+
+                if (survivorField.pickHistory) {
+                    const picks = survivorField.pickHistory.split(', ').filter(p => p.trim());
+
+                    if (selectedWeek) {
+                        const weekIndex = parseInt(selectedWeek) - 1;
+                        if (picks[weekIndex]) {
+                            csvData.push({
+                                userId: userId,
+                                displayName: displayName,
+                                teamPicked: picks[weekIndex].trim(),
+                                week: selectedWeek,
+                                aliveStatus: survivorField.alive,
+                                pickHistory: survivorField.pickHistory
+                            });
+                        }
+                    } else {
+                        picks.forEach((pick, index) => {
+                            csvData.push({
+                                userId: userId,
+                                displayName: displayName,
+                                teamPicked: pick.trim(),
+                                week: index + 1,
+                                aliveStatus: survivorField.alive,
+                                pickHistory: survivorField.pickHistory
+                            });
+                        });
+                    }
+                } else {
+                    csvData.push({
+                        userId: userId,
+                        displayName: displayName,
+                        teamPicked: 'No picks yet',
+                        week: selectedWeek || 'All',
+                        aliveStatus: survivorField.alive,
+                        pickHistory: 'No picks yet'
+                    });
+                }
+            }
+        });
+
+        console.log(`🎯 Generated ${csvData.length} CSV entries`);
+
+        const csvContent = [
+            csvHeaders.join(','),
+            ...csvData.map(row => [
+                `"${row.userId}"`,
+                `"${row.displayName}"`,
+                `"${row.teamPicked}"`,
+                row.week,
+                row.aliveStatus,
+                `"${row.pickHistory}"`
+            ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `survivor_data_${selectedWeek || 'all'}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        console.log('🎯 CSV export completed successfully');
+
+    } catch (error) {
+        console.error('🎯 CSV export error:', error);
+        throw error;
+    }
+}
+
+async function refreshMegatronDashboard() {
+    console.log('🎯 MEGATRON: Refreshing dashboard data...');
+
+    try {
+        const poolId = 'nerduniverse-2025';
+        const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+
+        console.log('🎯 Fetching fresh pool data...');
+        const poolDoc = await getDoc(doc(db, poolMembersPath));
+
+        if (!poolDoc.exists()) {
+            throw new Error('Pool members document not found');
+        }
+
+        const poolData = poolDoc.data();
+        let totalPlayers = 0;
+        let stillAlive = 0;
+        let eliminated = 0;
+
+        Object.values(poolData).forEach(userData => {
+            if (userData.survivor) {
+                totalPlayers++;
+                if (userData.survivor.alive === 18) {
+                    stillAlive++;
+                } else {
+                    eliminated++;
+                }
+            }
+        });
+
+        console.log(`🎯 Dashboard stats: ${totalPlayers} total, ${stillAlive} alive, ${eliminated} eliminated`);
+
+        updateMegatronStatsDisplay(totalPlayers, stillAlive, eliminated);
+
+        console.log('🎯 Dashboard refresh completed');
+
+    } catch (error) {
+        console.error('🎯 Dashboard refresh error:', error);
+        throw error;
+    }
+}
+
+async function updateMegatronStatsForWeek(weekNumber) {
+    console.log(`🎯 MEGATRON: Updating stats for week ${weekNumber}`);
+
+    try {
+        const poolId = 'nerduniverse-2025';
+        const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+
+        const poolDoc = await getDoc(doc(db, poolMembersPath));
+        if (!poolDoc.exists()) {
+            throw new Error('Pool members document not found');
+        }
+
+        const poolData = poolDoc.data();
+        let totalPlayers = 0;
+        let stillAlive = 0;
+        let eliminated = 0;
+
+        Object.values(poolData).forEach(userData => {
+            if (userData.survivor) {
+                totalPlayers++;
+                if (userData.survivor.alive >= parseInt(weekNumber)) {
+                    stillAlive++;
+                } else {
+                    eliminated++;
+                }
+            }
+        });
+
+        updateMegatronStatsDisplay(totalPlayers, stillAlive, eliminated, weekNumber);
+
+    } catch (error) {
+        console.error('🎯 Week stats update error:', error);
+    }
+}
+
+function updateMegatronStatsDisplay(totalPlayers, stillAlive, eliminated, weekNumber = null) {
+    const statContainers = document.querySelectorAll('.grid .bg-gray-50 .text-2xl, .grid .bg-green-50 .text-2xl, .grid .bg-red-50 .text-2xl, .grid .bg-blue-50 .text-2xl');
+
+    if (statContainers.length >= 4) {
+        statContainers[0].textContent = totalPlayers;
+        statContainers[1].textContent = stillAlive;
+        statContainers[2].textContent = eliminated;
+        statContainers[3].textContent = weekNumber ? `Week ${weekNumber}` : 'Live';
+    }
+
+    console.log(`🎯 Updated MEGATRON stats display: ${totalPlayers}/${stillAlive}/${eliminated}${weekNumber ? ` for Week ${weekNumber}` : ''}`);
+}
 
 // --- SYSTEM MESSENGER FUNCTIONS ---
 async function renderSystemMessenger(weekNumber) {
