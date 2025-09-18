@@ -263,6 +263,27 @@ async function waitForFirebaseAuth() {
 </script>
 ```
 
+### 🚨 ESPN Timezone Bug (4-Hour Offset)
+**SYMPTOM**: Game times show 4 hours early, games appear started when they haven't
+**ROOT CAUSE**: ESPN uses EST as "Zulu" reference, NOT true UTC
+**CRITICAL UNDERSTANDING**: ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (not UTC)
+
+**SOLUTION**: Apply ESPN EST-as-Zulu conversion logic
+```javascript
+// ESPN "Z" = Eastern Time, NOT UTC!
+const cleanTime = espnTimestamp.replace('Z', '');
+const easternTime = new Date(cleanTime);
+const offsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+```
+
+**FILES FIXED**:
+- `index.html` - getGameState() function and "Your Active Picks" section
+- `gameStateCache.js` - fallback timezone logic
+- `easternTimeParser-v2.js` - documentation updated
+
+**DST RULES**: March 9 - November 2 (EDT), November 3 - March 8 (EST)
+
 ## 🎯 Critical Standards
 
 ### 1. Testing BEFORE Deployment

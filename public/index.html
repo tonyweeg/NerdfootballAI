@@ -4131,7 +4131,30 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         
         tableHTML += `<td class="player-name px-3 py-2 text-sm ${nameClass}">${user.displayName}${isCurrentUser ? ' (You)' : ''}${shouldShowWarning && !isCurrentUser ? ' ⚠️' : ''}</td>`;
         
-        const anyGameStarted = games.some(game => now >= new Date(game.kickoff));
+        const anyGameStarted = games.some(game => {
+            // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+            const espnTimestamp = game.kickoff || game.dt;
+            let gameTime;
+
+            if (window.easternTimeParser) {
+                gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+            } else {
+                // FALLBACK: Manual Eastern Time conversion
+                const cleanTime = espnTimestamp.replace('Z', '');
+                const localDate = new Date(cleanTime);
+                const year = localDate.getFullYear();
+                const month = localDate.getMonth();
+                const day = localDate.getDate();
+                const hours = localDate.getHours();
+                const minutes = localDate.getMinutes();
+                const seconds = localDate.getSeconds();
+                const gameDate = new Date(year, month, day);
+         const offsetHours = getEasternTimeOffsetHours(gameDate);
+                gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+            }
+
+            return now >= gameTime;
+        });
         if (!anyGameStarted) {
             tableHTML += `<td class="px-3 py-2 text-sm font-bold text-gray-400">0</td>`;
             tableHTML += `<td class="px-3 py-2 text-sm text-gray-400">0</td>`;
@@ -10615,10 +10638,79 @@ function escapeHtml(text) {
  }
  }
 
- // Simple game state logic - just compare times
+ // 💎 DYNAMIC EASTERN TIME CONVERSION - Handles DST Changes Automatically
+function getEasternTimeOffsetHours(dateToCheck) {
+    // DST rules: Second Sunday in March to First Sunday in November
+    const year = dateToCheck.getFullYear();
+
+    // Second Sunday in March
+    const march = new Date(year, 2, 1); // March 1st
+    const firstSundayMarch = new Date(march.getTime() + (7 - march.getDay()) * 24 * 60 * 60 * 1000);
+    const secondSundayMarch = new Date(firstSundayMarch.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // First Sunday in November
+    const november = new Date(year, 10, 1); // November 1st
+    const firstSundayNovember = new Date(november.getTime() + (7 - november.getDay()) * 24 * 60 * 60 * 1000);
+
+    // Check if date is within DST period
+    const isDST = dateToCheck >= secondSundayMarch && dateToCheck < firstSundayNovember;
+
+    return isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+}
+
+// Simple game state logic - just compare times
 function getGameState(game) {
     const now = new Date();
-    const gameTime = new Date(game.dt || game.kickoff);
+
+    // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+    const espnTimestamp = game.dt || game.kickoff;
+    let gameTime;
+
+    // 🚨 ESPN USES EST AS ZULU! "Z" = Eastern Time, NOT UTC!
+    // ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (ESPN's "Zulu" = Eastern)
+
+    // Remove the misleading "Z" since it's actually Eastern Time
+    const cleanTime = espnTimestamp.replace('Z', '');
+
+    // Parse as local time to extract components (treating as Eastern)
+    const easternTime = new Date(cleanTime);
+    const year = easternTime.getFullYear();
+    const month = easternTime.getMonth();
+    const day = easternTime.getDate();
+    const hours = easternTime.getHours();
+    const minutes = easternTime.getMinutes();
+    const seconds = easternTime.getSeconds();
+
+    // Determine if DST is active for this date
+    const gameDate = new Date(year, month, day);
+    const isDST = getEasternTimeOffsetHours(gameDate) === 4;
+
+    // Convert Eastern time to proper UTC
+    // Eastern is BEHIND UTC: EDT = UTC-4, EST = UTC-5
+    const offsetHours = isDST ? 4 : 5;
+    gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+
+    console.log(`⏰ ESPN ZULU=EST: ${espnTimestamp} = ${hours}:${String(minutes).padStart(2,'0')} EASTERN → ${gameTime.toISOString()} UTC (offset +${offsetHours})`);
+
+    if (window.easternTimeParser) {
+        // Cross-check with parser if available
+        const parserTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+        if (Math.abs(gameTime.getTime() - parserTime.getTime()) > 60000) {
+            console.warn(`⚠️ Time mismatch: Manual=${gameTime.toISOString()}, Parser=${parserTime.toISOString()}`);
+        }
+    }
+
+    // 🔍 DEBUGGING: Log Miami @ Buffalo game specifically
+    if ((game.away === 'Miami Dolphins' && game.home === 'Buffalo Bills') ||
+        (game.home === 'Miami Dolphins' && game.away === 'Buffalo Bills')) {
+        console.log(`🐬 MIAMI @ BUFFALO DEBUG:
+        ESPN Timestamp: ${espnTimestamp}
+        Game Time UTC: ${gameTime.toISOString()}
+        Current Time UTC: ${now.toISOString()}
+        Time Until Game: ${(gameTime.getTime() - now.getTime()) / (1000 * 60)} minutes
+        Game Started?: ${now >= gameTime}
+        Game Winner: ${game.winner || 'TBD'}`);
+    }
 
     if (now < gameTime) {
         return 'PRE_GAME';
@@ -10628,6 +10720,29 @@ function getGameState(game) {
         return 'IN_PROGRESS';
     }
 }
+
+// 🔍 DEBUG FUNCTION: Call from browser console to test timezone conversion
+window.debugMiamiGame = function() {
+    const testGame = {
+        id: 301,
+        away: 'Miami Dolphins',
+        home: 'Buffalo Bills',
+        dt: '2025-09-18T20:15:00Z',
+        kickoff: '2025-09-18T20:15:00Z',
+        winner: 'TBD'
+    };
+
+    console.log('🔍 TESTING MIAMI @ BUFFALO GAME MANUALLY:');
+    const gameState = getGameState(testGame);
+    const isLocked = isGameLocked(testGame);
+
+    console.log(`Game State: ${gameState}`);
+    console.log(`Is Locked: ${isLocked}`);
+    console.log(`Should Show Buttons As: ${isLocked ? 'DISABLED' : 'ENABLED'}`);
+    console.log(`Should Show: ${gameState === 'IN_PROGRESS' ? 'Game in Progress' : gameState === 'PRE_GAME' ? 'Pre-Game' : 'Completed'}`);
+
+    return { gameState, isLocked };
+};
 
 function getTeamHelmetClass(teamName) {
     const teamMap = {
@@ -10668,28 +10783,90 @@ function isGameLocked(game) {
  }
 
  // Legacy function for backwards compatibility
- async function getWeekLockStatus(weekNumber) { 
-  const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) }; 
-  if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) return false; 
-  const firstKickoff = new Date(weekData.games[0].kickoff); 
-  return new Date() > firstKickoff; 
+ async function getWeekLockStatus(weekNumber) {
+  const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
+  if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) return false;
+
+  // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+  const firstGame = weekData.games[0];
+  const espnTimestamp = firstGame.kickoff || firstGame.dt;
+  let firstKickoff;
+
+  if (window.easternTimeParser) {
+      firstKickoff = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+  } else {
+      // FALLBACK: Manual Eastern Time conversion
+      const cleanTime = espnTimestamp.replace('Z', '');
+      const localDate = new Date(cleanTime);
+      const year = localDate.getFullYear();
+      const month = localDate.getMonth();
+      const day = localDate.getDate();
+      const hours = localDate.getHours();
+      const minutes = localDate.getMinutes();
+      const seconds = localDate.getSeconds();
+      const gameDate = new Date(year, month, day);
+      const offsetHours = getEasternTimeOffsetHours(gameDate);
+      firstKickoff = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+  }
+
+  return new Date() > firstKickoff;
  }
 
  // Helper function to identify Monday Night Football games
  function getMondayNightGame(games) {
    if (!games || !Array.isArray(games)) return null;
-   
+
    // Find all games that occur on Monday (day of week = 1)
    const mondayGames = games.filter(game => {
-     const gameTime = new Date(game.kickoff);
+     // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+     const espnTimestamp = game.kickoff || game.dt;
+     let gameTime;
+
+     if (window.easternTimeParser) {
+         gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+     } else {
+         // FALLBACK: Manual Eastern Time conversion
+         const cleanTime = espnTimestamp.replace('Z', '');
+         const localDate = new Date(cleanTime);
+         const year = localDate.getFullYear();
+         const month = localDate.getMonth();
+         const day = localDate.getDate();
+         const hours = localDate.getHours();
+         const minutes = localDate.getMinutes();
+         const seconds = localDate.getSeconds();
+         const gameDate = new Date(year, month, day);
+         const offsetHours = getEasternTimeOffsetHours(gameDate);
+         gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+     }
+
      return gameTime.getDay() === 1; // Monday
    });
-   
+
    // If multiple Monday games, return the latest one (last game of the week)
    if (mondayGames.length > 1) {
      return mondayGames.reduce((latest, current) => {
-       const latestTime = new Date(latest.kickoff);
-       const currentTime = new Date(current.kickoff);
+       // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+       const parseGameTime = (game) => {
+         const espnTimestamp = game.kickoff || game.dt;
+         if (window.easternTimeParser) {
+             return window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+         } else {
+             const cleanTime = espnTimestamp.replace('Z', '');
+             const localDate = new Date(cleanTime);
+             const year = localDate.getFullYear();
+             const month = localDate.getMonth();
+             const day = localDate.getDate();
+             const hours = localDate.getHours();
+             const minutes = localDate.getMinutes();
+             const seconds = localDate.getSeconds();
+             const gameDate = new Date(year, month, day);
+         const offsetHours = getEasternTimeOffsetHours(gameDate);
+             return new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+         }
+       };
+
+       const latestTime = parseGameTime(latest);
+       const currentTime = parseGameTime(current);
        return currentTime > latestTime ? current : latest;
      });
    }
@@ -11850,7 +12027,27 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
     const pick = userPicks[game.id];
     if (pick && pick.winner) {
      // Check if game has started
-     const gameTime = new Date(game.kickoff);
+     // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+     const espnTimestamp = game.kickoff || game.dt;
+     let gameTime;
+
+     if (window.easternTimeParser) {
+         gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+     } else {
+         // FALLBACK: Manual Eastern Time conversion
+         const cleanTime = espnTimestamp.replace('Z', '');
+         const localDate = new Date(cleanTime);
+         const year = localDate.getFullYear();
+         const month = localDate.getMonth();
+         const day = localDate.getDate();
+         const hours = localDate.getHours();
+         const minutes = localDate.getMinutes();
+         const seconds = localDate.getSeconds();
+         const gameDate = new Date(year, month, day);
+         const offsetHours = getEasternTimeOffsetHours(gameDate);
+         gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+     }
+
      const now = new Date();
      const gameHasStarted = now > gameTime;
      
@@ -11914,15 +12111,44 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      const homeAwayIndicator = isHome ? 'vs' : '@';
      
      
-     // Format game time
-     const gameTime = new Date(pick.game.kickoff);
+     // Format game time - FIXED: ESPN EST-as-Zulu conversion
+     // 🚨 ESPN USES EST AS ZULU! "Z" = Eastern Time, NOT UTC!
+     let gameTime;
+     let gameKickoff;
+
+     if (pick.game.kickoff && pick.game.kickoff.includes('Z')) {
+      // Apply ESPN EST-as-Zulu conversion
+      const cleanTime = pick.game.kickoff.replace('Z', '');
+      const easternTime = new Date(cleanTime);
+      const year = easternTime.getFullYear();
+      const month = easternTime.getMonth();
+      const day = easternTime.getDate();
+      const hours = easternTime.getHours();
+      const minutes = easternTime.getMinutes();
+      const seconds = easternTime.getSeconds();
+
+      // Check if DST is active
+      const date = new Date(year, month, day);
+      const dstStart = new Date(year, 2, 9); // March 9
+      const dstEnd = new Date(year, 10, 2);  // November 2
+      const isDST = date >= dstStart && date < dstEnd;
+      const offsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+
+      // Convert Eastern to UTC properly
+      gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+      gameKickoff = gameTime; // Same conversion for both
+     } else {
+      // Fallback for non-ESPN timestamps
+      gameTime = new Date(pick.game.kickoff);
+      gameKickoff = gameTime;
+     }
+
      const now = new Date();
      const isToday = gameTime.toDateString() === now.toDateString();
      const isTomorrow = gameTime.toDateString() === new Date(now.getTime() + 24*60*60*1000).toDateString();
-     
+
      // CRITICAL DEBUG: Let's see exactly what's happening
      const currentTime = new Date();
-     const gameKickoff = new Date(pick.game.kickoff);
      const gameWinner = getGameWinner(pick.gameResult);
      const hasActuallyStarted = currentTime > gameKickoff;
      

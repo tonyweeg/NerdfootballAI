@@ -1,9 +1,9 @@
 /**
- * Fixed Eastern Time Parser - Handles both correct UTC and Eastern Time formats
+ * Fixed Eastern Time Parser - ESPN uses EST as their "Zulu" reference
  *
- * PROBLEM SOLVED: ESPN data can be in different formats:
- * - Correct UTC: "2025-09-14T17:00:00Z" (1PM Eastern = 5PM UTC)
- * - Eastern Time: "2025-09-14T13:00:00Z" (1PM Eastern mislabeled as UTC)
+ * CRITICAL UNDERSTANDING: ESPN timestamps with "Z" mean EASTERN TIME!
+ * - ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (not UTC)
+ * - ESPN uses EST as their "Zulu" time reference, not true UTC
  */
 
 class EasternTimeParserV2 {
