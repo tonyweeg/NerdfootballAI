@@ -13067,6 +13067,53 @@ allUI.saveSurvivorPickBtn.addEventListener('click', async () => {
         const survivorData = { picks: { [weekNumber]: { team: selectedSurvivorTeam } } };
         
         await setDoc(survivorPicksDocRef, survivorData, { merge: true });
+        // 🎯 CRITICAL FIX: Also update pool members structure to maintain data consistency
+        const poolId = getCurrentPool();
+        const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+        const poolDoc = await getDoc(doc(db, poolMembersPath));
+
+        if (poolDoc.exists()) {
+            const poolData = poolDoc.data();
+            const userData = poolData[selectedSurvivorUser];
+
+            if (userData) {
+                // Update pick history in pool members structure
+                const survivor = userData.survivor || {};
+                const currentPickHistory = survivor.pickHistory || '';
+                const currentPicks = currentPickHistory.split(', ').filter(p => p && p.trim());
+
+                // Ensure picks array has correct length for this week
+                while (currentPicks.length < parseInt(weekNumber)) {
+                    currentPicks.push(''); // Add empty picks for missing weeks
+                }
+
+                // Update the specific week pick
+                currentPicks[parseInt(weekNumber) - 1] = selectedSurvivorTeam;
+
+                // Create new pick history string
+                const newPickHistory = currentPicks.filter(p => p && p.trim()).join(', ');
+
+                // Update user data in pool members
+                const updatedUserData = {
+                    ...userData,
+                    survivor: {
+                        ...survivor,
+                        pickHistory: newPickHistory,
+                        alive: true, // Keep user active when saving new pick
+                        eliminationWeek: null // Clear any elimination when saving new pick
+                    }
+                };
+
+                // Update pool members document
+                const updatedPoolData = {
+                    ...poolData,
+                    [selectedSurvivorUser]: updatedUserData
+                };
+
+                await setDoc(doc(db, poolMembersPath), updatedPoolData);
+                console.log(`✅ DUAL-WRITE: Updated both legacy picks AND pool members for ${user.displayName}`);
+            }
+        }
         
         // 💎 CRITICAL: Invalidate all cache affected by survivor picks changes
         window.gameStateCache.invalidateAfterDataUpdate('survivor_picks_saved', weekNumber);
