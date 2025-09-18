@@ -120,7 +120,7 @@ async function genesisEmbeddedSurvivorData() {
     // Step 1: Load game results for all completed weeks
     console.log('1️⃣ Loading game results for all completed weeks...');
     const allWeekWinners = {};
-    for (let week = 1; week <= 2; week++) { // Only Weeks 1-2 are complete as of Sept 17, 2025
+    for (let week = 1; week <= 3; week++) { // Weeks 1-3 are now available as of Sept 18, 2025
       allWeekWinners[week] = await extractWeekWinners(week);
       console.log(`   Week ${week}: ${allWeekWinners[week].length} winning teams`);
     }

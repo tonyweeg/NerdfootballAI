@@ -119,7 +119,7 @@ async function comprehensiveAudit() {
     // Step 1: Load game results for completed weeks
     console.log('\n1️⃣ LOADING GAME RESULTS...');
     const allWeekWinners = {};
-    for (let week = 1; week <= 2; week++) {
+    for (let week = 1; week <= 3; week++) {
       allWeekWinners[week] = await getWeekWinners(week);
       console.log(`   Week ${week}: ${allWeekWinners[week].length} winning teams`);
       console.log(`      Winners: ${allWeekWinners[week].join(', ')}`);
@@ -326,7 +326,7 @@ async function comprehensiveAudit() {
 
     // Step 6: Detailed game results verification
     console.log(`\n🏈 GAME RESULTS VERIFICATION:`);
-    for (let week = 1; week <= 2; week++) {
+    for (let week = 1; week <= 3; week++) {
       console.log(`\n   Week ${week} Winners (${allWeekWinners[week].length} teams):`);
       allWeekWinners[week].forEach(winner => {
         console.log(`      ✅ ${winner}`);

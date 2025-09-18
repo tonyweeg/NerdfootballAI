@@ -60,8 +60,8 @@ async function runCorrectedSurvivorAnalysis() {
     const weekPickCounts = {};
     const userPicksByWeek = {};
 
-    // Only check weeks 1-2 (current valid weeks)
-    for (let week = 1; week <= 2; week++) {
+    // Only check weeks 1-3 (current valid weeks)
+    for (let week = 1; week <= 3; week++) {
       weekPickCounts[week] = 0;
       userPicksByWeek[week] = [];
 

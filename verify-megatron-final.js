@@ -42,8 +42,8 @@ async function verifyMegatronFinalResults() {
     const weekPickCounts = {};
     const userPicksByWeek = {};
 
-    // Process weeks 1-2 only (current valid weeks for 2025 season)
-    for (let week = 1; week <= 2; week++) {
+    // Process weeks 1-3 only (current valid weeks for 2025 season)
+    for (let week = 1; week <= 3; week++) {
       weekPickCounts[week] = 0;
       userPicksByWeek[week] = [];
 
