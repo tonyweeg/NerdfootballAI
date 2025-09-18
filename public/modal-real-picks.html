@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏈 MODAiL THE NERD - Real Active Picks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b border-slate-200">
+        <div class="max-w-6xl mx-auto px-4 py-6">
+            <h1 class="text-4xl font-bold text-slate-800">🏈 MODAiL THE NERD</h1>
+            <p class="text-slate-600 mt-2">YOUR ACTIVE PICKS - Week 3 with REAL Games & Modal Integration</p>
+            <div class="mt-4 text-sm bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                <strong>📊 Data:</strong> Real Week 3 NFL games | <strong>🎯 Picks:</strong> Mock user picks | <strong>🚀 Port:</strong> localhost:5003
+            </div>
+        </div>
+    </div>
+
+    <!-- Your Active Picks Section (Matching real app style) -->
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+            <!-- Header matching real app -->
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-semibold text-slate-700">Your Active Picks</h3>
+                <div class="text-sm text-slate-500">Week 3 • 2025 Season</div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="picks-loading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="text-slate-600 mt-2">Loading your picks...</p>
+            </div>
+
+            <!-- Active Picks Grid (Matching real app structure) -->
+            <div id="active-picks-list" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Real picks will be rendered here -->
+            </div>
+
+            <!-- No Picks Message -->
+            <div id="no-picks-message" class="hidden text-center py-8 text-slate-500">
+                <p>No picks made yet for Week 3</p>
+            </div>
+        </div>
+
+        <!-- Modal Integration Info -->
+        <div class="mt-8 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="text-xl font-bold text-blue-800 mb-4">🎯 Real Game Integration</h3>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-semibold text-blue-700 mb-2">📊 Real Data Sources:</h4>
+                    <ul class="text-sm text-blue-600 space-y-1">
+                        <li>• Week 3 NFL schedule (16 games)</li>
+                        <li>• Real team names and matchups</li>
+                        <li>• Actual kickoff times</li>
+                        <li>• Stadium information</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-blue-700 mb-2">🎯 Your Picks Features:</h4>
+                    <ul class="text-sm text-blue-600 space-y-1">
+                        <li>• Click any pick card for AI analysis</li>
+                        <li>• Confidence values displayed</li>
+                        <li>• Game status indicators</li>
+                        <li>• Team logos and styling</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Game Modal -->
+    <div id="live-game-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-6 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-purple-50">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">🏈 Game Analysis</h2>
+                    <p class="text-slate-600 text-sm mt-1">AI insights for your Week 3 pick</p>
+                </div>
+                <button onclick="closeLiveGameModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="modal-loading" class="flex items-center justify-center p-16">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto"></div>
+                    <p class="text-slate-600 mt-6 text-lg font-medium">Analyzing game data...</p>
+                    <p class="text-slate-500 text-sm mt-2">Loading AI predictions for your pick</p>
+                </div>
+            </div>
+
+            <!-- Modal Content -->
+            <div id="modal-game-content" class="hidden">
+                <div id="game-data-display" class="p-6">
+                    <!-- Game data will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🚀 MODAiL THE NERD - Real Active Picks System');
+
+        // NFL Team Logos (same as main app)
+        const nflTeamLogos = {
+            'ARI': 'https://a.espncdn.com/i/teamlogos/nfl/500/ari.png',
+            'ATL': 'https://a.espncdn.com/i/teamlogos/nfl/500/atl.png',
+            'BAL': 'https://a.espncdn.com/i/teamlogos/nfl/500/bal.png',
+            'BUF': 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png',
+            'CAR': 'https://a.espncdn.com/i/teamlogos/nfl/500/car.png',
+            'CHI': 'https://a.espncdn.com/i/teamlogos/nfl/500/chi.png',
+            'CIN': 'https://a.espncdn.com/i/teamlogos/nfl/500/cin.png',
+            'CLE': 'https://a.espncdn.com/i/teamlogos/nfl/500/cle.png',
+            'DAL': 'https://a.espncdn.com/i/teamlogos/nfl/500/dal.png',
+            'DEN': 'https://a.espncdn.com/i/teamlogos/nfl/500/den.png',
+            'DET': 'https://a.espncdn.com/i/teamlogos/nfl/500/det.png',
+            'GB': 'https://a.espncdn.com/i/teamlogos/nfl/500/gb.png',
+            'HOU': 'https://a.espncdn.com/i/teamlogos/nfl/500/hou.png',
+            'IND': 'https://a.espncdn.com/i/teamlogos/nfl/500/ind.png',
+            'JAX': 'https://a.espncdn.com/i/teamlogos/nfl/500/jax.png',
+            'KC': 'https://a.espncdn.com/i/teamlogos/nfl/500/kc.png',
+            'LV': 'https://a.espncdn.com/i/teamlogos/nfl/500/lv.png',
+            'LAC': 'https://a.espncdn.com/i/teamlogos/nfl/500/lac.png',
+            'LAR': 'https://a.espncdn.com/i/teamlogos/nfl/500/lar.png',
+            'MIA': 'https://a.espncdn.com/i/teamlogos/nfl/500/mia.png',
+            'MIN': 'https://a.espncdn.com/i/teamlogos/nfl/500/min.png',
+            'NE': 'https://a.espncdn.com/i/teamlogos/nfl/500/ne.png',
+            'NO': 'https://a.espncdn.com/i/teamlogos/nfl/500/no.png',
+            'NYG': 'https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png',
+            'NYJ': 'https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png',
+            'PHI': 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png',
+            'PIT': 'https://a.espncdn.com/i/teamlogos/nfl/500/pit.png',
+            'SF': 'https://a.espncdn.com/i/teamlogos/nfl/500/sf.png',
+            'SEA': 'https://a.espncdn.com/i/teamlogos/nfl/500/sea.png',
+            'TB': 'https://a.espncdn.com/i/teamlogos/nfl/500/tb.png',
+            'TEN': 'https://a.espncdn.com/i/teamlogos/nfl/500/ten.png',
+            'WAS': 'https://a.espncdn.com/i/teamlogos/nfl/500/was.png'
+        };
+
+        // Team name to abbreviation mapping (like main app)
+        const teamNameToAbbr = {
+            'Arizona Cardinals': 'ARI', 'Atlanta Falcons': 'ATL', 'Baltimore Ravens': 'BAL',
+            'Buffalo Bills': 'BUF', 'Carolina Panthers': 'CAR', 'Chicago Bears': 'CHI',
+            'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Dallas Cowboys': 'DAL',
+            'Denver Broncos': 'DEN', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB',
+            'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX',
+            'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+            'Los Angeles Rams': 'LAR', 'Miami Dolphins': 'MIA', 'Minnesota Vikings': 'MIN',
+            'New England Patriots': 'NE', 'New Orleans Saints': 'NO', 'New York Giants': 'NYG',
+            'New York Jets': 'NYJ', 'Philadelphia Eagles': 'PHI', 'Pittsburgh Steelers': 'PIT',
+            'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA', 'Tampa Bay Buccaneers': 'TB',
+            'Tennessee Titans': 'TEN', 'Washington Commanders': 'WAS'
+        };
+
+        // 🚨 ESPN TIMEZONE FIX: ESPN uses "Z" to mean Eastern Time, NOT UTC!
+        function convertESPNTimeToEastern(espnTimestamp) {
+            // ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (not UTC!)
+            const cleanTime = espnTimestamp.replace('Z', ''); // Remove misleading Z
+            const tempDate = new Date(cleanTime); // Treat as Eastern
+
+            // Determine if DST is in effect (March 9 - November 2 for 2025)
+            const year = tempDate.getFullYear();
+            const isDST = (tempDate >= new Date(year, 2, 9) && tempDate <= new Date(year, 10, 2));
+            const offsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+
+            // Convert to proper UTC representation
+            const gameTime = new Date(Date.UTC(
+                tempDate.getFullYear(),
+                tempDate.getMonth(),
+                tempDate.getDate(),
+                tempDate.getHours() + offsetHours,
+                tempDate.getMinutes(),
+                tempDate.getSeconds()
+            ));
+
+            return gameTime;
+        }
+
+        // Mock user picks for Week 3 games (realistic confidence distribution)
+        const MOCK_USER_PICKS = {
+            301: { winner: "Buffalo Bills", confidence: 15 },           // MIA @ BUF - Highest confidence
+            302: { winner: "Atlanta Falcons", confidence: 12 },        // ATL @ CAR
+            303: { winner: "Green Bay Packers", confidence: 14 },      // GB @ CLE
+            304: { winner: "Houston Texans", confidence: 8 },          // HOU @ JAX
+            305: { winner: "Minnesota Vikings", confidence: 11 },      // CIN @ MIN
+            306: { winner: "Pittsburgh Steelers", confidence: 9 },     // PIT @ NE
+            307: { winner: "Philadelphia Eagles", confidence: 13 },    // LAR @ PHI
+            308: { winner: "Tampa Bay Buccaneers", confidence: 6 },    // NYJ @ TB
+            309: { winner: "Indianapolis Colts", confidence: 4 },      // IND @ TEN
+            310: { winner: "Washington Commanders", confidence: 7 },   // LV @ WAS
+            311: { winner: "Los Angeles Chargers", confidence: 10 },   // DEN @ LAC
+            312: { winner: "Seattle Seahawks", confidence: 5 },        // NO @ SEA
+            313: { winner: "Dallas Cowboys", confidence: 3 },          // DAL @ CHI
+            314: { winner: "San Francisco 49ers", confidence: 16 },    // ARI @ SF - Top pick
+            315: { winner: "Kansas City Chiefs", confidence: 2 },      // KC @ NYG
+            316: { winner: "Baltimore Ravens", confidence: 1 }         // DET @ BAL - Lowest confidence
+        };
+
+        let weekGames = [];
+        let activePicks = [];
+
+        // Load real Week 3 games data
+        async function loadWeekGames() {
+            try {
+                console.log('🔥 Loading real Week 3 games...');
+                const response = await fetch('nfl_2025_week_3.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const weekData = await response.json();
+                weekGames = weekData.games;
+                console.log(`✅ Loaded ${weekGames.length} real Week 3 games`);
+                return weekGames;
+            } catch (error) {
+                console.error('❌ Error loading games:', error);
+                return [];
+            }
+        }
+
+        // Generate active picks from user picks and game data
+        function generateActivePicks() {
+            const picks = [];
+
+            weekGames.forEach(game => {
+                const userPick = MOCK_USER_PICKS[game.id];
+                if (userPick) {
+                    // Determine opponent and home/away status
+                    const isHome = userPick.winner === game.h;
+                    const opponent = isHome ? game.a : game.h;
+                    const homeAwayIndicator = isHome ? 'vs' : '@';
+
+                    // Check if game has started (using ESPN timezone fix)
+                    const gameTime = convertESPNTimeToEastern(game.dt);
+                    const now = new Date();
+                    const gameHasStarted = now > gameTime;
+
+                    picks.push({
+                        gameId: game.id,
+                        team: userPick.winner,
+                        confidence: userPick.confidence,
+                        game: game,
+                        opponent: opponent,
+                        homeAwayIndicator: homeAwayIndicator,
+                        gameHasStarted: gameHasStarted,
+                        gameTime: gameTime
+                    });
+                }
+            });
+
+            // Sort by confidence (highest first) - just like real app
+            picks.sort((a, b) => b.confidence - a.confidence);
+            return picks;
+        }
+
+        // Render active picks in the exact style of the main app
+        function renderActivePicks() {
+            const picksList = document.getElementById('active-picks-list');
+            const loading = document.getElementById('picks-loading');
+            const noPicksMessage = document.getElementById('no-picks-message');
+
+            if (activePicks.length === 0) {
+                loading.classList.add('hidden');
+                noPicksMessage.classList.remove('hidden');
+                return;
+            }
+
+            const picksHTML = activePicks.map(pick => {
+                const teamAbbr = teamNameToAbbr[pick.team] || pick.team;
+                const logoUrl = nflTeamLogos[teamAbbr] || '';
+                const opponentAbbr = teamNameToAbbr[pick.opponent] || pick.opponent;
+                const opponentLogoUrl = nflTeamLogos[opponentAbbr] || '';
+
+                // Format game time
+                const timeDisplay = pick.gameTime.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+
+                // Game status styling
+                const statusClass = pick.gameHasStarted ? 'text-green-600' : 'text-slate-600';
+                const statusText = pick.gameHasStarted ? 'LIVE' : 'UPCOMING';
+
+                return `
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                         onclick="openGameModal(${pick.gameId})">
+                        <!-- Confidence Badge -->
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="bg-blue-600 text-white text-sm font-bold rounded-full w-8 h-8 flex items-center justify-center">
+                                ${pick.confidence}
+                            </div>
+                            <div class="text-xs ${statusClass} font-medium">${statusText}</div>
+                        </div>
+
+                        <!-- Team Info -->
+                        <div class="flex items-center space-x-3 mb-3">
+                            ${logoUrl ? `<img src="${logoUrl}" alt="${teamAbbr}" class="w-8 h-8">` : `<div class="w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center text-xs font-bold">${teamAbbr}</div>`}
+                            <div class="flex-1">
+                                <div class="font-semibold text-slate-800">${teamAbbr}</div>
+                                <div class="text-xs text-slate-500">${pick.team}</div>
+                            </div>
+                        </div>
+
+                        <!-- Matchup -->
+                        <div class="flex items-center justify-between text-sm">
+                            <div class="flex items-center space-x-2">
+                                ${opponentLogoUrl ? `<img src="${opponentLogoUrl}" alt="${opponentAbbr}" class="w-5 h-5">` : `<div class="w-5 h-5 bg-slate-300 rounded text-xs flex items-center justify-center">${opponentAbbr}</div>`}
+                                <span class="text-slate-600">${pick.homeAwayIndicator} ${opponentAbbr}</span>
+                            </div>
+                        </div>
+
+                        <!-- Game Time -->
+                        <div class="mt-3 text-xs text-slate-500 border-t border-slate-200 pt-2">
+                            ${timeDisplay}
+                        </div>
+
+                        <!-- Modal Hint -->
+                        <div class="mt-2 text-xs text-blue-600 text-center">
+                            Click for AI Analysis →
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            picksList.innerHTML = picksHTML;
+            loading.classList.add('hidden');
+            picksList.classList.remove('hidden');
+        }
+
+        // Modal functions
+        window.openGameModal = function(gameId) {
+            console.log(`🚀 Opening modal for game ID: ${gameId}`);
+
+            const game = weekGames.find(g => g.id === gameId);
+            const userPick = activePicks.find(p => p.gameId === gameId);
+
+            if (!game || !userPick) {
+                console.error('Game or pick not found');
+                return;
+            }
+
+            const modal = document.getElementById('live-game-modal');
+            const loading = document.getElementById('modal-loading');
+            const content = document.getElementById('modal-game-content');
+            const gameDisplay = document.getElementById('game-data-display');
+
+            modal.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            content.classList.add('hidden');
+
+            // Simulate loading with real data
+            setTimeout(() => {
+                console.log('✅ Displaying game analysis for:', game.a, '@', game.h);
+                gameDisplay.innerHTML = createRealGameAnalysis(game, userPick);
+                loading.classList.add('hidden');
+                content.classList.remove('hidden');
+            }, 1200);
+        };
+
+        window.closeLiveGameModal = function() {
+            document.getElementById('live-game-modal').classList.add('hidden');
+        };
+
+        // Create game analysis with real data
+        function createRealGameAnalysis(game, userPick) {
+            const awayAbbr = teamNameToAbbr[game.a] || game.a;
+            const homeAbbr = teamNameToAbbr[game.h] || game.h;
+            const awayLogo = nflTeamLogos[awayAbbr] || '';
+            const homeLogo = nflTeamLogos[homeAbbr] || '';
+
+            // Game time formatting (using ESPN timezone fix)
+            const gameTime = convertESPNTimeToEastern(game.dt);
+            const timeDisplay = gameTime.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                timeZoneName: 'short'
+            });
+
+            // Mock analysis based on team strength
+            const analysis = generateAnalysisForTeams(game.a, game.h);
+            const prediction = generatePredictionForTeams(game.a, game.h, userPick);
+
+            return `
+                <div class="space-y-6">
+                    <!-- Game Header -->
+                    <div class="text-center bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg p-6 border border-slate-200">
+                        <div class="text-sm font-medium text-slate-600 mb-3">Week 3 • ${timeDisplay}</div>
+                        <div class="flex justify-center items-center space-x-8">
+                            <div class="text-center">
+                                <div class="mb-3">
+                                    ${awayLogo ? `<img src="${awayLogo}" alt="${awayAbbr}" class="w-16 h-16 mx-auto">` : `<div class="w-16 h-16 bg-slate-300 rounded-full mx-auto flex items-center justify-center font-bold">${awayAbbr}</div>`}
+                                </div>
+                                <div class="text-xl font-bold text-slate-800">${awayAbbr}</div>
+                                <div class="text-sm text-slate-500">${game.a}</div>
+                            </div>
+                            <div class="text-slate-400 text-2xl">@</div>
+                            <div class="text-center">
+                                <div class="mb-3">
+                                    ${homeLogo ? `<img src="${homeLogo}" alt="${homeAbbr}" class="w-16 h-16 mx-auto">` : `<div class="w-16 h-16 bg-slate-300 rounded-full mx-auto flex items-center justify-center font-bold">${homeAbbr}</div>`}
+                                </div>
+                                <div class="text-xl font-bold text-slate-800">${homeAbbr}</div>
+                                <div class="text-sm text-slate-500">${game.h}</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-sm text-slate-500">${game.stadium}</div>
+                    </div>
+
+                    <!-- Your Pick Display -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+                            <span class="mr-2">🎯</span>Your Pick
+                        </h3>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center text-lg font-bold">
+                                    ${userPick.confidence}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-blue-800 text-lg">${teamNameToAbbr[userPick.team] || userPick.team}</div>
+                                    <div class="text-blue-600 text-sm">${userPick.team}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-blue-600 font-medium">Confidence Pick</div>
+                                <div class="text-xs text-blue-500">Week 3 Selection</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Analysis -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                            <span class="mr-2">🤖</span>AI Statistical Analysis
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${analysis.map(stat => `
+                                <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                    <div class="text-sm font-semibold text-slate-700 mb-2">${stat.category}</div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-slate-600">${awayAbbr}: ${stat.away}</span>
+                                            <span class="text-sm text-slate-600">${homeAbbr}: ${stat.home}</span>
+                                        </div>
+                                        ${stat.advantage ? `
+                                            <div class="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
+                                                ${stat.advantage}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- AI Win Prediction -->
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                            <span class="mr-2">🏆</span>AI Win Prediction
+                        </h3>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold mb-3 text-green-700">
+                                ${prediction.winner}
+                            </div>
+                            <div class="text-2xl font-bold text-green-700 mb-4">
+                                ${prediction.confidence}% Confidence
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-green-200">
+                                <div class="text-sm font-semibold text-green-800 mb-2">Key Factors:</div>
+                                <div class="text-sm text-green-700">${prediction.factors.join(' • ')}</div>
+                            </div>
+                            <div class="mt-4 text-xs text-green-600 italic">
+                                ${prediction.reasoning}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real Data Source -->
+                    <div class="bg-slate-100 border border-slate-300 rounded-lg p-4 text-center">
+                        <div class="text-sm text-slate-600">
+                            <strong>📊 Game Data:</strong> Real Week 3 NFL schedule |
+                            <strong>🎯 User Pick:</strong> ${userPick.team} (${userPick.confidence} confidence) |
+                            <strong>🔒 Security:</strong> Local testing only
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Generate mock analysis for real teams
+        function generateAnalysisForTeams(awayTeam, homeTeam) {
+            // Mock team strengths (simplified)
+            const teamStrengths = {
+                'Buffalo Bills': { offense: 92, defense: 88, experience: 85 },
+                'Kansas City Chiefs': { offense: 95, defense: 82, experience: 95 },
+                'San Francisco 49ers': { offense: 88, defense: 92, experience: 88 },
+                'Philadelphia Eagles': { offense: 90, defense: 85, experience: 82 },
+                'Baltimore Ravens': { offense: 86, defense: 90, experience: 80 },
+                'Dallas Cowboys': { offense: 82, defense: 78, experience: 85 },
+                'Miami Dolphins': { offense: 85, defense: 75, experience: 70 },
+                'Minnesota Vikings': { offense: 80, defense: 82, experience: 75 }
+            };
+
+            const awayStats = teamStrengths[awayTeam] || { offense: 75, defense: 75, experience: 75 };
+            const homeStats = teamStrengths[homeTeam] || { offense: 75, defense: 75, experience: 75 };
+
+            return [
+                {
+                    category: "Offensive Power",
+                    away: `${awayStats.offense}/100`,
+                    home: `${homeStats.offense}/100`,
+                    advantage: Math.abs(awayStats.offense - homeStats.offense) > 5 ?
+                        `${awayStats.offense > homeStats.offense ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} offensive edge` : null
+                },
+                {
+                    category: "Defensive Strength",
+                    away: `${awayStats.defense}/100`,
+                    home: `${homeStats.defense}/100`,
+                    advantage: Math.abs(awayStats.defense - homeStats.defense) > 5 ?
+                        `${awayStats.defense > homeStats.defense ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} defensive advantage` : null
+                },
+                {
+                    category: "Experience Factor",
+                    away: `${awayStats.experience}/100`,
+                    home: `${homeStats.experience}/100`,
+                    advantage: Math.abs(awayStats.experience - homeStats.experience) > 10 ?
+                        `${awayStats.experience > homeStats.experience ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} veteran leadership` : null
+                }
+            ];
+        }
+
+        // Generate prediction for real teams
+        function generatePredictionForTeams(awayTeam, homeTeam, userPick) {
+            const homeAdvantage = 3; // 3 point home field advantage
+
+            // Calculate basic prediction
+            const awayScore = Math.floor(Math.random() * 15) + 68; // 68-82 range
+            const homeScore = awayScore + homeAdvantage + Math.floor(Math.random() * 10) - 5;
+
+            const predictedWinner = homeScore > awayScore ? homeTeam : awayTeam;
+            const predictedWinnerAbbr = teamNameToAbbr[predictedWinner] || predictedWinner;
+
+            // Calculate confidence based on score difference
+            const scoreDiff = Math.abs(homeScore - awayScore);
+            const confidence = Math.min(85, Math.max(55, 50 + (scoreDiff * 3)));
+
+            const factors = ["Home field advantage", "Recent form", "Head-to-head history"];
+
+            // Check if prediction matches user pick
+            const matchesUserPick = predictedWinner === userPick.team;
+            const reasoning = matchesUserPick ?
+                `AI prediction aligns with your ${userPick.confidence} confidence pick` :
+                `AI disagrees with your pick - consider the statistical factors`;
+
+            return {
+                winner: predictedWinnerAbbr,
+                confidence: Math.round(confidence),
+                factors: factors,
+                reasoning: reasoning
+            };
+        }
+
+        // Initialize the system
+        async function initializeSystem() {
+            console.log('🚀 Initializing Real Active Picks System...');
+
+            // Load real games
+            await loadWeekGames();
+
+            if (weekGames.length === 0) {
+                document.getElementById('picks-loading').innerHTML = '<p class="text-red-600">Error loading Week 3 games</p>';
+                return;
+            }
+
+            // Generate active picks
+            activePicks = generateActivePicks();
+            console.log(`✅ Generated ${activePicks.length} active picks`);
+
+            // Render picks
+            renderActivePicks();
+
+            console.log('✅ Real Active Picks System Ready!');
+        }
+
+        // Close modal on outside click
+        document.getElementById('live-game-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLiveGameModal();
+            }
+        });
+
+        // Start the system
+        initializeSystem();
+    </script>
+</body>
+</html>
