@@ -43,7 +43,7 @@
  <script src="./emergencyCacheRefresh.js"></script>
  <script src="./core-bundle.js"></script>
  <script src="./survivorAutoElimination.js"></script>
-<script src="./survivor-bundle.js"></script>
+<script src="./survivor-battlefield-display.js"></script>
  <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
  <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
@@ -1100,22 +1100,7 @@ Status
                         <option value="">-- Select Week --</option>
                         <option value="1">Week 1 (Sep 4-10)</option>
                         <option value="2">Week 2 (Sep 11-17)</option>
-                        <option value="3">Week 3 (Sep 18-24)</option>
-                        <option value="4">Week 4 (Sep 25-Oct 1)</option>
-                        <option value="5">Week 5 (Oct 2-8)</option>
-                        <option value="6">Week 6 (Oct 9-15)</option>
-                        <option value="7">Week 7 (Oct 16-22)</option>
-                        <option value="8">Week 8 (Oct 23-29)</option>
-                        <option value="9">Week 9 (Oct 30-Nov 5)</option>
-                        <option value="10">Week 10 (Nov 6-12)</option>
-                        <option value="11">Week 11 (Nov 13-19)</option>
-                        <option value="12">Week 12 (Nov 20-26)</option>
-                        <option value="13">Week 13 (Nov 27-Dec 3)</option>
-                        <option value="14">Week 14 (Dec 4-10)</option>
-                        <option value="15">Week 15 (Dec 11-17)</option>
-                        <option value="16">Week 16 (Dec 18-24)</option>
-                        <option value="17">Week 17 (Dec 25-31)</option>
-                        <option value="18">Week 18 (Jan 1-7)</option>
+                        <!-- Week 3+ removed - games haven't occurred yet in 2025 season -->
                     </select>
                 </div>
 
@@ -3094,14 +3079,14 @@ await new Promise(resolve => {
    const newResultsDoc = await getDoc(doc(db, resultsPath(weekNumber)));
    let results = null;
 
-   if (newResultsDoc.exists()) {
+   if (newResultsDoc.exists) {
      results = newResultsDoc.data();
      console.log(`📍 Found results in NEW location (nerdfootball_games) for Week ${weekNumber}`);
    } else {
      // Fallback to old location (nerdfootball_results) for backward compatibility
      const oldPath = resultsPath(weekNumber).replace('nerdfootball_games', 'nerdfootball_results');
      const oldResultsDoc = await getDoc(doc(db, oldPath));
-     if (oldResultsDoc.exists()) {
+     if (oldResultsDoc.exists) {
        results = oldResultsDoc.data();
        console.log(`📍 Found results in OLD location (nerdfootball_results) for Week ${weekNumber}`);
      }
@@ -3524,7 +3509,7 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
    const poolMembersRef = doc(db, getPoolMembersPath(poolId));
    const poolMembersSnap = await getDoc(poolMembersRef);
    
-   if (poolMembersSnap.exists()) {
+   if (poolMembersSnap.exists) {
     const members = poolMembersSnap.data();
     const users = {};
     
@@ -3941,7 +3926,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         const poolMembersDoc = await getDoc(doc(db, getPoolMembersPath(getCurrentPool())));
         let userMap = new Map();
         
-        if (poolMembersDoc.exists()) {
+        if (poolMembersDoc.exists) {
             const members = poolMembersDoc.data();
             console.log('✅ Pool members found:', Object.keys(members).length);
             
@@ -3986,7 +3971,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         // Fetch results
         const resultsDocRef = doc(db, resultsPath(selectedWeek));
         const resultsSnap = await getDoc(resultsDocRef);
-        const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+        const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
 
         // Fetch picks
         const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
@@ -4307,7 +4292,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
     const poolMembersSnap = await getDoc(poolMembersRef);
     
     const currentMembers = new Set();
-    if (poolMembersSnap.exists()) {
+    if (poolMembersSnap.exists) {
       const membersData = poolMembersSnap.data();
       Object.keys(membersData).forEach(uid => currentMembers.add(uid));
     }
@@ -4364,7 +4349,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
     const poolMembersRef = doc(db, getPoolMembersPath(poolId));
     const poolMembersSnap = await getDoc(poolMembersRef);
     
-    if (poolMembersSnap.exists()) {
+    if (poolMembersSnap.exists) {
       const members = poolMembersSnap.data();
       if (members[userId]) {
         throw new Error(`User is already a member of this pool with role: ${members[userId].role}`);
@@ -4434,7 +4419,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
       console.log(`✅ Initialized picks documents for weeks ${currentWeek}-${maxWeeks}`);
       
       // 4. Update pool member count statistics (using data from read phase)
-      if (poolConfigSnap.exists()) {
+      if (poolConfigSnap.exists) {
         const currentConfig = poolConfigSnap.data();
         const currentMemberCount = currentConfig.memberCount || 0;
         
@@ -5031,7 +5016,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         // Try new location first (nerdfootball_games)
         const newResultsDoc = await getDoc(doc(db, resultsPath(weekNumber)));
 
-        if (newResultsDoc.exists()) {
+        if (newResultsDoc.exists) {
             currentResults = newResultsDoc.data();
             console.log(`📍 Admin found results in NEW location (nerdfootball_games) for Week ${weekNumber}`);
             console.log(`🔍 DEBUG: currentResults data:`, currentResults);
@@ -5039,7 +5024,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
             // Fallback to old location (nerdfootball_results) for backward compatibility
             const oldPath = resultsPath(weekNumber).replace('nerdfootball_games', 'nerdfootball_results');
             const oldResultsDoc = await getDoc(doc(db, oldPath));
-            if (oldResultsDoc.exists()) {
+            if (oldResultsDoc.exists) {
                 currentResults = oldResultsDoc.data();
                 console.log(`📍 Admin found results in OLD location (nerdfootball_results) for Week ${weekNumber}`);
             }
@@ -5633,7 +5618,7 @@ async function renderSurvivorStatus(weekNumber) {
     
     const statusDocRef = doc(db, survivorStatusPath());
     const statusSnap = await getDoc(statusDocRef);
-    const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
+    const allStatuses = statusSnap.exists ? statusSnap.data() : {};
     
     const picksCollectionRef = collection(db, survivorPicksPath('').slice(0,-1));
     const picksSnap = await getDocs(picksCollectionRef);
@@ -6094,7 +6079,7 @@ async function exportSurvivorDataToCsv(selectedWeek) {
         console.log('🎯 Step 1: Fetching pool members data...');
         const poolDoc = await getDoc(doc(db, poolMembersPath));
 
-        if (!poolDoc.exists()) {
+        if (!poolDoc.exists) {
             throw new Error('Pool members document not found');
         }
 
@@ -6112,7 +6097,7 @@ async function exportSurvivorDataToCsv(selectedWeek) {
             // Get real game results for this week
             const gameResultsPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`;
             const gameResultsDoc = await getDoc(doc(db, gameResultsPath));
-            const gameResults = gameResultsDoc.exists() ? gameResultsDoc.data() : {};
+            const gameResults = gameResultsDoc.exists ? gameResultsDoc.data() : {};
 
             console.log(`🎯 Found ${Object.keys(gameResults).length} game results for Week ${week}`);
 
@@ -6128,7 +6113,7 @@ async function exportSurvivorDataToCsv(selectedWeek) {
                     let pickResult = 'NO PICK';
                     let gameResult = 'NO GAME DATA';
 
-                    if (userPicksDoc.exists()) {
+                    if (userPicksDoc.exists) {
                         const picksData = userPicksDoc.data();
                         if (picksData.picks && picksData.picks[week]) {
                             userPick = picksData.picks[week];
@@ -6258,7 +6243,7 @@ async function refreshMegatronDashboard() {
         console.log('🎯 Step 1: Fetching pool members...');
         const poolDoc = await getDoc(doc(db, poolMembersPath));
 
-        if (!poolDoc.exists()) {
+        if (!poolDoc.exists) {
             throw new Error('Pool members document not found');
         }
 
@@ -6271,31 +6256,57 @@ async function refreshMegatronDashboard() {
         const weekPickCounts = {};
         const userPicksByWeek = {};
 
-        for (let week = 1; week <= 6; week++) {
+        // Process weeks 1-2 only (current valid weeks for 2025 season)
+        for (let week = 1; week <= 2; week++) {
             weekPickCounts[week] = 0;
             userPicksByWeek[week] = [];
 
-            console.log(`🎯 Checking Week ${week} picks...`);
+            console.log(`🎯 Checking Week ${week} picks for ${allUserIds.length} users...`);
 
-            for (const userId of allUserIds) {
-                try {
-                    const userPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
-                    const userPicksDoc = await getDoc(doc(db, userPicksPath));
+            // Process users in smaller batches to avoid timeout
+            const batchSize = 10;
+            for (let i = 0; i < allUserIds.length; i += batchSize) {
+                const batch = allUserIds.slice(i, i + batchSize);
+                console.log(`   Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(allUserIds.length/batchSize)} (users ${i+1}-${Math.min(i+batchSize, allUserIds.length)})`);
 
-                    if (userPicksDoc.exists()) {
-                        const picksData = userPicksDoc.data();
-                        if (picksData.picks && picksData.picks[week]) {
-                            weekPickCounts[week]++;
-                            userPicksByWeek[week].push({
-                                userId: userId,
-                                name: poolData[userId].displayName || poolData[userId].name || userId.substring(0,8),
-                                email: poolData[userId].email || poolData[userId].emailAddress || 'No email',
-                                team: picksData.picks[week].team
-                            });
+                const batchPromises = batch.map(async (userId) => {
+                    try {
+                        const userPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
+                        const userPicksDoc = await getDoc(doc(db, userPicksPath));
+
+                        if (userPicksDoc.exists) {
+                            const picksData = userPicksDoc.data();
+                            if (picksData.picks && picksData.picks[week]) {
+                                return {
+                                    userId: userId,
+                                    name: poolData[userId].displayName || poolData[userId].name || userId.substring(0,8),
+                                    email: poolData[userId].email || poolData[userId].emailAddress || 'No email',
+                                    team: picksData.picks[week].team
+                                };
+                            }
                         }
+                        return null;
+                    } catch (error) {
+                        console.warn(`   ⚠️ Error fetching picks for ${poolData[userId]?.displayName || userId.substring(0,8)}:`, error.message);
+                        return null;
                     }
-                } catch (error) {
-                    // Skip users with no picks
+                });
+
+                try {
+                    const batchResults = await Promise.all(batchPromises);
+                    const validPicks = batchResults.filter(pick => pick !== null);
+
+                    weekPickCounts[week] += validPicks.length;
+                    userPicksByWeek[week].push(...validPicks);
+
+                    console.log(`   Batch complete: Found ${validPicks.length} picks from ${batch.length} users`);
+
+                    // Small delay between batches to avoid overwhelming Firebase
+                    if (i + batchSize < allUserIds.length) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                } catch (batchError) {
+                    console.error(`   ❌ Batch ${Math.floor(i/batchSize) + 1} failed:`, batchError);
                 }
             }
 
@@ -6305,11 +6316,10 @@ async function refreshMegatronDashboard() {
         console.log('🎯 Step 3: REAL Elimination Analysis:');
         console.log(`   Week 1: ${weekPickCounts[1]} users made picks (TOTAL POOL)`);
         console.log(`   Week 2: ${weekPickCounts[2]} users made picks (${weekPickCounts[1] - weekPickCounts[2]} eliminated after Week 1)`);
-        console.log(`   Week 3: ${weekPickCounts[3]} users made picks (${weekPickCounts[2] - weekPickCounts[3]} eliminated after Week 2)`);
-        console.log(`   Week 4: ${weekPickCounts[4]} users made picks (${weekPickCounts[3] - weekPickCounts[4]} eliminated after Week 3)`);
+        console.log(`   Week 3+: TBD (Games haven't occurred yet in 2025 season)`);
 
         const totalStarters = weekPickCounts[1] || 0;
-        const currentAlive = weekPickCounts[6] || weekPickCounts[5] || weekPickCounts[4] || weekPickCounts[3] || weekPickCounts[2] || 0;
+        const currentAlive = weekPickCounts[2] || 0;
         const totalEliminated = totalStarters - currentAlive;
 
         console.log('🎯 Step 4: CORRECTED Dashboard Stats:');
@@ -6350,7 +6360,7 @@ async function updateMegatronStatsForWeek(weekNumber) {
         const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
 
         const poolDoc = await getDoc(doc(db, poolMembersPath));
-        if (!poolDoc.exists()) {
+        if (!poolDoc.exists) {
             throw new Error('Pool members document not found');
         }
 
@@ -6935,7 +6945,7 @@ function showMessageStatus(message, type) {
 async function calculateWeeklyLeaderboard(weekNumber) {
     // Get game results using the correct Firestore pattern
     const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
-    const results = resultsSnap.exists() ? resultsSnap.data() : {};
+    const results = resultsSnap.exists ? resultsSnap.data() : {};
     
     if (!results || Object.keys(results).length === 0) {
         console.log(`No results found for week ${weekNumber} - skipping leaderboard calculation`);
@@ -7367,7 +7377,7 @@ async function handleAuthStateChange(user) {
  const userDocRef = doc(db, `${usersPath()}/${user.uid}`);
  const userDoc = await getDoc(userDocRef);
 
- if (userDoc.exists() && userDoc.data().disabled) {
+ if (userDoc.exists && userDoc.data().disabled) {
  allUI.loadingView.classList.add('hidden');
  allUI.loginView.classList.remove('hidden');
  allUI.loginError.textContent = 'Your account has been disabled.';
@@ -8181,7 +8191,7 @@ const getPoolBasePath = () => {
      const poolConfigRef = doc(db, getPoolMetadataPath('nerduniverse-2025'));
      const poolConfigSnap = await getDoc(poolConfigRef);
      
-     if (poolConfigSnap.exists()) {
+     if (poolConfigSnap.exists) {
        poolExists = true;
        const poolData = poolConfigSnap.data();
        console.log('✅ NerdUniverse 2025 pool EXISTS');
@@ -8201,7 +8211,7 @@ const getPoolBasePath = () => {
      const poolMembersRef = doc(db, getPoolMembersPath('nerduniverse-2025'));
      const poolMembersSnap = await getDoc(poolMembersRef);
      
-     if (poolMembersSnap.exists()) {
+     if (poolMembersSnap.exists) {
        const members = poolMembersSnap.data();
        const memberCount = Object.keys(members).length;
        console.log(`✅ Pool membership data exists (${memberCount} members)`);
@@ -8226,7 +8236,7 @@ const getPoolBasePath = () => {
      const userPoolsRef = doc(db, getUserPoolsPath(currentUser.uid));
      const userPoolsSnap = await getDoc(userPoolsRef);
      
-     if (userPoolsSnap.exists()) {
+     if (userPoolsSnap.exists) {
        hasUserPools = true;
        const userPools = userPoolsSnap.data();
        console.log(`✅ Your pool memberships: ${Object.keys(userPools).join(', ')}`);
@@ -8481,7 +8491,7 @@ async function loadUserPoolMemberships() {
     const userPoolsRef = doc(db, getUserPoolsPath(currentUser.uid));
     const userPoolsSnap = await getDoc(userPoolsRef);
     
-    if (userPoolsSnap.exists()) {
+    if (userPoolsSnap.exists) {
       userPoolMemberships = userPoolsSnap.data();
     } else {
       // Migrate existing user to default pool and create pool config if needed
@@ -8514,7 +8524,7 @@ async function ensureDefaultPoolExists() {
     const poolConfigRef = doc(db, getPoolMetadataPath(defaultPoolId));
     const poolConfigSnap = await getDoc(poolConfigRef);
     
-    if (!poolConfigSnap.exists()) {
+    if (!poolConfigSnap.exists) {
       // Create default pool configuration
       const defaultPoolConfig = {
         poolId: defaultPoolId,
@@ -8551,7 +8561,7 @@ async function joinPool(poolId, inviteCode = null) {
     const poolConfigRef = doc(db, getPoolMetadataPath(poolId));
     const poolConfigSnap = await getDoc(poolConfigRef);
     
-    if (!poolConfigSnap.exists()) {
+    if (!poolConfigSnap.exists) {
       throw new Error('Pool not found');
     }
     
@@ -8607,12 +8617,12 @@ async function getUserPools() {
         let poolConfigSnap = await getDoc(poolConfigRef);
         
         // If not found, try client-accessible location
-        if (!poolConfigSnap.exists() && poolId === 'nerduniverse-2025') {
+        if (!poolConfigSnap.exists && poolId === 'nerduniverse-2025') {
           poolConfigRef = doc(db, `artifacts/nerdfootball/public/pools/${poolId}/config`);
           poolConfigSnap = await getDoc(poolConfigRef);
         }
         
-        if (poolConfigSnap.exists()) {
+        if (poolConfigSnap.exists) {
           poolConfig = poolConfigSnap.data();
         }
       }
@@ -9065,7 +9075,7 @@ async function loadPoolManagementData() {
     const poolConfigRef = doc(db, getPoolMetadataPath(currentPoolId));
     const poolConfigSnap = await getDoc(poolConfigRef);
     
-    if (poolConfigSnap.exists()) {
+    if (poolConfigSnap.exists) {
       const poolConfig = poolConfigSnap.data();
       updatePoolConfigurationDisplay(poolConfig);
     }
@@ -9121,7 +9131,7 @@ async function loadPoolMembers() {
     
     allUI.poolMembersTbody.innerHTML = '';
     
-    if (poolMembersSnap.exists()) {
+    if (poolMembersSnap.exists) {
       const members = poolMembersSnap.data();
       const memberEntries = Object.entries(members);
       
@@ -9420,7 +9430,7 @@ window.toggleParticipation = async function(uid) {
     const poolMembersRef = doc(db, getPoolMembersPath(getCurrentPool()));
     const poolMembersSnap = await getDoc(poolMembersRef);
     
-    if (!poolMembersSnap.exists()) {
+    if (!poolMembersSnap.exists) {
       showPoolSwitchFeedback('Member data not found', 'error');
       return;
     }
@@ -9635,7 +9645,7 @@ async function validateInviteCode(inviteCode) {
     const inviteRef = doc(db, `artifacts/${appId()}/invites/${inviteCode}`);
     const inviteSnap = await getDoc(inviteRef);
     
-    if (!inviteSnap.exists()) {
+    if (!inviteSnap.exists) {
       return { valid: false, reason: 'Invite code not found' };
     }
     
@@ -9667,7 +9677,7 @@ async function validateInviteCode(inviteCode) {
     const poolConfigRef = doc(db, getPoolMetadataPath(invite.poolId));
     const poolConfigSnap = await getDoc(poolConfigRef);
     
-    if (!poolConfigSnap.exists()) {
+    if (!poolConfigSnap.exists) {
       return { valid: false, reason: 'Pool no longer exists' };
     }
     
@@ -9682,7 +9692,7 @@ async function validateInviteCode(inviteCode) {
     const poolMembersRef = doc(db, getPoolMembersPath(invite.poolId));
     const poolMembersSnap = await getDoc(poolMembersRef);
     
-    if (poolMembersSnap.exists()) {
+    if (poolMembersSnap.exists) {
       const members = poolMembersSnap.data();
       const memberCount = Object.keys(members).length;
       
@@ -9743,7 +9753,7 @@ async function loadInviteLinks() {
     
     allUI.inviteLinksContainer.innerHTML = '';
     
-    if (poolInvitesSnap.exists()) {
+    if (poolInvitesSnap.exists) {
       const invites = poolInvitesSnap.data();
       const inviteEntries = Object.entries(invites);
       
@@ -10675,7 +10685,7 @@ function isGameLocked(game) {
    // Get user pick for this game
    const docRef = doc(db, picksPath(currentWeek, currentUser.uid));
    const docSnap = await getDoc(docRef);
-   const userPicks = docSnap.exists() ? docSnap.data() : {};
+   const userPicks = docSnap.exists ? docSnap.data() : {};
    const userPick = userPicks[gameId];
    
    // Get live data if available
@@ -11052,7 +11062,7 @@ function isGameLocked(game) {
    
    // Get game results and MNF actual total
    const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
-   const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+   const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
    const mnfResult = gameResults[mondayNightGame.id];
    const mnfActualTotal = mnfResult ? calculateGameTotalPoints(mnfResult) : null;
    
@@ -11127,7 +11137,7 @@ function isGameLocked(game) {
      if (mondayNightGame) {
        // Get game results and MNF actual total
        const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
-       const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+       const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
        const mnfResult = gameResults[mondayNightGame.id];
        mnfActualTotal = mnfResult ? calculateGameTotalPoints(mnfResult) : null;
        
@@ -11208,7 +11218,7 @@ function isGameLocked(game) {
  let userPicks = {}; 
  const weekData = { week: currentWeek, games: games };
 
- if (docSnap.exists()) { 
+ if (docSnap.exists) { 
  userPicks = docSnap.data(); 
  } else { 
  weekData.games.forEach((game, index) => { 
@@ -11239,7 +11249,7 @@ function isGameLocked(game) {
   // Get current picks from database
   const docRef = doc(db, picksPath(weekNum, currentUser.uid));
   const currentDoc = await getDoc(docRef);
-  const currentPicks = currentDoc.exists() ? currentDoc.data() : {};
+  const currentPicks = currentDoc.exists ? currentDoc.data() : {};
 
   // Validate each pick - only allow changes to games that haven't started
   const validatedPicks = { ...currentPicks };
@@ -11455,7 +11465,7 @@ async function calculateLeaderboard(weekNumber = null) {
 
     if (weekNumber) { // Weekly calculation
         const resultsSnap = await getDoc(doc(db, resultsPath(weekNumber)));
-        const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+        const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
         const picksSnap = await getDocs(collection(db, picksCollectionPath(weekNumber)));
         
         picksSnap.forEach(pickDoc => {
@@ -11497,7 +11507,7 @@ async function calculateLeaderboard(weekNumber = null) {
             
             const resultsSnap = allSnapshots[resultsIndex];
             const picksSnap = allSnapshots[picksIndex];
-            const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+            const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
 
             picksSnap.forEach(pickDoc => {
                 const userId = pickDoc.id;
@@ -11567,7 +11577,7 @@ async function updateLeaderboardSummary(weekNumber = null) {
             
             const resultsSnap = allSnapshots[resultsIndex];
             const picksSnap = allSnapshots[picksIndex];
-            const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+            const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
             
             let weeklyScores = [];
             
@@ -11629,7 +11639,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
         // Try to get summary document first
         const summaryDoc = await getDoc(doc(db, leaderboardSummaryPath()));
         
-        if (summaryDoc.exists()) {
+        if (summaryDoc.exists) {
             const summary = summaryDoc.data();
             console.log('✅ Using cached leaderboard summary (1 read instead of 36+)');
             
@@ -11715,12 +11725,12 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
 
    const docRef = doc(db, picksPath(currentWeek, currentUser.uid));
    const docSnap = await getDoc(docRef);
-   const userPicks = docSnap.exists() ? docSnap.data() : {};
+   const userPicks = docSnap.exists ? docSnap.data() : {};
 
    // Get game results for this week
    const resultsDocRef = doc(db, resultsPath(currentWeek));
    const resultsSnap = await getDoc(resultsDocRef);
-   const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+   const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
 
    // Get live scores from ESPN API if available
    let liveScores = {};
@@ -13846,7 +13856,7 @@ const SurvivorView = {
             const resultPromises = Array.from({ length: currentWeek }, (_, i) => {
                 const week = i + 1;
                 return getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`))
-                    .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
+                    .then(doc => ({ week, data: doc.exists ? doc.data() : null }))
                     .catch(error => {
                         console.error(`Error loading week ${week} results:`, error);
                         return { week, data: null };
@@ -14060,6 +14070,10 @@ const SurvivorView = {
     
     // DIAMOND OPTIMIZATION: Non-blocking elimination processing
     processEliminationsAsync: function(currentWeek, userResults) {
+        // DISABLED: Preventing setDoc errors with undefined displayName values
+        console.log('ℹ️ Background elimination processing disabled to prevent null/undefined data errors');
+        return; // Early exit to prevent any background writes
+
         // Process eliminations in background without blocking UI
         setTimeout(async () => {
             console.log('🔄 Background elimination processing...');
@@ -14067,7 +14081,7 @@ const SurvivorView = {
                 try {
                     const survivorElimination = new window.SurvivorAutoElimination(db, window.gameStateCache);
                     const eliminationResult = await survivorElimination.checkEliminationsForWeek(currentWeek);
-                    
+
                     if (eliminationResult.eliminatedCount > 0) {
                         console.log(`🚨 Background: ${eliminationResult.eliminatedCount} users eliminated! UI will update next reload.`);
                     }
@@ -14081,128 +14095,19 @@ const SurvivorView = {
     loadSurvivorResults: async function() {
         this.showLoading();
         const loadStartTime = performance.now();
-        
+
         try {
-            // DIAMOND LEVEL: Use clean survivor system with enhanced team normalization
-            let loadResult = null;
-
-
-            if (window.survivorSystem) {
-                console.log('💎 Using CLEAN DIAMOND survivor system (84.5% optimized + team normalization fixes)');
-                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
-                const results = await window.survivorSystem.getPoolSurvivalStatus(currentPool);
-                const summaryStats = window.survivorSystem.getSummaryStats(results);
-
-                // Professional stats with correct terminology
-                const pendingPlayers = results.filter(r => r.status === 'pending').length;
-
-                loadResult = {
-                    results,
-                    stats: {
-                        totalPlayers: summaryStats.total,
-                        activePlayers: summaryStats.active,
-                        eliminatedPlayers: summaryStats.eliminated,
-                        pendingPlayers: pendingPlayers
-                    },
-                    loadTime: performance.now() - loadStartTime,
-                    source: 'clean-diamond-survivor'
-                };
-            } else if (window.simpleSurvivorSystem) {
-                console.log('⚠️ Fallback to old survivor system (needs cleanup)');
-                const currentPool = (typeof getCurrentPool === 'function') ? getCurrentPool() : 'nerduniverse-2025';
-                const results = await window.simpleSurvivorSystem.getSurvivorTable(currentPool);
-
-                // Simple stats calculation
-                const total = results.length;
-                const eliminated = results.filter(r => r.status === 'lost' || r.status === 'eliminated').length;
-                const active = total - eliminated;
-
-                loadResult = {
-                    results,
-                    stats: {
-                        totalPlayers: total,
-                        activePlayers: active,
-                        eliminatedPlayers: eliminated,
-                        pendingPlayers: 0
-                    },
-                    loadTime: performance.now() - loadStartTime,
-                    source: 'simple-survivor-fallback'
-                };
-            } else if (window.espnSurvivorIntegration) {
-                console.log('⚡ Fallback to ESPN-integrated survivor data');
-                const enhancedData = await window.espnSurvivorIntegration.getDisplayData();
-                
-                loadResult = {
-                    results: enhancedData.data,
-                    stats: enhancedData.stats,
-                    loadTime: enhancedData.loadTimeMs,
-                    source: 'espn-integrated'
-                };
-            } else if (window.unifiedSurvivorManager) {
-                console.log('⚡ Fallback to unified survivor manager');
-                const displayData = await window.unifiedSurvivorManager.getDisplayData();
-                const stats = {
-                    totalPlayers: displayData.length,
-                    activePlayers: displayData.filter(u => !u.eliminated).length,
-                    eliminatedPlayers: displayData.filter(u => u.eliminated).length,
-                    pendingPlayers: 0
-                };
-                loadResult = {
-                    results: displayData,
-                    stats,
-                    loadTime: performance.now() - loadStartTime,
-                    source: 'unified'
-                };
-            } else {
-                throw new Error('No survivor loading system available');
+            // 🏆 BATTLEFIELD DISPLAY ONLY: No legacy survivor systems whatsoever!
+            if (window.survivorBattlefield && typeof window.survivorBattlefield.renderBattlefield === 'function') {
+                console.log('🏆 BATTLEFIELD DISPLAY: Using stunning visual survivor battlefield!');
+                await window.survivorBattlefield.renderBattlefield();
+                this.showResults();
+                console.log(`✅ BATTLEFIELD LOADED: ${(performance.now() - loadStartTime).toFixed(1)}ms`);
+                return;
             }
 
-            if (!loadResult || !loadResult.results) {
-                throw new Error('No survivor data loaded');
-            }
-
-            const { results, stats } = loadResult;
-            const totalLoadTime = performance.now() - loadStartTime;
-            
-            console.log(`✅ SURVIVOR LOADED: ${totalLoadTime.toFixed(1)}ms (${loadResult.source})`);
-            console.log(`📊 ${stats.totalPlayers} players, ${stats.activePlayers} active, ${stats.eliminatedPlayers} eliminated`);
-
-            // Update summary stats
-            allUI.survivorTotalPlayers.textContent = stats.totalPlayers;
-            allUI.survivorActivePlayers.textContent = stats.activePlayers;
-            allUI.survivorEliminatedPlayers.textContent = stats.eliminatedPlayers;
-            allUI.survivorCurrentWeek.textContent = 1; // Current week
-            
-            // Generate and display table
-            let tableHtml;
-            if (loadResult.source === 'simple-survivor' && window.simpleSurvivorSystem) {
-                tableHtml = window.simpleSurvivorSystem.generateTable(results);
-            } else if (loadResult.source === 'unified') {
-                tableHtml = this.generateUnifiedTable(results);
-            } else {
-                tableHtml = this.generateFallbackTable(results);
-            }
-            
-            // Put table into the survivor results container
-            if (allUI.survivorResultsContainer) {
-                const tableContainer = allUI.survivorResultsContainer.querySelector('.overflow-x-auto') || 
-                                     allUI.survivorResultsContainer.querySelector('table')?.parentElement;
-                if (tableContainer) {
-                    tableContainer.outerHTML = tableHtml;
-                } else {
-                    allUI.survivorResultsContainer.appendChild(document.createElement('div')).innerHTML = tableHtml;
-                }
-            }
-            
-            // Show performance metrics in console
-            if (totalLoadTime < 500) {
-                console.log(`🎯 PERFORMANCE TARGET MET: ${totalLoadTime.toFixed(1)}ms < 500ms`);
-            } else {
-                console.warn(`⚠️ Performance target missed: ${totalLoadTime.toFixed(1)}ms > 500ms`);
-            }
-            
-            // Show the results
-            this.showResults();
+            // If battlefield display is not available, show error
+            throw new Error('Battlefield display system not available. Please refresh the page.');
 
         } catch (error) {
             console.error('❌ Survivor loading error:', error);
@@ -14494,7 +14399,7 @@ const SurvivorPicksView = {
         // Check if user is eliminated first
         const statusDocRef = doc(db, this.survivorStatusPath());
         const statusSnap = await getDoc(statusDocRef);
-        const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
+        const allStatuses = statusSnap.exists ? statusSnap.data() : {};
         const myStatus = allStatuses[this.currentUser.uid];
         
         if (myStatus && myStatus.eliminated) {
@@ -14515,7 +14420,7 @@ const SurvivorPicksView = {
         // Get user's picks
         const picksDocRef = doc(db, this.survivorPicksPath(this.currentUser.uid));
         const picksSnap = await getDoc(picksDocRef);
-        const userPicks = picksSnap.exists() ? picksSnap.data() : { picks: {} };
+        const userPicks = picksSnap.exists ? picksSnap.data() : { picks: {} };
         
         // Get weekly games for selected week
         const weeklyGames = await this.getGamesForWeek(this.selectedWeek);

@@ -271,6 +271,13 @@ window.espnWinnerSync = {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🎮 ESPN Game Mapping System loaded');
 
+    // 🏆 BATTLEFIELD BYPASS: Skip ESPN auto-sync on survivor page (battlefield uses embedded data only)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('view') === 'survivor') {
+        console.log('🏆 BATTLEFIELD MODE: Skipping ESPN auto-sync - using embedded data only');
+        return;
+    }
+
     // Auto-run sync if ESPN API is available
     if (window.espnNerdApi) {
         // Run initial sync after 2 seconds to allow other systems to load

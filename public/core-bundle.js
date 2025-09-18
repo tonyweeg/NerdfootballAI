@@ -493,15 +493,22 @@ if (typeof module !== 'undefined') {
 
     // Fetch games for current week with caching
     async getCurrentWeekGames(forceRefresh = false) {
+        // 🏆 BATTLEFIELD BYPASS: Skip ESPN API calls on survivor page
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('view') === 'survivor') {
+            console.log('🏆 BATTLEFIELD MODE: Skipping ESPN getCurrentWeekGames - using embedded data only');
+            return { data: [] }; // Return empty data to prevent errors
+        }
+
         const currentWeek = window.currentWeek || this.getCurrentWeek();
         const cacheKey = `games_week_${currentWeek}`;
-        
+
         // Check cache first unless forcing refresh
         if (!forceRefresh && this.isCacheValid(cacheKey)) {
             console.log(`ESPN: Serving Week ${currentWeek} games from cache`);
             return this.getCache(cacheKey);
         }
-        
+
         try {
             console.log(`ESPN: Fetching Week ${currentWeek} games from API`);
             const result = await this.callFunction('fetchCurrentWeekGames', { week: currentWeek });
@@ -548,13 +555,20 @@ if (typeof module !== 'undefined') {
 
     // Fetch games for specific week
     async getWeekGames(week, forceRefresh = false) {
+        // 🏆 BATTLEFIELD BYPASS: Skip ESPN API calls on survivor page
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('view') === 'survivor') {
+            console.log(`🏆 BATTLEFIELD MODE: Skipping ESPN getWeekGames Week ${week} - using embedded data only`);
+            return { data: [] }; // Return empty data to prevent errors
+        }
+
         const cacheKey = `games_week_${week}`;
-        
+
         if (!forceRefresh && this.isCacheValid(cacheKey)) {
             console.log(`ESPN: Serving Week ${week} games from cache`);
             return this.getCache(cacheKey);
         }
-        
+
         try {
             console.log(`ESPN: Fetching Week ${week} games from API`);
             const result = await this.callFunction('fetchCurrentWeekGames', { week });
