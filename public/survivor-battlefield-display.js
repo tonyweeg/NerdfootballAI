@@ -207,13 +207,17 @@ class SurvivorBattlefieldDisplay {
                     playerName = `Player ${userId.substring(0, 8)}`; // Use partial user ID as last resort
                 }
 
+                // 🚨 SECURITY: Cap displayed pick count at currentWeek (don't reveal future pick totals)
+                const actualTotalPicks = (typeof survivorData.totalPicks === 'number') ? survivorData.totalPicks : 0;
+                const displayedTotalPicks = Math.min(actualTotalPicks, this.currentWeek);
+
                 const playerData = {
                     userId,
                     name: playerName,
                     email: (member.email && typeof member.email === 'string') ? member.email : '',
                     isAlive,
                     pickHistory: (survivorData.pickHistory && typeof survivorData.pickHistory === 'string') ? survivorData.pickHistory : '',
-                    totalPicks: (typeof survivorData.totalPicks === 'number') ? survivorData.totalPicks : 0,
+                    totalPicks: displayedTotalPicks,
                     eliminationWeek: (typeof survivorData.eliminationWeek === 'number') ? survivorData.eliminationWeek : null,
                     lastUpdated: survivorData.lastUpdated || null,
                     helmets: this.buildHelmetDisplay(survivorData, isAlive, playerName),
@@ -267,9 +271,20 @@ class SurvivorBattlefieldDisplay {
         const picks = survivorData.pickHistory.split(', ').filter(pick => pick && pick.trim());
         const helmets = [];
 
-        picks.forEach((teamName, index) => {
+        // 🚨 SECURITY: Only process picks up to currentWeek, and only show completed weeks
+        const currentWeekGamesStarted = false; // Assume safer default
+        const completedWeeks = currentWeekGamesStarted ? this.currentWeek : this.currentWeek - 1;
+        const maxPicksToProcess = this.currentWeek;
+
+        picks.slice(0, maxPicksToProcess).forEach((teamName, index) => {
             try {
                 const week = index + 1;
+
+                // Only show helmets for completed weeks (not current week if games haven't started)
+                if (week > completedWeeks) {
+                    return; // Skip current week if games haven't started
+                }
+
                 const cleanTeamName = (teamName || '').trim();
 
                 if (!cleanTeamName) return; // Skip empty team names
@@ -508,28 +523,44 @@ class SurvivorBattlefieldDisplay {
         const picks = this.parsePickHistory(player.pickHistory || '');
 
         if (picks.length > 0) {
-            helmetsHtml = picks.map((teamName, index) => {
+            // 🚨 SECURITY: Only show picks up to currentWeek (never show future weeks)
+            const maxPicksToShow = this.currentWeek;
+            const picksToShow = picks.slice(0, maxPicksToShow);
+
+            // Assume current week games haven't started yet (safer default)
+            const currentWeekGamesStarted = false;
+
+            // Show completed weeks only (current week is hidden if games haven't started)
+            const completedWeeks = currentWeekGamesStarted ? this.currentWeek : this.currentWeek - 1;
+
+            helmetsHtml = picksToShow.map((teamName, index) => {
+                const week = index + 1;
+
+                // Only show helmets for completed weeks
+                if (week > completedWeeks) {
+                    return ''; // Hide current week if games haven't started
+                }
+
                 const isLastPick = index === picks.length - 1 && !isAlive;
                 const opacity = isLastPick ? 'opacity-50' : 'opacity-100';
                 const ring = isLastPick ? 'ring-2 ring-red-400' : '';
-                const title = isLastPick ? `Week ${index + 1}: ${teamName} (💤 Elimination)` : `Week ${index + 1}: ${teamName}`;
+                const title = isLastPick ? `Week ${week}: ${teamName} (💤 Elimination)` : `Week ${week}: ${teamName}`;
                 const helmetClass = this.teamToHelmetMap[teamName] || 'default';
 
                 return `
                     <div class="helmet-container inline-block" title="${title}">
                         <div class="helmet ${helmetClass} ${opacity} ${ring}"
                              data-team="${teamName}"
-                             data-week="${index + 1}"
-                             style="width: 28px; height: 28px; background-size: contain; background-repeat: no-repeat; background-position: center;">
+                             data-week="${week}">
                         </div>
                     </div>
                 `;
             }).join('');
 
-            // 🤔 Add thinking emoji for active players with current week pending
-            if (isAlive && picks.length === this.currentWeek - 1) {
+            // 🤔 Add thinking emoji for current week if games haven't started
+            if (isAlive && !currentWeekGamesStarted && picksToShow.length >= this.currentWeek - 1) {
                 helmetsHtml += `
-                    <div class="inline-block" title="Week ${this.currentWeek}: Pick pending">
+                    <div class="inline-block" title="Week ${this.currentWeek}: Pick hidden until games start">
                         <div style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 18px;">
                             🤔
                         </div>
@@ -626,22 +657,57 @@ class SurvivorBattlefieldDisplay {
 // Enhanced CSS for the battlefield display
 const battlefieldStyles = `
 <style>
-/* Helmet Display Styles */
+/* NFL Team Helmet Icons - Base helmet class */
 .helmet {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    border-radius: 4px;
+    display: inline-block;
     cursor: pointer;
     transition: all 0.2s ease;
+    border-radius: 4px;
 }
 
 .helmet:hover {
     transform: scale(1.1);
     z-index: 10;
 }
+
+/* Team-specific helmet classes - matches existing class structure (.helmet.ari) */
+.helmet.ari { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fari_Arizona_Cardinals.png?alt=media&token=38143dcd-6075-4fa3-9f3c-98518a6ec3f3'); }
+.helmet.atl { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fatl_Atlanta_Falcons.png?alt=media'); }
+.helmet.bal { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fbal_Baltimore_Ravens.png?alt=media'); }
+.helmet.buf { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fbuf_Buffalo_Bills.png?alt=media'); }
+.helmet.car { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcar_Carolina_Panthers.png?alt=media'); }
+.helmet.chi { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fchi_Chicago_Bears.png?alt=media'); }
+.helmet.cin { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcin_Cincinnati_Bengals.png?alt=media'); }
+.helmet.cle { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcle_Cleveland_Browns.png?alt=media'); }
+.helmet.dal { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fdal_Dallas_Cowboys.png?alt=media'); }
+.helmet.den { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fden_Denver_Broncos.png?alt=media'); }
+.helmet.det { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fdet_Detroit_Lions.png?alt=media'); }
+.helmet.gb { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fgb_Green_Bay_Packers.png?alt=media'); }
+.helmet.hou { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fhou_Houston_Texans.png?alt=media'); }
+.helmet.ind { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Find_Indianapolis_Colts.png?alt=media'); }
+.helmet.jax { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fjax_Jacksonville_Jaguars.png?alt=media'); }
+.helmet.kc { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fkc_Kansas_City_Chiefs.png?alt=media'); }
+.helmet.lv { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flv_Las_Vegas_Raiders.png?alt=media'); }
+.helmet.lac { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flac_Los_Angeles_Chargers.png?alt=media'); }
+.helmet.lar { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flar_Los_Angeles_Rams.png?alt=media'); }
+.helmet.mia { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fmia_Miami_Dolphins.png?alt=media'); }
+.helmet.min { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fmin_Minnesota_Vikings.png?alt=media'); }
+.helmet.ne { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fne_New_England_Patriots.png?alt=media'); }
+.helmet.no { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fno_New_Orleans_Saints.png?alt=media'); }
+.helmet.nyg { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fnyg_New_York_Giants.png?alt=media'); }
+.helmet.nyj { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fnyj_New_York_Jets.png?alt=media'); }
+.helmet.phi { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fphi_Philadelphia_Eagles.png?alt=media'); }
+.helmet.pit { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fpit_Pittsburgh_Steelers.png?alt=media'); }
+.helmet.sf { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fsf_San_Francisco_49ers.png?alt=media'); }
+.helmet.sea { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fsea_Seattle_Seahawks.png?alt=media'); }
+.helmet.tb { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ftb_Tampa_Bay_Buccaneers.png?alt=media'); }
+.helmet.ten { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ften_Tennessee_Titans.png?alt=media'); }
+.helmet.was { background-image: url('https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fwas_Washington_Commanders.png?alt=media'); }
 
 .helmet-container {
     position: relative;

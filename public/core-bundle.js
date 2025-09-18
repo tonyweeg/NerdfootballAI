@@ -58,7 +58,7 @@ class WeekManager {
         }
 
         // Fallback to calendar calculation
-        const calendarWeek = this.calculateWeekFromDate();
+        const calendarWeek = this.getDateBasedWeekEstimate();
         console.log(`🏈 WeekManager: Using calendar calculation - Week ${calendarWeek}`);
         return calendarWeek;
     }

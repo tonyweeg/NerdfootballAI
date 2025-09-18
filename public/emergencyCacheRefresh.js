@@ -219,13 +219,29 @@ class EmergencyCacheRefresh {
 // Create global emergency system
 window.emergencyCacheRefresh = window.emergencyCacheRefresh || new EmergencyCacheRefresh();
 
-// Initialize when DOM is ready
+// Initialize when DOM is ready with defensive error handling
+function initializeEmergencySystem(retryCount = 0) {
+    const maxRetries = 10;
+
+    try {
+        if (window.emergencyCacheRefresh && typeof window.emergencyCacheRefresh.initialize === 'function') {
+            window.emergencyCacheRefresh.initialize();
+        } else if (retryCount < maxRetries) {
+            console.warn(`Emergency cache refresh system not ready for initialization (attempt ${retryCount + 1}/${maxRetries})`);
+            // Retry after a short delay with increasing intervals
+            setTimeout(() => initializeEmergencySystem(retryCount + 1), 100 * (retryCount + 1));
+        } else {
+            console.error('Emergency cache refresh system failed to initialize after maximum retries');
+        }
+    } catch (error) {
+        console.warn('Error initializing emergency cache refresh system:', error);
+    }
+}
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        window.emergencyCacheRefresh.initialize();
-    });
+    document.addEventListener('DOMContentLoaded', initializeEmergencySystem);
 } else {
-    window.emergencyCacheRefresh.initialize();
+    initializeEmergencySystem();
 }
 
 // Export for use in other modules
