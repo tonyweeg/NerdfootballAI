@@ -34,10 +34,28 @@ class GameStateCache {
         // Handle both raw JSON format (dt) and processed format (kickoff)
         const gameTime = game.kickoff || game.dt;
 
-        // 🔧 CRITICAL FIX: Use Eastern Time Parser for accurate game times
-        const kickoff = window.easternTimeParser ?
-            window.easternTimeParser.parseESPNTimestamp(gameTime) :
-            new Date(gameTime);
+        // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+        let kickoff;
+        if (window.easternTimeParser) {
+            kickoff = window.easternTimeParser.parseESPNTimestamp(gameTime);
+        } else {
+            // FALLBACK: Manual Eastern Time conversion
+            // ESPN timestamps like "2025-09-18T20:15:00Z" mean 8:15 PM Eastern (not UTC!)
+            const cleanTime = gameTime.replace('Z', '');
+            const localDate = new Date(cleanTime);
+            const year = localDate.getFullYear();
+            const month = localDate.getMonth();
+            const day = localDate.getDate();
+            const hours = localDate.getHours();
+            const minutes = localDate.getMinutes();
+            const seconds = localDate.getSeconds();
+
+            // Convert Eastern to UTC: EDT=UTC-4, EST=UTC-5 (Sept 18 is EDT)
+            const offsetHours = 4; // EDT offset
+            kickoff = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+
+            console.log(`⏰ GameState: ESPN ${gameTime} → Eastern Time → UTC ${kickoff.toISOString()}`);
+        }
 
         if (now < kickoff) {
             return 'PRE_GAME';
