@@ -9,6 +9,16 @@
         tailwind.config = {
             corePlugins: { preflight: true }
         }
+        // Suppress Tailwind production warning for development
+        if (typeof console !== 'undefined') {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && args[0].includes && args[0].includes('cdn.tailwindcss.com should not be used in production')) {
+                    return; // Suppress this specific warning
+                }
+                originalWarn.apply(console, args);
+            };
+        }
     </script>
 
     <!-- 🔥 Firebase Integration for ML Prediction System -->
@@ -647,7 +657,7 @@
             const factors = calculatePredictionFactors(awayData, homeData, awayTeam, homeTeam);
 
             // Calculate win probabilities
-            const { homeWinProbability, winnerPrediction, confidence } = calculateWinProbability(factors);
+            const { homeWinProbability, winnerPrediction, confidence } = calculateWinProbability(factors, homeTeam, awayTeam);
 
             // Generate detailed reasoning
             const reasoning = generateDetailedReasoning(factors, winnerPrediction, homeTeam, awayTeam);
@@ -734,7 +744,7 @@
             };
         }
 
-        function calculateWinProbability(factors) {
+        function calculateWinProbability(factors, homeTeam, awayTeam) {
             // Calculate total weighted score (home team perspective)
             let totalScore = 0;
             Object.keys(factors).forEach(key => {
