@@ -4018,23 +4018,29 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
             console.log('✅ Pool members found:', Object.keys(members).length);
             
             for (const [uid, memberData] of Object.entries(members)) {
+                // Skip malformed entries
+                if (!uid || !memberData || typeof memberData !== 'object') {
+                    console.log('🚫 MALFORMED USER ENTRY BLOCKED FROM GRID:', uid, memberData);
+                    continue;
+                }
+
                 // Block ghost user
                 if (uid === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
                     console.log('🚫 GHOST USER BLOCKED FROM GRID:', uid);
                     continue;
                 }
-                
+
                 // Check participation - only include users in confidence pool
                 const participation = memberData.participation || { confidence: { enabled: true } };
                 if (!participation.confidence?.enabled) {
-                    console.log(`⏭️ Skipping ${memberData.displayName} - not in confidence pool`);
+                    console.log(`⏭️ Skipping ${memberData.displayName || 'No Name'} - not in confidence pool`);
                     continue;
                 }
-                
+
                 userMap.set(uid, {
                     id: uid,
                     uid: uid,
-                    displayName: memberData.displayName || memberData.email || 'Unknown',
+                    displayName: memberData.displayName || memberData.email || 'Unknown User',
                     email: memberData.email || '',
                     role: memberData.role || 'member',
                     ...memberData
@@ -4059,6 +4065,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         const resultsDocRef = doc(db, resultsPath(selectedWeek));
         const resultsSnap = await getDoc(resultsDocRef);
         const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
+        console.log('🔍 gameResults loaded:', gameResults ? Object.keys(gameResults).length : 'undefined');
 
         // Fetch picks
         const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
@@ -4067,32 +4074,32 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         picksSnap.forEach(doc => {
             allPicks[doc.id] = doc.data();
         });
-        
+
         gridData = { allUsers: allUsersForGrid, gameResults, allPicks };
     } catch (error) {
         console.error('❌ Grid data error:', error);
         allUI.gridTableContent.innerHTML = `<p class="text-red-600">Error loading grid: ${error.message}</p>`;
         return;
     }
-    
-    const { allUsers: allUsersForGrid, gameResults, allPicks } = gridData;
+
+    const { allUsers: allUsersForGrid = [], gameResults = {}, allPicks = {} } = gridData || {};
     
     console.log('🚨 Grid users count:', allUsersForGrid.length);
-    const userScores = allUsersForGrid.map(user => {
+    const userScores = allUsersForGrid.filter(user => user && user.id).map(user => {
         let totalPoints = 0;
         let pointsLeft = 0;
-        const userPicks = allPicks[user.id] || {};
+        const userPicks = (allPicks && allPicks[user.id]) || {};
         
         games.forEach(game => {
             const pick = userPicks[game.id];
             if (pick) {
                 const confidence = pick.confidence != null ? parseInt(pick.confidence) : 0;
                 
-                if (gameResults[game.id]) {
+                if (gameResults && gameResults[game.id]) {
                     if (pick.winner === GridView.getGameWinner(gameResults[game.id])) {
                         totalPoints += confidence;
                     }
-                } else { 
+                } else {
                     pointsLeft += confidence;
                 }
             }
@@ -4134,8 +4141,8 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
             return now < gameTime;
         });
         
-        const hasMissingUpcomingPicks = upcomingGames.some(game => 
-            !user.picks[game.id] || !user.picks[game.id].winner
+        const hasMissingUpcomingPicks = upcomingGames.some(game =>
+            !user.picks || !user.picks[game.id] || !user.picks[game.id].winner
         );
         
         const shouldShowWarning = upcomingGames.length > 0 && hasMissingUpcomingPicks;
@@ -4188,7 +4195,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         }
         
         games.forEach((game, gameIndex) => {
-            const pick = user.picks[game.id];
+            const pick = user.picks && user.picks[game.id];
             // Handle both raw JSON format (dt) and processed format (kickoff) - preserve UTC timezone
             const gameTimeString = game.kickoff || game.dt;
             const gameTime = new Date(gameTimeString);
@@ -11262,11 +11269,9 @@ function getGameState(game) {
     console.log(`⏰ ESPN ZULU=EST: ${espnTimestamp} = ${hours}:${String(minutes).padStart(2,'0')} EASTERN → ${gameTime.toISOString()} UTC (offset +${offsetHours})`);
 
     if (window.easternTimeParser) {
-        // Cross-check with parser if available
-        const parserTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
-        if (Math.abs(gameTime.getTime() - parserTime.getTime()) > 60000) {
-            console.warn(`⚠️ Time mismatch: Manual=${gameTime.toISOString()}, Parser=${parserTime.toISOString()}`);
-        }
+        // Use parser result as authoritative - it has intelligent format detection
+        gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+        console.log(`⏰ Using authoritative parser result: ${gameTime.toISOString()}`);
     }
 
     // 🔍 DEBUGGING: Log Miami @ Buffalo game specifically
@@ -15554,7 +15559,7 @@ const SurvivorPicksView = {
         const currentUserStatus = allStatuses[this.currentUser.uid] || { eliminated: false };
         
         // Check if selected week is locked (eliminated users always locked, others based on game timing)
-        const isLocked = currentUserStatus.eliminated || await this.checkSurvivorPickLocked(this.selectedWeek);
+        const isLocked = currentUserStatus.eliminated || await this.isSurvivorWeekLocked(this.selectedWeek);
         
         // Render the survivor picks interface with week selector
         this.renderSurvivorPicksHTML(container, userPicks, weeklyGames, isLocked);
@@ -15612,35 +15617,33 @@ const SurvivorPicksView = {
         }
     },
     
-    checkSurvivorPickLocked: async function(weekToCheck = null) {
+    // 🏆 NEW CONSISTENT SURVIVOR LOCK FUNCTION - Uses same game fetching as confidence!
+    isSurvivorWeekLocked: async function(weekToCheck = null) {
         try {
             const week = weekToCheck || this.selectedWeek;
-            
+
             // Future weeks are never locked
             if (week > this.currentWeek) {
                 return false;
             }
-            
-            // Past weeks are always locked
+
+            // Past weeks are always locked (until Tuesday midnight Eastern)
             if (week < this.currentWeek) {
                 return true;
             }
-            
-            // For current week, check if any games have started
-            const response = await fetch(`nfl_2025_week_${week}.json`);
-            if (!response.ok) return false;
-            const weekData = await response.json();
-            
-            if (!weekData.games || !Array.isArray(weekData.games)) return false;
-            
-            // SECURITY FIX: Use proper game state validation to prevent picks during IN_PROGRESS games
-            return weekData.games.some(game => {
-                const gameState = this.getGameState(game);
-                // Only allow picks when games are PRE_GAME
-                return gameState === 'IN_PROGRESS' || gameState === 'COMPLETED';
-            });
+
+            // For current week, get games using SAME method as confidence
+            const games = await getGamesForWeek(week);
+            if (!games || !Array.isArray(games) || games.length === 0) {
+                return false;
+            }
+
+            // 🎯 CRITICAL: Check if ANY game is locked using confidence's isGameLocked function
+            // This ensures survivor locks exactly when confidence starts locking individual games
+            return games.some(game => isGameLocked(game));
+
         } catch (error) {
-            console.error('Error checking game lock status:', error);
+            console.error('Error checking survivor week lock status:', error);
             return false;
         }
     },
@@ -15849,7 +15852,7 @@ const SurvivorPicksView = {
             if (!btn.disabled && !isLocked) {
                 btn.addEventListener('click', async (e) => {
                     // Re-check lock status at time of click
-                    const currentlyLocked = await this.checkSurvivorPickLocked();
+                    const currentlyLocked = await this.isSurvivorWeekLocked();
                     if (currentlyLocked) {
                         alert('Sorry, games have started! Survivor picks are now locked for this week.');
                         this.show(); // Re-render to show lock state

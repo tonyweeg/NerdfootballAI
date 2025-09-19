@@ -1517,13 +1517,13 @@
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Home Team</label>
-                                        <select id="test-home-team" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                                        <select id="test-home-team-live" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
                                             <option value="">Select team...</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Away Team</label>
-                                        <select id="test-away-team" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                                        <select id="test-away-team-live" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
                                             <option value="">Select team...</option>
                                         </select>
                                     </div>
@@ -1571,6 +1571,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeDashboard();
             initializeEmailSystem();
+            loadMLTestingData();
 
             // Animate cards
             const cards = document.querySelectorAll('.system-card');
@@ -2921,25 +2922,59 @@ Thanks for playing and see you next week!`
                 'Washington Commanders': 'WAS'
             };
 
+            // Get both sets of dropdowns
             const homeSelect = document.getElementById('test-home-team');
             const awaySelect = document.getElementById('test-away-team');
+            const homeSelectLive = document.getElementById('test-home-team-live');
+            const awaySelectLive = document.getElementById('test-away-team-live');
 
-            // Clear existing options except first
-            homeSelect.innerHTML = '<option value="">Select team...</option>';
-            awaySelect.innerHTML = '<option value="">Select team...</option>';
+            // Clear existing options except first for both sets
+            if (homeSelect) {
+                homeSelect.innerHTML = '<option value="">Select team...</option>';
+            }
+            if (awaySelect) {
+                awaySelect.innerHTML = '<option value="">Select team...</option>';
+            }
+            if (homeSelectLive) {
+                homeSelectLive.innerHTML = '<option value="">Select team...</option>';
+            }
+            if (awaySelectLive) {
+                awaySelectLive.innerHTML = '<option value="">Select team...</option>';
+            }
 
-            // Populate with all 32 NFL teams
+            // Populate all dropdowns with all 32 NFL teams
             Object.keys(teamNameToAbbr).forEach(teamName => {
                 const teamCode = teamNameToAbbr[teamName];
-                homeSelect.innerHTML += `<option value="${teamName}">${teamName}</option>`;
-                awaySelect.innerHTML += `<option value="${teamName}">${teamName}</option>`;
+                const optionHTML = `<option value="${teamName}">${teamName}</option>`;
+
+                if (homeSelect) homeSelect.innerHTML += optionHTML;
+                if (awaySelect) awaySelect.innerHTML += optionHTML;
+                if (homeSelectLive) homeSelectLive.innerHTML += optionHTML;
+                if (awaySelectLive) awaySelectLive.innerHTML += optionHTML;
             });
         }
 
         // Run ML Prediction Test - REAL ALGORITHM
         async function runMLPredictionTest() {
-            const homeTeam = document.getElementById('test-home-team').value;
-            const awayTeam = document.getElementById('test-away-team').value;
+            // Try to get values from both sets of dropdowns
+            const homeTeamTab = document.getElementById('test-home-team')?.value || '';
+            const awayTeamTab = document.getElementById('test-away-team')?.value || '';
+            const homeTeamLive = document.getElementById('test-home-team-live')?.value || '';
+            const awayTeamLive = document.getElementById('test-away-team-live')?.value || '';
+
+            // Determine which set to use (prioritize live testing if both have values)
+            let homeTeam, awayTeam;
+            if (homeTeamLive && awayTeamLive) {
+                homeTeam = homeTeamLive;
+                awayTeam = awayTeamLive;
+            } else if (homeTeamTab && awayTeamTab) {
+                homeTeam = homeTeamTab;
+                awayTeam = awayTeamTab;
+            } else {
+                homeTeam = homeTeamTab || homeTeamLive;
+                awayTeam = awayTeamTab || awayTeamLive;
+            }
+
             const resultsDiv = document.getElementById('ml-test-results');
 
             if (!homeTeam || !awayTeam) {
