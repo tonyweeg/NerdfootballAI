@@ -831,6 +831,10 @@ exports.processGameOutcomes = processGameOutcomes;
 exports.recordPredictionOutcome = recordPredictionOutcome;
 exports.getMLPerformanceStats = getMLPerformanceStats;
 
+// SURVIVOR AUTO-UPDATE SYSTEM
+const { processSurvivorUpdatesForCompletedGames } = require('./survivorAutoUpdate');
+exports.processSurvivorUpdatesForCompletedGames = processSurvivorUpdatesForCompletedGames;
+
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
 // TESTING: Temporarily enabled for real-time sync testing
 const {
