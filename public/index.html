@@ -12512,9 +12512,21 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
  // --- PICKS SUMMARY FUNCTIONS ---
  async function renderActivePicksSummary() {
   if (!currentUser || !currentWeek) return;
-  
+
   try {
-   // Get current week games and user picks
+   // 🔄 CACHE WARMING: Refresh ESPN scores on every page load
+   try {
+     await fetch('https://us-central1-nerdfootball.cloudfunctions.net/syncGameScores', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ week: currentWeek, force: true })
+     });
+     console.log('✅ Cache refreshed for Week', currentWeek);
+   } catch (cacheError) {
+     console.warn('⚠️ Cache refresh failed, using existing data:', cacheError.message);
+   }
+
+   // Get current week games and user picks (now with fresh cache)
    const weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
    if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
     allUI.activePicksList.innerHTML = '<p class="text-center text-slate-500 text-sm">No games available for this week</p>';

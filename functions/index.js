@@ -832,12 +832,12 @@ exports.recordPredictionOutcome = recordPredictionOutcome;
 exports.getMLPerformanceStats = getMLPerformanceStats;
 
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
-// Will be enabled once client-side integration is verified
-// const {
-//     syncGameScores,
-//     syncLeaderboard,
-//     testRealTimeSync
-// } = require('./realtimeGameSync');
-// exports.syncGameScores = syncGameScores;
-// exports.syncLeaderboard = syncLeaderboard;
-// exports.testRealTimeSync = testRealTimeSync;
+// TESTING: Temporarily enabled for real-time sync testing
+const {
+    syncGameScores,
+    syncLeaderboard,
+    testRealTimeSync
+} = require('./realtimeGameSync');
+exports.syncGameScores = syncGameScores;
+exports.syncLeaderboard = syncLeaderboard;
+exports.testRealTimeSync = testRealTimeSync;
