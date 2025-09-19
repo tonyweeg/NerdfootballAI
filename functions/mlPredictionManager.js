@@ -17,10 +17,9 @@ const db = admin.firestore();
  * Automatically records outcomes for ML learning
  */
 exports.processGameOutcomes = functions.firestore
-    .document('cache/espn_current_data')
-    .onUpdate(async (change, context) => {
-        const newData = change.after.data();
-        const oldData = change.before.data();
+    .onDocumentUpdated('cache/espn_current_data', async (event) => {
+        const newData = event.data.after.data();
+        const oldData = event.data.before.data();
 
         console.log('🏈 ESPN cache updated, checking for final games...');
 

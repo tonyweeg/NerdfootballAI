@@ -820,6 +820,17 @@ Reply to: tonyweeg@gmail.com`;
     }
 });
 
+// Import and export ML Prediction Manager functions
+const {
+    processGameOutcomes,
+    recordPredictionOutcome,
+    getMLPerformanceStats
+} = require('./mlPredictionManager');
+
+exports.processGameOutcomes = processGameOutcomes;
+exports.recordPredictionOutcome = recordPredictionOutcome;
+exports.getMLPerformanceStats = getMLPerformanceStats;
+
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
 // Will be enabled once client-side integration is verified
 // const {
