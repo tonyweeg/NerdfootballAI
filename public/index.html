@@ -18244,6 +18244,64 @@ function updateHomeTab() {
 
     // Load compact picks summary
     loadHomePicksSummary();
+
+    // Update status section (rank and points)
+    updateHomeStatus();
+}
+
+// Update home status section with rank and points
+async function updateHomeStatus() {
+    console.log("🔧 DEBUG updateHomeStatus: Starting...");
+    const homeRankEl = document.getElementById("home-rank");
+    const homePointsEl = document.getElementById("home-points");
+
+    if (!homeRankEl || !homePointsEl) {
+        console.log("🔧 DEBUG updateHomeStatus: Missing rank or points elements");
+        return;
+    }
+
+    if (!window.currentUser || !window.ScoringSystemManager) {
+        console.log("🔧 DEBUG updateHomeStatus: Missing user or ScoringSystemManager");
+        homeRankEl.textContent = "--";
+        homePointsEl.textContent = "--";
+        return;
+    }
+
+    try {
+        console.log("🔧 DEBUG updateHomeStatus: Getting season totals for user:", window.currentUser.uid);
+        // Get user's season totals
+        const userId = window.currentUser.uid;
+        const seasonTotals = await window.ScoringSystemManager.getUserSeasonTotals(userId);
+
+        console.log("🔧 DEBUG updateHomeStatus: Season totals result:", seasonTotals);
+        if (seasonTotals && seasonTotals.totalPoints !== undefined) {
+            homePointsEl.textContent = seasonTotals.totalPoints;
+            console.log("🔧 DEBUG updateHomeStatus: Set points to:", seasonTotals.totalPoints);
+        } else {
+            homePointsEl.textContent = "0";
+            console.log("🔧 DEBUG updateHomeStatus: Set points to default: 0");
+        }
+
+        // Get season leaderboard to determine rank
+        const completedWeeks = [1, 2]; // Weeks that have been processed
+        console.log("🔧 DEBUG updateHomeStatus: Generating season leaderboard for weeks:", completedWeeks);
+        const leaderboard = await window.ScoringSystemManager.generateSeasonLeaderboard(completedWeeks);
+
+        console.log("🔧 DEBUG updateHomeStatus: Leaderboard result:", leaderboard);
+        if (leaderboard && leaderboard.standings) {
+            const userRank = leaderboard.standings.findIndex(entry => entry.userId === userId) + 1;
+            homeRankEl.textContent = userRank > 0 ? userRank : "--";
+            console.log("🔧 DEBUG updateHomeStatus: Set rank to:", userRank > 0 ? userRank : "--");
+        } else {
+            homeRankEl.textContent = "--";
+            console.log("🔧 DEBUG updateHomeStatus: Set rank to default: --");
+        }
+
+    } catch (error) {
+        console.error("❌ Error updating home status:", error);
+        homeRankEl.textContent = "--";
+        homePointsEl.textContent = "--";
+    }
 }
 
 // 🎯 LEADERBOARD WRAP UPS: Comprehensive pool statistics at end of console
@@ -18701,10 +18759,18 @@ async function getUserStatsDisplay(userId, currentWeek) {
                             const memberWeeklyPoints = memberUserData.weeklyPoints || {};
                             let memberTotal = 0;
 
-                            for (let week = 1; week <= currentWeek; week++) {
-                                const weekData = memberWeeklyPoints[week];
-                                if (weekData && weekData.totalPoints !== undefined) {
-                                    memberTotal += weekData.totalPoints || 0;
+                            // Use EXACT same logic as the successful data aggregation above
+                            for (const weekNumber of [1, 2]) { // Only completed weeks
+                                const weekData = memberWeeklyPoints[weekNumber.toString()];
+                                if (!weekData) {
+                                    const weekDataInt = memberWeeklyPoints[weekNumber];
+                                    if (weekDataInt && weekDataInt.totalPoints !== undefined) {
+                                        memberTotal += weekDataInt.totalPoints || 0;
+                                    }
+                                } else {
+                                    if (weekData.totalPoints !== undefined) {
+                                        memberTotal += weekData.totalPoints || 0;
+                                    }
                                 }
                             }
 
@@ -18743,6 +18809,7 @@ async function getUserStatsDisplay(userId, currentWeek) {
             }
 
         } else {
+            const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
             console.log("🚨 CRITICAL DEBUG - No scoring document found at:", scorePath);
 
             // 🔧 TRY ALTERNATIVE PATHS - Maybe scoring data is elsewhere?
