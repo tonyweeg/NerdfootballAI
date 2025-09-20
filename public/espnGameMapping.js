@@ -8,11 +8,11 @@ window.espnGameMapping = {
     "109": "401772836", "110": "401772726", "111": "401772729", "112": "401772730",
     "113": "401772837", "114": "401772919", "115": "401772715", "116": "401772811",
 
-    // Week 2 Games (201-216) - Fixed: Different ESPN IDs for Week 2
-    "201": "401773001", "202": "401773002", "203": "401773003", "204": "401773004",
-    "205": "401773005", "206": "401773006", "207": "401773007", "208": "401773008",
-    "209": "401773009", "210": "401773010", "211": "401773011", "212": "401773012",
-    "213": "401773013", "214": "401773014", "215": "401773015", "216": "401773016",
+    // Week 2 Games (201-216) - FIXED: Use unique Week 2 ESPN IDs
+    "201": "401773010", "202": "401773011", "203": "401773012", "204": "401773013",
+    "205": "401773014", "206": "401773015", "207": "401773016", "208": "401773017",
+    "209": "401773018", "210": "401773019", "211": "401773020", "212": "401773021",
+    "213": "401773022", "214": "401773023", "215": "401773024", "216": "401773025",
 
     // Weeks 3-18 use positional mapping (no static ESPN IDs needed)
     // The sync system will map by position: Week X Game Y = ESPN games[Y-1]
@@ -278,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
+    // DISABLED: Auto-run sync causing infinite loops
     // Auto-sync disabled due to ESPN API contamination issue
     // Users can manually trigger sync from admin interface if needed
     if (window.espnNerdApi && false) {

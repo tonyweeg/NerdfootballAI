@@ -6,6 +6,11 @@ class SurvivorSystem {
         this.db = db;
         this.currentWeek = 1; // Will be updated by initialization
         this.initialized = false;
+        // Get Firebase utils once for the entire class
+        this.firebaseUtils = window.firebaseUtils;
+        if (!this.firebaseUtils) {
+            throw new Error('Firebase utils not available - ensure Firebase is initialized');
+        }
         console.log(`🏆 PURE FIREBASE Survivor System initializing...`);
     }
 
@@ -24,6 +29,7 @@ class SurvivorSystem {
 
             // Check weeks 1-18 for complete game data
             for (let week = 1; week <= 18; week++) {
+                const { doc, getDoc } = this.firebaseUtils;
                 const weekResultsDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`));
 
                 if (weekResultsDoc.exists()) {
@@ -244,6 +250,7 @@ class SurvivorSystem {
             console.log('📝 CREATING SURVIVOR WINNER SHEETS...');
 
             // Get pool members and all user picks
+            const { doc, getDoc, collection, getDocs } = this.firebaseUtils;
             const [poolDoc, allPicksSnapshot] = await Promise.all([
                 getDoc(doc(this.db, `artifacts/nerdfootball/pools/${poolId}/metadata/members`)),
                 getDocs(collection(this.db, 'artifacts/nerdfootball/public/data/nerdSurvivor_picks'))
@@ -255,7 +262,7 @@ class SurvivorSystem {
 
             const allPicksMap = {};
             let totalPicksFound = 0;
-            allPicksSnapshot.forEach(doc => {
+            allPicksSnapshot.docs.forEach(doc => {
                 const uid = doc.id;
                 const data = doc.data();
                 const picks = data.picks || {};
@@ -283,6 +290,7 @@ class SurvivorSystem {
                 console.log(`📋 Creating Week ${week} survivor sheet...`);
 
                 // Get game results for this week from Firebase (where game winners are stored)
+                const { doc, getDoc } = this.firebaseUtils;
                 const weekResultsDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`));
                 const weekResults = weekResultsDoc?.exists() ? weekResultsDoc.data() : {};
 
@@ -418,6 +426,7 @@ class SurvivorSystem {
 
                 // Save this week's sheet
                 const sheetPath = `artifacts/nerdfootball/pools/${poolId}/survivor/2025/weeks/${week}`;
+                const { doc, setDoc } = this.firebaseUtils;
                 await setDoc(doc(this.db, sheetPath), weeklySheet);
 
                 const totalUsers = Object.keys(poolMembers).length;
@@ -438,6 +447,7 @@ class SurvivorSystem {
                 weeksProcessed: this.currentWeek
             };
 
+            const { doc, setDoc } = this.firebaseUtils;
             await setDoc(doc(this.db, `artifacts/nerdfootball/pools/${poolId}/survivor/compiled_sheets`), compiledSurvivorSheets);
             console.log(`💾 SAVED COMPILED SURVIVOR SHEETS: ${winnersArray.length} winners, ${losersArray.length} losers`);
             console.log('📋 WINNERS ARRAY (first 5):', JSON.stringify(winnersArray.slice(0, 5), null, 2));
@@ -464,6 +474,7 @@ class SurvivorSystem {
             await this.createSurvivorWinnerSheets(poolId);
 
             // Get pool members
+            const { doc, getDoc } = this.firebaseUtils;
             const poolDoc = await getDoc(doc(this.db, `artifacts/nerdfootball/pools/${poolId}/metadata/members`));
             if (!poolDoc.exists()) {
                 throw new Error('Pool not found');
@@ -593,13 +604,7 @@ async function initializePureSurvivorSystem() {
         return;
     }
 
-    const requiredGlobals = ['doc', 'getDoc', 'collection', 'getDocs'];
-    const missingGlobals = requiredGlobals.filter(global => typeof window[global] === 'undefined');
-
-    if (missingGlobals.length > 0) {
-        console.warn(`⚠️ Missing Firebase globals: ${missingGlobals.join(', ')}`);
-        return;
-    }
+    // Using Firebase v8 compat API directly - no globals needed
 
     try {
         if (typeof window.db === 'undefined') {
@@ -612,12 +617,12 @@ async function initializePureSurvivorSystem() {
         await window.survivorSystem.initialize();
         console.log('✅ PURE FIREBASE: Survivor System initialized successfully');
 
-        // Initialize ESPN sync integration if available
-        if (window.espnWinnerSync) {
-            console.log('🔄 ESPN sync system detected - enabling auto-sync...');
-            // Set up auto-refresh when ESPN data syncs
-            window.survivorSystem.enableESPNSync = true;
-        }
+        // DISABLED: ESPN sync integration causing infinite loops
+        // if (window.espnWinnerSync) {
+        //     console.log('🔄 ESPN sync system detected - enabling auto-sync...');
+        //     // Set up auto-refresh when ESPN data syncs
+        //     window.survivorSystem.enableESPNSync = true;
+        // }
 
         return true;
 

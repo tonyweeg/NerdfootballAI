@@ -2,6 +2,7 @@
 require('dotenv').config();
 
 const functions = require('firebase-functions');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
@@ -837,6 +838,245 @@ exports.getMLPerformanceStats = getMLPerformanceStats;
 // SURVIVOR AUTO-UPDATE SYSTEM
 const { processSurvivorUpdatesForCompletedGames } = require('./survivorAutoUpdate');
 exports.processSurvivorUpdatesForCompletedGames = processSurvivorUpdatesForCompletedGames;
+
+// DYNAMIC SURVIVOR CALCULATION LOGIC - Works for all weeks
+async function calculateSurvivorEliminationsCore(poolId = 'nerduniverse-2025', isScheduled = false) {
+    console.log('🏈 Starting survivor elimination calculation...');
+    console.log(`📅 Pool: ${poolId}, Scheduled: ${isScheduled}`);
+
+    // Dynamically load NFL results from Firebase for all available weeks
+    const nflResults = {};
+    const availableWeeks = [];
+
+    // Check weeks 1-18 for available NFL results
+    for (let week = 1; week <= 18; week++) {
+        try {
+            const weekDoc = await admin.firestore()
+                .doc(`artifacts/nerdfootball/public/data/nerdfootball_results/${week}`)
+                .get();
+
+            if (weekDoc.exists()) {
+                const weekData = weekDoc.data();
+                const gameCount = Object.keys(weekData).length;
+
+                if (gameCount > 0) {
+                    availableWeeks.push(week);
+
+                    // Extract winners and losers from Firebase data
+                    const winners = [];
+                    const losers = [];
+
+                    Object.values(weekData).forEach(game => {
+                        if (game.status === 'FINAL' && game.winner) {
+                            winners.push(game.winner);
+
+                            // Determine loser
+                            const loser = game.winner === game.homeTeam ? game.awayTeam : game.homeTeam;
+                            losers.push(loser);
+                        }
+                    });
+
+                    nflResults[week] = { winners, losers };
+                    console.log(`📊 Week ${week}: ${winners.length} games, ${winners.length} winners, ${losers.length} losers`);
+                }
+            }
+        } catch (error) {
+            console.log(`⚠️ Week ${week}: No NFL data available`);
+        }
+    }
+
+    console.log(`🏈 Processing ${availableWeeks.length} weeks: ${availableWeeks.join(', ')}`);
+
+    if (availableWeeks.length === 0) {
+        throw new Error('No NFL results available for any week');
+    }
+
+    // Get pool members
+    const poolMembersDoc = await admin.firestore()
+        .doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`)
+            .get();
+
+    if (!poolMembersDoc.exists()) {
+        throw new Error('Pool members not found');
+    }
+
+    const poolMembers = poolMembersDoc.data();
+    console.log(`👥 Processing ${Object.keys(poolMembers).length} pool members`);
+
+    // Dynamic eliminations structure for all weeks
+    const eliminations = {
+        byWeek: {}, // Will contain week1: [], week2: [], etc.
+        alive: [],
+        summary: {
+            totalMembers: Object.keys(poolMembers).length,
+            eliminationsByWeek: {},
+            stillAlive: 0,
+            lastUpdated: new Date().toISOString(),
+            currentWeek: Math.max(...availableWeeks),
+            availableWeeks: availableWeeks
+        }
+    };
+
+    // Initialize elimination arrays for each available week
+    availableWeeks.forEach(week => {
+        eliminations.byWeek[`week${week}`] = [];
+        eliminations.summary.eliminationsByWeek[week] = 0;
+    });
+
+    // Process each member
+    for (const [userId, member] of Object.entries(poolMembers)) {
+        try {
+            console.log(`🔍 Processing ${member.displayName} (${userId})`);
+
+            // Get member's survivor picks
+            const picksDoc = await admin.firestore()
+                .doc(`artifacts/nerdfootball/users/${userId}/survivor_picks/${poolId}`)
+                .get();
+
+            if (!picksDoc.exists()) {
+                console.log(`  ⚠️ No survivor picks found for ${member.displayName}`);
+                continue;
+            }
+
+            const picks = picksDoc.data();
+            let isEliminated = false;
+            let eliminatedWeek = null;
+            let eliminatedBy = null;
+            const memberPicks = {};
+
+            // Check elimination for each available week in order
+            for (const week of availableWeeks.sort((a, b) => a - b)) {
+                const weekPick = picks[week.toString()]?.teamPicked || picks[week.toString()]?.team;
+                memberPicks[`week${week}`] = weekPick;
+
+                console.log(`  Week ${week} pick: ${weekPick || 'None'}`);
+
+                if (weekPick && nflResults[week]?.losers.includes(weekPick)) {
+                    // This member is eliminated
+                    const eliminationData = {
+                        userId: userId,
+                        displayName: member.displayName,
+                        eliminatedBy: weekPick,
+                        week: week,
+                        reason: `Picked ${weekPick} who lost in Week ${week}`,
+                        eliminatedAt: new Date().toISOString(),
+                        picks: memberPicks
+                    };
+
+                    eliminations.byWeek[`week${week}`].push(eliminationData);
+                    eliminations.summary.eliminationsByWeek[week]++;
+
+                    console.log(`  💀 ELIMINATED Week ${week} (picked ${weekPick})`);
+
+                    isEliminated = true;
+                    eliminatedWeek = week;
+                    eliminatedBy = weekPick;
+                    break; // Stop checking further weeks
+                }
+            }
+
+            if (!isEliminated) {
+                // Still alive
+                const survivorData = {
+                    userId: userId,
+                    displayName: member.displayName,
+                    picks: memberPicks,
+                    weeksAlive: availableWeeks.length,
+                    status: 'ALIVE',
+                    lastPickWeek: Math.max(...availableWeeks.filter(week => memberPicks[`week${week}`]))
+                };
+
+                eliminations.alive.push(survivorData);
+                eliminations.summary.stillAlive++;
+
+                const picksList = availableWeeks.map(week => `W${week}: ${memberPicks[`week${week}`] || 'None'}`).join(', ');
+                console.log(`  ✅ ALIVE (${picksList})`);
+            }
+
+        } catch (error) {
+            console.error(`❌ Error processing ${member.displayName}:`, error);
+        }
+    }
+
+    // Add NFL results for reference
+    eliminations.nflResults = nflResults;
+
+    // Store results in Firebase
+    const resultsPath = `artifacts/nerdfootball/pools/${poolId}/survivor_results`;
+    await admin.firestore().doc(resultsPath).set(eliminations);
+
+    console.log('📊 SURVIVOR ELIMINATION SUMMARY:');
+    availableWeeks.forEach(week => {
+        const count = eliminations.summary.eliminationsByWeek[week];
+        console.log(`  💀 Week ${week} Eliminations: ${count}`);
+    });
+    console.log(`  ✅ Still Alive: ${eliminations.summary.stillAlive}`);
+    console.log(`  📄 Results stored at: ${resultsPath}`);
+
+    return {
+        success: true,
+        poolId: poolId,
+        summary: eliminations.summary,
+        resultsPath: resultsPath,
+        availableWeeks: availableWeeks,
+        eliminations: eliminations
+    };
+}
+
+// Manual callable function for admin use
+exports.calculateSurvivorEliminations = functions.https.onCall(async (data, context) => {
+    try {
+        // For Firebase Functions v2, auth context is in data.auth instead of context.auth
+        const authContext = context.auth || data.auth;
+
+        // Check if user is authenticated
+        if (!authContext) {
+            throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+        }
+
+        // Check if user is admin
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+        const userUid = authContext.uid || authContext.token?.uid;
+
+        if (!ADMIN_UIDS.includes(userUid)) {
+            throw new functions.https.HttpsError('permission-denied', 'Admin access required');
+        }
+
+        const poolId = data.poolId || 'nerduniverse-2025';
+        return await calculateSurvivorEliminationsCore(poolId, false);
+
+    } catch (error) {
+        console.error('❌ Manual survivor elimination calculation failed:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'Failed to calculate survivor eliminations');
+    }
+});
+
+// Scheduled function - runs every Tuesday at midnight
+exports.scheduledSurvivorCalculation = onSchedule('0 0 * * 2', async (event) => {
+    try {
+        console.log('🕛 SCHEDULED: Tuesday midnight survivor calculation starting...');
+
+        const poolId = 'nerduniverse-2025';
+        const result = await calculateSurvivorEliminationsCore(poolId, true);
+
+        console.log('✅ SCHEDULED: Survivor calculation completed successfully');
+        console.log(`📊 Results: ${result.summary.stillAlive} alive, ${Object.values(result.summary.eliminationsByWeek).reduce((a, b) => a + b, 0)} total eliminations`);
+
+        return null;
+
+    } catch (error) {
+        console.error('❌ SCHEDULED: Survivor calculation failed:', error);
+
+        // Could send notification to admins here
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+        // TODO: Add admin notification on failure
+
+        return null;
+    }
+});
 
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
 // TESTING: Temporarily enabled for real-time sync testing
