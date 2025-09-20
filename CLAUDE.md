@@ -63,6 +63,37 @@ if (currentUser && ADMIN_UIDS.includes(currentUser.uid)) {
 ### 🚀 MEGATRON Production URL:
 **Admin Dashboard**: https://nerdfootball.web.app/nerdfootball-system-architecture.html
 
+## 🚨 SEASON LEADERBOARD AGGREGATION FIX - CRITICAL
+**PROBLEM**: Season leaderboard showing "high score: 0" despite users having Week 1 + Week 2 data
+**ROOT CAUSE**: `getUserSeasonTotals()` relied on stored season stats that weren't aggregating properly
+**SOLUTION**: Modified `generateSeasonLeaderboard()` in ScoringSystemManager.js to manually aggregate weekly data:
+
+```javascript
+// BEFORE (broken - relied on stored season stats):
+const seasonData = await this.getUserSeasonTotals(member.uid);
+
+// AFTER (working - manual aggregation):
+const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${member.uid}`;
+const docSnap = await window.getDoc(window.doc(window.db, scorePath));
+const weeklyPoints = docSnap.data().weeklyPoints || {};
+
+// Manually aggregate data for completed weeks [1, 2]
+let totalPoints = 0;
+for (const weekNumber of completedWeeks) {
+    const weekData = weeklyPoints[weekNumber];
+    if (weekData && weekData.totalPoints !== undefined) {
+        totalPoints += weekData.totalPoints || 0;
+    }
+}
+```
+
+**VALIDATION**: Top 3 season leaders should show:
+1. CX0etIyJbGg33nmHCo4eezPWrsr2: 232 points (120 + 112)
+2. sm17z8ovI8NAGmyQvogD86lIurr1: 231 points (120 + 111)
+3. dN91P1yGG4YBttxeGWmpAM2xhl22: 224 points (122 + 102)
+
+**DEPLOYED**: 2025-09-20 - https://nerdfootball.web.app
+
 ## 🏆 ESPN CACHE SYSTEM BENCHMARK - v3.0
 **CURRENT PRODUCTION STANDARD - SUB-500MS ESPN PERFORMANCE**
 
@@ -261,6 +292,36 @@ async function waitForFirebaseAuth() {
         corePlugins: { preflight: true }
     }
 </script>
+```
+
+### 🚨 Scoring System Path Issues - CRITICAL FIX
+**SYMPTOM**: Scoring system finds zero picks despite users having made picks
+**ROOT CAUSE**: Using wrong Firebase path - not matching The Grid's working path structure
+**CRITICAL SOLUTION**: Use EXACT same path as The Grid (nerdfootballTheGrid.html:624):
+
+```javascript
+// WRONG (my attempts):
+// `picks/pools/nerduniverse-2025/weeks/${weekNumber}/users/${userId}` (7 segments error)
+// `artifacts/nerdfootball/pools/nerduniverse-2025/confidence/2025/weeks/${weekNumber}` (wrong structure)
+
+// CORRECT (The Grid's working path):
+const picksCollectionPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions`;
+const picksDocRef = window.doc(window.db, picksCollectionPath, userId);
+const picksSnap = await window.getDoc(picksDocRef);
+return picksSnap.data(); // Direct user pick data
+```
+
+**NEVER USE** any other path structure for picks - ALWAYS copy The Grid's exact logic!
+
+### 🚨 JavaScript Cache Issues in Production
+**SYMPTOM**: Code changes not reflecting in browser despite file updates
+**ROOT CAUSE**: Browser cache serving old JavaScript files
+**SOLUTION**: Use timestamp-based cache busting:
+```html
+<!-- Force cache refresh with current timestamp -->
+<script src="./ScoringCalculator.js?v=1758345045"></script>
+<script src="./WeeklyLeaderboardGenerator.js?v=1758345045"></script>
+<script src="./ScoringSystemManager.js?v=1758345045"></script>
 ```
 
 ## 🎯 Critical Standards

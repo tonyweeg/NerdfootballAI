@@ -131,6 +131,22 @@ service cloud.firestore {
       allow read: if isPoolMember(poolId);
       allow write: if isPoolAdmin(poolId);
     }
+
+    // ============================================
+    // SCORING SYSTEM - Confidence Points & Leaderboards
+    // ============================================
+
+    // User scoring documents - pool members can read their own, admins can write all
+    match /artifacts/nerdfootball/pools/{poolId}/scoring-users/{userId} {
+      allow read: if isAuthenticated() && (isPoolMember(poolId) || isGlobalAdmin());
+      allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
+    }
+
+    // Weekly leaderboards - all pool members can read, admins can write
+    match /artifacts/nerdfootball/pools/{poolId}/leaderboards/{leaderboardId} {
+      allow read: if isAuthenticated() && (isPoolMember(poolId) || isGlobalAdmin());
+      allow write: if isPoolAdmin(poolId) || isGlobalAdmin();
+    }
     
     // UNIFIED SURVIVOR DOCUMENTS - Sub-500ms performance architecture
     // Single document stores all user picks for a week

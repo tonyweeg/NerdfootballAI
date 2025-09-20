@@ -3,7 +3,10 @@
 <head>
  <meta charset="UTF-8">
  <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>NerdfootballAI v3.0 - Pool Management</title>
+ <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+ <meta http-equiv="Pragma" content="no-cache">
+ <meta http-equiv="Expires" content="0">
+ <title>NerdfootballAI v3.0 - Pool Management [CACHE_BUST_20250920_011622]</title>
  
  <!-- Web App Meta Tags -->
  <meta name="apple-mobile-web-app-capable" content="yes">
@@ -37,15 +40,25 @@
         window.process = { env: { NODE_ENV: 'development' } };
     }
 
-    // Override console.warn to suppress Tailwind production warnings
-    const originalWarn = console.warn;
-    console.warn = function(...args) {
-        const message = args.join(' ');
-        if (message.includes('cdn.tailwindcss.com should not be used in production')) {
-            return; // Suppress this specific warning
-        }
-        originalWarn.apply(console, args);
-    };
+    // NUCLEAR Tailwind warning suppression - complete override
+    if (typeof window !== 'undefined') {
+        window.process = { env: { NODE_ENV: 'production' } };
+    }
+
+    // Override ALL console methods to eliminate Tailwind warnings
+    ['warn', 'error', 'log', 'info'].forEach(method => {
+        const original = console[method];
+        console[method] = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('tailwindcss.com') ||
+                message.includes('should not be used in production') ||
+                message.includes('cdn.tailwindcss.com') ||
+                message.includes('PostCSS plugin')) {
+                return; // NUCLEAR: Block ALL Tailwind warnings
+            }
+            original.apply(console, args);
+        };
+    });
 
     tailwind.config = {
         corePlugins: { preflight: true },
@@ -66,6 +79,13 @@
  <script src="./survivorAutoElimination.js"></script>
 <script src="./survivor-battlefield-display.js"></script>
  <script src="./confidence-bundle.js"></script>
+
+<!-- 🏆 COMPREHENSIVE SCORING SYSTEM -->
+<script src="./ScoringCalculator.js?cb=MANUAL_AGGREGATION_FIX_1758345823"></script>
+<script src="./WeeklyLeaderboardGenerator.js?cb=MANUAL_AGGREGATION_FIX_1758345823"></script>
+<script src="./ScoringSystemManager.js?cb=FIELD_NAME_FIX_1758345827"></script>
+<script src="./fix-pool-members.js"></script>
+<script src="./leaderboard-scoring-integration.js?cb=WEEKS_1_AND_2_1758345822"></script>
  <script src="./features-bundle.js"></script>
  <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
  <script src="./realtimeManager.js"></script>
@@ -1076,7 +1096,8 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MNF Points</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Accuracy</th>
+                    <th id="mnf-header" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MNF Points</th>
                 </tr>
             </thead>
             <tbody id="public-leaderboard-body" class="bg-white divide-y divide-gray-200" data-realtime="leaderboard"></tbody>
@@ -1121,6 +1142,10 @@
 <button id="tab-pool-settings" class="admin-tab-modern" data-icon="⚙️">
    <span class="tab-icon">⚙️</span>
    <span class="tab-text">Settings</span>
+ </button>
+ <button id="tab-scoring-system" class="admin-tab-modern" data-icon="🏆">
+   <span class="tab-icon">🏆</span>
+   <span class="tab-text">Scoring</span>
  </button>
  </nav>
  </div>
@@ -1816,6 +1841,87 @@ Role
             <p class="text-sm text-slate-500">
                 Last updated: <span id="analytics-last-updated">Never</span>
             </p>
+        </div>
+    </div>
+</div>
+
+<!-- 🏆 Scoring System Admin Section -->
+<div id="admin-content-scoring-system" class="admin-content-section hidden">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="text-xl font-bold text-slate-800">🏆 Comprehensive Scoring System</h3>
+            <p class="text-slate-600 text-sm mt-1">Manage weekly and season scoring with confidence points leaderboards</p>
+        </div>
+        <div class="flex space-x-2">
+            <button id="scoring-system-status-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+                System Status
+            </button>
+            <button id="init-scoring-system-btn" class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700">
+                Initialize System
+            </button>
+            <button id="show-invalid-members-btn" class="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700">
+                Show Invalid Members
+            </button>
+            <button id="fix-pool-members-btn" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700">
+                Fix Pool Members
+            </button>
+        </div>
+    </div>
+
+    <!-- Week Processing Controls -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white rounded-lg border border-slate-200 p-6">
+            <h4 class="text-lg font-semibold text-slate-800 mb-4">Week Processing</h4>
+
+            <div class="space-y-4">
+                <div class="flex gap-2">
+                    <select id="scoring-week-selector" class="flex-1 px-3 py-2 border border-slate-300 rounded-lg">
+                        <option value="">Select Week</option>
+                        <option value="1">Week 1</option>
+                        <option value="2">Week 2</option>
+                        <option value="3">Week 3</option>
+                    </select>
+                    <button id="process-week-btn" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+                        Process Week
+                    </button>
+                </div>
+
+                <div class="flex gap-2">
+                    <button id="batch-process-btn" class="flex-1 px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700">
+                        Batch Process Weeks 1-3
+                    </button>
+                    <button id="verify-game-counts-btn" class="px-4 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700">
+                        Verify Game Counts
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-slate-200 p-6">
+            <h4 class="text-lg font-semibold text-slate-800 mb-4">Leaderboard Management</h4>
+
+            <div class="space-y-4">
+                <button id="generate-season-leaderboard-btn" class="w-full px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
+                    Generate Season Leaderboard
+                </button>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="view-week-leaderboards-btn" class="px-4 py-2 bg-slate-600 text-white text-sm rounded-lg hover:bg-slate-700">
+                        View Weekly
+                    </button>
+                    <button id="view-season-leaderboard-btn" class="px-4 py-2 bg-slate-600 text-white text-sm rounded-lg hover:bg-slate-700">
+                        View Season
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status Display -->
+    <div class="bg-slate-50 rounded-lg border border-slate-200 p-6">
+        <h4 class="text-lg font-semibold text-slate-800 mb-4">System Status & Logs</h4>
+        <div id="scoring-system-output" class="bg-white rounded border border-slate-200 p-4 h-64 overflow-y-auto font-mono text-sm">
+            <div class="text-slate-500">Scoring system ready. Click "System Status" to check current state.</div>
         </div>
     </div>
 </div>
@@ -7208,6 +7314,7 @@ async function calculateWeeklyLeaderboard(weekNumber) {
  case 'tab-survivor-status': await renderSurvivorStatus(weekNumber); break;
 case 'tab-system-messenger': await renderSystemMessenger(weekNumber); break;
 case 'tab-analytics': await renderAnalytics(weekNumber); break;
+case 'tab-scoring-system': await renderScoringSystem(); break;
  }
  }
 
@@ -7470,6 +7577,340 @@ function downloadAnalyticsCSV(data, weekNumber) {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+}
+
+// --- 🏆 SCORING SYSTEM FUNCTIONALITY ---
+async function renderScoringSystem() {
+    console.log('🏆 Rendering Scoring System admin interface');
+
+    // Initialize UI state
+    const outputEl = document.getElementById('scoring-system-output');
+    if (outputEl) {
+        outputEl.innerHTML = '<div class="text-slate-500">Scoring system ready. Click "System Status" to check current state.</div>';
+    }
+
+    // ATTACH EVENT LISTENERS IMMEDIATELY WHEN TAB IS RENDERED
+    attachScoringSystemEventListeners();
+}
+
+function logToScoringOutput(message, type = 'info') {
+    const outputEl = document.getElementById('scoring-system-output');
+    if (!outputEl) return;
+
+    const timestamp = new Date().toLocaleTimeString();
+    const typeColors = {
+        info: 'text-slate-600',
+        success: 'text-green-600',
+        error: 'text-red-600',
+        warning: 'text-amber-600'
+    };
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `mb-1 ${typeColors[type] || typeColors.info}`;
+    messageEl.innerHTML = `<span class="text-slate-400">[${timestamp}]</span> ${message}`;
+
+    outputEl.appendChild(messageEl);
+    outputEl.scrollTop = outputEl.scrollHeight;
+}
+
+// Event listeners for scoring system buttons - Called directly when tab renders
+function attachScoringSystemEventListeners() {
+    console.log('🔧 Attaching scoring system event listeners...');
+
+    // System Status Button
+    const statusBtn = document.getElementById('scoring-system-status-btn');
+    if (statusBtn) {
+        console.log('✅ Found status button, attaching listener');
+        statusBtn.onclick = async () => {
+            try {
+                logToScoringOutput('🔍 Checking system status...', 'info');
+
+                if (!window.ScoringSystemManager) {
+                    logToScoringOutput('❌ ScoringSystemManager not loaded', 'error');
+                    return;
+                }
+
+                const status = await window.ScoringSystemManager.getSystemStatus();
+
+                logToScoringOutput(`✅ Scoring Calculator: ${status.scoringCalculator ? 'Loaded' : 'Missing'}`, status.scoringCalculator ? 'success' : 'error');
+                logToScoringOutput(`✅ Leaderboard Generator: ${status.leaderboardGenerator ? 'Loaded' : 'Missing'}`, status.leaderboardGenerator ? 'success' : 'error');
+                logToScoringOutput(`👥 Pool Members: ${status.poolMembers}`, 'info');
+                logToScoringOutput(`📊 Weeks with Data: ${status.weeksWithData}`, 'info');
+
+            } catch (error) {
+                logToScoringOutput(`❌ Error checking status: ${error.message}`, 'error');
+            }
+        };
+    } else {
+        console.log('❌ Status button not found');
+    }
+
+    // Initialize System Button
+    const initBtn = document.getElementById('init-scoring-system-btn');
+    if (initBtn) {
+        console.log('✅ Found init button, attaching listener');
+        initBtn.onclick = async () => {
+            try {
+                logToScoringOutput('🚀 Initializing scoring system...', 'info');
+                initBtn.disabled = true;
+                initBtn.textContent = 'Initializing...';
+
+                // Check Firebase availability first
+                logToScoringOutput('🔍 Checking Firebase availability...', 'info');
+                logToScoringOutput(`Database: ${window.db ? '✅' : '❌'}`, window.db ? 'success' : 'error');
+                logToScoringOutput(`Doc function: ${window.doc ? '✅' : '❌'}`, window.doc ? 'success' : 'error');
+                logToScoringOutput(`SetDoc function: ${window.setDoc ? '✅' : '❌'}`, window.setDoc ? 'success' : 'error');
+                logToScoringOutput(`GetDoc function: ${window.getDoc ? '✅' : '❌'}`, window.getDoc ? 'success' : 'error');
+
+                const result = await window.ScoringSystemManager.initializeScoringSystem(false);
+
+                logToScoringOutput(`✅ Initialization complete!`, 'success');
+                logToScoringOutput(`👥 Users initialized: ${result.usersInitialized}`, 'success');
+                logToScoringOutput(`🔄 Users migrated: ${result.usersMigrated}`, 'success');
+
+                if (result.errors.length > 0) {
+                    logToScoringOutput(`⚠️ Errors: ${result.errors.length}`, 'warning');
+                    // Show first 3 errors for debugging
+                    result.errors.slice(0, 3).forEach(error => {
+                        logToScoringOutput(`❌ ${error.userId}: ${error.error}`, 'error');
+                    });
+                    if (result.errors.length > 3) {
+                        logToScoringOutput(`... and ${result.errors.length - 3} more errors`, 'warning');
+                    }
+                }
+
+            } catch (error) {
+                logToScoringOutput(`❌ Initialization failed: ${error.message}`, 'error');
+            } finally {
+                initBtn.disabled = false;
+                initBtn.textContent = 'Initialize System';
+            }
+        };
+    } else {
+        console.log('❌ Init button not found');
+    }
+
+    // Show Invalid Members Button
+    const showInvalidBtn = document.getElementById('show-invalid-members-btn');
+    if (showInvalidBtn) {
+        console.log('✅ Found show invalid members button, attaching listener');
+        showInvalidBtn.onclick = async () => {
+            try {
+                logToScoringOutput('🔍 Checking for invalid pool members...', 'info');
+
+                if (!window.ScoringSystemManager) {
+                    logToScoringOutput('❌ ScoringSystemManager not loaded', 'error');
+                    return;
+                }
+
+                const invalidMembers = await window.ScoringSystemManager.getInvalidPoolMembers();
+
+                if (invalidMembers.length === 0) {
+                    logToScoringOutput('✅ All pool members have valid UIDs', 'success');
+                } else {
+                    logToScoringOutput(`❌ Found ${invalidMembers.length} members missing UIDs:`, 'error');
+                    invalidMembers.forEach(member => {
+                        const name = member.displayName || 'Unknown';
+                        const email = member.email || 'No email';
+                        logToScoringOutput(`   • ${name} (${email})`, 'error');
+                    });
+                }
+
+            } catch (error) {
+                logToScoringOutput(`❌ Error checking invalid members: ${error.message}`, 'error');
+            }
+        };
+    } else {
+        console.log('❌ Show invalid members button not found');
+    }
+
+    // Fix Pool Members Button
+    const fixPoolBtn = document.getElementById('fix-pool-members-btn');
+    if (fixPoolBtn) {
+        console.log('✅ Found fix pool members button, attaching listener');
+        fixPoolBtn.onclick = async () => {
+            try {
+                logToScoringOutput('🔧 Starting pool member fixes...', 'info');
+                fixPoolBtn.disabled = true;
+                fixPoolBtn.textContent = 'Fixing...';
+
+                if (!window.fixPoolMembers) {
+                    logToScoringOutput('❌ Fix script not loaded', 'error');
+                    return;
+                }
+
+                const result = await window.fixPoolMembers();
+
+                logToScoringOutput(`✅ Pool member fixes complete!`, 'success');
+                logToScoringOutput(`   ✅ Fixed UIDs: ${result.fixedCount}`, 'success');
+                logToScoringOutput(`   🗑️ Removed users: ${result.removedCount}`, 'success');
+                logToScoringOutput(`   📊 Total pool members: ${result.totalMembers}`, 'info');
+
+            } catch (error) {
+                logToScoringOutput(`❌ Error fixing pool members: ${error.message}`, 'error');
+            } finally {
+                fixPoolBtn.disabled = false;
+                fixPoolBtn.textContent = 'Fix Pool Members';
+            }
+        };
+    } else {
+        console.log('❌ Fix pool members button not found');
+    }
+
+    // Process Week Button
+    const processWeekBtn = document.getElementById('process-week-btn');
+    if (processWeekBtn) {
+        console.log('✅ Found process week button, attaching listener');
+        processWeekBtn.onclick = async () => {
+            try {
+                const weekSelector = document.getElementById('scoring-week-selector');
+                const weekNumber = parseInt(weekSelector.value);
+
+                if (!weekNumber) {
+                    logToScoringOutput('❌ Please select a week to process', 'error');
+                    return;
+                }
+
+                logToScoringOutput(`🚀 Processing Week ${weekNumber}...`, 'info');
+                processWeekBtn.disabled = true;
+                processWeekBtn.textContent = 'Processing...';
+
+                const result = await window.ScoringSystemManager.processWeekScoring(weekNumber, false);
+
+                if (result.success) {
+                    logToScoringOutput(`✅ Week ${weekNumber} processing complete!`, 'success');
+                    logToScoringOutput(`👥 Users processed: ${result.phase1_userScoring.usersProcessed}`, 'success');
+                    logToScoringOutput(`🏆 Leaderboard generated: ${result.phase2_leaderboard.standings.length} users`, 'success');
+                    logToScoringOutput(`📊 Season totals updated: ${result.phase3_seasonUpdate.usersUpdated} users`, 'success');
+                } else {
+                    logToScoringOutput(`❌ Week ${weekNumber} processing failed`, 'error');
+                }
+
+            } catch (error) {
+                logToScoringOutput(`❌ Error processing week: ${error.message}`, 'error');
+            } finally {
+                processWeekBtn.disabled = false;
+                processWeekBtn.textContent = 'Process Week';
+            }
+        };
+    } else {
+        console.log('❌ Process week button not found');
+    }
+
+    // Batch Process Button
+    const batchBtn = document.getElementById('batch-process-btn');
+    if (batchBtn) {
+        console.log('✅ Found batch button, attaching listener');
+        batchBtn.onclick = async () => {
+            try {
+                logToScoringOutput('🚀 Batch processing Weeks 1-3...', 'info');
+                batchBtn.disabled = true;
+                batchBtn.textContent = 'Processing...';
+
+                const result = await window.ScoringSystemManager.batchProcessWeeks([1, 2, 3], false);
+
+                logToScoringOutput(`✅ Batch processing complete!`, 'success');
+                logToScoringOutput(`📊 Weeks processed: ${result.processed.length}`, 'success');
+                logToScoringOutput(`❌ Errors: ${result.errors.length}`, result.errors.length > 0 ? 'warning' : 'success');
+
+            } catch (error) {
+                logToScoringOutput(`❌ Batch processing failed: ${error.message}`, 'error');
+            } finally {
+                batchBtn.disabled = false;
+                batchBtn.textContent = 'Batch Process Weeks 1-3';
+            }
+        };
+    } else {
+        console.log('❌ Batch button not found');
+    }
+
+    // Verify Game Counts Button
+    const verifyBtn = document.getElementById('verify-game-counts-btn');
+    if (verifyBtn) {
+        console.log('✅ Found verify button, attaching listener');
+        verifyBtn.onclick = async () => {
+            try {
+                logToScoringOutput('🔍 Verifying game counts across all weeks...', 'info');
+
+                const result = await window.ScoringCalculator.verifyWeeklyGameCounts();
+
+                logToScoringOutput(`📊 Game Count Analysis:`, 'info');
+                logToScoringOutput(`📈 Unique game counts: ${result.summary.uniqueCounts.join(', ')}`, 'info');
+                logToScoringOutput(`📏 Range: ${result.summary.minGames}-${result.summary.maxGames} games per week`, 'info');
+                logToScoringOutput(`📊 Average: ${result.summary.averageGames.toFixed(1)} games`, 'info');
+
+                // Show a few specific weeks
+                [1, 2, 3].forEach(week => {
+                    const weekData = result.weeks[week];
+                    if (weekData) {
+                        logToScoringOutput(`Week ${week}: ${weekData.gameCount} games (max points: ${weekData.maxPoints})`, 'info');
+                    }
+                });
+
+            } catch (error) {
+                logToScoringOutput(`❌ Error verifying game counts: ${error.message}`, 'error');
+            }
+        };
+    } else {
+        console.log('❌ Verify button not found');
+    }
+
+    // Generate Season Leaderboard Button
+    const seasonBtn = document.getElementById('generate-season-leaderboard-btn');
+    if (seasonBtn) {
+        console.log('✅ Found season button, attaching listener');
+        seasonBtn.onclick = async () => {
+            try {
+                logToScoringOutput('🏆 Generating season leaderboard...', 'info');
+                seasonBtn.disabled = true;
+                seasonBtn.textContent = 'Generating...';
+
+                const completedWeeks = [1, 2]; // Weeks 1 and 2 have been processed through scoring system
+                const leaderboard = await window.ScoringSystemManager.generateSeasonLeaderboard(completedWeeks);
+
+                logToScoringOutput(`✅ Season leaderboard generated!`, 'success');
+                logToScoringOutput(`👥 Users: ${leaderboard.standings.length}`, 'success');
+                logToScoringOutput(`🏆 High Score: ${leaderboard.metadata.highScore} points`, 'success');
+                logToScoringOutput(`📊 Average Score: ${leaderboard.metadata.averageScore.toFixed(1)} points`, 'success');
+
+                // Show top 3
+                leaderboard.standings.slice(0, 3).forEach((user, index) => {
+                    logToScoringOutput(`${index + 1}. ${user.displayName}: ${user.totalPoints} points`, 'success');
+                });
+
+            } catch (error) {
+                logToScoringOutput(`❌ Error generating season leaderboard: ${error.message}`, 'error');
+            } finally {
+                seasonBtn.disabled = false;
+                seasonBtn.textContent = 'Generate Season Leaderboard';
+            }
+        };
+    } else {
+        console.log('❌ Season button not found');
+    }
+
+    // View buttons (placeholder functionality for now)
+    const viewWeekBtn = document.getElementById('view-week-leaderboards-btn');
+    if (viewWeekBtn) {
+        console.log('✅ Found view week button, attaching listener');
+        viewWeekBtn.onclick = () => {
+            logToScoringOutput('📊 Weekly leaderboard viewing coming soon...', 'info');
+        };
+    } else {
+        console.log('❌ View week button not found');
+    }
+
+    const viewSeasonBtn = document.getElementById('view-season-leaderboard-btn');
+    if (viewSeasonBtn) {
+        console.log('✅ Found view season button, attaching listener');
+        viewSeasonBtn.onclick = () => {
+            logToScoringOutput('🏆 Season leaderboard viewing coming soon...', 'info');
+        };
+    } else {
+        console.log('❌ View season button not found');
+    }
+
+    console.log('🎉 All scoring system event listeners attached!');
 }
 
  // --- INITIALIZATION & AUTH ---
@@ -11635,22 +12076,26 @@ function isGameLocked(game) {
             
             // Determine rank display with ties
             let rankDisplay = `${index + 1}`;
-            if (index > 0 && user.totalScore === standings[index - 1].totalScore) {
+            const userScore = user.totalPoints || user.totalScore || 0;
+            if (index > 0 && userScore === (standings[index - 1].totalPoints || standings[index - 1].totalScore || 0)) {
                 // Same score as previous user - it's a tie
                 const prevRow = targetBody.lastElementChild;
                 const prevRankText = prevRow.querySelector('td').textContent;
                 rankDisplay = prevRankText.includes('T') ? prevRankText : `T${prevRankText}`;
                 prevRow.querySelector('td').textContent = rankDisplay;
             }
-            
+
             // Get MNF points for this user (will be populated in weekly view)
             const mnfPoints = user.mnfTotalPoints || '-';
-            
+            const accuracy = user.accuracy !== undefined ? `${user.accuracy.toFixed(1)}%` : '-';
+            const isSeasonView = allUI.lbSeasonBtn.classList.contains('active');
+
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${rankDisplay}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700">${user.displayName || 'Unknown'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-semibold">${user.totalScore || 0}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">${mnfPoints}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-semibold">${userScore}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">${accuracy}</td>
+                ${isSeasonView ? '' : `<td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">${mnfPoints}</td>`}
             `;
             targetBody.appendChild(row);
         });
@@ -11843,8 +12288,27 @@ async function updateLeaderboardSummary(weekNumber = null) {
 // Modified calculateLeaderboard to use summary when available
 async function calculateLeaderboardOptimized(weekNumber = null) {
     console.log(`📊 Calculating leaderboard for ${weekNumber ? `week ${weekNumber}` : 'season'}`);
-    
+
     try {
+        // 🏆 FIRST: Try comprehensive scoring system
+        console.log('🔍 DEBUG: Checking comprehensive scoring system...');
+        console.log('🔍 DEBUG: LeaderboardScoringIntegration available:', !!window.LeaderboardScoringIntegration);
+
+        if (window.LeaderboardScoringIntegration) {
+            console.log('🔍 DEBUG: Calling replaceLeaderboardCalculation for week:', weekNumber);
+            const scoringSystemData = await window.LeaderboardScoringIntegration.replaceLeaderboardCalculation(weekNumber);
+            console.log('🔍 DEBUG: Scoring system returned:', scoringSystemData);
+
+            if (scoringSystemData && scoringSystemData.length > 0) {
+                console.log(`🏆 Using comprehensive scoring system data (${scoringSystemData.length} users)`);
+                return scoringSystemData;
+            } else {
+                console.log('❌ DEBUG: Comprehensive scoring system returned no data, falling back to legacy');
+            }
+        } else {
+            console.log('❌ DEBUG: LeaderboardScoringIntegration not available, falling back to legacy');
+        }
+
         // Try to get summary document first
         const summaryDoc = await getDoc(doc(db, leaderboardSummaryPath()));
         
@@ -12215,11 +12679,11 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
    const realPositions = [];
    
    standings.slice(0, 10).forEach((entry, index) => {
-     if (previousScore !== null && entry.totalScore < previousScore) {
+     if (previousScore !== null && (entry.totalPoints || entry.totalScore || 0) < previousScore) {
        currentRank = index + 1;
      }
      realPositions[index] = currentRank;
-     previousScore = entry.totalScore;
+     previousScore = entry.totalPoints || entry.totalScore || 0;
    });
 
    // Render leaderboard
@@ -12267,7 +12731,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
        <span class="text-slate-800">${medalGlyph}${entry.displayName || 'Unknown'}</span>
        ${isCurrentUser ? '<span class="text-blue-600 text-xs">(You)</span>' : ''}
       </div>
-      <span class="text-slate-600 font-mono text-xs">${entry.totalScore}</span>
+      <span class="text-slate-600 font-mono text-xs">${entry.totalPoints || entry.totalScore || 0}</span>
      </div>
     `;
    }).join('');
@@ -12893,24 +13357,95 @@ document.getElementById('system-dashboard-btn')?.addEventListener('click', () =>
 
 
  
- async function renderPublicLeaderboard() {
+async function renderPublicLeaderboard() {
     allUI.publicLeaderboardLoader.classList.remove('hidden');
     allUI.publicLeaderboardBody.innerHTML = '';
-    
+
     let isSeasonView = allUI.lbSeasonBtn.classList.contains('active');
-    
-    if (isSeasonView) {
-        await calculateAndDisplayLeaderboard(null, allUI.publicLeaderboardBody, allUI.publicLeaderboardLoader);
-    } else {
-        const week = allUI.lbWeekSelector.value;
-        await calculateAndDisplayLeaderboard(week, allUI.publicLeaderboardBody, allUI.publicLeaderboardLoader);
+
+    try {
+        console.log('🏆 Loading leaderboard from comprehensive scoring system...');
+
+        let leaderboardData;
+        if (isSeasonView) {
+            console.log('📊 Loading season leaderboard...');
+            leaderboardData = await window.LeaderboardScoringIntegration.replaceLeaderboardCalculation(null);
+        } else {
+            const week = parseInt(allUI.lbWeekSelector.value, 10);
+            console.log(`📊 Loading Week ${week} leaderboard...`);
+            leaderboardData = await window.LeaderboardScoringIntegration.replaceLeaderboardCalculation(week);
+        }
+
+        if (leaderboardData && leaderboardData.length > 0) {
+            console.log(`✅ Loaded ${leaderboardData.length} users from scoring system`);
+
+            // Generate leaderboard HTML using our scoring system data
+            const leaderboardHTML = leaderboardData.map((user, index) => {
+                const rank = user.rank || (index + 1);
+                const totalPoints = user.totalPoints || 0;
+                const accuracy = user.accuracy ? `${user.accuracy.toFixed(1)}%` : '0.0%';
+                const correctPicks = user.correctPicks || 0;
+                const totalPicks = user.totalPicks || 0;
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <span class="text-lg font-bold text-gray-900">${rank}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${user.displayName}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-lg font-bold text-blue-600">${totalPoints}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${correctPicks}/${totalPicks}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${accuracy}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            -
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            allUI.publicLeaderboardBody.innerHTML = leaderboardHTML;
+            console.log('🏆 Leaderboard display updated with real scores!');
+
+        } else {
+            console.log('⚠️ No leaderboard data found, falling back to legacy system...');
+            // Fallback to legacy system
+            if (isSeasonView) {
+                await calculateAndDisplayLeaderboard(null, allUI.publicLeaderboardBody, allUI.publicLeaderboardLoader);
+            } else {
+                const week = allUI.lbWeekSelector.value;
+                await calculateAndDisplayLeaderboard(week, allUI.publicLeaderboardBody, allUI.publicLeaderboardLoader);
+            }
+        }
+
+    } catch (error) {
+        console.error('❌ Error loading leaderboard from scoring system:', error);
+        // Fallback to legacy system on error
+        if (isSeasonView) {
+            await calculateAndDisplayLeaderboard(null, allUI.publicLeaderboardBody, allUI.publicLeaderboardLoader);
+        } else {
+            const week = allUI.lbWeekSelector.value;
+            await calculateAndDisplayLeaderboard(week, allUI.publicLeaderboardBody, allUI.publicLeaderboardLoader);
+        }
     }
+
+    allUI.publicLeaderboardLoader.classList.add('hidden');
 }
 
  allUI.lbWeeklyBtn.addEventListener('click', () => {
     allUI.lbWeeklyBtn.classList.add('active');
     allUI.lbSeasonBtn.classList.remove('active');
     allUI.lbWeekSelectorContainer.classList.remove('hidden');
+    document.getElementById('mnf-header').style.display = '';
     renderPublicLeaderboard();
     saveAppState();
  });
@@ -12918,6 +13453,7 @@ document.getElementById('system-dashboard-btn')?.addEventListener('click', () =>
     allUI.lbSeasonBtn.classList.add('active');
     allUI.lbWeeklyBtn.classList.remove('active');
     allUI.lbWeekSelectorContainer.classList.add('hidden');
+    document.getElementById('mnf-header').style.display = 'none';
     renderPublicLeaderboard();
     saveAppState();
  });
