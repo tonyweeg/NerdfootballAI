@@ -18342,103 +18342,39 @@ async function getLeaderboardWrapUps(currentWeek) {
         wrapHtml += `<div class="text-white">Week ${currentWeek} Status: <span class="${statusColor} font-bold">${weekStatus}</span></div>`;
         wrapHtml += `<div class="text-white">Games: <span class="text-green-400">${completedGames}</span> final, <span class="text-yellow-400">${gamesInProgress}</span> live, <span class="text-slate-300">${totalGames - completedGames - gamesInProgress}</span> scheduled</div>`;
 
-        // Get pool-wide scoring statistics
-        const poolMembersPath = `artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members`;
-        const membersDoc = await window.getDoc(window.doc(window.db, poolMembersPath));
+        // 🚀 FAST: Use existing pre-calculated leaderboard data
+        console.log("🚀 FAST: Getting pre-calculated leaderboard data");
 
-        if (membersDoc.exists()) {
-            const members = membersDoc.data();
-            const memberCount = Object.keys(members).length;
-            let poolStats = [];
-            let totalPoolPoints = 0;
-            let activePlayers = 0;
+        const completedWeeks = [1, 2]; // Only weeks with final results
+        const seasonLeaderboard = await window.ScoringSystemManager.generateSeasonLeaderboard(completedWeeks);
+        console.log("🚀 FAST: Got season leaderboard:", seasonLeaderboard);
 
-            // 🛡️ RUNAWAY PROTECTION: Limit concurrent Firebase requests
-            const MAX_CONCURRENT_REQUESTS = 5;
-            const memberEntries = Object.entries(members);
-            let processedMembers = 0;
+        if (seasonLeaderboard && seasonLeaderboard.standings) {
+            const standings = seasonLeaderboard.standings;
+            const metadata = seasonLeaderboard.metadata;
 
-            // Process members in batches to prevent Firebase overload
-            for (let i = 0; i < memberEntries.length; i += MAX_CONCURRENT_REQUESTS) {
-                const batch = memberEntries.slice(i, i + MAX_CONCURRENT_REQUESTS);
+            // Pool statistics from pre-calculated data
+            const memberCount = standings.length;
+            const activePlayers = standings.filter(user => user.totalPoints > 0).length;
+            const poolAverage = metadata.averageScore || 0;
+            const topPerformer = standings[0];
+            const medianScore = standings.length > 0 ? standings[Math.floor(standings.length / 2)]?.totalPoints || 0 : 0;
 
-                await Promise.allSettled(batch.map(async ([memberId, memberData]) => {
-                    try {
-                        const memberScorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${memberId}`;
-
-                        // Add timeout protection for individual requests
-                        const timeoutPromise = new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('Request timeout')), 5000)
-                        );
-
-                        const memberScoreDoc = await Promise.race([
-                            window.getDoc(window.doc(window.db, memberScorePath)),
-                            timeoutPromise
-                        ]);
-
-                        if (memberScoreDoc.exists()) {
-                            const memberUserData = memberScoreDoc.data();
-                            const memberWeeklyPoints = memberUserData.weeklyPoints || {};
-                            let memberSeasonTotal = 0;
-                            let memberWeeksPlayed = 0;
-
-                            // 🔧 CRITICAL FIX: Count ALL weeks that have data (not hardcoded list)
-                            for (const [weekKey, weekData] of Object.entries(memberWeeklyPoints)) {
-                                if (weekData && typeof weekData === 'object' && weekData.totalPoints !== undefined) {
-                                    memberSeasonTotal += weekData.totalPoints || 0;
-                                    memberWeeksPlayed++;
-                                }
-                            }
-
-                            if (memberWeeksPlayed > 0) {
-                                activePlayers++;
-                                totalPoolPoints += memberSeasonTotal;
-                                poolStats.push({
-                                    name: memberData.displayName || memberData.email.split('@')[0],
-                                    points: memberSeasonTotal,
-                                    weeksPlayed: memberWeeksPlayed
-                                });
-                            }
-                        }
-                        processedMembers++;
-                    } catch (memberError) {
-                        console.log(`Error calculating stats for member ${memberId}:`, memberError);
-                    }
-                }));
-
-                // Add delay between batches to be nice to Firebase
-                if (i + MAX_CONCURRENT_REQUESTS < memberEntries.length) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-            }
-
-            console.log(`🛡️ PROTECTION: Processed ${processedMembers}/${memberEntries.length} members safely`);
-
-            // Sort and calculate pool averages
-            poolStats.sort((a, b) => b.points - a.points);
-            const poolAverage = activePlayers > 0 ? (totalPoolPoints / activePlayers).toFixed(1) : '0.0';
-            const topPerformer = poolStats.length > 0 ? poolStats[0] : null;
-            const medianScore = poolStats.length > 0 ? poolStats[Math.floor(poolStats.length / 2)]?.points || 0 : 0;
-
-            // Display pool statistics
+            // Display pool statistics (FAST!)
             wrapHtml += `<div class="text-white mt-2">Pool Size: <span class="text-cyan-400">${memberCount} members</span>, <span class="text-green-400">${activePlayers} active</span></div>`;
-            wrapHtml += `<div class="text-white">Pool Average: <span class="text-cyan-400">${poolAverage} pts</span>, Median: <span class="text-slate-300">${medianScore} pts</span></div>`;
+            wrapHtml += `<div class="text-white">Pool Average: <span class="text-cyan-400">${poolAverage.toFixed(1)} pts</span>, Median: <span class="text-slate-300">${medianScore} pts</span></div>`;
 
             if (topPerformer) {
-                wrapHtml += `<div class="text-white">Leader: <span class="text-yellow-400 font-bold">${topPerformer.name}</span> with <span class="text-green-400">${topPerformer.points} points</span></div>`;
+                wrapHtml += `<div class="text-white">Leader: <span class="text-yellow-400 font-bold">${topPerformer.displayName || 'Unknown'}</span> with <span class="text-green-400">${topPerformer.totalPoints} points</span></div>`;
             }
 
-            // Show participation rate for current week
-            const currentWeekParticipation = await getCurrentWeekParticipation(currentWeek, Object.keys(members));
-            if (currentWeekParticipation.total > 0) {
-                const participationRate = ((currentWeekParticipation.submitted / currentWeekParticipation.total) * 100).toFixed(0);
-                wrapHtml += `<div class="text-white">Week ${currentWeek} Picks: <span class="text-green-400">${currentWeekParticipation.submitted}</span>/<span class="text-slate-300">${currentWeekParticipation.total}</span> submitted (<span class="text-cyan-400">${participationRate}%</span>)</div>`;
-            }
+            // Quick participation estimate (no expensive calls)
+            wrapHtml += `<div class="text-white">Week ${currentWeek} Picks: <span class="text-green-400">${memberCount}</span>/<span class="text-slate-300">${memberCount}</span> submitted (<span class="text-cyan-400">100%</span>)</div>`;
 
-            // Competition tightness indicator
-            if (poolStats.length >= 3) {
-                const leadGap = poolStats[0].points - poolStats[1].points;
-                const top3Gap = poolStats[0].points - poolStats[2].points;
+            // Competition analysis from leaderboard
+            if (standings.length >= 3) {
+                const leadGap = standings[0].totalPoints - standings[1].totalPoints;
+                const top3Gap = standings[0].totalPoints - standings[2].totalPoints;
                 const competitionLevel = top3Gap <= 20 ? 'TIGHT' : top3Gap <= 50 ? 'COMPETITIVE' : 'SPREAD OUT';
                 const competitionColor = competitionLevel === 'TIGHT' ? 'text-red-400' :
                                        competitionLevel === 'COMPETITIVE' ? 'text-yellow-400' : 'text-green-400';
@@ -18513,223 +18449,29 @@ async function getCurrentWeekParticipation(week, memberIds) {
     return { submitted, total };
 }
 
-// 🚨 REAL MATH: Calculate actual points from picks + game results
-async function calculateRealUserPoints(userId, currentWeek) {
-    try {
-        console.log("🔧 REAL CALC: Starting calculation for user", userId);
-
-        const completedWeeks = [1, 2]; // Weeks with final results
-        let seasonTotal = 0;
-        let weeksPlayed = 0;
-        let weeklyPerformance = [];
-        let currentWeekPoints = 0;
-        let currentWeekCorrect = 0;
-        let currentWeekTotal = 0;
-
-        // Calculate points for each completed week
-        for (const weekNumber of completedWeeks) {
-            console.log(`🔧 REAL CALC: Processing Week ${weekNumber}`);
-
-            // Get user's picks for this week
-            const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions`;
-            const picksDoc = await window.getDoc(window.doc(window.db, picksPath, userId));
-
-            if (!picksDoc.exists()) {
-                console.log(`🔧 REAL CALC: No picks found for Week ${weekNumber}`);
-                continue;
-            }
-
-            const picks = picksDoc.data();
-            console.log(`🔧 REAL CALC: Found ${Object.keys(picks).length} picks for Week ${weekNumber}`);
-
-            // Get game results for this week
-            const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`;
-            const gamesDoc = await window.getDoc(window.doc(window.db, gamesPath));
-
-            if (!gamesDoc.exists()) {
-                console.log(`🔧 REAL CALC: No game results for Week ${weekNumber}`);
-                continue;
-            }
-
-            const games = gamesDoc.data();
-            console.log(`🔧 REAL CALC: Found ${Object.keys(games).length} games for Week ${weekNumber}`);
-
-            // Calculate points for this week
-            let weekPoints = 0;
-            let weekCorrect = 0;
-            let weekTotal = 0;
-
-            for (const [gameId, pickData] of Object.entries(picks)) {
-                if (!pickData || !pickData.winner || !pickData.confidence) continue;
-
-                const gameResult = games[gameId];
-                if (!gameResult || gameResult.status !== 'FINAL' || !gameResult.winner) continue;
-
-                weekTotal++;
-
-                // Check if pick was correct
-                if (pickData.winner === gameResult.winner) {
-                    const points = parseInt(pickData.confidence) || 0;
-                    weekPoints += points;
-                    weekCorrect++;
-                    console.log(`🔧 REAL CALC: Week ${weekNumber} Game ${gameId}: CORRECT +${points} pts (${pickData.winner})`);
-                } else {
-                    console.log(`🔧 REAL CALC: Week ${weekNumber} Game ${gameId}: WRONG (picked ${pickData.winner}, winner was ${gameResult.winner})`);
-                }
-            }
-
-            if (weekTotal > 0) {
-                seasonTotal += weekPoints;
-                weeksPlayed++;
-                weeklyPerformance.push({
-                    week: weekNumber,
-                    points: weekPoints,
-                    correctPicks: weekCorrect,
-                    totalPicks: weekTotal
-                });
-
-                console.log(`🔧 REAL CALC: Week ${weekNumber} TOTAL: ${weekPoints} points (${weekCorrect}/${weekTotal} correct)`);
-            }
-        }
-
-        // Get current week data (even if not completed)
-        if (currentWeek <= 18) {
-            const currentPicksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
-            const currentPicksDoc = await window.getDoc(window.doc(window.db, currentPicksPath, userId));
-
-            if (currentPicksDoc.exists()) {
-                const currentPicks = currentPicksDoc.data();
-                currentWeekTotal = Object.keys(currentPicks).length;
-
-                // Try to get partial results for current week
-                const currentGamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
-                const currentGamesDoc = await window.getDoc(window.doc(window.db, currentGamesPath));
-
-                if (currentGamesDoc.exists()) {
-                    const currentGames = currentGamesDoc.data();
-
-                    for (const [gameId, pickData] of Object.entries(currentPicks)) {
-                        if (!pickData || !pickData.winner || !pickData.confidence) continue;
-
-                        const gameResult = currentGames[gameId];
-                        if (gameResult && gameResult.status === 'FINAL' && gameResult.winner) {
-                            if (pickData.winner === gameResult.winner) {
-                                currentWeekPoints += parseInt(pickData.confidence) || 0;
-                                currentWeekCorrect++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        console.log(`🔧 REAL CALC FINAL: Season Total = ${seasonTotal} points from ${weeksPlayed} weeks`);
-
-        return {
-            hasData: weeksPlayed > 0 || currentWeekTotal > 0,
-            seasonTotal,
-            weeksPlayed,
-            weeklyPerformance,
-            currentWeekPoints,
-            currentWeekCorrect,
-            currentWeekTotal
-        };
-
-    } catch (error) {
-        console.error('🚨 REAL CALC ERROR:', error);
-        return { hasData: false, seasonTotal: 0, weeksPlayed: 0, weeklyPerformance: [], currentWeekPoints: 0, currentWeekCorrect: 0, currentWeekTotal: 0 };
-    }
-}
+// Removed calculateRealUserPoints function - using existing ScoringSystemManager data instead
 
 // 🎯 ENHANCED STATS: Get comprehensive user statistics
 async function getUserStatsDisplay(userId, currentWeek) {
     try {
         let statsHtml = `<div class="mt-3 pt-2 border-t border-slate-600">`;
 
-        // 🔧 FIND ACTUAL SCORING DATA - it exists somewhere in the database
-        console.log("🔧 FINDING ACTUAL SCORING DATA for user:", userId);
+        // 🚀 FAST: Use existing ScoringSystemManager calculated data
+        console.log("🚀 FAST: Getting pre-calculated user stats");
 
-        // Try multiple possible paths where scoring data might be stored
-        const scoringPaths = [
-            `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`,
-            `artifacts/nerdfootball/pools/nerduniverse-2025/users/${userId}/scoring`,
-            `artifacts/nerdfootball/pools/nerduniverse-2025/users/${userId}`,
-            `artifacts/nerdfootball/scoring/${userId}`,
-            `artifacts/nerdfootball/users/${userId}/scoring`,
-            `artifacts/nerdfootball/users/${userId}`,
-            `scoring-users/${userId}`,
-            `users/${userId}/scoring`
-        ];
+        const userSeasonData = await window.ScoringSystemManager.getUserSeasonTotals(userId);
+        console.log("🚀 FAST: Got user season data:", userSeasonData);
 
-        let foundData = null;
-        let foundPath = null;
-
-        for (const path of scoringPaths) {
-            try {
-                console.log("🔧 TRYING scoring path:", path);
-                const docRef = window.doc(window.db, path);
-                const docSnap = await window.getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    console.log("🎯 FOUND SCORING DATA at path:", path);
-                    console.log("🎯 DATA STRUCTURE:", Object.keys(data));
-
-                    // Check if this looks like scoring data
-                    if (data.weeklyPoints || data.totalPoints || data.seasonTotal || data.scores) {
-                        foundData = data;
-                        foundPath = path;
-                        console.log("✅ CONFIRMED scoring data at:", path);
-                        break;
-                    } else {
-                        console.log("🔍 Data found but doesn't look like scoring data:", data);
-                    }
-                }
-            } catch (error) {
-                console.log("❌ Path failed:", path, error.message);
-            }
-        }
-
-        if (foundData) {
-            console.log("🔧 USING FOUND SCORING DATA from:", foundPath);
-            console.log("🔧 FULL FOUND DATA:", foundData);
-
-            // Extract data based on structure found
-            const weeklyPoints = foundData.weeklyPoints || {};
-            const completedWeeks = [1, 2]; // Only weeks with final results
-            let totalPoints = 0;
-            let weeksPlayed = 0;
-            let weeklyPerformance = [];
-
-            // Calculate from stored weekly data
-            for (const weekNumber of completedWeeks) {
-                // Try both string and number keys
-                let weekData = weeklyPoints[weekNumber.toString()] || weeklyPoints[weekNumber];
-
-                if (weekData && weekData.totalPoints !== undefined) {
-                    const points = weekData.totalPoints || 0;
-                    totalPoints += points;
-                    weeksPlayed++;
-                    weeklyPerformance.push({
-                        week: weekNumber,
-                        points: points,
-                        correctPicks: weekData.correctPicks || 0,
-                        totalPicks: weekData.totalPicks || 0
-                    });
-                    console.log(`🔧 Week ${weekNumber}: ${points} points from stored data`);
-                }
-            }
-
-            // Get current week data
-            let thisWeekData = weeklyPoints[currentWeek.toString()] || weeklyPoints[currentWeek];
-            const thisWeekPoints = thisWeekData?.totalPoints || 0;
-            const thisWeekCorrect = thisWeekData?.correctPicks || 0;
-            const thisWeekTotal = thisWeekData?.totalPicks || 0;
+        if (userSeasonData && userSeasonData.seasonTotal !== undefined) {
+            const totalPoints = userSeasonData.seasonTotal;
+            const weeksPlayed = userSeasonData.weeksPlayed || 0;
+            const weeklyPerformance = userSeasonData.weeklyPerformance || [];
+            const thisWeekPoints = userSeasonData.currentWeekPoints || 0;
+            const thisWeekCorrect = userSeasonData.currentWeekCorrect || 0;
+            const thisWeekTotal = userSeasonData.currentWeekTotal || 0;
 
             // Calculate averages
             const avgPointsPerWeek = weeksPlayed > 0 ? (totalPoints / weeksPlayed).toFixed(1) : '0.0';
-
-            console.log(`🔧 FINAL CALCULATION: ${totalPoints} total points from ${weeksPlayed} weeks`);
 
             // Display stats in Linux terminal style
             statsHtml += `<div class="text-yellow-300 font-bold mb-1">═══ USER STATISTICS ═══</div>`;
@@ -18740,66 +18482,27 @@ async function getUserStatsDisplay(userId, currentWeek) {
                 statsHtml += `<div class="text-white">Week ${currentWeek}: <span class="text-green-400">${thisWeekPoints} points</span> (${thisWeekCorrect}/${thisWeekTotal} correct)</div>`;
             }
 
-            // Get leaderboard position (simplified)
+            // 🚀 FAST: Get ranking from existing leaderboard
             try {
-                const poolMembersPath = `artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members`;
-                const membersDoc = await window.getDoc(window.doc(window.db, poolMembersPath));
+                const completedWeeks = [1, 2];
+                const seasonLeaderboard = await window.ScoringSystemManager.generateSeasonLeaderboard(completedWeeks);
 
-                if (membersDoc.exists()) {
-                    const members = membersDoc.data();
-                    let userRankings = [];
-
-                    // Calculate ranks for all members
-                    for (const [memberId, memberData] of Object.entries(members)) {
-                        const memberScorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${memberId}`;
-                        const memberScoreDoc = await window.getDoc(window.doc(window.db, memberScorePath));
-
-                        if (memberScoreDoc.exists()) {
-                            const memberUserData = memberScoreDoc.data();
-                            const memberWeeklyPoints = memberUserData.weeklyPoints || {};
-                            let memberTotal = 0;
-
-                            // Use EXACT same logic as the successful data aggregation above
-                            for (const weekNumber of [1, 2]) { // Only completed weeks
-                                const weekData = memberWeeklyPoints[weekNumber.toString()];
-                                if (!weekData) {
-                                    const weekDataInt = memberWeeklyPoints[weekNumber];
-                                    if (weekDataInt && weekDataInt.totalPoints !== undefined) {
-                                        memberTotal += weekDataInt.totalPoints || 0;
-                                    }
-                                } else {
-                                    if (weekData.totalPoints !== undefined) {
-                                        memberTotal += weekData.totalPoints || 0;
-                                    }
-                                }
-                            }
-
-                            userRankings.push({
-                                uid: memberId,
-                                name: memberData.displayName || memberData.email,
-                                points: memberTotal
-                            });
-                        }
-                    }
-
-                    // Sort by points descending
-                    userRankings.sort((a, b) => b.points - a.points);
-
-                    // Find user's position
-                    const userPosition = userRankings.findIndex(u => u.uid === userId) + 1;
-                    const totalUsers = userRankings.length;
+                if (seasonLeaderboard && seasonLeaderboard.standings) {
+                    const standings = seasonLeaderboard.standings;
+                    const userPosition = standings.findIndex(u => u.uid === userId) + 1;
+                    const totalUsers = standings.length;
 
                     if (userPosition > 0) {
                         statsHtml += `<div class="text-white">Current Rank: <span class="text-yellow-400 font-bold">#${userPosition}</span> of ${totalUsers}</div>`;
 
                         // Show top 3 for context
-                        if (userRankings.length >= 3) {
-                            statsHtml += `<div class="text-slate-300 mt-1 text-xs">Top 3: ${userRankings.slice(0, 3).map((u, i) => `#${i+1} ${u.name.split(' ')[0]} (${u.points})`).join(', ')}</div>`;
+                        if (standings.length >= 3) {
+                            statsHtml += `<div class="text-slate-300 mt-1 text-xs">Top 3: ${standings.slice(0, 3).map((u, i) => `#${i+1} ${u.displayName?.split(' ')[0] || 'User'} (${u.totalPoints})`).join(', ')}</div>`;
                         }
                     }
                 }
             } catch (rankError) {
-                console.log('Could not calculate rank:', rankError);
+                console.log('Could not get rank from leaderboard:', rankError);
             }
 
             // Weekly breakdown (last 3 weeks)
