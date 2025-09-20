@@ -82,7 +82,7 @@ class EspnNerdApi {
     // Get current NFL week
     getCurrentWeek() {
         const now = new Date();
-        const seasonStart = new Date('2024-09-05'); // 2024 NFL Season started Sept 5
+        const seasonStart = new Date('2025-09-04'); // 2025 NFL Season starts Sept 4
         const weekMs = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
         
         if (now < seasonStart) return 1;
@@ -142,20 +142,24 @@ class EspnNerdApi {
         const venue = competition?.venue;
         const status = competition?.status?.type?.name || 'STATUS_SCHEDULED';
         const isCompleted = status === 'STATUS_FINAL';
-        const homeScore = homeCompetitor?.score || '0';
-        const awayScore = awayCompetitor?.score || '0';
+        const homeScore = parseInt(homeCompetitor?.score || '0', 10);
+        const awayScore = parseInt(awayCompetitor?.score || '0', 10);
         
-        // Calculate winner
+        // Calculate winner with validation
         let winner = 'TBD';
         if (isCompleted) {
-            const homeScoreNum = parseInt(homeScore);
-            const awayScoreNum = parseInt(awayScore);
-            if (homeScoreNum > awayScoreNum) {
-                winner = homeTeam;
-            } else if (awayScoreNum > homeScoreNum) {
-                winner = awayTeam;
+            // homeScore and awayScore are already numbers from parseInt above
+            if (!isNaN(homeScore) && !isNaN(awayScore)) {
+                if (homeScore > awayScore) {
+                    winner = homeTeam;
+                } else if (awayScore > homeScore) {
+                    winner = awayTeam;
+                } else {
+                    winner = 'TIE';
+                }
             } else {
-                winner = 'TIE';
+                console.warn(`Invalid scores for game ${espnGame.id}: home=${homeScore}, away=${awayScore}`);
+                winner = 'TBD';
             }
         }
 
@@ -167,10 +171,15 @@ class EspnNerdApi {
             name: espnGame.name || `${awayTeam} at ${homeTeam}`,
             shortName: espnGame.shortName || `${awayTeam} @ ${homeTeam}`,
             
-            // Teams and scores
+            // Teams and scores - FRONTEND COMPATIBLE FORMAT
+            away_team: awayTeam,
+            home_team: homeTeam,
+            dt: espnGame.date, // ESPN timestamp (Eastern Time with Z suffix - needs parsing)
+            home_score: homeScore,
+            away_score: awayScore,
+            // Legacy format for backward compatibility
             a: awayTeam,
             h: homeTeam,
-            dt: espnGame.date, // ESPN timestamp (Eastern Time with Z suffix - needs parsing)
             homeScore: homeScore,
             awayScore: awayScore,
             winner: winner,
@@ -326,7 +335,7 @@ class EspnNerdApi {
 
     // Get date range for a specific NFL week
     getWeekDates(week) {
-        const seasonStart = new Date('2024-09-05'); // First Thursday of 2024 season
+        const seasonStart = new Date('2025-09-04'); // First Thursday of 2025 season
         const weekOffset = (week - 1) * 7;
         const weekStart = new Date(seasonStart.getTime() + (weekOffset * 24 * 60 * 60 * 1000));
         
