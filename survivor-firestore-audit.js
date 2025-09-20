@@ -119,7 +119,16 @@ async function comprehensiveAudit() {
     // Step 1: Load game results for completed weeks
     console.log('\n1️⃣ LOADING GAME RESULTS...');
     const allWeekWinners = {};
-    for (let week = 1; week <= 2; week++) {
+    // Calculate current week dynamically
+    const getCurrentWeek = () => {
+      const now = new Date();
+      const seasonStart = new Date('2025-09-04');
+      const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+      return Math.min(Math.max(Math.floor(daysSinceStart / 7) + 1, 1), 18);
+    };
+
+    const currentWeek = getCurrentWeek();
+    for (let week = 1; week <= currentWeek; week++) {
       allWeekWinners[week] = await getWeekWinners(week);
       console.log(`   Week ${week}: ${allWeekWinners[week].length} winning teams`);
       console.log(`      Winners: ${allWeekWinners[week].join(', ')}`);
@@ -326,7 +335,7 @@ async function comprehensiveAudit() {
 
     // Step 6: Detailed game results verification
     console.log(`\n🏈 GAME RESULTS VERIFICATION:`);
-    for (let week = 1; week <= 2; week++) {
+    for (let week = 1; week <= currentWeek; week++) {
       console.log(`\n   Week ${week} Winners (${allWeekWinners[week].length} teams):`);
       allWeekWinners[week].forEach(winner => {
         console.log(`      ✅ ${winner}`);

@@ -36,7 +36,7 @@ window.espnWinnerSync = {
             }
 
             // Skip if ESPN is returning cached data from a different week
-            if (espnData.week && espnData.week !== week && week > 2) {
+            if (espnData.week && espnData.week !== week && week > 18) {
                 console.log(`⚠️ ESPN returned Week ${espnData.week} data when requesting Week ${week} - skipping`);
                 return { success: true, synced: 0, updates: {} };
             }

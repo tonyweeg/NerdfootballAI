@@ -504,6 +504,115 @@ class EspnNerdApi {
             throw error;
         }
     }
+
+    // 🚀 LIVE GAME DETAILS - For DOPE Game Modal System
+    async fetchLiveGameDetails(espnEventId) {
+        try {
+            const endpoint = `/summary?event=${espnEventId}`;
+            const data = await this.makeRequest(endpoint);
+
+            if (!data || !data.header) {
+                throw new Error(`No game details found for event ${espnEventId}`);
+            }
+
+            return this.transformLiveGameData(data);
+
+        } catch (error) {
+            console.error(`Error fetching live game details for ${espnEventId}:`, error);
+            throw error;
+        }
+    }
+
+    // Transform ESPN summary data into DOPE live game format
+    transformLiveGameData(espnSummary) {
+        const header = espnSummary.header;
+        const gameInfo = header.competitions?.[0];
+        const homeTeam = gameInfo?.competitors?.find(c => c.homeAway === 'home');
+        const awayTeam = gameInfo?.competitors?.find(c => c.homeAway === 'away');
+
+        const gameData = {
+            // Basic game info
+            id: header.id,
+            espnId: header.id,
+            status: gameInfo?.status?.type?.name || 'STATUS_SCHEDULED',
+            statusDisplay: gameInfo?.status?.type?.shortDetail || 'Scheduled',
+
+            // Teams and scores
+            teams: {
+                home: {
+                    name: homeTeam?.team?.displayName || 'Home Team',
+                    abbreviation: homeTeam?.team?.abbreviation || 'HOME',
+                    color: homeTeam?.team?.color || 'fb4f14',
+                    score: parseInt(homeTeam?.score || '0'),
+                    record: homeTeam?.records?.[0]?.summary || '0-0'
+                },
+                away: {
+                    name: awayTeam?.team?.displayName || 'Away Team',
+                    abbreviation: awayTeam?.team?.abbreviation || 'AWAY',
+                    color: awayTeam?.team?.color || '007487',
+                    score: parseInt(awayTeam?.score || '0'),
+                    record: awayTeam?.records?.[0]?.summary || '0-0'
+                }
+            },
+
+            // Team statistics (if available)
+            teamStats: this.extractTeamStats(espnSummary),
+
+            // Venue and other details
+            venue: {
+                name: gameInfo?.venue?.fullName || 'Unknown',
+                indoor: gameInfo?.venue?.indoor || false
+            },
+
+            // Timestamps
+            lastUpdated: new Date().toISOString()
+        };
+
+        return this.sanitizeForFirestore(gameData);
+    }
+
+    // Extract team statistics from ESPN summary
+    extractTeamStats(espnSummary) {
+        const boxScore = espnSummary.boxscore;
+        if (!boxScore || !boxScore.teams) {
+            return { home: {}, away: {} };
+        }
+
+        const homeStats = {};
+        const awayStats = {};
+
+        // Parse team stats from boxscore
+        boxScore.teams.forEach(team => {
+            const isHome = team.homeAway === 'home';
+            const statsObj = isHome ? homeStats : awayStats;
+
+            if (team.statistics) {
+                team.statistics.forEach(stat => {
+                    const key = stat.name?.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '') || 'unknown';
+                    statsObj[key] = stat.displayValue || stat.value || '0';
+                });
+            }
+        });
+
+        return { home: homeStats, away: awayStats };
+    }
+
+    // Helper function to remove undefined values (Firestore doesn't allow them)
+    sanitizeForFirestore(obj) {
+        if (obj === null || obj === undefined) return null;
+        if (typeof obj !== 'object') return obj;
+        if (Array.isArray(obj)) {
+            return obj.map(item => this.sanitizeForFirestore(item)).filter(item => item !== undefined);
+        }
+
+        const sanitized = {};
+        for (const [key, value] of Object.entries(obj)) {
+            if (value !== undefined) {
+                sanitized[key] = this.sanitizeForFirestore(value);
+            }
+        }
+        return sanitized;
+    }
 }
 
 // Firebase Cloud Functions
@@ -676,6 +785,8 @@ exports.espnApiStatus = functions.https.onCall(async (data, context) => {
         return { success: false, error: error.message };
     }
 });*/
+
+// REMOVED: Insecure public function - using local mock data instead
 
 // Export class for direct usage
 module.exports.EspnNerdApi = EspnNerdApi;

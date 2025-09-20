@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏈 MODAiL THE NERD - Live Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-slate-800 mb-6">🏈 MODAiL THE NERD - Live Test</h1>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">🧪 API Test</h2>
+            <button onclick="testAPI()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Test ESPN API
+            </button>
+            <div id="api-result" class="mt-4 p-4 bg-slate-50 rounded border hidden">
+                <!-- API results will appear here -->
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">🎯 Quick Modal Test</h2>
+            <button onclick="window.open('/modal-system.html', '_blank')" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                Open Full Modal System
+            </button>
+        </div>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('api-result');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = '<div class="text-blue-600">Testing ESPN API...</div>';
+
+            try {
+                const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/testLiveGameDetails', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ espnEventId: '401772725' })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div class="text-green-600 font-semibold mb-2">✅ API Success!</div>
+                        <div class="text-sm text-slate-600">
+                            <strong>Game:</strong> ${result.data?.teams?.away?.name || 'Away'} @ ${result.data?.teams?.home?.name || 'Home'}<br>
+                            <strong>Status:</strong> ${result.data?.statusDisplay || 'Unknown'}<br>
+                            <strong>Score:</strong> ${result.data?.teams?.away?.score || 0} - ${result.data?.teams?.home?.score || 0}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="text-red-600">❌ API Error: ${result.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="text-red-600">❌ Connection Error: ${error.message}</div>`;
+            }
+        }
+
+        console.log('🚀 MODAiL THE NERD Live Test Ready!');
+        console.log('📍 Current URL:', window.location.href);
+    </script>
+</body>
+</html>

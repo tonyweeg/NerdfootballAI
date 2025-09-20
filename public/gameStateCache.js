@@ -34,10 +34,31 @@ class GameStateCache {
         // Handle both raw JSON format (dt) and processed format (kickoff)
         const gameTime = game.kickoff || game.dt;
 
-        // 🔧 CRITICAL FIX: Use Eastern Time Parser for accurate game times
-        const kickoff = window.easternTimeParser ?
-            window.easternTimeParser.parseESPNTimestamp(gameTime) :
-            new Date(gameTime);
+        // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+        let kickoff;
+        if (window.easternTimeParser) {
+            kickoff = window.easternTimeParser.parseESPNTimestamp(gameTime);
+        } else {
+            // ESPN USES EST AS ZULU! "Z" = Eastern Time, NOT UTC!
+            // ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (ESPN's "Zulu" = Eastern)
+            const cleanTime = gameTime.replace('Z', '');
+            const easternTime = new Date(cleanTime);
+            const year = easternTime.getFullYear();
+            const month = easternTime.getMonth();
+            const day = easternTime.getDate();
+            const hours = easternTime.getHours();
+            const minutes = easternTime.getMinutes();
+            const seconds = easternTime.getSeconds();
+
+            // Determine DST: Sept 18 is EDT (UTC-4)
+            const gameDate = new Date(year, month, day);
+            const isDST = gameDate >= new Date(year, 2, 9) && gameDate < new Date(year, 10, 2);
+            const offsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+
+            kickoff = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+
+            console.log(`⏰ GameState ESPN ZULU=EST: ${gameTime} = ${hours}:${String(minutes).padStart(2,'0')} EASTERN → UTC ${kickoff.toISOString()}`);
+        }
 
         if (now < kickoff) {
             return 'PRE_GAME';

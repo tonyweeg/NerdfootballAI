@@ -5,6 +5,9 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
+// For scheduled functions (Firebase Functions v2 style)
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+
 // Initialize Firebase Admin
 admin.initializeApp();
 
@@ -820,13 +823,152 @@ Reply to: tonyweeg@gmail.com`;
     }
 });
 
+// Import and export ML Prediction Manager functions
+const {
+    processGameOutcomes,
+    recordPredictionOutcome,
+    getMLPerformanceStats
+} = require('./mlPredictionManager');
+
+exports.processGameOutcomes = processGameOutcomes;
+exports.recordPredictionOutcome = recordPredictionOutcome;
+exports.getMLPerformanceStats = getMLPerformanceStats;
+
+// SURVIVOR AUTO-UPDATE SYSTEM
+const { processSurvivorUpdatesForCompletedGames } = require('./survivorAutoUpdate');
+exports.processSurvivorUpdatesForCompletedGames = processSurvivorUpdatesForCompletedGames;
+
 // TODO: PHAROAH'S REAL-TIME SYNC functions - temporarily disabled for testing
-// Will be enabled once client-side integration is verified
-// const {
-//     syncGameScores,
-//     syncLeaderboard,
-//     testRealTimeSync
-// } = require('./realtimeGameSync');
-// exports.syncGameScores = syncGameScores;
-// exports.syncLeaderboard = syncLeaderboard;
-// exports.testRealTimeSync = testRealTimeSync;
+// TESTING: Temporarily enabled for real-time sync testing
+const {
+    syncGameScores,
+    syncLeaderboard,
+    testRealTimeSync
+} = require('./realtimeGameSync');
+exports.syncGameScores = syncGameScores;
+exports.syncLeaderboard = syncLeaderboard;
+exports.testRealTimeSync = testRealTimeSync;
+
+// ============================================
+// 🤖 AUTOMATED GAME COMPLETION SYSTEM
+// Runs every 5 minutes during NFL game days
+// ============================================
+
+/**
+ * 🚀 AUTOMATED GAME COMPLETION ORCHESTRATOR
+ * Scheduled function that automatically:
+ * 1. Syncs scores from ESPN (detects FINAL games)
+ * 2. Eliminates survivor pool users
+ * 3. Updates leaderboards
+ * 4. Only runs during NFL game days (Thu-Mon, Sept-Feb)
+ */
+exports.autoGameCompletion = onSchedule('every 5 minutes', async (event) => {
+    console.log('🤖 AUTO GAME COMPLETION: Starting automated check...');
+
+    try {
+        // Check if we should run (NFL season and game day)
+        if (!isNFLGameDay()) {
+            console.log('📅 Not an NFL game day - skipping automation');
+            return null;
+        }
+
+        console.log('🏈 NFL game day detected - running automation...');
+
+        const results = {
+            timestamp: new Date().toISOString(),
+            syncResults: null,
+            survivorResults: null,
+            leaderboardResults: null,
+            errors: []
+        };
+
+        // Step 1: Sync game scores from ESPN (this detects FINAL games)
+        try {
+            console.log('⚡ Step 1: Syncing game scores from ESPN...');
+            const syncResponse = await fetch(`https://us-central1-nerdfootball.cloudfunctions.net/syncGameScores`);
+            const syncData = await syncResponse.json();
+            results.syncResults = syncData;
+
+            if (syncData.success && syncData.significantUpdates > 0) {
+                console.log(`✅ Found ${syncData.significantUpdates} game updates - proceeding with survivor/leaderboard updates`);
+
+                // Step 2: Process survivor eliminations for completed games
+                try {
+                    console.log('💀 Step 2: Processing survivor eliminations...');
+                    const survivorResponse = await fetch(`https://us-central1-nerdfootball.cloudfunctions.net/processSurvivorUpdatesForCompletedGames`);
+                    const survivorData = await survivorResponse.json();
+                    results.survivorResults = survivorData;
+                    console.log(`✅ Survivor processing: ${survivorData.usersEliminated || 0} eliminated, ${survivorData.usersAdvanced || 0} advanced`);
+                } catch (survivorError) {
+                    console.error('❌ Survivor processing failed:', survivorError);
+                    results.errors.push(`Survivor: ${survivorError.message}`);
+                }
+
+                // Step 3: Update leaderboards
+                try {
+                    console.log('🏆 Step 3: Updating leaderboards...');
+                    const leaderboardResponse = await fetch(`https://us-central1-nerdfootball.cloudfunctions.net/syncLeaderboard`);
+                    const leaderboardData = await leaderboardResponse.json();
+                    results.leaderboardResults = leaderboardData;
+                    console.log('✅ Leaderboard sync completed');
+                } catch (leaderboardError) {
+                    console.error('❌ Leaderboard sync failed:', leaderboardError);
+                    results.errors.push(`Leaderboard: ${leaderboardError.message}`);
+                }
+
+            } else {
+                console.log('📊 No significant game updates - skipping survivor/leaderboard updates');
+            }
+
+        } catch (syncError) {
+            console.error('❌ ESPN sync failed:', syncError);
+            results.errors.push(`ESPN Sync: ${syncError.message}`);
+        }
+
+        // Log final results
+        console.log('🤖 AUTO GAME COMPLETION: Results summary:');
+        console.log(`   📊 Games synced: ${results.syncResults?.gamesSync || 0}`);
+        console.log(`   🔄 Significant updates: ${results.syncResults?.significantUpdates || 0}`);
+        console.log(`   💀 Users eliminated: ${results.survivorResults?.usersEliminated || 0}`);
+        console.log(`   ✅ Users advanced: ${results.survivorResults?.usersAdvanced || 0}`);
+        console.log(`   ❌ Errors: ${results.errors.length}`);
+
+        if (results.errors.length > 0) {
+            console.error('⚠️  Automation completed with errors:', results.errors);
+        } else {
+            console.log('✅ Automation completed successfully');
+        }
+
+        return results;
+
+    } catch (error) {
+        console.error('💥 CRITICAL: Auto game completion failed:', error);
+        return { error: error.message, timestamp: new Date().toISOString() };
+    }
+});
+
+/**
+ * Helper function to determine if today is an NFL game day
+ * Games typically run Thu-Mon during NFL season (Sept-Feb)
+ */
+function isNFLGameDay() {
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-12
+    const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+
+    // NFL season months: September (9) through February (2)
+    const isNFLSeason = month >= 9 || month <= 2;
+
+    // NFL game days: Thursday (4) through Monday (1)
+    // Sunday (0), Monday (1), Thursday (4), Friday (5), Saturday (6)
+    const isGameDay = dayOfWeek === 0 || dayOfWeek === 1 || dayOfWeek >= 4;
+
+    const result = isNFLSeason && isGameDay;
+
+    console.log(`📅 NFL Game Day Check: Month=${month}, Day=${dayOfWeek}, Season=${isNFLSeason}, GameDay=${isGameDay}, Result=${result}`);
+
+    return result;
+}
+
+// Export helper for testing
+exports.isNFLGameDay = isNFLGameDay;

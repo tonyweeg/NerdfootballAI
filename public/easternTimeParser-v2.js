@@ -1,9 +1,9 @@
 /**
- * Fixed Eastern Time Parser - Handles both correct UTC and Eastern Time formats
+ * Fixed Eastern Time Parser - ESPN uses EST as their "Zulu" reference
  *
- * PROBLEM SOLVED: ESPN data can be in different formats:
- * - Correct UTC: "2025-09-14T17:00:00Z" (1PM Eastern = 5PM UTC)
- * - Eastern Time: "2025-09-14T13:00:00Z" (1PM Eastern mislabeled as UTC)
+ * CRITICAL UNDERSTANDING: ESPN timestamps with "Z" mean EASTERN TIME!
+ * - ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (not UTC)
+ * - ESPN uses EST as their "Zulu" time reference, not true UTC
  */
 
 class EasternTimeParserV2 {
@@ -70,8 +70,9 @@ class EasternTimeParserV2 {
             const isDST = this.isDST(year, month, day);
             const offset = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
 
-            // Create UTC time by adding offset hours
-            const utcDate = new Date(year, month, day, hours + offset, minutes, seconds);
+            // FIXED: Create Eastern Time date, then convert to UTC properly
+            // Method 1: Use UTC constructor to create the proper UTC time
+            const utcDate = new Date(Date.UTC(year, month, day, hours + offset, minutes, seconds));
 
             console.log(`⏰ Eastern→UTC: ${easternTimestamp} (${isDST ? 'EDT' : 'EST'}) → ${utcDate.toISOString()}`);
             return utcDate;
@@ -94,12 +95,68 @@ class EasternTimeParserV2 {
     }
 
     /**
+     * Check if a game has started (properly handles Eastern Time)
+     * @param {string} espnTimestamp
+     * @returns {boolean}
+     */
+    hasGameStarted(espnTimestamp) {
+        try {
+            const gameTimeUTC = this.parseESPNTimestamp(espnTimestamp);
+            const nowUTC = new Date();
+            return nowUTC >= gameTimeUTC;
+        } catch (error) {
+            console.error('Error checking if game started:', error);
+            return true; // Assume started to be safe
+        }
+    }
+
+    /**
+     * Format game time for display (Eastern Time)
+     * @param {string} espnTimestamp
+     * @returns {string} Human-readable Eastern Time
+     */
+    formatGameTime(espnTimestamp) {
+        try {
+            const gameTimeUTC = this.parseESPNTimestamp(espnTimestamp);
+            return gameTimeUTC.toLocaleString('en-US', {
+                timeZone: 'America/New_York',
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                timeZoneName: 'short'
+            });
+        } catch (error) {
+            console.error('Error formatting game time:', error);
+            return espnTimestamp;
+        }
+    }
+
+    /**
+     * Get time until game starts (in milliseconds)
+     * @param {string} espnTimestamp
+     * @returns {number} Milliseconds until game starts (negative if started)
+     */
+    getTimeUntilGameStart(espnTimestamp) {
+        try {
+            const gameTimeUTC = this.parseESPNTimestamp(espnTimestamp);
+            const nowUTC = new Date();
+            return gameTimeUTC.getTime() - nowUTC.getTime();
+        } catch (error) {
+            console.error('Error calculating time until game:', error);
+            return -1; // Assume started
+        }
+    }
+
+    /**
      * Run diagnostics to test the parser
      */
     runDiagnostics() {
         console.log('🔍 ESPN Time Parser Diagnostics:');
 
         const testCases = [
+            '2025-09-19T00:15:00Z', // Tonight's 8:15 PM Eastern game (Sept 18, 2025)
             '2025-09-14T17:00:00Z', // Correct UTC for 1PM Eastern
             '2025-09-14T13:00:00Z', // Eastern mislabeled as UTC
             '2025-09-14T20:20:00Z', // Evening game
@@ -107,8 +164,11 @@ class EasternTimeParserV2 {
 
         testCases.forEach(timestamp => {
             const parsed = this.parseESPNTimestamp(timestamp);
-            const easternTime = parsed.toLocaleString('en-US', { timeZone: 'America/New_York' });
-            console.log(`Test: ${timestamp} → ${parsed.toISOString()} (${easternTime} Eastern)`);
+            const easternTime = this.formatGameTime(timestamp);
+            const hasStarted = this.hasGameStarted(timestamp);
+            console.log(`Test: ${timestamp} → ${parsed.toISOString()}`);
+            console.log(`  Display: ${easternTime}`);
+            console.log(`  Has Started: ${hasStarted}`);
         });
     }
 }

@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏈 MODAiL THE NERD - Real Active Picks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+        // Suppress Tailwind production warning for development
+        if (typeof console !== 'undefined') {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                if (args[0] && args[0].includes && args[0].includes('cdn.tailwindcss.com should not be used in production')) {
+                    return; // Suppress this specific warning
+                }
+                originalWarn.apply(console, args);
+            };
+        }
+    </script>
+
+    <!-- 🔥 Firebase Integration for ML Prediction System -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b border-slate-200">
+        <div class="max-w-6xl mx-auto px-4 py-6">
+            <h1 class="text-4xl font-bold text-slate-800">🏈 MODAiL THE NERD</h1>
+            <p class="text-slate-600 mt-2">YOUR ACTIVE PICKS - Week 3 with REAL Games & Modal Integration</p>
+            <div class="mt-4 text-sm bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                <strong>📊 Data:</strong> Real Week 3 NFL games | <strong>🎯 Picks:</strong> Mock user picks | <strong>🚀 Port:</strong> localhost:5003
+            </div>
+        </div>
+    </div>
+
+    <!-- Your Active Picks Section (Matching real app style) -->
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <div class="bg-white p-6 rounded-lg shadow-md border border-slate-200">
+            <!-- Header matching real app -->
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-semibold text-slate-700">Your Active Picks</h3>
+                <div class="text-sm text-slate-500">Week 3 • 2025 Season</div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="picks-loading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="text-slate-600 mt-2">Loading your picks...</p>
+            </div>
+
+            <!-- Active Picks Grid (Matching real app structure) -->
+            <div id="active-picks-list" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Real picks will be rendered here -->
+            </div>
+
+            <!-- No Picks Message -->
+            <div id="no-picks-message" class="hidden text-center py-8 text-slate-500">
+                <p>No picks made yet for Week 3</p>
+            </div>
+        </div>
+
+        <!-- Modal Integration Info -->
+        <div class="mt-8 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="text-xl font-bold text-blue-800 mb-4">🎯 Real Game Integration</h3>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="font-semibold text-blue-700 mb-2">📊 Real Data Sources:</h4>
+                    <ul class="text-sm text-blue-600 space-y-1">
+                        <li>• Week 3 NFL schedule (16 games)</li>
+                        <li>• Real team names and matchups</li>
+                        <li>• Actual kickoff times</li>
+                        <li>• Stadium information</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-blue-700 mb-2">🎯 Your Picks Features:</h4>
+                    <ul class="text-sm text-blue-600 space-y-1">
+                        <li>• Click any pick card for AI analysis</li>
+                        <li>• Confidence values displayed</li>
+                        <li>• Game status indicators</li>
+                        <li>• Team logos and styling</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Game Modal -->
+    <div id="live-game-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-6 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-purple-50">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">🏈 Game Analysis</h2>
+                    <p class="text-slate-600 text-sm mt-1">AI insights for your Week 3 pick</p>
+                </div>
+                <button onclick="closeLiveGameModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="modal-loading" class="flex items-center justify-center p-16">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto"></div>
+                    <p class="text-slate-600 mt-6 text-lg font-medium">Analyzing game data...</p>
+                    <p class="text-slate-500 text-sm mt-2">Loading AI predictions for your pick</p>
+                </div>
+            </div>
+
+            <!-- Modal Content -->
+            <div id="modal-game-content" class="hidden">
+                <div id="game-data-display" class="p-6">
+                    <!-- Game data will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🚀 MODAiL THE NERD - Real Active Picks System');
+
+        // 🔥 FIREBASE CONFIGURATION & INITIALIZATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        // Initialize Firebase
+        if (!window.firebase?.apps?.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // Global variables for user and pool context
+        let currentUser = null;
+        let currentPoolId = 'nerduniverse-2025'; // Default pool
+
+        // 🚀 WAIT FOR FIREBASE AUTH INITIALIZATION
+        async function waitForFirebaseAuth() {
+            return new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    currentUser = user;
+                    console.log('🔐 Firebase Auth Ready:', user ? `User: ${user.uid}` : 'No user');
+                    resolve(user);
+                });
+
+                // Timeout after 5 seconds
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve(null);
+                }, 5000);
+            });
+        }
+
+        // NFL Team Logos (same as main app)
+        const nflTeamLogos = {
+            'ARI': 'https://a.espncdn.com/i/teamlogos/nfl/500/ari.png',
+            'ATL': 'https://a.espncdn.com/i/teamlogos/nfl/500/atl.png',
+            'BAL': 'https://a.espncdn.com/i/teamlogos/nfl/500/bal.png',
+            'BUF': 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png',
+            'CAR': 'https://a.espncdn.com/i/teamlogos/nfl/500/car.png',
+            'CHI': 'https://a.espncdn.com/i/teamlogos/nfl/500/chi.png',
+            'CIN': 'https://a.espncdn.com/i/teamlogos/nfl/500/cin.png',
+            'CLE': 'https://a.espncdn.com/i/teamlogos/nfl/500/cle.png',
+            'DAL': 'https://a.espncdn.com/i/teamlogos/nfl/500/dal.png',
+            'DEN': 'https://a.espncdn.com/i/teamlogos/nfl/500/den.png',
+            'DET': 'https://a.espncdn.com/i/teamlogos/nfl/500/det.png',
+            'GB': 'https://a.espncdn.com/i/teamlogos/nfl/500/gb.png',
+            'HOU': 'https://a.espncdn.com/i/teamlogos/nfl/500/hou.png',
+            'IND': 'https://a.espncdn.com/i/teamlogos/nfl/500/ind.png',
+            'JAX': 'https://a.espncdn.com/i/teamlogos/nfl/500/jax.png',
+            'KC': 'https://a.espncdn.com/i/teamlogos/nfl/500/kc.png',
+            'LV': 'https://a.espncdn.com/i/teamlogos/nfl/500/lv.png',
+            'LAC': 'https://a.espncdn.com/i/teamlogos/nfl/500/lac.png',
+            'LAR': 'https://a.espncdn.com/i/teamlogos/nfl/500/lar.png',
+            'MIA': 'https://a.espncdn.com/i/teamlogos/nfl/500/mia.png',
+            'MIN': 'https://a.espncdn.com/i/teamlogos/nfl/500/min.png',
+            'NE': 'https://a.espncdn.com/i/teamlogos/nfl/500/ne.png',
+            'NO': 'https://a.espncdn.com/i/teamlogos/nfl/500/no.png',
+            'NYG': 'https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png',
+            'NYJ': 'https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png',
+            'PHI': 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png',
+            'PIT': 'https://a.espncdn.com/i/teamlogos/nfl/500/pit.png',
+            'SF': 'https://a.espncdn.com/i/teamlogos/nfl/500/sf.png',
+            'SEA': 'https://a.espncdn.com/i/teamlogos/nfl/500/sea.png',
+            'TB': 'https://a.espncdn.com/i/teamlogos/nfl/500/tb.png',
+            'TEN': 'https://a.espncdn.com/i/teamlogos/nfl/500/ten.png',
+            'WAS': 'https://a.espncdn.com/i/teamlogos/nfl/500/was.png'
+        };
+
+        // Team name to abbreviation mapping (like main app)
+        const teamNameToAbbr = {
+            'Arizona Cardinals': 'ARI', 'Atlanta Falcons': 'ATL', 'Baltimore Ravens': 'BAL',
+            'Buffalo Bills': 'BUF', 'Carolina Panthers': 'CAR', 'Chicago Bears': 'CHI',
+            'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Dallas Cowboys': 'DAL',
+            'Denver Broncos': 'DEN', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB',
+            'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX',
+            'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+            'Los Angeles Rams': 'LAR', 'Miami Dolphins': 'MIA', 'Minnesota Vikings': 'MIN',
+            'New England Patriots': 'NE', 'New Orleans Saints': 'NO', 'New York Giants': 'NYG',
+            'New York Jets': 'NYJ', 'Philadelphia Eagles': 'PHI', 'Pittsburgh Steelers': 'PIT',
+            'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA', 'Tampa Bay Buccaneers': 'TB',
+            'Tennessee Titans': 'TEN', 'Washington Commanders': 'WAS'
+        };
+
+        // 🚨 ESPN TIMEZONE FIX: ESPN uses "Z" to mean Eastern Time, NOT UTC!
+        function convertESPNTimeToEastern(espnTimestamp) {
+            // ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (not UTC!)
+            const cleanTime = espnTimestamp.replace('Z', ''); // Remove misleading Z
+            const tempDate = new Date(cleanTime); // Treat as Eastern
+
+            // Determine if DST is in effect (March 9 - November 2 for 2025)
+            const year = tempDate.getFullYear();
+            const isDST = (tempDate >= new Date(year, 2, 9) && tempDate <= new Date(year, 10, 2));
+            const offsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+
+            // Convert to proper UTC representation
+            const gameTime = new Date(Date.UTC(
+                tempDate.getFullYear(),
+                tempDate.getMonth(),
+                tempDate.getDate(),
+                tempDate.getHours() + offsetHours,
+                tempDate.getMinutes(),
+                tempDate.getSeconds()
+            ));
+
+            return gameTime;
+        }
+
+        // Mock user picks for Week 3 games (realistic confidence distribution)
+        const MOCK_USER_PICKS = {
+            301: { winner: "Buffalo Bills", confidence: 15 },           // MIA @ BUF - Highest confidence
+            302: { winner: "Atlanta Falcons", confidence: 12 },        // ATL @ CAR
+            303: { winner: "Green Bay Packers", confidence: 14 },      // GB @ CLE
+            304: { winner: "Houston Texans", confidence: 8 },          // HOU @ JAX
+            305: { winner: "Minnesota Vikings", confidence: 11 },      // CIN @ MIN
+            306: { winner: "Pittsburgh Steelers", confidence: 9 },     // PIT @ NE
+            307: { winner: "Philadelphia Eagles", confidence: 13 },    // LAR @ PHI
+            308: { winner: "Tampa Bay Buccaneers", confidence: 6 },    // NYJ @ TB
+            309: { winner: "Indianapolis Colts", confidence: 4 },      // IND @ TEN
+            310: { winner: "Washington Commanders", confidence: 7 },   // LV @ WAS
+            311: { winner: "Los Angeles Chargers", confidence: 10 },   // DEN @ LAC
+            312: { winner: "Seattle Seahawks", confidence: 5 },        // NO @ SEA
+            313: { winner: "Dallas Cowboys", confidence: 3 },          // DAL @ CHI
+            314: { winner: "San Francisco 49ers", confidence: 16 },    // ARI @ SF - Top pick
+            315: { winner: "Kansas City Chiefs", confidence: 2 },      // KC @ NYG
+            316: { winner: "Baltimore Ravens", confidence: 1 }         // DET @ BAL - Lowest confidence
+        };
+
+        let weekGames = [];
+        let activePicks = [];
+
+        // Load real Week 3 games data
+        async function loadWeekGames() {
+            try {
+                console.log('🔥 Loading real Week 3 games...');
+                const response = await fetch('nfl_2025_week_3.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const weekData = await response.json();
+                weekGames = weekData.games;
+                console.log(`✅ Loaded ${weekGames.length} real Week 3 games`);
+                return weekGames;
+            } catch (error) {
+                console.error('❌ Error loading games:', error);
+                return [];
+            }
+        }
+
+        // Generate active picks from user picks and game data
+        function generateActivePicks() {
+            const picks = [];
+
+            weekGames.forEach(game => {
+                const userPick = MOCK_USER_PICKS[game.id];
+                if (userPick) {
+                    // Determine opponent and home/away status
+                    const isHome = userPick.winner === game.h;
+                    const opponent = isHome ? game.a : game.h;
+                    const homeAwayIndicator = isHome ? 'vs' : '@';
+
+                    // Check if game has started (using ESPN timezone fix)
+                    const gameTime = convertESPNTimeToEastern(game.dt);
+                    const now = new Date();
+                    const gameHasStarted = now > gameTime;
+
+                    picks.push({
+                        gameId: game.id,
+                        team: userPick.winner,
+                        confidence: userPick.confidence,
+                        game: game,
+                        opponent: opponent,
+                        homeAwayIndicator: homeAwayIndicator,
+                        gameHasStarted: gameHasStarted,
+                        gameTime: gameTime
+                    });
+                }
+            });
+
+            // Sort by confidence (highest first) - just like real app
+            picks.sort((a, b) => b.confidence - a.confidence);
+            return picks;
+        }
+
+        // Render active picks in the exact style of the main app
+        function renderActivePicks() {
+            const picksList = document.getElementById('active-picks-list');
+            const loading = document.getElementById('picks-loading');
+            const noPicksMessage = document.getElementById('no-picks-message');
+
+            if (activePicks.length === 0) {
+                loading.classList.add('hidden');
+                noPicksMessage.classList.remove('hidden');
+                return;
+            }
+
+            const picksHTML = activePicks.map(pick => {
+                const teamAbbr = teamNameToAbbr[pick.team] || pick.team;
+                const logoUrl = nflTeamLogos[teamAbbr] || '';
+                const opponentAbbr = teamNameToAbbr[pick.opponent] || pick.opponent;
+                const opponentLogoUrl = nflTeamLogos[opponentAbbr] || '';
+
+                // Format game time
+                const timeDisplay = pick.gameTime.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                });
+
+                // Game status styling
+                const statusClass = pick.gameHasStarted ? 'text-green-600' : 'text-slate-600';
+                const statusText = pick.gameHasStarted ? 'LIVE' : 'UPCOMING';
+
+                return `
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                         onclick="openGameModal(${pick.gameId})">
+                        <!-- Confidence Badge -->
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="bg-blue-600 text-white text-sm font-bold rounded-full w-8 h-8 flex items-center justify-center">
+                                ${pick.confidence}
+                            </div>
+                            <div class="text-xs ${statusClass} font-medium">${statusText}</div>
+                        </div>
+
+                        <!-- Team Info -->
+                        <div class="flex items-center space-x-3 mb-3">
+                            ${logoUrl ? `<img src="${logoUrl}" alt="${teamAbbr}" class="w-8 h-8">` : `<div class="w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center text-xs font-bold">${teamAbbr}</div>`}
+                            <div class="flex-1">
+                                <div class="font-semibold text-slate-800">${teamAbbr}</div>
+                                <div class="text-xs text-slate-500">${pick.team}</div>
+                            </div>
+                        </div>
+
+                        <!-- Matchup -->
+                        <div class="flex items-center justify-between text-sm">
+                            <div class="flex items-center space-x-2">
+                                ${opponentLogoUrl ? `<img src="${opponentLogoUrl}" alt="${opponentAbbr}" class="w-5 h-5">` : `<div class="w-5 h-5 bg-slate-300 rounded text-xs flex items-center justify-center">${opponentAbbr}</div>`}
+                                <span class="text-slate-600">${pick.homeAwayIndicator} ${opponentAbbr}</span>
+                            </div>
+                        </div>
+
+                        <!-- Game Time -->
+                        <div class="mt-3 text-xs text-slate-500 border-t border-slate-200 pt-2">
+                            ${timeDisplay}
+                        </div>
+
+                        <!-- Modal Hint -->
+                        <div class="mt-2 text-xs text-blue-600 text-center">
+                            Click for AI Analysis →
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            picksList.innerHTML = picksHTML;
+            loading.classList.add('hidden');
+            picksList.classList.remove('hidden');
+        }
+
+        // Modal functions
+        window.openGameModal = function(gameId) {
+            console.log(`🚀 Opening modal for game ID: ${gameId}`);
+
+            const game = weekGames.find(g => g.id === gameId);
+            const userPick = activePicks.find(p => p.gameId === gameId);
+
+            if (!game || !userPick) {
+                console.error('Game or pick not found');
+                return;
+            }
+
+            const modal = document.getElementById('live-game-modal');
+            const loading = document.getElementById('modal-loading');
+            const content = document.getElementById('modal-game-content');
+            const gameDisplay = document.getElementById('game-data-display');
+
+            modal.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            content.classList.add('hidden');
+
+            // Simulate loading with real data
+            setTimeout(() => {
+                console.log('✅ Displaying game analysis for:', game.a, '@', game.h);
+                gameDisplay.innerHTML = createRealGameAnalysis(game, userPick);
+                loading.classList.add('hidden');
+                content.classList.remove('hidden');
+            }, 1200);
+        };
+
+        window.closeLiveGameModal = function() {
+            document.getElementById('live-game-modal').classList.add('hidden');
+        };
+
+        // Create game analysis with real data
+        function createRealGameAnalysis(game, userPick) {
+            const awayAbbr = teamNameToAbbr[game.a] || game.a;
+            const homeAbbr = teamNameToAbbr[game.h] || game.h;
+            const awayLogo = nflTeamLogos[awayAbbr] || '';
+            const homeLogo = nflTeamLogos[homeAbbr] || '';
+
+            // Game time formatting (using ESPN timezone fix)
+            const gameTime = convertESPNTimeToEastern(game.dt);
+            const timeDisplay = gameTime.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                timeZoneName: 'short'
+            });
+
+            // Mock analysis based on team strength
+            const analysis = generateAnalysisForTeams(game.a, game.h);
+            const prediction = generatePredictionForTeams(game.a, game.h, userPick);
+
+            return `
+                <div class="space-y-6">
+                    <!-- Game Header -->
+                    <div class="text-center bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg p-6 border border-slate-200">
+                        <div class="text-sm font-medium text-slate-600 mb-3">Week 3 • ${timeDisplay}</div>
+                        <div class="flex justify-center items-center space-x-8">
+                            <div class="text-center">
+                                <div class="mb-3">
+                                    ${awayLogo ? `<img src="${awayLogo}" alt="${awayAbbr}" class="w-16 h-16 mx-auto">` : `<div class="w-16 h-16 bg-slate-300 rounded-full mx-auto flex items-center justify-center font-bold">${awayAbbr}</div>`}
+                                </div>
+                                <div class="text-xl font-bold text-slate-800">${awayAbbr}</div>
+                                <div class="text-sm text-slate-500">${game.a}</div>
+                            </div>
+                            <div class="text-slate-400 text-2xl">@</div>
+                            <div class="text-center">
+                                <div class="mb-3">
+                                    ${homeLogo ? `<img src="${homeLogo}" alt="${homeAbbr}" class="w-16 h-16 mx-auto">` : `<div class="w-16 h-16 bg-slate-300 rounded-full mx-auto flex items-center justify-center font-bold">${homeAbbr}</div>`}
+                                </div>
+                                <div class="text-xl font-bold text-slate-800">${homeAbbr}</div>
+                                <div class="text-sm text-slate-500">${game.h}</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-sm text-slate-500">${game.stadium}</div>
+                    </div>
+
+                    <!-- Your Pick Display -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+                            <span class="mr-2">🎯</span>Your Pick
+                        </h3>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center text-lg font-bold">
+                                    ${userPick.confidence}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-blue-800 text-lg">${teamNameToAbbr[userPick.team] || userPick.team}</div>
+                                    <div class="text-blue-600 text-sm">${userPick.team}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-blue-600 font-medium">Confidence Pick</div>
+                                <div class="text-xs text-blue-500">Week 3 Selection</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Analysis -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                            <span class="mr-2">🤖</span>AI Statistical Analysis
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${analysis.map(stat => `
+                                <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                    <div class="text-sm font-semibold text-slate-700 mb-2">${stat.category}</div>
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-slate-600">${awayAbbr}: ${stat.away}</span>
+                                            <span class="text-sm text-slate-600">${homeAbbr}: ${stat.home}</span>
+                                        </div>
+                                        ${stat.advantage ? `
+                                            <div class="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
+                                                ${stat.advantage}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- 🤖 ML WIN PREDICTION v1.0 -->
+                    <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                            <span class="mr-2">🤖</span>ML Win Prediction v${prediction.algorithm || '1.0'}
+                        </h3>
+
+                        <!-- Win Probability Display -->
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-white rounded-lg p-4 border border-blue-200 text-center">
+                                <div class="text-lg font-bold text-blue-700">${awayAbbr}</div>
+                                <div class="text-3xl font-bold text-blue-600 mb-2">
+                                    ${prediction.awayWinProbability || (100 - prediction.confidence)}%
+                                </div>
+                                <div class="text-sm text-blue-500">Win Probability</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 border border-green-200 text-center">
+                                <div class="text-lg font-bold text-green-700">${homeAbbr}</div>
+                                <div class="text-3xl font-bold text-green-600 mb-2">
+                                    ${prediction.homeWinProbability || prediction.confidence}%
+                                </div>
+                                <div class="text-sm text-green-500">Win Probability</div>
+                            </div>
+                        </div>
+
+                        <!-- Predicted Winner -->
+                        <div class="text-center mb-4">
+                            <div class="text-2xl font-bold mb-2 text-green-700">
+                                🏆 Predicted Winner: ${prediction.winner}
+                            </div>
+                            <div class="text-lg font-semibold text-green-600">
+                                ${prediction.confidence}% Confidence
+                            </div>
+                        </div>
+
+                        <!-- Key Factors Summary -->
+                        <div class="bg-white rounded-lg p-4 border border-green-200 mb-4">
+                            <div class="text-sm font-semibold text-green-800 mb-3">🎯 Key Factors Analyzed:</div>
+                            <div class="grid grid-cols-1 gap-2">
+                                ${prediction.factors.slice(0, 4).map(factor => `
+                                    <div class="text-sm text-green-700 bg-green-50 px-3 py-2 rounded border">
+                                        ${factor}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <!-- AI Reasoning -->
+                        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                            <div class="text-sm font-semibold text-slate-800 mb-2">🧠 AI Analysis:</div>
+                            <div class="text-sm text-slate-700 italic">
+                                ${prediction.reasoning}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real Data Source -->
+                    <div class="bg-slate-100 border border-slate-300 rounded-lg p-4 text-center">
+                        <div class="text-sm text-slate-600">
+                            <strong>📊 Game Data:</strong> Real Week 3 NFL schedule |
+                            <strong>🎯 User Pick:</strong> ${userPick.team} (${userPick.confidence} confidence) |
+                            <strong>🔒 Security:</strong> Local testing only
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 🤖 FOUNDATION ML ALGORITHM v1.0 - Built to Evolve!
+        const ML_ALGORITHM_VERSION = "v1.0";
+
+        // Enhanced NFL Team Database - Foundation for ML Learning
+        const nflTeamDatabase = {
+            'Buffalo Bills': {
+                offense: 92, defense: 88, recentForm: 85, homeAdvantage: 3.2,
+                passingOffense: 91, rushingOffense: 78, passingDefense: 85, rushingDefense: 90,
+                turnoverDiff: +8, injuryImpact: 2, coachingRating: 88, clutchFactor: 92
+            },
+            'Kansas City Chiefs': {
+                offense: 95, defense: 82, recentForm: 95, homeAdvantage: 4.1,
+                passingOffense: 98, rushingOffense: 76, passingDefense: 80, rushingDefense: 84,
+                turnoverDiff: +12, injuryImpact: 1, coachingRating: 98, clutchFactor: 99
+            },
+            'San Francisco 49ers': {
+                offense: 88, defense: 92, recentForm: 88, homeAdvantage: 3.8,
+                passingOffense: 86, rushingOffense: 91, passingDefense: 93, rushingDefense: 90,
+                turnoverDiff: +6, injuryImpact: 4, coachingRating: 94, clutchFactor: 87
+            },
+            'Philadelphia Eagles': {
+                offense: 90, defense: 85, recentForm: 82, homeAdvantage: 3.5,
+                passingOffense: 89, rushingOffense: 92, passingDefense: 83, rushingDefense: 87,
+                turnoverDiff: +4, injuryImpact: 3, coachingRating: 86, clutchFactor: 84
+            },
+            'Baltimore Ravens': {
+                offense: 86, defense: 90, recentForm: 80, homeAdvantage: 3.3,
+                passingOffense: 82, rushingOffense: 94, passingDefense: 88, rushingDefense: 92,
+                turnoverDiff: +2, injuryImpact: 5, coachingRating: 91, clutchFactor: 88
+            },
+            'Dallas Cowboys': {
+                offense: 82, defense: 78, recentForm: 85, homeAdvantage: 3.7,
+                passingOffense: 85, rushingOffense: 79, passingDefense: 76, rushingDefense: 80,
+                turnoverDiff: -2, injuryImpact: 6, coachingRating: 78, clutchFactor: 75
+            },
+            'Miami Dolphins': {
+                offense: 85, defense: 75, recentForm: 70, homeAdvantage: 2.8,
+                passingOffense: 90, rushingOffense: 72, passingDefense: 72, rushingDefense: 78,
+                turnoverDiff: -4, injuryImpact: 8, coachingRating: 82, clutchFactor: 76
+            },
+            'Minnesota Vikings': {
+                offense: 80, defense: 82, recentForm: 75, homeAdvantage: 3.1,
+                passingOffense: 83, rushingOffense: 77, passingDefense: 85, rushingDefense: 79,
+                turnoverDiff: +1, injuryImpact: 4, coachingRating: 85, clutchFactor: 81
+            }
+        };
+
+        // ML Factor Weights v1.0 - These will evolve based on accuracy!
+        const factorWeights = {
+            offensiveRating: 0.25,
+            defensiveRating: 0.25,
+            recentForm: 0.15,
+            homeFieldAdvantage: 0.12,
+            turnoverDifferential: 0.10,
+            injuryImpact: 0.08,
+            coachingClutch: 0.05
+        };
+
+        // Foundation ML Prediction Algorithm
+        function generateMLPrediction(awayTeam, homeTeam, gameId) {
+            const awayData = nflTeamDatabase[awayTeam] || createDefaultTeamData();
+            const homeData = nflTeamDatabase[homeTeam] || createDefaultTeamData();
+
+            // Calculate weighted scores for each factor
+            const factors = calculatePredictionFactors(awayData, homeData, awayTeam, homeTeam);
+
+            // Calculate win probabilities
+            const { homeWinProbability, winnerPrediction, confidence } = calculateWinProbability(factors, homeTeam, awayTeam);
+
+            // Generate detailed reasoning
+            const reasoning = generateDetailedReasoning(factors, winnerPrediction, homeTeam, awayTeam);
+
+            // Record prediction breadcrumb (will integrate with Firestore)
+            recordPredictionBreadcrumb(gameId, awayTeam, homeTeam, homeWinProbability, confidence);
+
+            return {
+                winner: winnerPrediction,
+                confidence: Math.round(confidence),
+                homeWinProbability: Math.round(homeWinProbability * 10) / 10,
+                awayWinProbability: Math.round((100 - homeWinProbability) * 10) / 10,
+                factors: Object.keys(factors).map(key => factors[key].summary),
+                reasoning: reasoning,
+                algorithm: ML_ALGORITHM_VERSION,
+                factors_detailed: factors
+            };
+        }
+
+        function createDefaultTeamData() {
+            return {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                passingOffense: 75, rushingOffense: 75, passingDefense: 75, rushingDefense: 75,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+        }
+
+        function calculatePredictionFactors(awayData, homeData, awayTeam, homeTeam) {
+            return {
+                offensiveRating: {
+                    away: awayData.offense,
+                    home: homeData.offense,
+                    advantage: homeData.offense - awayData.offense,
+                    weight: factorWeights.offensiveRating,
+                    score: (homeData.offense - awayData.offense) * factorWeights.offensiveRating,
+                    summary: `Offensive Power: ${teamNameToAbbr[homeTeam]} ${homeData.offense} vs ${teamNameToAbbr[awayTeam]} ${awayData.offense}`
+                },
+                defensiveRating: {
+                    away: awayData.defense,
+                    home: homeData.defense,
+                    advantage: homeData.defense - awayData.defense,
+                    weight: factorWeights.defensiveRating,
+                    score: (homeData.defense - awayData.defense) * factorWeights.defensiveRating,
+                    summary: `Defensive Strength: ${teamNameToAbbr[homeTeam]} ${homeData.defense} vs ${teamNameToAbbr[awayTeam]} ${awayData.defense}`
+                },
+                recentForm: {
+                    away: awayData.recentForm,
+                    home: homeData.recentForm,
+                    advantage: homeData.recentForm - awayData.recentForm,
+                    weight: factorWeights.recentForm,
+                    score: (homeData.recentForm - awayData.recentForm) * factorWeights.recentForm,
+                    summary: `Recent Form: ${teamNameToAbbr[homeTeam]} ${homeData.recentForm}% vs ${teamNameToAbbr[awayTeam]} ${awayData.recentForm}%`
+                },
+                homeFieldAdvantage: {
+                    value: homeData.homeAdvantage,
+                    weight: factorWeights.homeFieldAdvantage,
+                    score: homeData.homeAdvantage * factorWeights.homeFieldAdvantage * 10,
+                    summary: `Home Field Advantage: +${homeData.homeAdvantage} points for ${teamNameToAbbr[homeTeam]}`
+                },
+                turnoverDifferential: {
+                    away: awayData.turnoverDiff,
+                    home: homeData.turnoverDiff,
+                    advantage: homeData.turnoverDiff - awayData.turnoverDiff,
+                    weight: factorWeights.turnoverDifferential,
+                    score: (homeData.turnoverDiff - awayData.turnoverDiff) * factorWeights.turnoverDifferential * 2,
+                    summary: `Turnover Differential: ${teamNameToAbbr[homeTeam]} ${homeData.turnoverDiff > 0 ? '+' : ''}${homeData.turnoverDiff} vs ${teamNameToAbbr[awayTeam]} ${awayData.turnoverDiff > 0 ? '+' : ''}${awayData.turnoverDiff}`
+                },
+                injuryImpact: {
+                    away: awayData.injuryImpact,
+                    home: homeData.injuryImpact,
+                    advantage: awayData.injuryImpact - homeData.injuryImpact, // Lower is better
+                    weight: factorWeights.injuryImpact,
+                    score: (awayData.injuryImpact - homeData.injuryImpact) * factorWeights.injuryImpact * 3,
+                    summary: `Injury Impact: ${teamNameToAbbr[homeTeam]} ${homeData.injuryImpact}/10 vs ${teamNameToAbbr[awayTeam]} ${awayData.injuryImpact}/10`
+                },
+                coachingClutch: {
+                    away: (awayData.coachingRating + awayData.clutchFactor) / 2,
+                    home: (homeData.coachingRating + homeData.clutchFactor) / 2,
+                    advantage: ((homeData.coachingRating + homeData.clutchFactor) / 2) - ((awayData.coachingRating + awayData.clutchFactor) / 2),
+                    weight: factorWeights.coachingClutch,
+                    score: (((homeData.coachingRating + homeData.clutchFactor) / 2) - ((awayData.coachingRating + awayData.clutchFactor) / 2)) * factorWeights.coachingClutch,
+                    summary: `Coaching/Clutch: ${teamNameToAbbr[homeTeam]} ${Math.round((homeData.coachingRating + homeData.clutchFactor) / 2)} vs ${teamNameToAbbr[awayTeam]} ${Math.round((awayData.coachingRating + awayData.clutchFactor) / 2)}`
+                }
+            };
+        }
+
+        function calculateWinProbability(factors, homeTeam, awayTeam) {
+            // Calculate total weighted score (home team perspective)
+            let totalScore = 0;
+            Object.keys(factors).forEach(key => {
+                totalScore += factors[key].score || 0;
+            });
+
+            // Convert score to probability using sigmoid-like function
+            // Base 50% + weighted adjustments
+            let homeWinProbability = 50 + totalScore;
+
+            // Clamp between 15% and 95% for realistic predictions
+            homeWinProbability = Math.max(15, Math.min(95, homeWinProbability));
+
+            const awayWinProbability = 100 - homeWinProbability;
+            const winnerPrediction = homeWinProbability > 50 ? homeTeam : awayTeam;
+            const confidence = Math.max(homeWinProbability, awayWinProbability);
+
+            return { homeWinProbability, winnerPrediction, confidence };
+        }
+
+        function generateDetailedReasoning(factors, winner, homeTeam, awayTeam) {
+            const winnerAbbr = teamNameToAbbr[winner];
+            const topFactors = [];
+
+            // Find strongest factors
+            Object.keys(factors).forEach(key => {
+                const factor = factors[key];
+                if (Math.abs(factor.score || 0) > 1) {
+                    topFactors.push({
+                        name: key,
+                        impact: Math.abs(factor.score || 0),
+                        favors: factor.score > 0 ? homeTeam : awayTeam
+                    });
+                }
+            });
+
+            topFactors.sort((a, b) => b.impact - a.impact);
+            const topTwo = topFactors.slice(0, 2);
+
+            let reasoning = `${winnerAbbr} prediction based on `;
+            if (topTwo.length > 0) {
+                reasoning += `${topTwo[0].name.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}`;
+                if (topTwo.length > 1) {
+                    reasoning += ` and ${topTwo[1].name.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}`;
+                }
+                reasoning += ' advantages. ';
+            }
+
+            reasoning += `Algorithm ${ML_ALGORITHM_VERSION} analysis of ${Object.keys(factors).length} key factors.`;
+
+            return reasoning;
+        }
+
+        // 🔥 FULL FIRESTORE ML PREDICTION RECORDING SYSTEM
+        async function recordPredictionBreadcrumb(gameId, awayTeam, homeTeam, probability, confidence) {
+            try {
+                const predictionData = await createMLPredictionRecord(gameId, awayTeam, homeTeam, probability, confidence);
+                await recordUserPredictionView(predictionData.predictionId, gameId, awayTeam, homeTeam);
+                console.log('✅ ML Prediction Recorded:', predictionData.predictionId);
+            } catch (error) {
+                console.error('❌ Failed to record ML prediction:', error);
+            }
+        }
+
+        // Create or update ML prediction record in Firestore
+        async function createMLPredictionRecord(gameId, awayTeam, homeTeam, probability, confidence) {
+            const year = 2025;
+            const week = 3; // Current week
+
+            // Generate detailed prediction factors
+            const awayData = nflTeamDatabase[awayTeam] || createDefaultTeamData();
+            const homeData = nflTeamDatabase[homeTeam] || createDefaultTeamData();
+            const factors = calculatePredictionFactors(awayData, homeData, awayTeam, homeTeam);
+
+            const predictionId = `${year}_week${week}_game${gameId}`;
+            const predictionPath = `artifacts/nerdfootball/predictions/${year}/weeks/${week}/games/${gameId}`;
+
+            const predictionData = {
+                predictionId,
+                gameId,
+                week,
+                year,
+                teams: {
+                    home: homeTeam,
+                    away: awayTeam
+                },
+                prediction: {
+                    winner: probability > 50 ? homeTeam : awayTeam,
+                    confidence: Math.round(Math.max(probability, 100 - probability)),
+                    homeWinProbability: Math.round(probability * 10) / 10,
+                    awayWinProbability: Math.round((100 - probability) * 10) / 10,
+                    factors: factors,
+                    reasoning: generateDetailedReasoning(factors, probability > 50 ? homeTeam : awayTeam, homeTeam, awayTeam)
+                },
+                algorithm: {
+                    version: ML_ALGORITHM_VERSION,
+                    factorWeights: factorWeights,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                },
+                breadcrumbs: [],
+                gameOutcome: null, // Will be filled post-game
+                accuracyScore: null, // ML learning metric
+                created: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'active'
+            };
+
+            // Save to Firestore
+            await db.doc(predictionPath).set(predictionData, { merge: true });
+            console.log('📊 ML Prediction saved to:', predictionPath);
+
+            return { predictionId, predictionData };
+        }
+
+        // Record user viewing a prediction (breadcrumb trail)
+        async function recordUserPredictionView(predictionId, gameId, awayTeam, homeTeam) {
+            const userId = currentUser?.uid || 'anonymous_user';
+            const viewData = {
+                userId,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                action: 'view_prediction',
+                source: 'modal',
+                poolId: currentPoolId,
+                gameId,
+                teams: { away: awayTeam, home: homeTeam },
+                sessionId: generateSessionId(),
+                userAgent: navigator.userAgent
+            };
+
+            const year = 2025;
+            const week = 3;
+            const predictionPath = `artifacts/nerdfootball/predictions/${year}/weeks/${week}/games/${gameId}`;
+
+            // Add breadcrumb to prediction document
+            await db.doc(predictionPath).update({
+                breadcrumbs: firebase.firestore.FieldValue.arrayUnion(viewData)
+            });
+
+            // Also track in separate user prediction views collection for analytics
+            const viewPath = `artifacts/nerdfootball/ml_analytics/${year}/user_prediction_views`;
+            const viewId = `${userId}_${gameId}_${Date.now()}`;
+
+            await db.doc(viewPath).collection('views').doc(viewId).set(viewData);
+
+            console.log('👁️ User prediction view recorded:', {
+                userId: userId.substring(0, 8) + '...',
+                gameId,
+                teams: `${awayTeam} @ ${homeTeam}`
+            });
+
+            return viewData;
+        }
+
+        // Generate unique session ID for tracking
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // 🎯 POST-GAME OUTCOME RECORDING SYSTEM
+        async function recordGameOutcome(gameId, winner, homeScore, awayScore, homeTeam, awayTeam) {
+            const year = 2025;
+            const week = 3;
+            const predictionPath = `artifacts/nerdfootball/predictions/${year}/weeks/${week}/games/${gameId}`;
+
+            try {
+                // Get existing prediction
+                const predictionDoc = await db.doc(predictionPath).get();
+
+                if (!predictionDoc.exists) {
+                    console.log('⚠️ No prediction found for game:', gameId);
+                    return;
+                }
+
+                const predictionData = predictionDoc.data();
+                const actualOutcome = {
+                    winner,
+                    homeScore,
+                    awayScore,
+                    margin: Math.abs(homeScore - awayScore),
+                    completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    source: 'espn_cache' // Where the outcome data came from
+                };
+
+                // Calculate prediction accuracy
+                const wasCorrect = predictionData.prediction.winner === winner;
+                const confidenceScore = predictionData.prediction.confidence;
+
+                // ML Accuracy Score: Combines correctness with confidence calibration
+                let accuracyScore = 0;
+                if (wasCorrect) {
+                    // Reward correct predictions more for higher confidence
+                    accuracyScore = 50 + (confidenceScore / 2); // 50-97.5 range
+                } else {
+                    // Penalize incorrect predictions more for higher confidence
+                    accuracyScore = 50 - (confidenceScore / 2); // 2.5-50 range
+                }
+
+                // Update prediction with outcome and accuracy
+                await db.doc(predictionPath).update({
+                    gameOutcome: actualOutcome,
+                    accuracyScore: Math.round(accuracyScore * 10) / 10,
+                    predictionCorrect: wasCorrect,
+                    confidenceCalibration: {
+                        predicted: confidenceScore,
+                        actual: wasCorrect ? 100 : 0,
+                        calibrationError: Math.abs(confidenceScore - (wasCorrect ? 100 : 0))
+                    },
+                    processedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Trigger ML learning update
+                await updateMLLearningMetrics(year, week, gameId, accuracyScore, wasCorrect, confidenceScore);
+
+                console.log('🏆 Game outcome recorded:', {
+                    gameId,
+                    winner,
+                    prediction: predictionData.prediction.winner,
+                    correct: wasCorrect,
+                    accuracyScore
+                });
+
+                return { wasCorrect, accuracyScore, actualOutcome };
+
+            } catch (error) {
+                console.error('❌ Failed to record game outcome:', error);
+                throw error;
+            }
+        }
+
+        // 🤖 ML FEEDBACK LOOP - UPDATE LEARNING METRICS
+        async function updateMLLearningMetrics(year, week, gameId, accuracyScore, wasCorrect, confidence) {
+            const learningPath = `artifacts/nerdfootball/ml_learning/${year}`;
+
+            try {
+                // Update weekly accuracy metrics
+                const weeklyPath = `${learningPath}/weekly_performance/week_${week}`;
+                await db.doc(weeklyPath).set({
+                    [`game_${gameId}`]: {
+                        accuracyScore,
+                        correct: wasCorrect,
+                        confidence,
+                        processedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }
+                }, { merge: true });
+
+                // Update algorithm performance tracking
+                const algorithmPath = `${learningPath}/algorithm_performance/${ML_ALGORITHM_VERSION}`;
+                await db.doc(algorithmPath).set({
+                    totalPredictions: firebase.firestore.FieldValue.increment(1),
+                    correctPredictions: firebase.firestore.FieldValue.increment(wasCorrect ? 1 : 0),
+                    averageAccuracyScore: firebase.firestore.FieldValue.increment(accuracyScore),
+                    confidenceCalibration: {
+                        [`confidence_${Math.floor(confidence / 10) * 10}`]: firebase.firestore.FieldValue.increment(1)
+                    },
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+
+                // Check if we need to evolve factor weights
+                await evaluateAlgorithmEvolution(year, week);
+
+                console.log('📈 ML learning metrics updated for game:', gameId);
+
+            } catch (error) {
+                console.error('❌ Failed to update ML learning metrics:', error);
+            }
+        }
+
+        // 🧬 ALGORITHM EVOLUTION - ADJUST WEIGHTS BASED ON PERFORMANCE
+        async function evaluateAlgorithmEvolution(year, week) {
+            const learningPath = `artifacts/nerdfootball/ml_learning/${year}`;
+
+            try {
+                // Get current algorithm performance
+                const algorithmDoc = await db.doc(`${learningPath}/algorithm_performance/${ML_ALGORITHM_VERSION}`).get();
+
+                if (!algorithmDoc.exists) {
+                    return;
+                }
+
+                const performance = algorithmDoc.data();
+                const accuracy = performance.correctPredictions / performance.totalPredictions;
+
+                // Evolution triggers
+                const shouldEvolve = (
+                    performance.totalPredictions >= 10 && // Minimum sample size
+                    (accuracy < 0.60 || // Low accuracy
+                     performance.totalPredictions % 25 === 0) // Periodic review
+                );
+
+                if (shouldEvolve) {
+                    await proposeAlgorithmEvolution(year, accuracy, performance);
+                }
+
+            } catch (error) {
+                console.error('❌ Algorithm evolution evaluation failed:', error);
+            }
+        }
+
+        // 🔬 PROPOSE NEW ALGORITHM VERSION BASED ON LEARNING
+        async function proposeAlgorithmEvolution(year, currentAccuracy, performance) {
+            const evolutionPath = `artifacts/nerdfootball/ml_learning/${year}/algorithm_evolution`;
+
+            // Analyze which factors correlate with accuracy
+            const factorAnalysis = await analyzeFactorEffectiveness();
+
+            // Propose new weights based on factor effectiveness
+            const newWeights = {
+                ...factorWeights,
+                // Boost weights for effective factors, reduce for ineffective ones
+                offensiveRating: Math.max(0.15, Math.min(0.35, factorWeights.offensiveRating * factorAnalysis.offensiveRating)),
+                defensiveRating: Math.max(0.15, Math.min(0.35, factorWeights.defensiveRating * factorAnalysis.defensiveRating)),
+                recentForm: Math.max(0.05, Math.min(0.25, factorWeights.recentForm * factorAnalysis.recentForm)),
+                homeFieldAdvantage: Math.max(0.05, Math.min(0.20, factorWeights.homeFieldAdvantage * factorAnalysis.homeFieldAdvantage)),
+                turnoverDifferential: Math.max(0.05, Math.min(0.20, factorWeights.turnoverDifferential * factorAnalysis.turnoverDifferential)),
+                injuryImpact: Math.max(0.03, Math.min(0.15, factorWeights.injuryImpact * factorAnalysis.injuryImpact)),
+                coachingClutch: Math.max(0.02, Math.min(0.10, factorWeights.coachingClutch * factorAnalysis.coachingClutch))
+            };
+
+            // Normalize weights to sum to 1.0
+            const totalWeight = Object.values(newWeights).reduce((sum, weight) => sum + weight, 0);
+            Object.keys(newWeights).forEach(key => {
+                newWeights[key] = newWeights[key] / totalWeight;
+            });
+
+            const evolutionProposal = {
+                currentVersion: ML_ALGORITHM_VERSION,
+                proposedVersion: `v${parseFloat(ML_ALGORITHM_VERSION.replace('v', '')) + 0.1}`,
+                currentAccuracy,
+                currentWeights: factorWeights,
+                proposedWeights: newWeights,
+                factorAnalysis,
+                performanceData: performance,
+                proposedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'pending_review'
+            };
+
+            await db.doc(evolutionPath).collection('proposals').add(evolutionProposal);
+
+            console.log('🧬 Algorithm evolution proposed:', {
+                version: evolutionProposal.proposedVersion,
+                accuracy: currentAccuracy,
+                keyChanges: Object.keys(newWeights).filter(key =>
+                    Math.abs(newWeights[key] - factorWeights[key]) > 0.02
+                )
+            });
+        }
+
+        // 📊 ANALYZE FACTOR EFFECTIVENESS
+        async function analyzeFactorEffectiveness() {
+            // Simplified analysis - in production would analyze actual game outcomes
+            // For now, return adaptive multipliers based on performance patterns
+            return {
+                offensiveRating: 1.1, // Slight boost
+                defensiveRating: 1.05, // Slight boost
+                recentForm: 0.9, // Slight reduction
+                homeFieldAdvantage: 1.15, // Significant boost
+                turnoverDifferential: 1.2, // Major boost
+                injuryImpact: 0.8, // Reduction
+                coachingClutch: 0.95 // Slight reduction
+            };
+        }
+
+        // Generate ML analysis display data
+        function generateAnalysisForTeams(awayTeam, homeTeam, gameId = 'demo') {
+            const mlPrediction = generateMLPrediction(awayTeam, homeTeam, gameId);
+            const awayData = nflTeamDatabase[awayTeam] || createDefaultTeamData();
+            const homeData = nflTeamDatabase[homeTeam] || createDefaultTeamData();
+
+            return [
+                {
+                    category: "🏈 Offensive Power",
+                    away: `${awayData.offense}/100`,
+                    home: `${homeData.offense}/100`,
+                    advantage: Math.abs(awayData.offense - homeData.offense) > 5 ?
+                        `${awayData.offense > homeData.offense ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} +${Math.abs(awayData.offense - homeData.offense)} edge` : null
+                },
+                {
+                    category: "🛡️ Defensive Strength",
+                    away: `${awayData.defense}/100`,
+                    home: `${homeData.defense}/100`,
+                    advantage: Math.abs(awayData.defense - homeData.defense) > 5 ?
+                        `${awayData.defense > homeData.defense ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} +${Math.abs(awayData.defense - homeData.defense)} advantage` : null
+                },
+                {
+                    category: "📈 Recent Form",
+                    away: `${awayData.recentForm}%`,
+                    home: `${homeData.recentForm}%`,
+                    advantage: Math.abs(awayData.recentForm - homeData.recentForm) > 10 ?
+                        `${awayData.recentForm > homeData.recentForm ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} momentum edge` : null
+                },
+                {
+                    category: "🏟️ Home Field Impact",
+                    away: `0 points`,
+                    home: `+${homeData.homeAdvantage} points`,
+                    advantage: `${teamNameToAbbr[homeTeam]} +${homeData.homeAdvantage} home advantage`
+                },
+                {
+                    category: "🔄 Turnover Differential",
+                    away: `${awayData.turnoverDiff > 0 ? '+' : ''}${awayData.turnoverDiff}`,
+                    home: `${homeData.turnoverDiff > 0 ? '+' : ''}${homeData.turnoverDiff}`,
+                    advantage: Math.abs(awayData.turnoverDiff - homeData.turnoverDiff) > 3 ?
+                        `${awayData.turnoverDiff > homeData.turnoverDiff ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} ball security edge` : null
+                },
+                {
+                    category: "🏥 Injury Impact",
+                    away: `${awayData.injuryImpact}/10 severity`,
+                    home: `${homeData.injuryImpact}/10 severity`,
+                    advantage: Math.abs(awayData.injuryImpact - homeData.injuryImpact) > 2 ?
+                        `${awayData.injuryImpact < homeData.injuryImpact ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} health advantage` : null
+                }
+            ];
+        }
+
+        // Generate ML prediction for real teams
+        function generatePredictionForTeams(awayTeam, homeTeam, userPick) {
+            const mlPrediction = generateMLPrediction(awayTeam, homeTeam, userPick.gameId || 'demo');
+
+            // Check if prediction matches user pick
+            const matchesUserPick = mlPrediction.winner === userPick.team;
+            const adjustedReasoning = matchesUserPick ?
+                `🎯 AI aligns with your ${userPick.confidence} confidence pick! ${mlPrediction.reasoning}` :
+                `⚠️ AI differs from your pick. ${mlPrediction.reasoning} Consider these factors.`;
+
+            return {
+                winner: teamNameToAbbr[mlPrediction.winner] || mlPrediction.winner,
+                confidence: mlPrediction.confidence,
+                factors: mlPrediction.factors,
+                reasoning: adjustedReasoning,
+                homeWinProbability: mlPrediction.homeWinProbability,
+                awayWinProbability: mlPrediction.awayWinProbability,
+                algorithm: mlPrediction.algorithm
+            };
+        }
+
+        // Initialize the system
+        async function initializeSystem() {
+            console.log('🚀 Initializing Real Active Picks System...');
+
+            // Wait for Firebase authentication
+            await waitForFirebaseAuth();
+            console.log('🔐 Firebase Authentication Ready');
+
+            // Load real games
+            await loadWeekGames();
+
+            if (weekGames.length === 0) {
+                document.getElementById('picks-loading').innerHTML = '<p class="text-red-600">Error loading Week 3 games</p>';
+                return;
+            }
+
+            // Generate active picks
+            activePicks = generateActivePicks();
+            console.log(`✅ Generated ${activePicks.length} active picks`);
+
+            // Render picks
+            renderActivePicks();
+
+            console.log('✅ Real Active Picks System Ready!');
+        }
+
+        // Close modal on outside click
+        document.getElementById('live-game-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLiveGameModal();
+            }
+        });
+
+        // Start the system
+        initializeSystem();
+    </script>
+</body>
+</html>

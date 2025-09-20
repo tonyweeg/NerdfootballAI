@@ -120,7 +120,16 @@ async function genesisEmbeddedSurvivorData() {
     // Step 1: Load game results for all completed weeks
     console.log('1️⃣ Loading game results for all completed weeks...');
     const allWeekWinners = {};
-    for (let week = 1; week <= 2; week++) { // Only Weeks 1-2 are complete as of Sept 17, 2025
+    // Calculate current week dynamically
+    const getCurrentWeek = () => {
+      const now = new Date();
+      const seasonStart = new Date('2025-09-04');
+      const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+      return Math.min(Math.max(Math.floor(daysSinceStart / 7) + 1, 1), 18);
+    };
+
+    const currentWeek = getCurrentWeek();
+    for (let week = 1; week <= currentWeek; week++) { // Dynamic week calculation - automatically advances
       allWeekWinners[week] = await extractWeekWinners(week);
       console.log(`   Week ${week}: ${allWeekWinners[week].length} winning teams`);
     }

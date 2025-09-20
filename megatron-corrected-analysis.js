@@ -60,8 +60,17 @@ async function runCorrectedSurvivorAnalysis() {
     const weekPickCounts = {};
     const userPicksByWeek = {};
 
-    // Only check weeks 1-2 (current valid weeks)
-    for (let week = 1; week <= 2; week++) {
+    // Calculate current week dynamically
+    const getCurrentWeek = () => {
+      const now = new Date();
+      const seasonStart = new Date('2025-09-04');
+      const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+      return Math.min(Math.max(Math.floor(daysSinceStart / 7) + 1, 1), 18);
+    };
+
+    const currentWeek = getCurrentWeek();
+    // Only check weeks 1 through current week (dynamic)
+    for (let week = 1; week <= currentWeek; week++) {
       weekPickCounts[week] = 0;
       userPicksByWeek[week] = [];
 

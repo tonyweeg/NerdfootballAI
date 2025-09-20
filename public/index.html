@@ -3008,6 +3008,26 @@ Role
         </div>
     </div>
 
+    <!-- 🤖 ML PREDICTION MODAL -->
+    <div id="ml-prediction-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex" role="dialog" aria-labelledby="ml-prediction-title" aria-modal="true">
+        <div class="fixed inset-0 bg-black bg-opacity-50" onclick="closeMlPredictionModal()" aria-hidden="true"></div>
+        <div class="relative p-6 bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="ml-prediction-title" class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">🤖 AI Game Prediction</h2>
+                <button id="close-ml-prediction-btn" onclick="closeMlPredictionModal()" class="text-slate-400 hover:text-slate-600 transition-colors" aria-label="Close AI prediction">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Content Container -->
+            <div id="ml-prediction-content" class="space-y-6">
+                <!-- Content will be dynamically inserted here -->
+            </div>
+        </div>
+    </div>
+
     <!-- NerdUniverse Migration Modal -->
     <div id="migration-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex" role="dialog" aria-labelledby="migration-title" aria-modal="true">
         <div class="fixed inset-0 bg-black bg-opacity-50" aria-hidden="true"></div>
@@ -3571,6 +3591,10 @@ searchLoading: document.getElementById('search-loading'),
 searchResultsList: document.getElementById('search-results-list'),
 addUserModal: document.getElementById('add-user-modal'),
 closeAddUserModal: document.getElementById('close-add-user-modal'),
+// ML Prediction Modal Elements
+mlPredictionModal: document.getElementById('ml-prediction-modal'),
+closeMlPredictionBtn: document.getElementById('close-ml-prediction-btn'),
+mlPredictionContent: document.getElementById('ml-prediction-content'),
 modalUserAvatar: document.getElementById('modal-user-avatar'),
 modalUserName: document.getElementById('modal-user-name'),
 modalUserEmail: document.getElementById('modal-user-email'),
@@ -4222,23 +4246,29 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
             console.log('✅ Pool members found:', Object.keys(members).length);
             
             for (const [uid, memberData] of Object.entries(members)) {
+                // Skip malformed entries
+                if (!uid || !memberData || typeof memberData !== 'object') {
+                    console.log('🚫 MALFORMED USER ENTRY BLOCKED FROM GRID:', uid, memberData);
+                    continue;
+                }
+
                 // Block ghost user
                 if (uid === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
                     console.log('🚫 GHOST USER BLOCKED FROM GRID:', uid);
                     continue;
                 }
-                
+
                 // Check participation - only include users in confidence pool
                 const participation = memberData.participation || { confidence: { enabled: true } };
                 if (!participation.confidence?.enabled) {
-                    console.log(`⏭️ Skipping ${memberData.displayName} - not in confidence pool`);
+                    console.log(`⏭️ Skipping ${memberData.displayName || 'No Name'} - not in confidence pool`);
                     continue;
                 }
-                
+
                 userMap.set(uid, {
                     id: uid,
                     uid: uid,
-                    displayName: memberData.displayName || memberData.email || 'Unknown',
+                    displayName: memberData.displayName || memberData.email || 'Unknown User',
                     email: memberData.email || '',
                     role: memberData.role || 'member',
                     ...memberData
@@ -4263,6 +4293,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         const resultsDocRef = doc(db, resultsPath(selectedWeek));
         const resultsSnap = await getDoc(resultsDocRef);
         const gameResults = resultsSnap.exists ? resultsSnap.data() : {};
+        console.log('🔍 gameResults loaded:', gameResults ? Object.keys(gameResults).length : 'undefined');
 
         // Fetch picks
         const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
@@ -4271,32 +4302,32 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         picksSnap.forEach(doc => {
             allPicks[doc.id] = doc.data();
         });
-        
+
         gridData = { allUsers: allUsersForGrid, gameResults, allPicks };
     } catch (error) {
         console.error('❌ Grid data error:', error);
         allUI.gridTableContent.innerHTML = `<p class="text-red-600">Error loading grid: ${error.message}</p>`;
         return;
     }
-    
-    const { allUsers: allUsersForGrid, gameResults, allPicks } = gridData;
+
+    const { allUsers: allUsersForGrid = [], gameResults = {}, allPicks = {} } = gridData || {};
     
     console.log('🚨 Grid users count:', allUsersForGrid.length);
-    const userScores = allUsersForGrid.map(user => {
+    const userScores = allUsersForGrid.filter(user => user && user.id).map(user => {
         let totalPoints = 0;
         let pointsLeft = 0;
-        const userPicks = allPicks[user.id] || {};
+        const userPicks = (allPicks && allPicks[user.id]) || {};
         
         games.forEach(game => {
             const pick = userPicks[game.id];
             if (pick) {
                 const confidence = pick.confidence != null ? parseInt(pick.confidence) : 0;
                 
-                if (gameResults[game.id]) {
+                if (gameResults && gameResults[game.id]) {
                     if (pick.winner === GridView.getGameWinner(gameResults[game.id])) {
                         totalPoints += confidence;
                     }
-                } else { 
+                } else {
                     pointsLeft += confidence;
                 }
             }
@@ -4338,8 +4369,8 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
             return now < gameTime;
         });
         
-        const hasMissingUpcomingPicks = upcomingGames.some(game => 
-            !user.picks[game.id] || !user.picks[game.id].winner
+        const hasMissingUpcomingPicks = upcomingGames.some(game =>
+            !user.picks || !user.picks[game.id] || !user.picks[game.id].winner
         );
         
         const shouldShowWarning = upcomingGames.length > 0 && hasMissingUpcomingPicks;
@@ -4359,7 +4390,30 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         
         tableHTML += `<td class="player-name px-3 py-2 text-sm ${nameClass}">${user.displayName}${isCurrentUser ? ' (You)' : ''}${shouldShowWarning && !isCurrentUser ? ' ⚠️' : ''}</td>`;
         
-        const anyGameStarted = games.some(game => now >= new Date(game.kickoff));
+        const anyGameStarted = games.some(game => {
+            // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+            const espnTimestamp = game.kickoff || game.dt;
+            let gameTime;
+
+            if (window.easternTimeParser) {
+                gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+            } else {
+                // FALLBACK: Manual Eastern Time conversion
+                const cleanTime = espnTimestamp.replace('Z', '');
+                const localDate = new Date(cleanTime);
+                const year = localDate.getFullYear();
+                const month = localDate.getMonth();
+                const day = localDate.getDate();
+                const hours = localDate.getHours();
+                const minutes = localDate.getMinutes();
+                const seconds = localDate.getSeconds();
+                const gameDate = new Date(year, month, day);
+         const offsetHours = getEasternTimeOffsetHours(gameDate);
+                gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+            }
+
+            return now >= gameTime;
+        });
         if (!anyGameStarted) {
             tableHTML += `<td class="px-3 py-2 text-sm font-bold text-gray-400">0</td>`;
             tableHTML += `<td class="px-3 py-2 text-sm text-gray-400">0</td>`;
@@ -4369,7 +4423,7 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         }
         
         games.forEach((game, gameIndex) => {
-            const pick = user.picks[game.id];
+            const pick = user.picks && user.picks[game.id];
             // Handle both raw JSON format (dt) and processed format (kickoff) - preserve UTC timezone
             const gameTimeString = game.kickoff || game.dt;
             const gameTime = new Date(gameTimeString);
@@ -5033,6 +5087,20 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
       btn.addEventListener('click', closeAddUserModal);
     }
   });
+
+  // ML Prediction Modal close button
+  if (allUI.closeMlPredictionBtn) {
+    allUI.closeMlPredictionBtn.addEventListener('click', closeMlPredictionModal);
+  }
+
+  // Close ML modal when clicking outside
+  if (allUI.mlPredictionModal) {
+    allUI.mlPredictionModal.addEventListener('click', (e) => {
+      if (e.target === allUI.mlPredictionModal) {
+        closeMlPredictionModal();
+      }
+    });
+  }
   
   // Confirm add user in modal
   if (allUI.confirmAddUser) {
@@ -5169,7 +5237,538 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
     }
   }, 5000);
  }
- 
+
+ // 🤖 ML PREDICTION SYSTEM - COMPLETE INTEGRATION
+
+ // Foundation ML Algorithm v1.0
+ const ML_ALGORITHM_VERSION = "v1.0";
+
+ // Enhanced NFL Team Database - Foundation for ML Learning
+ const nflTeamDatabase = {
+     'Buffalo Bills': {
+         offense: 92, defense: 88, recentForm: 85, homeAdvantage: 3.2,
+         passingOffense: 91, rushingOffense: 78, passingDefense: 85, rushingDefense: 90,
+         turnoverDiff: +8, injuryImpact: 2, coachingRating: 88, clutchFactor: 92
+     },
+     'Kansas City Chiefs': {
+         offense: 95, defense: 82, recentForm: 95, homeAdvantage: 4.1,
+         passingOffense: 98, rushingOffense: 76, passingDefense: 80, rushingDefense: 84,
+         turnoverDiff: +12, injuryImpact: 1, coachingRating: 98, clutchFactor: 99
+     },
+     'San Francisco 49ers': {
+         offense: 88, defense: 92, recentForm: 88, homeAdvantage: 3.8,
+         passingOffense: 86, rushingOffense: 91, passingDefense: 93, rushingDefense: 90,
+         turnoverDiff: +6, injuryImpact: 4, coachingRating: 94, clutchFactor: 87
+     },
+     'Philadelphia Eagles': {
+         offense: 90, defense: 85, recentForm: 82, homeAdvantage: 3.5,
+         passingOffense: 89, rushingOffense: 92, passingDefense: 83, rushingDefense: 87,
+         turnoverDiff: +4, injuryImpact: 3, coachingRating: 86, clutchFactor: 84
+     },
+     'Baltimore Ravens': {
+         offense: 86, defense: 90, recentForm: 80, homeAdvantage: 3.3,
+         passingOffense: 82, rushingOffense: 94, passingDefense: 88, rushingDefense: 92,
+         turnoverDiff: +2, injuryImpact: 5, coachingRating: 91, clutchFactor: 88
+     },
+     'Dallas Cowboys': {
+         offense: 82, defense: 78, recentForm: 85, homeAdvantage: 3.7,
+         passingOffense: 85, rushingOffense: 79, passingDefense: 76, rushingDefense: 80,
+         turnoverDiff: -2, injuryImpact: 6, coachingRating: 78, clutchFactor: 75
+     },
+     'Miami Dolphins': {
+         offense: 85, defense: 75, recentForm: 70, homeAdvantage: 2.8,
+         passingOffense: 90, rushingOffense: 72, passingDefense: 72, rushingDefense: 78,
+         turnoverDiff: -4, injuryImpact: 8, coachingRating: 82, clutchFactor: 76
+     },
+     'Minnesota Vikings': {
+         offense: 80, defense: 82, recentForm: 75, homeAdvantage: 3.1,
+         passingOffense: 83, rushingOffense: 77, passingDefense: 85, rushingDefense: 79,
+         turnoverDiff: +1, injuryImpact: 4, coachingRating: 85, clutchFactor: 81
+     },
+     'Green Bay Packers': {
+         offense: 88, defense: 85, recentForm: 80, homeAdvantage: 4.0,
+         passingOffense: 92, rushingOffense: 75, passingDefense: 82, rushingDefense: 88,
+         turnoverDiff: +3, injuryImpact: 3, coachingRating: 90, clutchFactor: 89
+     },
+     'Atlanta Falcons': {
+         offense: 78, defense: 72, recentForm: 65, homeAdvantage: 2.5,
+         passingOffense: 80, rushingOffense: 76, passingDefense: 70, rushingDefense: 74,
+         turnoverDiff: -6, injuryImpact: 7, coachingRating: 75, clutchFactor: 70
+     }
+ };
+
+ // ML Factor Weights v1.0 - These will evolve based on accuracy!
+ const factorWeights = {
+     offensiveRating: 0.25,
+     defensiveRating: 0.25,
+     recentForm: 0.15,
+     homeFieldAdvantage: 0.12,
+     turnoverDifferential: 0.10,
+     injuryImpact: 0.08,
+     coachingClutch: 0.05
+ };
+
+ // Foundation ML Prediction Algorithm
+ function generateMLPrediction(awayTeam, homeTeam, gameId) {
+     const awayData = nflTeamDatabase[awayTeam] || createDefaultTeamData();
+     const homeData = nflTeamDatabase[homeTeam] || createDefaultTeamData();
+
+     // Calculate weighted scores for each factor
+     const factors = calculatePredictionFactors(awayData, homeData, awayTeam, homeTeam);
+
+     // Calculate win probabilities
+     const { homeWinProbability, winnerPrediction, confidence } = calculateWinProbability(factors, homeTeam, awayTeam);
+
+     // Generate detailed reasoning
+     const reasoning = generateDetailedReasoning(factors, winnerPrediction, homeTeam, awayTeam);
+
+     // Record prediction breadcrumb (will integrate with Firestore)
+     recordPredictionBreadcrumb(gameId, awayTeam, homeTeam, homeWinProbability, confidence);
+
+     return {
+         winner: winnerPrediction,
+         confidence: Math.round(confidence),
+         homeWinProbability: Math.round(homeWinProbability * 10) / 10,
+         awayWinProbability: Math.round((100 - homeWinProbability) * 10) / 10,
+         factors: Object.keys(factors).map(key => factors[key].summary),
+         reasoning: reasoning,
+         algorithm: ML_ALGORITHM_VERSION,
+         factors_detailed: factors
+     };
+ }
+
+ function createDefaultTeamData() {
+     return {
+         offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+         passingOffense: 75, rushingOffense: 75, passingDefense: 75, rushingDefense: 75,
+         turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+     };
+ }
+
+ function calculatePredictionFactors(awayData, homeData, awayTeam, homeTeam) {
+     return {
+         offensiveRating: {
+             away: awayData.offense,
+             home: homeData.offense,
+             advantage: homeData.offense - awayData.offense,
+             weight: factorWeights.offensiveRating,
+             score: (homeData.offense - awayData.offense) * factorWeights.offensiveRating,
+             summary: `Offensive Power: ${teamNameToAbbr[homeTeam]} ${homeData.offense} vs ${teamNameToAbbr[awayTeam]} ${awayData.offense}`
+         },
+         defensiveRating: {
+             away: awayData.defense,
+             home: homeData.defense,
+             advantage: homeData.defense - awayData.defense,
+             weight: factorWeights.defensiveRating,
+             score: (homeData.defense - awayData.defense) * factorWeights.defensiveRating,
+             summary: `Defensive Strength: ${teamNameToAbbr[homeTeam]} ${homeData.defense} vs ${teamNameToAbbr[awayTeam]} ${awayData.defense}`
+         },
+         recentForm: {
+             away: awayData.recentForm,
+             home: homeData.recentForm,
+             advantage: homeData.recentForm - awayData.recentForm,
+             weight: factorWeights.recentForm,
+             score: (homeData.recentForm - awayData.recentForm) * factorWeights.recentForm,
+             summary: `Recent Form: ${teamNameToAbbr[homeTeam]} ${homeData.recentForm}% vs ${teamNameToAbbr[awayTeam]} ${awayData.recentForm}%`
+         },
+         homeFieldAdvantage: {
+             value: homeData.homeAdvantage,
+             weight: factorWeights.homeFieldAdvantage,
+             score: homeData.homeAdvantage * factorWeights.homeFieldAdvantage * 10,
+             summary: `Home Field Advantage: +${homeData.homeAdvantage} points for ${teamNameToAbbr[homeTeam]}`
+         },
+         turnoverDifferential: {
+             away: awayData.turnoverDiff,
+             home: homeData.turnoverDiff,
+             advantage: homeData.turnoverDiff - awayData.turnoverDiff,
+             weight: factorWeights.turnoverDifferential,
+             score: (homeData.turnoverDiff - awayData.turnoverDiff) * factorWeights.turnoverDifferential * 2,
+             summary: `Turnover Differential: ${teamNameToAbbr[homeTeam]} ${homeData.turnoverDiff > 0 ? '+' : ''}${homeData.turnoverDiff} vs ${teamNameToAbbr[awayTeam]} ${awayData.turnoverDiff > 0 ? '+' : ''}${awayData.turnoverDiff}`
+         },
+         injuryImpact: {
+             away: awayData.injuryImpact,
+             home: homeData.injuryImpact,
+             advantage: awayData.injuryImpact - homeData.injuryImpact, // Lower is better
+             weight: factorWeights.injuryImpact,
+             score: (awayData.injuryImpact - homeData.injuryImpact) * factorWeights.injuryImpact * 3,
+             summary: `Injury Impact: ${teamNameToAbbr[homeTeam]} ${homeData.injuryImpact}/10 vs ${teamNameToAbbr[awayTeam]} ${awayData.injuryImpact}/10`
+         },
+         coachingClutch: {
+             away: (awayData.coachingRating + awayData.clutchFactor) / 2,
+             home: (homeData.coachingRating + homeData.clutchFactor) / 2,
+             advantage: ((homeData.coachingRating + homeData.clutchFactor) / 2) - ((awayData.coachingRating + awayData.clutchFactor) / 2),
+             weight: factorWeights.coachingClutch,
+             score: (((homeData.coachingRating + homeData.clutchFactor) / 2) - ((awayData.coachingRating + awayData.clutchFactor) / 2)) * factorWeights.coachingClutch,
+             summary: `Coaching/Clutch: ${teamNameToAbbr[homeTeam]} ${Math.round((homeData.coachingRating + homeData.clutchFactor) / 2)} vs ${teamNameToAbbr[awayTeam]} ${Math.round((awayData.coachingRating + awayData.clutchFactor) / 2)}`
+         }
+     };
+ }
+
+ function calculateWinProbability(factors, homeTeam, awayTeam) {
+     // Calculate total weighted score (home team perspective)
+     let totalScore = 0;
+     Object.keys(factors).forEach(key => {
+         totalScore += factors[key].score || 0;
+     });
+
+     // Convert score to probability using sigmoid-like function
+     // Base 50% + weighted adjustments
+     let homeWinProbability = 50 + totalScore;
+
+     // Clamp between 15% and 95% for realistic predictions
+     homeWinProbability = Math.max(15, Math.min(95, homeWinProbability));
+
+     const awayWinProbability = 100 - homeWinProbability;
+     const winnerPrediction = homeWinProbability > 50 ? homeTeam : awayTeam;
+     const confidence = Math.max(homeWinProbability, awayWinProbability);
+
+     return { homeWinProbability, winnerPrediction, confidence };
+ }
+
+ function generateDetailedReasoning(factors, winner, homeTeam, awayTeam) {
+     const winnerAbbr = teamNameToAbbr[winner];
+     const topFactors = [];
+
+     // Find strongest factors
+     Object.keys(factors).forEach(key => {
+         const factor = factors[key];
+         if (Math.abs(factor.score || 0) > 1) {
+             topFactors.push({
+                 name: key,
+                 impact: Math.abs(factor.score || 0),
+                 favors: factor.score > 0 ? homeTeam : awayTeam
+             });
+         }
+     });
+
+     topFactors.sort((a, b) => b.impact - a.impact);
+     const topTwo = topFactors.slice(0, 2);
+
+     let reasoning = `${winnerAbbr} prediction based on `;
+     if (topTwo.length > 0) {
+         reasoning += `${topTwo[0].name.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}`;
+         if (topTwo.length > 1) {
+             reasoning += ` and ${topTwo[1].name.replace(/([A-Z])/g, ' $1').toLowerCase().trim()}`;
+         }
+         reasoning += ' advantages. ';
+     }
+
+     reasoning += `Algorithm ${ML_ALGORITHM_VERSION} analysis of ${Object.keys(factors).length} key factors.`;
+
+     return reasoning;
+ }
+
+ // Record prediction breadcrumb for ML learning
+ async function recordPredictionBreadcrumb(gameId, awayTeam, homeTeam, probability, confidence) {
+     if (!currentUser) return;
+
+     try {
+         const predictionData = await createMLPredictionRecord(gameId, awayTeam, homeTeam, probability, confidence);
+         await recordUserPredictionView(predictionData.predictionId, gameId, awayTeam, homeTeam);
+         console.log('✅ ML Prediction Recorded:', predictionData.predictionId);
+     } catch (error) {
+         console.error('❌ Failed to record ML prediction:', error);
+     }
+ }
+
+ // Create or update ML prediction record in Firestore
+ async function createMLPredictionRecord(gameId, awayTeam, homeTeam, probability, confidence) {
+     const year = 2025;
+     const week = currentWeek || 3;
+
+     // Generate detailed prediction factors
+     const awayData = nflTeamDatabase[awayTeam] || createDefaultTeamData();
+     const homeData = nflTeamDatabase[homeTeam] || createDefaultTeamData();
+     const factors = calculatePredictionFactors(awayData, homeData, awayTeam, homeTeam);
+
+     const predictionId = `${year}_week${week}_game${gameId}`;
+     const predictionPath = `artifacts/nerdfootball/predictions/${year}/weeks/${week}/games/${gameId}`;
+
+     const predictionData = {
+         predictionId,
+         gameId,
+         week,
+         year,
+         teams: {
+             home: homeTeam,
+             away: awayTeam
+         },
+         prediction: {
+             winner: probability > 50 ? homeTeam : awayTeam,
+             confidence: Math.round(Math.max(probability, 100 - probability)),
+             homeWinProbability: Math.round(probability * 10) / 10,
+             awayWinProbability: Math.round((100 - probability) * 10) / 10,
+             factors: factors,
+             reasoning: generateDetailedReasoning(factors, probability > 50 ? homeTeam : awayTeam, homeTeam, awayTeam)
+         },
+         algorithm: {
+             version: ML_ALGORITHM_VERSION,
+             factorWeights: factorWeights,
+             lastUpdated: serverTimestamp()
+         },
+         breadcrumbs: [],
+         gameOutcome: null,
+         accuracyScore: null,
+         created: serverTimestamp(),
+         status: 'active'
+     };
+
+     // Save to Firestore
+     await setDoc(doc(db, predictionPath), predictionData, { merge: true });
+     console.log('📊 ML Prediction saved to:', predictionPath);
+
+     return { predictionId, predictionData };
+ }
+
+ // Record user viewing a prediction (breadcrumb trail)
+ async function recordUserPredictionView(predictionId, gameId, awayTeam, homeTeam) {
+     if (!currentUser) return;
+
+     const userId = currentUser.uid;
+     const viewData = {
+         userId,
+         timestamp: serverTimestamp(),
+         action: 'view_prediction',
+         source: 'modal',
+         poolId: getCurrentPool(),
+         gameId,
+         teams: { away: awayTeam, home: homeTeam },
+         sessionId: generateSessionId(),
+         userAgent: navigator.userAgent
+     };
+
+     const year = 2025;
+     const week = currentWeek || 3;
+     const predictionPath = `artifacts/nerdfootball/predictions/${year}/weeks/${week}/games/${gameId}`;
+
+     // Add breadcrumb to prediction document
+     await updateDoc(doc(db, predictionPath), {
+         breadcrumbs: arrayUnion(viewData)
+     });
+
+     // Also track in separate user prediction views collection for analytics
+     const viewPath = `artifacts/nerdfootball/ml_analytics/${year}/user_prediction_views`;
+     const viewId = `${userId}_${gameId}_${Date.now()}`;
+
+     await setDoc(doc(db, viewPath, viewId), viewData);
+
+     console.log('👁️ User prediction view recorded:', {
+         userId: userId.substring(0, 8) + '...',
+         gameId,
+         teams: `${awayTeam} @ ${homeTeam}`
+     });
+
+     return viewData;
+ }
+
+ // Generate unique session ID for tracking
+ function generateSessionId() {
+     return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+ }
+
+ // Open ML Prediction Modal
+ window.openMLPredictionModal = async function(gameId, awayTeam, homeTeam, event) {
+     if (event) {
+         event.stopPropagation(); // Prevent triggering expandGameView
+     }
+
+     if (!currentUser) {
+         showMessage('Please sign in to view AI predictions', 'error');
+         return;
+     }
+
+     // 🔒 ADMIN-ONLY AI FEATURES
+     if (!ADMIN_UIDS.includes(currentUser.uid)) {
+         showMessage('AI predictions are currently in beta testing', 'info');
+         return;
+     }
+
+     console.log('🚀 Opening ML prediction modal for:', { gameId, awayTeam, homeTeam });
+
+     try {
+         // Generate ML prediction
+         const mlPrediction = generateMLPrediction(awayTeam, homeTeam, gameId);
+         const analysis = generateAnalysisForTeams(awayTeam, homeTeam, gameId);
+
+         // Get team abbreviations and logos
+         const awayAbbr = teamNameToAbbr[awayTeam] || awayTeam;
+         const homeAbbr = teamNameToAbbr[homeTeam] || homeTeam;
+         const awayLogo = nflTeamLogos[awayAbbr] || '';
+         const homeLogo = nflTeamLogos[homeAbbr] || '';
+
+         // Create modal content
+         const modalContent = `
+             <!-- Game Header -->
+             <div class="bg-gradient-to-r from-slate-50 to-blue-50 rounded-lg p-6 mb-6">
+                 <div class="flex items-center justify-between">
+                     <div class="flex items-center space-x-4">
+                         <img src="${awayLogo}" alt="${awayTeam}" class="w-12 h-12 rounded-sm">
+                         <div class="text-center">
+                             <div class="text-lg font-bold text-slate-800">${awayTeam}</div>
+                             <div class="text-sm text-slate-600">@</div>
+                         </div>
+                         <img src="${homeLogo}" alt="${homeTeam}" class="w-12 h-12 rounded-sm">
+                         <div>
+                             <div class="text-lg font-bold text-slate-800">${homeTeam}</div>
+                         </div>
+                     </div>
+                     <div class="text-right">
+                         <div class="text-sm text-slate-600">Game ${gameId}</div>
+                         <div class="text-sm text-slate-600">Week ${currentWeek || 3}</div>
+                     </div>
+                 </div>
+             </div>
+
+             <!-- 🤖 ML WIN PREDICTION v1.0 -->
+             <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 mb-6">
+                 <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                     <span class="mr-2">🤖</span>ML Win Prediction v${mlPrediction.algorithm || '1.0'}
+                 </h3>
+
+                 <!-- Win Probability Display -->
+                 <div class="grid grid-cols-2 gap-4 mb-6">
+                     <div class="bg-white rounded-lg p-4 border border-blue-200 text-center">
+                         <div class="text-lg font-bold text-blue-700">${awayAbbr}</div>
+                         <div class="text-3xl font-bold text-blue-600 mb-2">
+                             ${mlPrediction.awayWinProbability}%
+                         </div>
+                         <div class="text-sm text-blue-500">Win Probability</div>
+                     </div>
+                     <div class="bg-white rounded-lg p-4 border border-green-200 text-center">
+                         <div class="text-lg font-bold text-green-700">${homeAbbr}</div>
+                         <div class="text-3xl font-bold text-green-600 mb-2">
+                             ${mlPrediction.homeWinProbability}%
+                         </div>
+                         <div class="text-sm text-green-500">Win Probability</div>
+                     </div>
+                 </div>
+
+                 <!-- Predicted Winner -->
+                 <div class="text-center mb-4">
+                     <div class="text-2xl font-bold mb-2 text-green-700">
+                         🏆 Predicted Winner: ${mlPrediction.winner}
+                     </div>
+                     <div class="text-lg font-semibold text-green-600">
+                         ${mlPrediction.confidence}% Confidence
+                     </div>
+                 </div>
+
+                 <!-- Key Factors Summary -->
+                 <div class="bg-white rounded-lg p-4 border border-green-200 mb-4">
+                     <div class="text-sm font-semibold text-green-800 mb-3">🎯 Key Factors Analyzed:</div>
+                     <div class="grid grid-cols-1 gap-2">
+                         ${mlPrediction.factors.slice(0, 4).map(factor => `
+                             <div class="text-sm text-green-700 bg-green-50 px-3 py-2 rounded border">
+                                 ${factor}
+                             </div>
+                         `).join('')}
+                     </div>
+                 </div>
+
+                 <!-- AI Reasoning -->
+                 <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                     <div class="text-sm font-semibold text-slate-800 mb-2">🧠 AI Analysis:</div>
+                     <div class="text-sm text-slate-700 italic">
+                         ${mlPrediction.reasoning}
+                     </div>
+                 </div>
+             </div>
+
+             <!-- AI Statistical Analysis -->
+             <div class="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                 <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                     <span class="mr-2">📊</span>Detailed Statistical Analysis
+                 </h3>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     ${analysis.map(stat => `
+                         <div class="bg-white rounded-lg p-4 border border-slate-200">
+                             <div class="text-sm font-semibold text-slate-700 mb-2">${stat.category}</div>
+                             <div class="space-y-2">
+                                 <div class="flex justify-between items-center">
+                                     <span class="text-sm text-slate-600">${awayAbbr}: ${stat.away}</span>
+                                     <span class="text-sm text-slate-600">${homeAbbr}: ${stat.home}</span>
+                                 </div>
+                                 ${stat.advantage ? `
+                                     <div class="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
+                                         ${stat.advantage}
+                                     </div>
+                                 ` : ''}
+                             </div>
+                         </div>
+                     `).join('')}
+                 </div>
+             </div>
+         `;
+
+         // Insert content and show modal
+         allUI.mlPredictionContent.innerHTML = modalContent;
+         allUI.mlPredictionModal.classList.remove('hidden');
+
+         console.log('✅ ML prediction modal displayed successfully');
+
+     } catch (error) {
+         console.error('❌ Failed to open ML prediction modal:', error);
+         showMessage('Error loading AI prediction', 'error');
+     }
+ }
+
+ // Generate ML analysis display data
+ function generateAnalysisForTeams(awayTeam, homeTeam, gameId = 'demo') {
+     const awayData = nflTeamDatabase[awayTeam] || createDefaultTeamData();
+     const homeData = nflTeamDatabase[homeTeam] || createDefaultTeamData();
+
+     return [
+         {
+             category: "🏈 Offensive Power",
+             away: `${awayData.offense}/100`,
+             home: `${homeData.offense}/100`,
+             advantage: Math.abs(awayData.offense - homeData.offense) > 5 ?
+                 `${awayData.offense > homeData.offense ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} +${Math.abs(awayData.offense - homeData.offense)} edge` : null
+         },
+         {
+             category: "🛡️ Defensive Strength",
+             away: `${awayData.defense}/100`,
+             home: `${homeData.defense}/100`,
+             advantage: Math.abs(awayData.defense - homeData.defense) > 5 ?
+                 `${awayData.defense > homeData.defense ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} +${Math.abs(awayData.defense - homeData.defense)} advantage` : null
+         },
+         {
+             category: "📈 Recent Form",
+             away: `${awayData.recentForm}%`,
+             home: `${homeData.recentForm}%`,
+             advantage: Math.abs(awayData.recentForm - homeData.recentForm) > 10 ?
+                 `${awayData.recentForm > homeData.recentForm ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} momentum edge` : null
+         },
+         {
+             category: "🏟️ Home Field Impact",
+             away: `0 points`,
+             home: `+${homeData.homeAdvantage} points`,
+             advantage: `${teamNameToAbbr[homeTeam]} +${homeData.homeAdvantage} home advantage`
+         },
+         {
+             category: "🔄 Turnover Differential",
+             away: `${awayData.turnoverDiff > 0 ? '+' : ''}${awayData.turnoverDiff}`,
+             home: `${homeData.turnoverDiff > 0 ? '+' : ''}${homeData.turnoverDiff}`,
+             advantage: Math.abs(awayData.turnoverDiff - homeData.turnoverDiff) > 3 ?
+                 `${awayData.turnoverDiff > homeData.turnoverDiff ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} ball security edge` : null
+         },
+         {
+             category: "🏥 Injury Impact",
+             away: `${awayData.injuryImpact}/10 severity`,
+             home: `${homeData.injuryImpact}/10 severity`,
+             advantage: Math.abs(awayData.injuryImpact - homeData.injuryImpact) > 2 ?
+                 `${awayData.injuryImpact < homeData.injuryImpact ? teamNameToAbbr[awayTeam] : teamNameToAbbr[homeTeam]} health advantage` : null
+         }
+     ];
+ };
+
+ // Close ML Prediction Modal
+ window.closeMlPredictionModal = function() {
+     if (allUI.mlPredictionModal) {
+         allUI.mlPredictionModal.classList.add('hidden');
+     }
+ }
+
  function getPoolDisplayName(poolId) {
   // Get pool name from metadata or use fallback
   if (typeof getCurrentPoolName === 'function') {
@@ -11202,10 +11801,77 @@ function escapeHtml(text) {
  }
  }
 
- // Simple game state logic - just compare times
+ // 💎 DYNAMIC EASTERN TIME CONVERSION - Handles DST Changes Automatically
+function getEasternTimeOffsetHours(dateToCheck) {
+    // DST rules: Second Sunday in March to First Sunday in November
+    const year = dateToCheck.getFullYear();
+
+    // Second Sunday in March
+    const march = new Date(year, 2, 1); // March 1st
+    const firstSundayMarch = new Date(march.getTime() + (7 - march.getDay()) * 24 * 60 * 60 * 1000);
+    const secondSundayMarch = new Date(firstSundayMarch.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // First Sunday in November
+    const november = new Date(year, 10, 1); // November 1st
+    const firstSundayNovember = new Date(november.getTime() + (7 - november.getDay()) * 24 * 60 * 60 * 1000);
+
+    // Check if date is within DST period
+    const isDST = dateToCheck >= secondSundayMarch && dateToCheck < firstSundayNovember;
+
+    return isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+}
+
+// Simple game state logic - just compare times
 function getGameState(game) {
     const now = new Date();
-    const gameTime = new Date(game.dt || game.kickoff);
+
+    // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+    const espnTimestamp = game.dt || game.kickoff;
+    let gameTime;
+
+    // 🚨 ESPN USES EST AS ZULU! "Z" = Eastern Time, NOT UTC!
+    // ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (ESPN's "Zulu" = Eastern)
+
+    // Remove the misleading "Z" since it's actually Eastern Time
+    const cleanTime = espnTimestamp.replace('Z', '');
+
+    // Parse as local time to extract components (treating as Eastern)
+    const easternTime = new Date(cleanTime);
+    const year = easternTime.getFullYear();
+    const month = easternTime.getMonth();
+    const day = easternTime.getDate();
+    const hours = easternTime.getHours();
+    const minutes = easternTime.getMinutes();
+    const seconds = easternTime.getSeconds();
+
+    // Determine if DST is active for this date
+    const gameDate = new Date(year, month, day);
+    const isDST = getEasternTimeOffsetHours(gameDate) === 4;
+
+    // Convert Eastern time to proper UTC
+    // Eastern is BEHIND UTC: EDT = UTC-4, EST = UTC-5
+    const offsetHours = isDST ? 4 : 5;
+    gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+
+    console.log(`⏰ ESPN ZULU=EST: ${espnTimestamp} = ${hours}:${String(minutes).padStart(2,'0')} EASTERN → ${gameTime.toISOString()} UTC (offset +${offsetHours})`);
+
+    if (window.easternTimeParser) {
+        // Use parser result as authoritative - it has intelligent format detection
+        gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+        console.log(`⏰ Using authoritative parser result: ${gameTime.toISOString()}`);
+    }
+
+    // 🔍 DEBUGGING: Log Miami @ Buffalo game specifically
+    if ((game.away === 'Miami Dolphins' && game.home === 'Buffalo Bills') ||
+        (game.home === 'Miami Dolphins' && game.away === 'Buffalo Bills')) {
+        console.log(`🐬 MIAMI @ BUFFALO DEBUG:
+        ESPN Timestamp: ${espnTimestamp}
+        Game Time UTC: ${gameTime.toISOString()}
+        Current Time UTC: ${now.toISOString()}
+        Time Until Game: ${(gameTime.getTime() - now.getTime()) / (1000 * 60)} minutes
+        Game Started?: ${now >= gameTime}
+        Game Winner: ${game.winner || 'TBD'}`);
+    }
 
     if (now < gameTime) {
         return 'PRE_GAME';
@@ -11215,6 +11881,29 @@ function getGameState(game) {
         return 'IN_PROGRESS';
     }
 }
+
+// 🔍 DEBUG FUNCTION: Call from browser console to test timezone conversion
+window.debugMiamiGame = function() {
+    const testGame = {
+        id: 301,
+        away: 'Miami Dolphins',
+        home: 'Buffalo Bills',
+        dt: '2025-09-18T20:15:00Z',
+        kickoff: '2025-09-18T20:15:00Z',
+        winner: 'TBD'
+    };
+
+    console.log('🔍 TESTING MIAMI @ BUFFALO GAME MANUALLY:');
+    const gameState = getGameState(testGame);
+    const isLocked = isGameLocked(testGame);
+
+    console.log(`Game State: ${gameState}`);
+    console.log(`Is Locked: ${isLocked}`);
+    console.log(`Should Show Buttons As: ${isLocked ? 'DISABLED' : 'ENABLED'}`);
+    console.log(`Should Show: ${gameState === 'IN_PROGRESS' ? 'Game in Progress' : gameState === 'PRE_GAME' ? 'Pre-Game' : 'Completed'}`);
+
+    return { gameState, isLocked };
+};
 
 function getTeamHelmetClass(teamName) {
     const teamMap = {
@@ -11255,28 +11944,90 @@ function isGameLocked(game) {
  }
 
  // Legacy function for backwards compatibility
- async function getWeekLockStatus(weekNumber) { 
-  const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) }; 
-  if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) return false; 
-  const firstKickoff = new Date(weekData.games[0].kickoff); 
-  return new Date() > firstKickoff; 
+ async function getWeekLockStatus(weekNumber) {
+  const weekData = { week: weekNumber, games: await getGamesForWeek(weekNumber) };
+  if (!weekData || !Array.isArray(weekData.games) || weekData.games.length === 0) return false;
+
+  // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+  const firstGame = weekData.games[0];
+  const espnTimestamp = firstGame.kickoff || firstGame.dt;
+  let firstKickoff;
+
+  if (window.easternTimeParser) {
+      firstKickoff = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+  } else {
+      // FALLBACK: Manual Eastern Time conversion
+      const cleanTime = espnTimestamp.replace('Z', '');
+      const localDate = new Date(cleanTime);
+      const year = localDate.getFullYear();
+      const month = localDate.getMonth();
+      const day = localDate.getDate();
+      const hours = localDate.getHours();
+      const minutes = localDate.getMinutes();
+      const seconds = localDate.getSeconds();
+      const gameDate = new Date(year, month, day);
+      const offsetHours = getEasternTimeOffsetHours(gameDate);
+      firstKickoff = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+  }
+
+  return new Date() > firstKickoff;
  }
 
  // Helper function to identify Monday Night Football games
  function getMondayNightGame(games) {
    if (!games || !Array.isArray(games)) return null;
-   
+
    // Find all games that occur on Monday (day of week = 1)
    const mondayGames = games.filter(game => {
-     const gameTime = new Date(game.kickoff);
+     // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+     const espnTimestamp = game.kickoff || game.dt;
+     let gameTime;
+
+     if (window.easternTimeParser) {
+         gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+     } else {
+         // FALLBACK: Manual Eastern Time conversion
+         const cleanTime = espnTimestamp.replace('Z', '');
+         const localDate = new Date(cleanTime);
+         const year = localDate.getFullYear();
+         const month = localDate.getMonth();
+         const day = localDate.getDate();
+         const hours = localDate.getHours();
+         const minutes = localDate.getMinutes();
+         const seconds = localDate.getSeconds();
+         const gameDate = new Date(year, month, day);
+         const offsetHours = getEasternTimeOffsetHours(gameDate);
+         gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+     }
+
      return gameTime.getDay() === 1; // Monday
    });
-   
+
    // If multiple Monday games, return the latest one (last game of the week)
    if (mondayGames.length > 1) {
      return mondayGames.reduce((latest, current) => {
-       const latestTime = new Date(latest.kickoff);
-       const currentTime = new Date(current.kickoff);
+       // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+       const parseGameTime = (game) => {
+         const espnTimestamp = game.kickoff || game.dt;
+         if (window.easternTimeParser) {
+             return window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+         } else {
+             const cleanTime = espnTimestamp.replace('Z', '');
+             const localDate = new Date(cleanTime);
+             const year = localDate.getFullYear();
+             const month = localDate.getMonth();
+             const day = localDate.getDate();
+             const hours = localDate.getHours();
+             const minutes = localDate.getMinutes();
+             const seconds = localDate.getSeconds();
+             const gameDate = new Date(year, month, day);
+         const offsetHours = getEasternTimeOffsetHours(gameDate);
+             return new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+         }
+       };
+
+       const latestTime = parseGameTime(latest);
+       const currentTime = parseGameTime(current);
        return currentTime > latestTime ? current : latest;
      });
    }
@@ -12373,13 +13124,207 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
  allUI.lbWeekSelector.innerHTML = options;
  }
 
+ // --- NERDY CACHE SYSTEM ---
+ const nerdyMessages = [
+   "🤓 ESPN.exe stopped responding...",
+   "⚡ API timeout, loading backup drive...",
+   "🔧 ESPN debugging in progress...",
+   "🍕 ESPN hiccupping, serving our freshest slice!",
+   "🤖 Beep boop, ESPN needs coffee...",
+   "💾 Loading from the floppy disk...",
+   "🔄 ESPN buffering at 56k speed...",
+   "🧠 AI thinking... ESPN not so much...",
+   "⌛ ESPN stuck in loading screen...",
+   "🎮 ESPN lagged out, respawning data...",
+   "🔌 ESPN unplugged, using backup power...",
+   "📡 ESPN signal weak, boosting antennas...",
+   "🐛 ESPN found bug, squashing now...",
+   "💻 ESPN CTRL+ALT+DEL in progress...",
+   "🚀 ESPN rocket failed, using backup shuttle...",
+   "🎯 ESPN missed the target, we didn't...",
+   "🔥 ESPN servers on fire, ours are ice cold...",
+   "⚙️ ESPN gears jammed, our engine purrs...",
+   "🎪 ESPN juggling errors, we caught them...",
+   "🍩 ESPN out of donuts, we saved some..."
+ ];
+
+ function showNerdyMessage(message, type = 'info') {
+   console.log(`🤓 ${message}`);
+   // Could add UI toast notification here later
+ }
+
+ function getRandomNerdyMessage() {
+   return nerdyMessages[Math.floor(Math.random() * nerdyMessages.length)];
+ }
+
+ async function checkFinalCache(week) {
+   try {
+     const finalCacheDoc = await getDoc(doc(db, `cache/espn_final_week_${week}`));
+     if (finalCacheDoc.exists()) {
+       showNerdyMessage("From the oven...", 'final');
+       return { data: finalCacheDoc.data(), source: 'final' };
+     }
+   } catch (error) {
+     console.warn('Final cache check failed:', error);
+   }
+   return null;
+ }
+
+ async function checkWarmCache() {
+   try {
+     const warmCacheDoc = await getDoc(doc(db, 'cache/espn_current_data'));
+     if (warmCacheDoc.exists()) {
+       const cacheData = warmCacheDoc.data();
+       const timeWritten = cacheData.timeWritten?.toDate?.() || new Date(cacheData.timeWritten);
+       const ageSeconds = (Date.now() - timeWritten.getTime()) / 1000;
+
+       if (ageSeconds < 30) {
+         showNerdyMessage("Serving hot cache...", 'warm');
+         return { data: cacheData, source: 'warm-fresh', age: ageSeconds };
+       } else {
+         return { data: cacheData, source: 'warm-stale', age: ageSeconds };
+       }
+     }
+   } catch (error) {
+     console.warn('Warm cache check failed:', error);
+   }
+   return null;
+ }
+
+ async function attemptFreshESPN(week) {
+   try {
+     const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/syncGameScores', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ week: week, force: true })
+     });
+
+     if (response.ok) {
+       showNerdyMessage("Fresh Garlic Breadsticks, NERD!", 'fresh');
+       // Clear retry count on success
+       localStorage.removeItem(`espn_retry_${week}`);
+       return { success: true, source: 'fresh' };
+     }
+   } catch (error) {
+     console.warn('ESPN refresh failed:', error);
+   }
+   return { success: false };
+ }
+
+ function getRetryDelay(attempt) {
+   const shortRetries = [60, 120, 180, 240, 300]; // 1-5 minutes
+   const longRetries = [300, 600, 3600]; // 5min, 10min, 60min
+
+   if (attempt < shortRetries.length) {
+     return shortRetries[attempt] * 1000;
+   } else if (attempt < shortRetries.length + longRetries.length) {
+     return longRetries[attempt - shortRetries.length] * 1000;
+   } else {
+     return 60 * 1000; // Reset to 1 minute after full cycle
+   }
+ }
+
+ async function handleESPNFailure(week, warmCacheData) {
+   // Get current retry info from localStorage
+   const retryKey = `espn_retry_${week}`;
+   const retryData = JSON.parse(localStorage.getItem(retryKey) || '{"attempts": 0, "lastAttempt": 0}');
+
+   const now = Date.now();
+   const timeSinceLastAttempt = now - retryData.lastAttempt;
+   const nextRetryDelay = getRetryDelay(retryData.attempts);
+
+   // Show nerdy message and serve warm cache
+   const message = getRandomNerdyMessage();
+   showNerdyMessage(message, 'failed');
+
+   // Schedule next retry if enough time has passed
+   if (timeSinceLastAttempt >= nextRetryDelay) {
+     retryData.attempts++;
+     retryData.lastAttempt = now;
+     localStorage.setItem(retryKey, JSON.stringify(retryData));
+
+     // Background retry (don't await)
+     setTimeout(() => attemptFreshESPN(week), 100);
+   }
+
+   return { data: warmCacheData, source: 'fallback', nextRetry: nextRetryDelay };
+ }
+
+ async function createFinalCacheIfComplete(week, games) {
+   try {
+     if (!games || !Array.isArray(games)) return;
+
+     const allGamesFinal = games.every(game =>
+       game.status === 'STATUS_FINAL' ||
+       (game.competitions && game.competitions[0] &&
+        game.competitions[0].status &&
+        game.competitions[0].status.type &&
+        game.competitions[0].status.type.name === 'STATUS_FINAL')
+     );
+
+     if (allGamesFinal && games.length >= 16) {
+       const finalCacheRef = doc(db, `cache/espn_final_week_${week}`);
+       await setDoc(finalCacheRef, {
+         games: games,
+         week: week,
+         finalizedAt: new Date(),
+         source: 'auto-finalization'
+       });
+       console.log(`✅ Created final cache for Week ${week} - all 16 games complete`);
+     }
+   } catch (error) {
+     console.warn('Final cache creation failed:', error);
+   }
+ }
+
  // --- PICKS SUMMARY FUNCTIONS ---
  async function renderActivePicksSummary() {
   if (!currentUser || !currentWeek) return;
-  
+
   try {
-   // Get current week games and user picks
-   const weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
+   // 🤓 NERDY CACHE SYSTEM: 4-step cache priority with engaging messages
+   let cacheResult;
+   let weekData;
+
+   // Step 1: Check final cache (permanent data)
+   const finalCache = await checkFinalCache(currentWeek);
+   if (finalCache) {
+     weekData = { week: currentWeek, games: finalCache.data.games || [] };
+     cacheResult = finalCache;
+   } else {
+     // Step 2: Check warm cache (<30s = hot, >30s = stale)
+     const warmCache = await checkWarmCache();
+
+     if (warmCache && warmCache.source === 'warm-fresh') {
+       // Hot cache - use it directly
+       weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
+       cacheResult = warmCache;
+     } else {
+       // Step 3: Attempt fresh ESPN fetch
+       const freshESPN = await attemptFreshESPN(currentWeek);
+
+       if (freshESPN.success) {
+         // Fresh data obtained - get it and check for final cache creation
+         weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
+         cacheResult = freshESPN;
+
+         // Check if week is complete and create final cache
+         await createFinalCacheIfComplete(currentWeek, weekData.games);
+       } else {
+         // Step 4: ESPN failed - use warm cache as fallback with retry logic
+         if (warmCache) {
+           const fallbackResult = await handleESPNFailure(currentWeek, warmCache.data);
+           weekData = { week: currentWeek, games: await getGamesForWeek(currentWeek) };
+           cacheResult = fallbackResult;
+         } else {
+           // No cache available at all - show error
+           console.error('🚨 No cache available and ESPN failed');
+           allUI.activePicksList.innerHTML = '<p class="text-center text-red-500 text-sm">🤓 All systems down! Rebooting...</p>';
+           return;
+         }
+       }
+     }
+   }
    if (!Array.isArray(weekData.games) || weekData.games.length === 0) {
     allUI.activePicksList.innerHTML = '<p class="text-center text-slate-500 text-sm">No games available for this week</p>';
     return;
@@ -12460,7 +13405,27 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
     const pick = userPicks[game.id];
     if (pick && pick.winner) {
      // Check if game has started
-     const gameTime = new Date(game.kickoff);
+     // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+     const espnTimestamp = game.kickoff || game.dt;
+     let gameTime;
+
+     if (window.easternTimeParser) {
+         gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+     } else {
+         // FALLBACK: Manual Eastern Time conversion
+         const cleanTime = espnTimestamp.replace('Z', '');
+         const localDate = new Date(cleanTime);
+         const year = localDate.getFullYear();
+         const month = localDate.getMonth();
+         const day = localDate.getDate();
+         const hours = localDate.getHours();
+         const minutes = localDate.getMinutes();
+         const seconds = localDate.getSeconds();
+         const gameDate = new Date(year, month, day);
+         const offsetHours = getEasternTimeOffsetHours(gameDate);
+         gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+     }
+
      const now = new Date();
      const gameHasStarted = now > gameTime;
      
@@ -12524,15 +13489,44 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      const homeAwayIndicator = isHome ? 'vs' : '@';
      
      
-     // Format game time
-     const gameTime = new Date(pick.game.kickoff);
+     // Format game time - FIXED: ESPN EST-as-Zulu conversion
+     // 🚨 ESPN USES EST AS ZULU! "Z" = Eastern Time, NOT UTC!
+     let gameTime;
+     let gameKickoff;
+
+     if (pick.game.kickoff && pick.game.kickoff.includes('Z')) {
+      // Apply ESPN EST-as-Zulu conversion
+      const cleanTime = pick.game.kickoff.replace('Z', '');
+      const easternTime = new Date(cleanTime);
+      const year = easternTime.getFullYear();
+      const month = easternTime.getMonth();
+      const day = easternTime.getDate();
+      const hours = easternTime.getHours();
+      const minutes = easternTime.getMinutes();
+      const seconds = easternTime.getSeconds();
+
+      // Check if DST is active
+      const date = new Date(year, month, day);
+      const dstStart = new Date(year, 2, 9); // March 9
+      const dstEnd = new Date(year, 10, 2);  // November 2
+      const isDST = date >= dstStart && date < dstEnd;
+      const offsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+
+      // Convert Eastern to UTC properly
+      gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
+      gameKickoff = gameTime; // Same conversion for both
+     } else {
+      // Fallback for non-ESPN timestamps
+      gameTime = new Date(pick.game.kickoff);
+      gameKickoff = gameTime;
+     }
+
      const now = new Date();
      const isToday = gameTime.toDateString() === now.toDateString();
      const isTomorrow = gameTime.toDateString() === new Date(now.getTime() + 24*60*60*1000).toDateString();
-     
+
      // CRITICAL DEBUG: Let's see exactly what's happening
      const currentTime = new Date();
-     const gameKickoff = new Date(pick.game.kickoff);
      const gameWinner = getGameWinner(pick.gameResult);
      const hasActuallyStarted = currentTime > gameKickoff;
      
@@ -12599,7 +13593,16 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
        ${gradientOverlay}
        <!-- Content layer -->
        <div class="relative z-10 flex items-center w-full">
-        <img src="${logoUrl}" alt="${pick.team}" class="w-8 h-8 rounded-sm mr-3 flex-shrink-0" onerror="this.style.visibility='hidden'; this.style.width='8px';">
+        <div class="flex flex-col items-center mr-3 flex-shrink-0">
+         <img src="${logoUrl}" alt="${pick.team}" class="w-8 h-8 rounded-sm" onerror="this.style.visibility='hidden'; this.style.width='8px';">
+         ${currentUser && ADMIN_UIDS.includes(currentUser.uid) ? `
+         <!-- 🧠 AI BRAIN ICON -->
+         <button onclick="openMLPredictionModal('${pick.gameId}', '${pick.game.away}', '${pick.game.home}', event)"
+                 class="w-4 h-4 hover:bg-blue-100 transform hover:scale-125 transition-all duration-150 flex items-center justify-center group mt-0.5"
+                 title="AI Prediction">
+           <span class="text-xs group-hover:animate-pulse">🧠</span>
+         </button>` : ''}
+        </div>
         <div class="flex-1 min-w-0">
          <div class="text-sm text-slate-800 ${textClass} truncate">${pick.team} (${pick.confidence})</div>
          <div class="text-xs text-slate-600 mt-1">
@@ -13693,6 +14696,53 @@ allUI.saveSurvivorPickBtn.addEventListener('click', async () => {
         const survivorData = { picks: { [weekNumber]: { team: selectedSurvivorTeam } } };
         
         await setDoc(survivorPicksDocRef, survivorData, { merge: true });
+        // 🎯 CRITICAL FIX: Also update pool members structure to maintain data consistency
+        const poolId = getCurrentPool();
+        const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+        const poolDoc = await getDoc(doc(db, poolMembersPath));
+
+        if (poolDoc.exists()) {
+            const poolData = poolDoc.data();
+            const userData = poolData[selectedSurvivorUser];
+
+            if (userData) {
+                // Update pick history in pool members structure
+                const survivor = userData.survivor || {};
+                const currentPickHistory = survivor.pickHistory || '';
+                const currentPicks = currentPickHistory.split(', ').filter(p => p && p.trim());
+
+                // Ensure picks array has correct length for this week
+                while (currentPicks.length < parseInt(weekNumber)) {
+                    currentPicks.push(''); // Add empty picks for missing weeks
+                }
+
+                // Update the specific week pick
+                currentPicks[parseInt(weekNumber) - 1] = selectedSurvivorTeam;
+
+                // Create new pick history string
+                const newPickHistory = currentPicks.filter(p => p && p.trim()).join(', ');
+
+                // Update user data in pool members
+                const updatedUserData = {
+                    ...userData,
+                    survivor: {
+                        ...survivor,
+                        pickHistory: newPickHistory,
+                        alive: true, // Keep user active when saving new pick
+                        eliminationWeek: null // Clear any elimination when saving new pick
+                    }
+                };
+
+                // Update pool members document
+                const updatedPoolData = {
+                    ...poolData,
+                    [selectedSurvivorUser]: updatedUserData
+                };
+
+                await setDoc(doc(db, poolMembersPath), updatedPoolData);
+                console.log(`✅ DUAL-WRITE: Updated both legacy picks AND pool members for ${user.displayName}`);
+            }
+        }
         
         // 💎 CRITICAL: Invalidate all cache affected by survivor picks changes
         window.gameStateCache.invalidateAfterDataUpdate('survivor_picks_saved', weekNumber);
@@ -15132,7 +16182,7 @@ const SurvivorPicksView = {
         const currentUserStatus = allStatuses[this.currentUser.uid] || { eliminated: false };
         
         // Check if selected week is locked (eliminated users always locked, others based on game timing)
-        const isLocked = currentUserStatus.eliminated || await this.checkSurvivorPickLocked(this.selectedWeek);
+        const isLocked = currentUserStatus.eliminated || await this.isSurvivorWeekLocked(this.selectedWeek);
         
         // Render the survivor picks interface with week selector
         this.renderSurvivorPicksHTML(container, userPicks, weeklyGames, isLocked);
@@ -15190,35 +16240,33 @@ const SurvivorPicksView = {
         }
     },
     
-    checkSurvivorPickLocked: async function(weekToCheck = null) {
+    // 🏆 NEW CONSISTENT SURVIVOR LOCK FUNCTION - Uses same game fetching as confidence!
+    isSurvivorWeekLocked: async function(weekToCheck = null) {
         try {
             const week = weekToCheck || this.selectedWeek;
-            
+
             // Future weeks are never locked
             if (week > this.currentWeek) {
                 return false;
             }
-            
-            // Past weeks are always locked
+
+            // Past weeks are always locked (until Tuesday midnight Eastern)
             if (week < this.currentWeek) {
                 return true;
             }
-            
-            // For current week, check if any games have started
-            const response = await fetch(`nfl_2025_week_${week}.json`);
-            if (!response.ok) return false;
-            const weekData = await response.json();
-            
-            if (!weekData.games || !Array.isArray(weekData.games)) return false;
-            
-            // SECURITY FIX: Use proper game state validation to prevent picks during IN_PROGRESS games
-            return weekData.games.some(game => {
-                const gameState = this.getGameState(game);
-                // Only allow picks when games are PRE_GAME
-                return gameState === 'IN_PROGRESS' || gameState === 'COMPLETED';
-            });
+
+            // For current week, get games using SAME method as confidence
+            const games = await getGamesForWeek(week);
+            if (!games || !Array.isArray(games) || games.length === 0) {
+                return false;
+            }
+
+            // 🎯 CRITICAL: Check if ANY game is locked using confidence's isGameLocked function
+            // This ensures survivor locks exactly when confidence starts locking individual games
+            return games.some(game => isGameLocked(game));
+
         } catch (error) {
-            console.error('Error checking game lock status:', error);
+            console.error('Error checking survivor week lock status:', error);
             return false;
         }
     },
@@ -15427,7 +16475,7 @@ const SurvivorPicksView = {
             if (!btn.disabled && !isLocked) {
                 btn.addEventListener('click', async (e) => {
                     // Re-check lock status at time of click
-                    const currentlyLocked = await this.checkSurvivorPickLocked();
+                    const currentlyLocked = await this.isSurvivorWeekLocked();
                     if (currentlyLocked) {
                         alert('Sorry, games have started! Survivor picks are now locked for this week.');
                         this.show(); // Re-render to show lock state
