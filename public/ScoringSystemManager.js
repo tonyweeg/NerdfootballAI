@@ -126,6 +126,8 @@ window.ScoringSystemManager = {
 
             for (const member of poolMembers) {
                 try {
+                    console.log(`🔍 Processing member: ${member.displayName || member.email || member.uid.slice(-6)} (${member.uid})`);
+
                     // Get stored scoring data document
                     const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${member.uid}`;
                     const docRef = window.doc(window.db, scorePath);
@@ -141,6 +143,7 @@ window.ScoringSystemManager = {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         const weeklyPoints = data.weeklyPoints || {};
+                        console.log(`📊 Found scoring data for ${member.displayName || member.uid.slice(-6)}: ${Object.keys(weeklyPoints).length} weeks`);
 
                         // Aggregate ONLY the completed weeks
                         for (const weekNumber of completedWeeks) {
@@ -177,6 +180,44 @@ window.ScoringSystemManager = {
                                 }
                             }
                         }
+                    } else {
+                        console.log(`❌ NO scoring data found for ${member.displayName || member.uid.slice(-6)} (${member.uid})`);
+
+                        // Special debug for the problem user
+                        if (member.uid === 'THoYhTIT46RdGeNuL9CyfPCJtZ73') {
+                            console.log('🚨 PROBLEM USER DETECTED: THoYhTIT46RdGeNuL9CyfPCJtZ73 has no scoring data but should have picks!');
+                            console.log('🔧 Attempting to auto-fix by processing missing scoring data...');
+
+                            // Try to automatically fix this user's scoring data
+                            try {
+                                await this.fixUserScoringData(member.uid, completedWeeks);
+                                console.log('✅ Auto-fix attempt completed, re-checking scoring data...');
+
+                                // Re-fetch the user's scoring data after fix attempt
+                                const retryDocSnap = await window.getDoc(docRef);
+                                if (retryDocSnap.exists()) {
+                                    const retryData = retryDocSnap.data();
+                                    const weeklyPoints = retryData.weeklyPoints || {};
+                                    console.log(`🎯 After fix: ${member.displayName || member.uid.slice(-6)} now has ${Object.keys(weeklyPoints).length} weeks of data`);
+
+                                    // Re-process the scoring for this user
+                                    for (const weekNumber of completedWeeks) {
+                                        const weekData = weeklyPoints[weekNumber.toString()] || weeklyPoints[weekNumber];
+                                        if (weekData && weekData.totalPoints !== undefined) {
+                                            totalPoints += weekData.totalPoints || 0;
+                                            totalCorrectPicks += weekData.correctPicks || 0;
+                                            totalPicks += weekData.totalPicks || 0;
+                                            weeksPlayed++;
+                                        }
+                                    }
+                                }
+                            } catch (fixError) {
+                                console.error('❌ Auto-fix failed:', fixError);
+                            }
+                        }
+
+                        // For users with no scoring data, we should still include them in the leaderboard with 0 points
+                        // but log that they need processing
                     }
 
                     const overallAccuracy = totalPicks > 0 ? (totalCorrectPicks / totalPicks * 100) : 0;
@@ -539,6 +580,70 @@ window.ScoringSystemManager = {
                 error: error.message,
                 timestamp: new Date().toISOString()
             };
+        }
+    },
+
+    /**
+     * Fix user scoring data by processing their picks through the scoring system
+     * @param {string} userId - User ID to fix
+     * @param {Array} completedWeeks - Array of weeks to process
+     */
+    async fixUserScoringData(userId, completedWeeks = [1, 2]) {
+        try {
+            console.log(`🔧 Attempting to fix scoring data for user ${userId}...`);
+
+            let picksFound = false;
+            let weeksProcessed = 0;
+
+            // Check each completed week for picks
+            for (const weekNumber of completedWeeks) {
+                console.log(`🔍 Checking Week ${weekNumber} picks for user ${userId}...`);
+
+                // Check if user has picks for this week
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions`;
+                const picksDocRef = window.doc(window.db, picksPath, userId);
+                const picksSnap = await window.getDoc(picksDocRef);
+
+                if (picksSnap.exists() && picksSnap.data()) {
+                    const picksData = picksSnap.data();
+                    const pickCount = Object.keys(picksData).length;
+                    console.log(`✅ Found ${pickCount} picks for Week ${weekNumber}`);
+                    picksFound = true;
+
+                    // Process this user's scoring for this week
+                    if (window.ScoringCalculator && window.ScoringCalculator.calculateUserScore) {
+                        try {
+                            console.log(`🎯 Processing scoring for Week ${weekNumber}...`);
+                            const scoreResult = await window.ScoringCalculator.calculateUserScore(userId, weekNumber);
+
+                            if (scoreResult && scoreResult.success) {
+                                console.log(`✅ Week ${weekNumber} scoring processed: ${scoreResult.totalPoints} points`);
+                                weeksProcessed++;
+                            } else {
+                                console.log(`⚠️ Week ${weekNumber} scoring failed or returned no results`);
+                            }
+                        } catch (scoreError) {
+                            console.error(`❌ Error calculating Week ${weekNumber} score:`, scoreError);
+                        }
+                    } else {
+                        console.log(`⚠️ ScoringCalculator not available for Week ${weekNumber} processing`);
+                    }
+                } else {
+                    console.log(`📭 No picks found for Week ${weekNumber}`);
+                }
+            }
+
+            if (picksFound) {
+                console.log(`🎉 Fix attempt complete: Found picks for ${userId}, processed ${weeksProcessed} weeks`);
+                return { success: true, weeksProcessed, picksFound: true };
+            } else {
+                console.log(`❌ No picks found for user ${userId} in any completed week`);
+                return { success: false, weeksProcessed: 0, picksFound: false };
+            }
+
+        } catch (error) {
+            console.error(`❌ Error fixing user scoring data for ${userId}:`, error);
+            return { success: false, error: error.message };
         }
     }
 };
