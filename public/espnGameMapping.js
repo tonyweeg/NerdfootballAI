@@ -44,17 +44,23 @@ window.espnWinnerSync = {
             const updates = {};
             let syncedCount = 0;
 
-            // Use positional mapping - ESPN game index maps to our game ID
-            for (let gameIndex = 0; gameIndex < espnData.games.length && gameIndex < 16; gameIndex++) {
-                const ourGameId = `${week}${String(gameIndex + 1).padStart(2, '0')}`;
-                const espnGame = espnData.games[gameIndex];
+            // Get our local games for team matching (no more positional mapping!)
+            const localResponse = await fetch(`nfl_2025_week_${week}.json`);
+            const localWeekData = await localResponse.json();
+            const localGames = localWeekData.games;
+
+            // Use team-based matching instead of positional mapping
+            localGames.forEach(localGame => {
+                const espnGame = espnData.games.find(espn =>
+                    espn.away_team === localGame.a && espn.home_team === localGame.h
+                );
 
                 if (espnGame && espnGame.status === 'STATUS_FINAL' && espnGame.home_score && espnGame.away_score) {
                     const homeScore = parseInt(espnGame.home_score);
                     const awayScore = parseInt(espnGame.away_score);
                     const winner = homeScore > awayScore ? espnGame.home_team : espnGame.away_team;
 
-                    updates[ourGameId] = {
+                    updates[localGame.id] = {
                         homeTeam: espnGame.home_team,
                         awayTeam: espnGame.away_team,
                         homeScore: homeScore,
@@ -66,9 +72,9 @@ window.espnWinnerSync = {
                     };
 
                     syncedCount++;
-                    console.log(`✅ ${ourGameId}: ${winner} wins (${homeScore}-${awayScore})`);
+                    console.log(`✅ ${localGame.id}: ${winner} wins (${homeScore}-${awayScore})`);
                 }
-            }
+            });
 
             if (syncedCount > 0) {
                 // Save to both data paths for compatibility

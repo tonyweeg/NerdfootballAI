@@ -36,6 +36,11 @@
         window.functions = getFunctions(app);
         window.rtdb = getDatabase(app);
         window.auth = getAuth(app);
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.collection = collection;
+        window.getDocs = getDocs;
         window.firebaseUtils = { doc, getDoc, collection, getDocs, onSnapshot, ref, onValue, httpsCallable, onAuthStateChanged, setDoc };
 
         console.log('🔥 Firebase initialized for dashboard');
@@ -1110,6 +1115,10 @@
                     </span>
                 </h3>
                 <div class="flex gap-3">
+                    <button id="process-scoring-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center">
+                        <i class="fas fa-bolt mr-2"></i>
+                        Process Weeks 1-2
+                    </button>
                     <button id="generate-season-leaderboard-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center">
                         <i class="fas fa-trophy mr-2"></i>
                         Generate Season Leaderboard
@@ -2723,19 +2732,61 @@ Thanks for playing and see you next week!`
             }
         }
 
+        // Add event listener for Process Scoring button
+        async function processWeeksScoring() {
+            try {
+                const btn = document.getElementById('process-scoring-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+
+                log('🚀 Processing Weeks 1-2 scoring...', 'info');
+
+                // Process Week 1
+                log('📊 Processing Week 1...', 'info');
+                const week1 = await window.ScoringSystemManager.processWeekScoring(1, true);
+                log(`✅ Week 1: ${week1.phase1_userScoring.usersProcessed} users processed`, 'success');
+
+                // Process Week 2
+                log('📊 Processing Week 2...', 'info');
+                const week2 = await window.ScoringSystemManager.processWeekScoring(2, true);
+                log(`✅ Week 2: ${week2.phase1_userScoring.usersProcessed} users processed`, 'success');
+
+                log('🎉 WEEKS 1-2 SCORING COMPLETE! Season leaderboard should now show points.', 'success');
+
+            } catch (error) {
+                log(`❌ Error processing scoring: ${error.message}`, 'error');
+            } finally {
+                const btn = document.getElementById('process-scoring-btn');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-bolt mr-2"></i>Process Weeks 1-2';
+            }
+        }
+
         // Add event listener for Generate Season Leaderboard button
         document.addEventListener('DOMContentLoaded', function() {
             const generateBtn = document.getElementById('generate-season-leaderboard-btn');
             if (generateBtn) {
                 generateBtn.addEventListener('click', generateSeasonLeaderboard);
             }
+
+            const processBtn = document.getElementById('process-scoring-btn');
+            if (processBtn) {
+                processBtn.addEventListener('click', processWeeksScoring);
+            }
         });
+
+        function showTab(tabName) {
             if (tabName === 'nfl-audit') {
                 loadNFLAuditTab();
             }
-        };
+        }
 
     </script>
+
+    <!-- Scoring System Scripts -->
+    <script src="./ScoringCalculator.js"></script>
+    <script src="./WeeklyLeaderboardGenerator.js"></script>
+    <script src="./ScoringSystemManager.js"></script>
 
     <style>
         @keyframes fade-in {

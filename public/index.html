@@ -126,26 +126,27 @@
  <script src="./easternTimeParser-v2.js"></script>
  <script src="./poolParticipationManager.js"></script>
  <script src="./poolRemovalService.js"></script>
- <script src="./espnCacheManager.js?v=fix3"></script>
+ <script src="./espnCacheManager.js"></script>
  <script src="./espnGameMapping.js"></script>
  <script src="./gameStateCache.js"></script>
  <script src="./emergencyCacheRefresh.js"></script>
  <script src="./core-bundle.js"></script>
  <script src="./survivorAutoElimination.js"></script>
 <script src="./survivor-battlefield-display.js"></script>
- <script src="./confidence-bundle.js"></script>
 
 <!-- 🏆 COMPREHENSIVE SCORING SYSTEM -->
-<script src="./ScoringCalculator.js?cb=MANUAL_AGGREGATION_FIX_1758345823"></script>
-<script src="./WeeklyLeaderboardGenerator.js?cb=MANUAL_AGGREGATION_FIX_1758345823"></script>
-<script src="./ScoringSystemManager.js?cb=FIELD_NAME_FIX_1758345827"></script>
+<script src="./ScoringSystemManager.js"></script>
+<script src="./ScoringCalculator.js"></script>
+<script src="./WeeklyLeaderboardGenerator.js"></script>
 <script src="./fix-pool-members.js"></script>
-<script src="./leaderboard-scoring-integration.js?cb=WEEKS_1_AND_2_1758345822"></script>
+<script src="./leaderboard-scoring-integration.js"></script>
+ <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
- <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
  <script src="./realtimeManager.js"></script>
-<!-- 🚨 EMERGENCY CACHE REFRESH TOOL - For live game issues -->
-<script src="./emergency-cache-refresh.js"></script>
+ <script src="./production-ready-precomputed.js"></script>
+ <script src="./performance-monitor.js"></script>
+ <script src="./completed-weeks-migrator.js"></script>
+<!-- 🚨 EMERGENCY CACHE REFRESH TOOL - For live game issues (using comprehensive version) -->
 <!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
@@ -1036,6 +1037,7 @@
                  <a href="./websocket-test.html" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🚀 WebSocket Test</a>
                  <button id="user-diagnostic-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🔬 User Diagnostics</button>
                  <button id="system-dashboard-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">📊 System Dashboard</button>
+                 <button id="precomputed-migration-btn" class="w-full text-left block px-4 py-2 text-sm text-blue-700 hover:bg-blue-50" role="menuitem">🚀 Migrate Precomputed Data</button>
                  <div class="border-t border-gray-200 my-1"></div>
             </div>
             
@@ -8712,6 +8714,32 @@ function attachScoringSystemEventListeners() {
      console.warn('Firebase messaging initialization failed:', error);
  }
  onAuthStateChanged(auth, handleAuthStateChange);
+
+ // 🚨 MAINTENANCE MODE CHECK
+ async function checkMaintenanceMode() {
+     await new Promise((resolve) => {
+         const unsubscribe = window.auth.onAuthStateChanged((user) => {
+             unsubscribe();
+             resolve();
+         });
+         setTimeout(resolve, 3000);
+     });
+
+     const currentUser = window.auth.currentUser;
+     const TONY_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
+
+     if (!currentUser || currentUser.uid !== TONY_UID) {
+         document.body.innerHTML = `
+             <div style="text-align:center; padding:50px; font-size:24px; color:red;">
+                 🚨 NERDFOOTBALL IS STARTING TO FEEL BETTER... STAY TUNED! Tony has made great progress! 🚨
+             </div>
+         `;
+         return false;
+     }
+     return true;
+ }
+
+ checkMaintenanceMode();
 console.log('💎 onAuthStateChanged listener set up');
 
 // Initialize picks view toggle functionality
@@ -13222,7 +13250,30 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
     console.log(`📊 Calculating leaderboard for ${weekNumber ? `week ${weekNumber}` : 'season'}`);
 
     try {
-        // 🏆 FIRST: Try comprehensive scoring system
+        // 🚀 PRIORITY 1: Try precomputed data (Lightning Fast - 0.1ms)
+        if (window.precomputedReader) {
+            console.log('⚡ Checking precomputed data...');
+
+            if (weekNumber && (weekNumber === 1 || weekNumber === 2)) {
+                // Week 1 or 2 - try precomputed
+                const precomputedData = await window.precomputedReader.getWeekLeaderboard(weekNumber);
+                if (precomputedData && precomputedData.length > 0) {
+                    console.log(`🚀 LIGHTNING PERFORMANCE: Using precomputed Week ${weekNumber} data (${precomputedData.length} users)`);
+                    return precomputedData;
+                }
+            } else if (!weekNumber) {
+                // Season leaderboard - try precomputed
+                const precomputedSeason = await window.precomputedReader.getSeasonLeaderboard();
+                if (precomputedSeason && precomputedSeason.length > 0) {
+                    console.log(`🚀 LIGHTNING PERFORMANCE: Using precomputed season data (${precomputedSeason.length} users)`);
+                    return precomputedSeason;
+                }
+            }
+
+            console.log(`⚠️ No precomputed data for ${weekNumber ? `week ${weekNumber}` : 'season'}, falling back to live calculation`);
+        }
+
+        // 🏆 FALLBACK 1: Try comprehensive scoring system
         console.log('🔍 DEBUG: Checking comprehensive scoring system...');
         console.log('🔍 DEBUG: LeaderboardScoringIntegration available:', !!window.LeaderboardScoringIntegration);
 
@@ -13578,13 +13629,13 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      espnGames.forEach(espnGame => {
       // Map ESPN game to our game ID (simple mapping for now)
       const matchedGame = weekData.games.find(game => {
-       return (game.away === espnGame.a || game.away === espnGame.awayTeam) && 
-              (game.home === espnGame.h || game.home === espnGame.homeTeam);
+       return (game.away === espnGame.away_team || game.away === espnGame.awayTeam || game.away === espnGame.a) &&
+              (game.home === espnGame.home_team || game.home === espnGame.homeTeam || game.home === espnGame.h);
       });
       if (matchedGame) {
        liveScores[matchedGame.id] = {
-        awayTeam: espnGame.a || espnGame.awayTeam || matchedGame.away,
-        homeTeam: espnGame.h || espnGame.homeTeam || matchedGame.home,
+        awayTeam: espnGame.away_team || espnGame.awayTeam || espnGame.a || matchedGame.away,
+        homeTeam: espnGame.home_team || espnGame.homeTeam || espnGame.h || matchedGame.home,
         awayScore: espnGame.awayScore || 0,
         homeScore: espnGame.homeScore || 0,
         winner: espnGame.winner,
@@ -14953,7 +15004,7 @@ if (!activePicks.mnfTotalPoints) {
 
  // --- EVENT LISTENERS ---
  allUI.picksViewBtn.addEventListener('click', async () => {
-    allUI.picksContainer.classList.add('hidden');
+    allUI.picksContainer.classList.remove('hidden');
     allUI.picksSummaryContainer.classList.remove('hidden');
     allUI.adminContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.add('hidden');
@@ -15003,6 +15054,64 @@ document.getElementById('system-dashboard-btn')?.addEventListener('click', () =>
     // Pass admin credentials to dashboard and navigate in same window
     const dashboardURL = `./nerdfootball-system-architecture.html?admin=${currentUser.uid}&timestamp=${Date.now()}`;
     window.location.href = dashboardURL;
+});
+
+// Precomputed Data Migration Admin Button
+document.getElementById('precomputed-migration-btn')?.addEventListener('click', async () => {
+    // 🔒 ADMIN SECURITY CHECK
+    if (!window.auth || !window.auth.currentUser) {
+        alert('❌ You must be logged in to run migration.');
+        return;
+    }
+
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2']; // Tony's UID
+    if (!ADMIN_UIDS.includes(window.auth.currentUser.uid)) {
+        alert('❌ Admin permissions required for migration.');
+        return;
+    }
+
+    if (!window.migrateCompletedWeeks) {
+        alert('❌ Migration system not loaded. Please refresh the page and try again.');
+        return;
+    }
+
+    if (!confirm('🚀 Start migration of Week 1 & 2 data to precomputed format?\n\nThis will create lightning-fast leaderboards for completed weeks.\n\n⚠️ This operation will write to Firestore. Continue?')) {
+        return;
+    }
+
+    console.log('🚀 ADMIN: Starting precomputed data migration...');
+
+    try {
+        // Show loading state
+        const button = document.getElementById('precomputed-migration-btn');
+        const originalText = button.textContent;
+        button.textContent = '🔄 Migrating...';
+        button.disabled = true;
+
+        // Run migration with authenticated user
+        const results = await window.migrateCompletedWeeks();
+
+        // Restore button
+        button.textContent = originalText;
+        button.disabled = false;
+
+        if (results.errors && results.errors.length > 0) {
+            console.error('❌ Migration completed with errors:', results);
+            alert(`❌ Migration completed with ${results.errors.length} errors.\n\nCheck console for details.`);
+        } else {
+            console.log('✅ Migration completed successfully:', results);
+            alert(`✅ Migration successful!\n\nMigrated weeks: ${results.migratedWeeks.join(', ')}\nTime: ${Math.round(results.performance.totalTime)}ms\n\nWeek 1 & 2 leaderboards now load instantly!`);
+        }
+
+    } catch (error) {
+        // Restore button
+        const button = document.getElementById('precomputed-migration-btn');
+        button.textContent = '🚀 Migrate Precomputed Data';
+        button.disabled = false;
+
+        console.error('❌ Migration failed:', error);
+        alert(`❌ Migration failed: ${error.message}\n\nCheck console for details.`);
+    }
 });
 
  if (allUI.survivorAdminBtn) {
@@ -18462,8 +18571,8 @@ async function getUserStatsDisplay(userId, currentWeek) {
         const userSeasonData = await window.ScoringSystemManager.getUserSeasonTotals(userId);
         console.log("🚀 FAST: Got user season data:", userSeasonData);
 
-        if (userSeasonData && userSeasonData.seasonTotal !== undefined) {
-            const totalPoints = userSeasonData.seasonTotal;
+        if (userSeasonData && userSeasonData.totalPoints !== undefined) {
+            const totalPoints = userSeasonData.totalPoints;
             const weeksPlayed = userSeasonData.weeksPlayed || 0;
             const weeklyPerformance = userSeasonData.weeklyPerformance || [];
             const thisWeekPoints = userSeasonData.currentWeekPoints || 0;
@@ -18686,5 +18795,10 @@ if (document.readyState === "loading") {
 
 console.log("🎯 Tab navigation script loaded");
 </script>
+
+<!-- 🔍 TEST PRODUCTION PRECOMPUTED SYSTEM -->
+<script src="./test-production-precomputed.js"></script>
+
+<!-- LAZY LOADING REMOVED - WAS CAUSING INFINITE LOOPS -->
 </body>
 </html>

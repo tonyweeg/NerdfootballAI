@@ -30,8 +30,10 @@ window.ScoringSystemManager = {
             console.log(`🏆 Phase 2: Generating weekly leaderboard for Week ${weekNumber}...`);
             results.phase2_leaderboard = await window.WeeklyLeaderboardGenerator.generateWeeklyLeaderboard(weekNumber, true);
 
-            // Phase 3: Update season aggregates for all users
+            // Phase 3: Update season aggregates for all users (with delay for Firestore consistency)
             console.log(`🎯 Phase 3: Updating season totals...`);
+            console.log(`⏱️ Waiting 3 seconds for Firestore writes to propagate...`);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for Firestore writes
             results.phase3_seasonUpdate = await this.updateSeasonTotals(weekNumber);
 
             results.endTime = new Date().toISOString();
