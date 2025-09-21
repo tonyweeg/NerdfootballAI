@@ -128,8 +128,6 @@ window.ScoringSystemManager = {
 
             for (const member of poolMembers) {
                 try {
-                    console.log(`🔍 Processing member: ${member.displayName || member.email || member.uid.slice(-6)} (${member.uid})`);
-
                     // Get stored scoring data document
                     const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${member.uid}`;
                     const docRef = window.doc(window.db, scorePath);
@@ -145,7 +143,6 @@ window.ScoringSystemManager = {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         const weeklyPoints = data.weeklyPoints || {};
-                        console.log(`📊 Found scoring data for ${member.displayName || member.uid.slice(-6)}: ${Object.keys(weeklyPoints).length} weeks`);
 
                         // Aggregate ONLY the completed weeks
                         for (const weekNumber of completedWeeks) {
@@ -239,7 +236,7 @@ window.ScoringSystemManager = {
                     });
 
                     if (totalPoints > 0) {
-                        console.log(`✅ ${member.displayName || member.uid.slice(-6)}: ${totalPoints} points (${weeksPlayed} weeks)`);
+                        // User has points, add to leaderboard
                     }
                 } catch (userError) {
                     console.warn(`⚠️ Error loading stored data for ${member.uid}:`, userError);
