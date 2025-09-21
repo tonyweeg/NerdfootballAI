@@ -16,7 +16,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -36,7 +36,12 @@
         window.functions = getFunctions(app);
         window.rtdb = getDatabase(app);
         window.auth = getAuth(app);
-        window.firebaseUtils = { doc, getDoc, collection, getDocs, onSnapshot, ref, onValue, httpsCallable, onAuthStateChanged };
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.firebaseUtils = { doc, getDoc, collection, getDocs, onSnapshot, ref, onValue, httpsCallable, onAuthStateChanged, setDoc };
 
         console.log('🔥 Firebase initialized for dashboard');
 
@@ -432,6 +437,9 @@
             </button>
             <button onclick="showTab('scoring-admin')" class="tab-btn" data-tab="scoring-admin">
                 📊 Scoring Admin
+            </button>
+            <button onclick="showTab('nfl-audit')" class="tab-btn" data-tab="nfl-audit">
+                🏈 NFL Audit
             </button>
         </div>
     </div>
@@ -907,6 +915,25 @@
                             <p class="text-sm font-medium text-gray-600">Survival Rate</p>
                             <p class="text-xl font-bold text-purple-600" id="dashboard-survival-rate">--%</p>
                         </div>
+    <!-- NFL Audit Tab -->
+    <div id="tab-nfl-audit" class="tab-content hidden">
+        <div class="dashboard-grid">
+            <!-- NFL Audit Header -->
+            <div class="glass-effect ocean-card rounded-xl p-6 col-span-full">
+                <h3 class="text-3xl font-700 ocean-text mb-4">🏈 NFL Foundation Data Audit</h3>
+                <div class="flex flex-wrap gap-4 items-center justify-between">
+                    <div class="flex gap-4">
+                        <button onclick="loadNFLAuditData()" class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-all">
+                            🔄 Refresh NFL Data
+                        </button>
+                        <button onclick="exportNFLData()" class="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all">
+                            📊 Export Data
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-4 text-sm ocean-text">
+                        <div id="nfl-audit-status">🔍 Loading...</div>
+                        <div id="nfl-weeks-found">Weeks: --</div>
+                        <div id="nfl-games-total">Games: --</div>
                     </div>
                 </div>
             </div>
@@ -963,6 +990,113 @@
                             <i class="fas fa-layer-group mr-2"></i>
                             Bulk Operations
                         </button>
+            <!-- Week Selector -->
+            <div class="glass-effect ocean-card rounded-xl p-6">
+                <h4 class="text-xl font-600 ocean-text mb-4">📅 Week Selection</h4>
+                <div id="week-selector" class="grid grid-cols-3 md:grid-cols-6 gap-2">
+                    <!-- Week buttons will be dynamically generated -->
+                </div>
+                <div class="mt-4 text-sm ocean-text-muted">
+                    <div id="selected-week-info">Select a week to view detailed results</div>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="glass-effect ocean-card rounded-xl p-6">
+                <h4 class="text-xl font-600 ocean-text mb-4">📊 Quick Stats</h4>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="ocean-text">Total Weeks Available:</span>
+                        <span class="font-600 ocean-accent" id="stats-total-weeks">--</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="ocean-text">Total Games:</span>
+                        <span class="font-600 ocean-accent" id="stats-total-games">--</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="ocean-text">Foundation Status:</span>
+                        <span class="font-600" id="stats-foundation-status">🔍 Checking...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Winners Table -->
+            <div class="glass-effect ocean-card rounded-xl p-6 col-span-full">
+                <h4 class="text-2xl font-700 ocean-text mb-4">🏆 WINNERS</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-slate-300">
+                                <th class="text-left p-3 ocean-text">Week</th>
+                                <th class="text-left p-3 ocean-text">Winner</th>
+                                <th class="text-left p-3 ocean-text">Score</th>
+                                <th class="text-left p-3 ocean-text">Beat</th>
+                                <th class="text-left p-3 ocean-text">Final Score</th>
+                                <th class="text-left p-3 ocean-text">Margin</th>
+                            </tr>
+                        </thead>
+                        <tbody id="winners-table-body">
+                            <tr>
+                                <td colspan="6" class="p-6 text-center ocean-text-muted">
+                                    Click "Refresh NFL Data" to load winners
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Losers Table -->
+            <div class="glass-effect ocean-card rounded-xl p-6 col-span-full">
+                <h4 class="text-2xl font-700 ocean-text mb-4">💀 LOSERS</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-slate-300">
+                                <th class="text-left p-3 ocean-text">Week</th>
+                                <th class="text-left p-3 ocean-text">Loser</th>
+                                <th class="text-left p-3 ocean-text">Score</th>
+                                <th class="text-left p-3 ocean-text">Lost To</th>
+                                <th class="text-left p-3 ocean-text">Final Score</th>
+                                <th class="text-left p-3 ocean-text">How They Lost</th>
+                            </tr>
+                        </thead>
+                        <tbody id="losers-table-body">
+                            <tr>
+                                <td colspan="6" class="p-6 text-center ocean-text-muted">
+                                    Click "Refresh NFL Data" to load losers
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Critical Fixes Summary -->
+            <div class="glass-effect ocean-card rounded-xl p-6 col-span-full">
+                <h4 class="text-2xl font-700 ocean-text mb-4">🚨 Foundation Fix Summary</h4>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-gradient-to-r from-red-100 to-red-200 p-4 rounded-lg">
+                        <h5 class="text-lg font-600 text-red-800 mb-2">❌ Week 1 Corrections Applied</h5>
+                        <div class="space-y-2 text-red-700">
+                            <div>🔧 <strong>Miami Dolphins:</strong> Now correctly LOSES 8-33 to Colts</div>
+                            <div>🔧 <strong>Houston Texans:</strong> Now correctly LOSES 9-14 to Rams</div>
+                            <div class="text-sm mt-2">These teams were showing as winners in corrupted data</div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-r from-green-100 to-green-200 p-4 rounded-lg">
+                        <h5 class="text-lg font-600 text-green-800 mb-2">💀 Survivor Eliminations</h5>
+                        <div class="space-y-1 text-green-700">
+                            <div>💀 Erik Weeg (Miami) - ELIMINATED Week 1</div>
+                            <div>💀 jim weeg (Miami) - ELIMINATED Week 1</div>
+                            <div>💀 John Durkin (Houston) - ELIMINATED Week 1</div>
+                            <div>💀 Rob Altork (Miami) - ELIMINATED Week 1</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 p-4 bg-gradient-to-r from-blue-100 to-blue-200 rounded-lg">
+                    <div class="text-blue-800">
+                        <strong>✅ Foundation Status:</strong> All REAL NFL data installed for accurate survivor logic
                     </div>
                 </div>
             </div>
@@ -981,6 +1115,10 @@
                     </span>
                 </h3>
                 <div class="flex gap-3">
+                    <button id="process-scoring-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center">
+                        <i class="fas fa-bolt mr-2"></i>
+                        Process Weeks 1-2
+                    </button>
                     <button id="generate-season-leaderboard-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center">
                         <i class="fas fa-trophy mr-2"></i>
                         Generate Season Leaderboard
@@ -2260,6 +2398,244 @@ Thanks for playing and see you next week!`
         }
 
         // Auto-refresh survivor stats when tab becomes active
+        // NFL Audit System Functions
+        let nflAuditData = {};
+        let availableWeeks = [];
+        let selectedWeek = null;
+
+        async function loadNFLAuditData() {
+            try {
+                log('Loading NFL audit data...', 'info');
+                document.getElementById('nfl-audit-status').textContent = '🔄 Loading...';
+
+                // Get Firebase utils once outside the loop
+                const { doc, getDoc } = window.firebaseUtils;
+
+                // Check weeks 1-18 for available data
+                availableWeeks = [];
+                let totalGames = 0;
+
+                for (let week = 1; week <= 18; week++) {
+                    try {
+                        const weekDoc = await getDoc(doc(window.db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`));
+
+                        if (weekDoc.exists()) {
+                            const weekData = weekDoc.data();
+                            const gameCount = Object.keys(weekData).length;
+
+                            if (gameCount > 0) {
+                                availableWeeks.push(week);
+                                nflAuditData[week] = weekData;
+                                totalGames += gameCount;
+                                log(`Week ${week}: ${gameCount} games found`, 'success');
+                            } else {
+                                log(`Week ${week}: Document exists but no games`, 'info');
+                            }
+                        } else {
+                            log(`Week ${week}: No document found`, 'info');
+                        }
+                    } catch (error) {
+                        log(`Week ${week}: Error - ${error.message}`, 'error');
+                    }
+                }
+
+                updateNFLAuditUI(totalGames);
+                generateWeekSelector();
+                processAllNFLData();
+
+                log(`NFL audit complete: ${availableWeeks.length} weeks, ${totalGames} games`, 'success');
+
+            } catch (error) {
+                log(`Error loading NFL audit data: ${error.message}`, 'error');
+                document.getElementById('nfl-audit-status').textContent = '❌ Error loading';
+            }
+        }
+
+        function updateNFLAuditUI(totalGames) {
+            document.getElementById('nfl-audit-status').textContent = '✅ Loaded';
+            document.getElementById('nfl-weeks-found').textContent = `Weeks: ${availableWeeks.length}`;
+            document.getElementById('nfl-games-total').textContent = `Games: ${totalGames}`;
+
+            document.getElementById('stats-total-weeks').textContent = availableWeeks.length;
+            document.getElementById('stats-total-games').textContent = totalGames;
+
+            // Check foundation status
+            const hasWeek1 = availableWeeks.includes(1);
+            const hasWeek2 = availableWeeks.includes(2);
+
+            if (hasWeek1 && hasWeek2) {
+                document.getElementById('stats-foundation-status').innerHTML = '<span class="text-green-600">✅ Foundation Solid</span>';
+            } else {
+                document.getElementById('stats-foundation-status').innerHTML = '<span class="text-red-600">⚠️ Foundation Issues</span>';
+            }
+        }
+
+        function generateWeekSelector() {
+            const selector = document.getElementById('week-selector');
+
+            selector.innerHTML = availableWeeks.map(week => `
+                <button onclick="selectWeek(${week})"
+                        class="week-btn px-3 py-2 rounded-lg border transition-all ${selectedWeek === week ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-cyan-500' : 'bg-white ocean-text border-slate-300 hover:border-cyan-400'}"
+                        data-week="${week}">
+                    Week ${week}
+                </button>
+            `).join('');
+
+            // Add "All Weeks" button
+            selector.innerHTML += `
+                <button onclick="selectWeek('all')"
+                        class="week-btn px-3 py-2 rounded-lg border transition-all ${selectedWeek === 'all' ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-purple-500' : 'bg-white ocean-text border-slate-300 hover:border-purple-400'}">
+                    All Weeks
+                </button>
+            `;
+        }
+
+        function selectWeek(week) {
+            selectedWeek = week;
+            generateWeekSelector(); // Refresh buttons
+
+            if (week === 'all') {
+                document.getElementById('selected-week-info').textContent = `Showing all ${availableWeeks.length} weeks`;
+                processAllNFLData();
+            } else {
+                document.getElementById('selected-week-info').textContent = `Showing Week ${week} only`;
+                processSingleWeekData(week);
+            }
+        }
+
+        function processAllNFLData() {
+            const winners = [];
+            const losers = [];
+
+            availableWeeks.forEach(week => {
+                const weekData = nflAuditData[week];
+                Object.entries(weekData).forEach(([gameId, game]) => {
+                    const result = processGameData(game, week);
+                    winners.push(result.winner);
+                    losers.push(result.loser);
+                });
+            });
+
+            displayNFLResults(winners, losers);
+        }
+
+        function processSingleWeekData(week) {
+            const winners = [];
+            const losers = [];
+
+            const weekData = nflAuditData[week];
+            if (weekData) {
+                Object.entries(weekData).forEach(([gameId, game]) => {
+                    const result = processGameData(game, week);
+                    winners.push(result.winner);
+                    losers.push(result.loser);
+                });
+            }
+
+            displayNFLResults(winners, losers);
+        }
+
+        function processGameData(game, week) {
+            const winner = game.winner;
+            const homeTeam = game.homeTeam;
+            const awayTeam = game.awayTeam;
+            const homeScore = game.homeScore;
+            const awayScore = game.awayScore;
+
+            const loser = winner === homeTeam ? awayTeam : homeTeam;
+            const winnerScore = winner === homeTeam ? homeScore : awayScore;
+            const loserScore = winner === homeTeam ? awayScore : homeScore;
+            const margin = Math.abs(winnerScore - loserScore);
+
+            return {
+                winner: {
+                    week,
+                    team: winner,
+                    score: winnerScore,
+                    opponent: loser,
+                    opponentScore: loserScore,
+                    finalScore: `${winnerScore}-${loserScore}`,
+                    margin: `+${margin}`
+                },
+                loser: {
+                    week,
+                    team: loser,
+                    score: loserScore,
+                    opponent: winner,
+                    opponentScore: winnerScore,
+                    finalScore: `${loserScore}-${winnerScore}`,
+                    howLost: `Lost by ${margin} points`
+                }
+            };
+        }
+
+        function displayNFLResults(winners, losers) {
+            // Sort by week then team name
+            winners.sort((a, b) => a.week - b.week || a.team.localeCompare(b.team));
+            losers.sort((a, b) => a.week - b.week || a.team.localeCompare(b.team));
+
+            // Update winners table
+            const winnersTableBody = document.getElementById('winners-table-body');
+            winnersTableBody.innerHTML = winners.map(winner => `
+                <tr class="border-b border-slate-200 hover:bg-gradient-to-r hover:from-green-50 hover:to-green-100 transition-all">
+                    <td class="p-3 font-600 ocean-text">Week ${winner.week}</td>
+                    <td class="p-3 font-700 text-green-700">${winner.team}</td>
+                    <td class="p-3 text-2xl font-800 text-green-600">${winner.score}</td>
+                    <td class="p-3 ocean-text">${winner.opponent}</td>
+                    <td class="p-3 font-mono text-lg ocean-text">${winner.finalScore}</td>
+                    <td class="p-3 font-600 text-green-600">${winner.margin}</td>
+                </tr>
+            `).join('');
+
+            // Update losers table
+            const losersTableBody = document.getElementById('losers-table-body');
+            losersTableBody.innerHTML = losers.map(loser => `
+                <tr class="border-b border-slate-200 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 transition-all">
+                    <td class="p-3 font-600 ocean-text">Week ${loser.week}</td>
+                    <td class="p-3 font-700 text-red-700">${loser.team}</td>
+                    <td class="p-3 text-2xl font-800 text-red-600">${loser.score}</td>
+                    <td class="p-3 ocean-text">${loser.opponent}</td>
+                    <td class="p-3 font-mono text-lg ocean-text">${loser.finalScore}</td>
+                    <td class="p-3 text-red-600">${loser.howLost}</td>
+                </tr>
+            `).join('');
+
+            log(`Displayed ${winners.length} winners and ${losers.length} losers`, 'success');
+        }
+
+        function exportNFLData() {
+            try {
+                const exportData = {
+                    exportDate: new Date().toISOString(),
+                    availableWeeks: availableWeeks,
+                    totalGames: availableWeeks.reduce((sum, week) => sum + Object.keys(nflAuditData[week] || {}).length, 0),
+                    foundationStatus: availableWeeks.includes(1) && availableWeeks.includes(2) ? 'SOLID' : 'ISSUES',
+                    weekData: nflAuditData
+                };
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `nfl-foundation-audit-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                log('NFL data exported successfully', 'success');
+
+            } catch (error) {
+                log(`Error exporting NFL data: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-load NFL audit data when tab is shown
+        function loadNFLAuditTab() {
+            if (Object.keys(nflAuditData).length === 0) {
+                loadNFLAuditData();
+            }
+        }
+
+        // Update showTab function to handle NFL audit
         const originalShowTab = showTab;
         showTab = function(tabName) {
             originalShowTab(tabName);
@@ -2356,14 +2732,61 @@ Thanks for playing and see you next week!`
             }
         }
 
+        // Add event listener for Process Scoring button
+        async function processWeeksScoring() {
+            try {
+                const btn = document.getElementById('process-scoring-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+
+                log('🚀 Processing Weeks 1-2 scoring...', 'info');
+
+                // Process Week 1
+                log('📊 Processing Week 1...', 'info');
+                const week1 = await window.ScoringSystemManager.processWeekScoring(1, true);
+                log(`✅ Week 1: ${week1.phase1_userScoring.usersProcessed} users processed`, 'success');
+
+                // Process Week 2
+                log('📊 Processing Week 2...', 'info');
+                const week2 = await window.ScoringSystemManager.processWeekScoring(2, true);
+                log(`✅ Week 2: ${week2.phase1_userScoring.usersProcessed} users processed`, 'success');
+
+                log('🎉 WEEKS 1-2 SCORING COMPLETE! Season leaderboard should now show points.', 'success');
+
+            } catch (error) {
+                log(`❌ Error processing scoring: ${error.message}`, 'error');
+            } finally {
+                const btn = document.getElementById('process-scoring-btn');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-bolt mr-2"></i>Process Weeks 1-2';
+            }
+        }
+
         // Add event listener for Generate Season Leaderboard button
         document.addEventListener('DOMContentLoaded', function() {
             const generateBtn = document.getElementById('generate-season-leaderboard-btn');
             if (generateBtn) {
                 generateBtn.addEventListener('click', generateSeasonLeaderboard);
             }
+
+            const processBtn = document.getElementById('process-scoring-btn');
+            if (processBtn) {
+                processBtn.addEventListener('click', processWeeksScoring);
+            }
         });
+
+        function showTab(tabName) {
+            if (tabName === 'nfl-audit') {
+                loadNFLAuditTab();
+            }
+        }
+
     </script>
+
+    <!-- Scoring System Scripts -->
+    <script src="./ScoringCalculator.js"></script>
+    <script src="./WeeklyLeaderboardGenerator.js"></script>
+    <script src="./ScoringSystemManager.js"></script>
 
     <style>
         @keyframes fade-in {

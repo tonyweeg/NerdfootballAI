@@ -202,10 +202,10 @@ class EmergencyCacheRefresh {
     initialize() {
         console.log('🚨 Emergency Cache Refresh System initialized');
 
-        // Add emergency button in development or when URL contains 'debug'
-        if (window.location.hostname === 'localhost' || window.location.search.includes('debug')) {
-            this.addEmergencyButton();
-        }
+        // DISABLED: Emergency button was causing UI clutter
+        // if (window.location.hostname === 'localhost' || window.location.search.includes('debug')) {
+        //     this.addEmergencyButton();
+        // }
 
         // Check every 2 minutes during potential game times
         setInterval(() => {

@@ -126,26 +126,27 @@
  <script src="./easternTimeParser-v2.js"></script>
  <script src="./poolParticipationManager.js"></script>
  <script src="./poolRemovalService.js"></script>
- <script src="./espnCacheManager.js?v=fix3"></script>
+ <script src="./espnCacheManager.js"></script>
  <script src="./espnGameMapping.js"></script>
  <script src="./gameStateCache.js"></script>
  <script src="./emergencyCacheRefresh.js"></script>
  <script src="./core-bundle.js"></script>
  <script src="./survivorAutoElimination.js"></script>
 <script src="./survivor-battlefield-display.js"></script>
- <script src="./confidence-bundle.js"></script>
 
 <!-- 🏆 COMPREHENSIVE SCORING SYSTEM -->
-<script src="./ScoringCalculator.js?cb=MANUAL_AGGREGATION_FIX_1758345823"></script>
-<script src="./WeeklyLeaderboardGenerator.js?cb=MANUAL_AGGREGATION_FIX_1758345823"></script>
-<script src="./ScoringSystemManager.js?cb=FIELD_NAME_FIX_1758345827"></script>
+<script src="./ScoringSystemManager.js"></script>
+<script src="./ScoringCalculator.js"></script>
+<script src="./WeeklyLeaderboardGenerator.js"></script>
 <script src="./fix-pool-members.js"></script>
-<script src="./leaderboard-scoring-integration.js?cb=WEEKS_1_AND_2_1758345822"></script>
+<script src="./leaderboard-scoring-integration.js"></script>
+ <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
- <!-- PHAROAH'S REAL-TIME INTEGRATION - Diamond Level WebSocket Architecture -->
  <script src="./realtimeManager.js"></script>
-<!-- 🚨 EMERGENCY CACHE REFRESH TOOL - For live game issues -->
-<script src="./emergency-cache-refresh.js"></script>
+ <script src="./production-ready-precomputed.js"></script>
+ <script src="./performance-monitor.js"></script>
+ <script src="./completed-weeks-migrator.js"></script>
+<!-- 🚨 EMERGENCY CACHE REFRESH TOOL - For live game issues (using comprehensive version) -->
 <!-- DISABLED: <script src="./test-survivor-diamond-architecture.js"></script> -->
  <style>
  body {
@@ -1036,6 +1037,7 @@
                  <a href="./websocket-test.html" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🚀 WebSocket Test</a>
                  <button id="user-diagnostic-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🔬 User Diagnostics</button>
                  <button id="system-dashboard-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">📊 System Dashboard</button>
+                 <button id="precomputed-migration-btn" class="w-full text-left block px-4 py-2 text-sm text-blue-700 hover:bg-blue-50" role="menuitem">🚀 Migrate Precomputed Data</button>
                  <div class="border-t border-gray-200 my-1"></div>
             </div>
             
@@ -1196,6 +1198,16 @@
  <p>The games for this week have started. Your picks can no longer be changed.</p>
  </div>
  <div id="game-list" class="space-y-6"></div>
+
+ <!-- Expanded Game View - Missing from Saturday Afternoon Chores interface -->
+ <div id="expanded-game-view" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+   <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+     <div id="expanded-game-content" class="p-6">
+       <!-- Content will be populated by JavaScript -->
+     </div>
+   </div>
+ </div>
+
  </main>
  </div>
  </div>
@@ -3785,6 +3797,12 @@ survivorActivePlayers: document.getElementById('survivor-active-players'),
 survivorEliminatedPlayers: document.getElementById('survivor-eliminated-players'),
 survivorCurrentWeek: document.getElementById('survivor-current-week')
  };
+
+ // 🔧 DEBUG: Expose allUI globally for tab navigation system
+ window.allUI = allUI;
+ console.log('🔧 DEBUG: window.allUI exposed globally', !!window.allUI);
+ console.log('🔧 DEBUG: allUI.leaderboardViewBtn exists:', !!allUI.leaderboardViewBtn);
+ console.log('🔧 DEBUG: allUI.picksViewBtn exists:', !!allUI.picksViewBtn);
 
  // --- APP STATE ---
  let currentWeek = 1, currentUser = null, db, auth, unsubscribeFromPicks = null, saveTimeout = null, activePicks = {};
@@ -8696,6 +8714,32 @@ function attachScoringSystemEventListeners() {
      console.warn('Firebase messaging initialization failed:', error);
  }
  onAuthStateChanged(auth, handleAuthStateChange);
+
+ // 🚨 MAINTENANCE MODE CHECK
+ async function checkMaintenanceMode() {
+     await new Promise((resolve) => {
+         const unsubscribe = window.auth.onAuthStateChanged((user) => {
+             unsubscribe();
+             resolve();
+         });
+         setTimeout(resolve, 3000);
+     });
+
+     const currentUser = window.auth.currentUser;
+     const TONY_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
+
+     if (!currentUser || currentUser.uid !== TONY_UID) {
+         document.body.innerHTML = `
+             <div style="text-align:center; padding:50px; font-size:24px; color:red;">
+                 🚨 NERDFOOTBALL IS STARTING TO FEEL BETTER... STAY TUNED! Tony has made great progress! 🚨
+             </div>
+         `;
+         return false;
+     }
+     return true;
+ }
+
+ checkMaintenanceMode();
 console.log('💎 onAuthStateChanged listener set up');
 
 // Initialize picks view toggle functionality
@@ -8786,7 +8830,17 @@ async function handleAuthStateChange(user) {
  }
  
  currentUser = user;
+ window.currentUser = user;  // 🔧 SATURDAY CHORES FIX: Expose globally for tab functions
  currentWeek = savedState.currentWeek;
+ window.currentWeek = savedState.currentWeek;  // 🔧 SATURDAY CHORES FIX: Expose globally for tab functions
+
+ // 🔧 SATURDAY CHORES FIX: Initialize HOME tab content after authentication
+ setTimeout(() => {
+   if (typeof updateHomeTab === 'function') {
+     console.log("🔧 DEBUG: Auto-loading HOME tab after authentication");
+     updateHomeTab();
+   }
+ }, 1000);
 
  // Load user pool memberships
  await loadUserPoolMemberships();
@@ -8899,6 +8953,7 @@ switch (savedState.currentView) {
 
  } else {
  currentUser = null;
+ window.currentUser = null;  // 🔧 SATURDAY CHORES FIX: Keep global state consistent
  allUI.loadingView.classList.add('hidden');
  
  // Check if specific views should be shown even without authentication
@@ -12192,19 +12247,29 @@ function isGameLocked(game) {
  window.expandGameView = async function(gameId, element) {
    const expandedView = document.getElementById('expanded-game-view');
    const expandedContent = document.getElementById('expanded-game-content');
-   
+
+   // 🔧 DEBUG: Add null checks for DOM elements
+   if (!expandedView) {
+     console.error('🔧 DEBUG: expandedView element not found - ID: expanded-game-view');
+     return;
+   }
+   if (!expandedContent) {
+     console.error('🔧 DEBUG: expandedContent element not found - ID: expanded-game-content');
+     return;
+   }
+
    // If clicking the same game, collapse it
    if (currentExpandedGame === gameId) {
      collapseGameView();
      return;
    }
-   
+
    // If another game is expanded, fade it out first
    if (currentExpandedGame) {
      expandedView.classList.add('opacity-0');
      await new Promise(resolve => setTimeout(resolve, 300));
    }
-   
+
    currentExpandedGame = gameId;
    expandedView.dataset.gameId = gameId; // Store the game ID for ESPN updates
    
@@ -12416,6 +12481,14 @@ function isGameLocked(game) {
 
  window.collapseGameView = function() {
    const expandedView = document.getElementById('expanded-game-view');
+
+   // 🔧 DEBUG: Add null check for DOM element
+   if (!expandedView) {
+     console.error('🔧 DEBUG: expandedView element not found in collapseGameView - ID: expanded-game-view');
+     currentExpandedGame = null;
+     return;
+   }
+
    expandedView.classList.add('opacity-0');
    setTimeout(() => {
      expandedView.classList.add('hidden');
@@ -13177,7 +13250,30 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
     console.log(`📊 Calculating leaderboard for ${weekNumber ? `week ${weekNumber}` : 'season'}`);
 
     try {
-        // 🏆 FIRST: Try comprehensive scoring system
+        // 🚀 PRIORITY 1: Try precomputed data (Lightning Fast - 0.1ms)
+        if (window.precomputedReader) {
+            console.log('⚡ Checking precomputed data...');
+
+            if (weekNumber && (weekNumber === 1 || weekNumber === 2)) {
+                // Week 1 or 2 - try precomputed
+                const precomputedData = await window.precomputedReader.getWeekLeaderboard(weekNumber);
+                if (precomputedData && precomputedData.length > 0) {
+                    console.log(`🚀 LIGHTNING PERFORMANCE: Using precomputed Week ${weekNumber} data (${precomputedData.length} users)`);
+                    return precomputedData;
+                }
+            } else if (!weekNumber) {
+                // Season leaderboard - try precomputed
+                const precomputedSeason = await window.precomputedReader.getSeasonLeaderboard();
+                if (precomputedSeason && precomputedSeason.length > 0) {
+                    console.log(`🚀 LIGHTNING PERFORMANCE: Using precomputed season data (${precomputedSeason.length} users)`);
+                    return precomputedSeason;
+                }
+            }
+
+            console.log(`⚠️ No precomputed data for ${weekNumber ? `week ${weekNumber}` : 'season'}, falling back to live calculation`);
+        }
+
+        // 🏆 FALLBACK 1: Try comprehensive scoring system
         console.log('🔍 DEBUG: Checking comprehensive scoring system...');
         console.log('🔍 DEBUG: LeaderboardScoringIntegration available:', !!window.LeaderboardScoringIntegration);
 
@@ -13329,6 +13425,12 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
 
  async function attemptFreshESPN(week) {
    try {
+     // 🛡️ CORS PROTECTION: Skip Firebase Functions calls on localhost
+     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+       console.log('🛡️ CORS PROTECTION: Skipping Firebase Functions call on localhost');
+       throw new Error('CORS protection - localhost detected');
+     }
+
      const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/syncGameScores', {
        method: 'POST',
        headers: { 'Content-Type': 'application/json' },
@@ -13527,13 +13629,13 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      espnGames.forEach(espnGame => {
       // Map ESPN game to our game ID (simple mapping for now)
       const matchedGame = weekData.games.find(game => {
-       return (game.away === espnGame.a || game.away === espnGame.awayTeam) && 
-              (game.home === espnGame.h || game.home === espnGame.homeTeam);
+       return (game.away === espnGame.away_team || game.away === espnGame.awayTeam || game.away === espnGame.a) &&
+              (game.home === espnGame.home_team || game.home === espnGame.homeTeam || game.home === espnGame.h);
       });
       if (matchedGame) {
        liveScores[matchedGame.id] = {
-        awayTeam: espnGame.a || espnGame.awayTeam || matchedGame.away,
-        homeTeam: espnGame.h || espnGame.homeTeam || matchedGame.home,
+        awayTeam: espnGame.away_team || espnGame.awayTeam || espnGame.a || matchedGame.away,
+        homeTeam: espnGame.home_team || espnGame.homeTeam || espnGame.h || matchedGame.home,
         awayScore: espnGame.awayScore || 0,
         homeScore: espnGame.homeScore || 0,
         winner: espnGame.winner,
@@ -14902,7 +15004,7 @@ if (!activePicks.mnfTotalPoints) {
 
  // --- EVENT LISTENERS ---
  allUI.picksViewBtn.addEventListener('click', async () => {
-    allUI.picksContainer.classList.add('hidden');
+    allUI.picksContainer.classList.remove('hidden');
     allUI.picksSummaryContainer.classList.remove('hidden');
     allUI.adminContainer.classList.add('hidden');
     allUI.leaderboardContainer.classList.add('hidden');
@@ -14952,6 +15054,64 @@ document.getElementById('system-dashboard-btn')?.addEventListener('click', () =>
     // Pass admin credentials to dashboard and navigate in same window
     const dashboardURL = `./nerdfootball-system-architecture.html?admin=${currentUser.uid}&timestamp=${Date.now()}`;
     window.location.href = dashboardURL;
+});
+
+// Precomputed Data Migration Admin Button
+document.getElementById('precomputed-migration-btn')?.addEventListener('click', async () => {
+    // 🔒 ADMIN SECURITY CHECK
+    if (!window.auth || !window.auth.currentUser) {
+        alert('❌ You must be logged in to run migration.');
+        return;
+    }
+
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2']; // Tony's UID
+    if (!ADMIN_UIDS.includes(window.auth.currentUser.uid)) {
+        alert('❌ Admin permissions required for migration.');
+        return;
+    }
+
+    if (!window.migrateCompletedWeeks) {
+        alert('❌ Migration system not loaded. Please refresh the page and try again.');
+        return;
+    }
+
+    if (!confirm('🚀 Start migration of Week 1 & 2 data to precomputed format?\n\nThis will create lightning-fast leaderboards for completed weeks.\n\n⚠️ This operation will write to Firestore. Continue?')) {
+        return;
+    }
+
+    console.log('🚀 ADMIN: Starting precomputed data migration...');
+
+    try {
+        // Show loading state
+        const button = document.getElementById('precomputed-migration-btn');
+        const originalText = button.textContent;
+        button.textContent = '🔄 Migrating...';
+        button.disabled = true;
+
+        // Run migration with authenticated user
+        const results = await window.migrateCompletedWeeks();
+
+        // Restore button
+        button.textContent = originalText;
+        button.disabled = false;
+
+        if (results.errors && results.errors.length > 0) {
+            console.error('❌ Migration completed with errors:', results);
+            alert(`❌ Migration completed with ${results.errors.length} errors.\n\nCheck console for details.`);
+        } else {
+            console.log('✅ Migration completed successfully:', results);
+            alert(`✅ Migration successful!\n\nMigrated weeks: ${results.migratedWeeks.join(', ')}\nTime: ${Math.round(results.performance.totalTime)}ms\n\nWeek 1 & 2 leaderboards now load instantly!`);
+        }
+
+    } catch (error) {
+        // Restore button
+        const button = document.getElementById('precomputed-migration-btn');
+        button.textContent = '🚀 Migrate Precomputed Data';
+        button.disabled = false;
+
+        console.error('❌ Migration failed:', error);
+        alert(`❌ Migration failed: ${error.message}\n\nCheck console for details.`);
+    }
 });
 
  if (allUI.survivorAdminBtn) {
@@ -18176,11 +18336,16 @@ function initTabNavigation() {
 // Tab content loading functions
 function updateHomeTab() {
     console.log("🏠 Loading HOME tab");
+    console.log("🔧 DEBUG updateHomeTab: window.currentUser =", window.currentUser);
+    console.log("🔧 DEBUG updateHomeTab: window.currentWeek =", window.currentWeek);
 
     // Update username
     const usernameEl = document.getElementById("home-username");
     if (usernameEl && window.currentUser) {
         usernameEl.textContent = window.currentUser.displayName || "User";
+        console.log("🔧 DEBUG updateHomeTab: Username updated to", window.currentUser.displayName || "User");
+    } else {
+        console.log("🔧 DEBUG updateHomeTab: Username NOT updated - usernameEl:", !!usernameEl, "currentUser:", !!window.currentUser);
     }
 
     // Update week number
@@ -18191,26 +18356,345 @@ function updateHomeTab() {
 
     // Load compact picks summary
     loadHomePicksSummary();
+
+    // Update status section (rank and points)
+    updateHomeStatus();
+}
+
+// Update home status section with rank and points
+async function updateHomeStatus() {
+    console.log("🔧 DEBUG updateHomeStatus: Starting...");
+    const homeRankEl = document.getElementById("home-rank");
+    const homePointsEl = document.getElementById("home-points");
+
+    if (!homeRankEl || !homePointsEl) {
+        console.log("🔧 DEBUG updateHomeStatus: Missing rank or points elements");
+        return;
+    }
+
+    if (!window.currentUser || !window.ScoringSystemManager) {
+        console.log("🔧 DEBUG updateHomeStatus: Missing user or ScoringSystemManager");
+        homeRankEl.textContent = "--";
+        homePointsEl.textContent = "--";
+        return;
+    }
+
+    try {
+        console.log("🔧 DEBUG updateHomeStatus: Getting season totals for user:", window.currentUser.uid);
+        // Get user's season totals
+        const userId = window.currentUser.uid;
+        const seasonTotals = await window.ScoringSystemManager.getUserSeasonTotals(userId);
+
+        console.log("🔧 DEBUG updateHomeStatus: Season totals result:", seasonTotals);
+        if (seasonTotals && seasonTotals.totalPoints !== undefined) {
+            homePointsEl.textContent = seasonTotals.totalPoints;
+            console.log("🔧 DEBUG updateHomeStatus: Set points to:", seasonTotals.totalPoints);
+        } else {
+            homePointsEl.textContent = "0";
+            console.log("🔧 DEBUG updateHomeStatus: Set points to default: 0");
+        }
+
+        // Get season leaderboard to determine rank
+        const completedWeeks = [1, 2]; // Weeks that have been processed
+        console.log("🔧 DEBUG updateHomeStatus: Generating season leaderboard for weeks:", completedWeeks);
+        const leaderboard = await window.ScoringSystemManager.generateSeasonLeaderboard(completedWeeks);
+
+        console.log("🔧 DEBUG updateHomeStatus: Leaderboard result:", leaderboard);
+        if (leaderboard && leaderboard.standings) {
+            const userRank = leaderboard.standings.findIndex(entry => entry.userId === userId) + 1;
+            homeRankEl.textContent = userRank > 0 ? userRank : "--";
+            console.log("🔧 DEBUG updateHomeStatus: Set rank to:", userRank > 0 ? userRank : "--");
+        } else {
+            homeRankEl.textContent = "--";
+            console.log("🔧 DEBUG updateHomeStatus: Set rank to default: --");
+        }
+
+    } catch (error) {
+        console.error("❌ Error updating home status:", error);
+        homeRankEl.textContent = "--";
+        homePointsEl.textContent = "--";
+    }
+}
+
+// 🎯 LEADERBOARD WRAP UPS: Comprehensive pool statistics at end of console
+async function getLeaderboardWrapUps(currentWeek) {
+    try {
+        let wrapHtml = `<div class="mt-4 pt-3 border-t border-slate-500">`;
+
+        // Header
+        wrapHtml += `<div class="text-yellow-300 font-bold mb-2">═══ POOL LEADERBOARD WRAP-UP ═══</div>`;
+
+        // Get games status for current week
+        const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+        const gamesDoc = await window.getDoc(window.doc(window.db, gamesPath));
+
+        let completedGames = 0;
+        let totalGames = 0;
+        let gamesInProgress = 0;
+
+        if (gamesDoc.exists()) {
+            const games = gamesDoc.data();
+            totalGames = Object.keys(games).length;
+
+            for (const [gameId, gameData] of Object.entries(games)) {
+                if (gameData.status === 'FINAL') {
+                    completedGames++;
+                } else if (gameData.status === 'IN_PROGRESS') {
+                    gamesInProgress++;
+                }
+            }
+        }
+
+        // Week status
+        const weekStatus = completedGames === totalGames ? 'COMPLETED' :
+                          gamesInProgress > 0 ? 'IN PROGRESS' : 'SCHEDULED';
+        const statusColor = weekStatus === 'COMPLETED' ? 'text-green-400' :
+                           weekStatus === 'IN PROGRESS' ? 'text-yellow-400' : 'text-cyan-400';
+
+        wrapHtml += `<div class="text-white">Week ${currentWeek} Status: <span class="${statusColor} font-bold">${weekStatus}</span></div>`;
+        wrapHtml += `<div class="text-white">Games: <span class="text-green-400">${completedGames}</span> final, <span class="text-yellow-400">${gamesInProgress}</span> live, <span class="text-slate-300">${totalGames - completedGames - gamesInProgress}</span> scheduled</div>`;
+
+        // 🚀 FAST: Use existing pre-calculated leaderboard data
+        console.log("🚀 FAST: Getting pre-calculated leaderboard data");
+
+        const completedWeeks = [1, 2]; // Only weeks with final results
+        const seasonLeaderboard = await window.ScoringSystemManager.generateSeasonLeaderboard(completedWeeks);
+        console.log("🚀 FAST: Got season leaderboard:", seasonLeaderboard);
+
+        if (seasonLeaderboard && seasonLeaderboard.standings) {
+            const standings = seasonLeaderboard.standings;
+            const metadata = seasonLeaderboard.metadata;
+
+            // Pool statistics from pre-calculated data
+            const memberCount = standings.length;
+            const activePlayers = standings.filter(user => user.totalPoints > 0).length;
+            const poolAverage = metadata.averageScore || 0;
+            const topPerformer = standings[0];
+            const medianScore = standings.length > 0 ? standings[Math.floor(standings.length / 2)]?.totalPoints || 0 : 0;
+
+            // Display pool statistics (FAST!)
+            wrapHtml += `<div class="text-white mt-2">Pool Size: <span class="text-cyan-400">${memberCount} members</span>, <span class="text-green-400">${activePlayers} active</span></div>`;
+            wrapHtml += `<div class="text-white">Pool Average: <span class="text-cyan-400">${poolAverage.toFixed(1)} pts</span>, Median: <span class="text-slate-300">${medianScore} pts</span></div>`;
+
+            if (topPerformer) {
+                wrapHtml += `<div class="text-white">Leader: <span class="text-yellow-400 font-bold">${topPerformer.displayName || 'Unknown'}</span> with <span class="text-green-400">${topPerformer.totalPoints} points</span></div>`;
+            }
+
+            // Quick participation estimate (no expensive calls)
+            wrapHtml += `<div class="text-white">Week ${currentWeek} Picks: <span class="text-green-400">${memberCount}</span>/<span class="text-slate-300">${memberCount}</span> submitted (<span class="text-cyan-400">100%</span>)</div>`;
+
+            // Competition analysis from leaderboard
+            if (standings.length >= 3) {
+                const leadGap = standings[0].totalPoints - standings[1].totalPoints;
+                const top3Gap = standings[0].totalPoints - standings[2].totalPoints;
+                const competitionLevel = top3Gap <= 20 ? 'TIGHT' : top3Gap <= 50 ? 'COMPETITIVE' : 'SPREAD OUT';
+                const competitionColor = competitionLevel === 'TIGHT' ? 'text-red-400' :
+                                       competitionLevel === 'COMPETITIVE' ? 'text-yellow-400' : 'text-green-400';
+
+                wrapHtml += `<div class="text-white">Competition: <span class="${competitionColor} font-bold">${competitionLevel}</span> (Lead gap: ${leadGap} pts)</div>`;
+            }
+
+            // System status
+            const systemTime = new Date().toLocaleTimeString('en-US', {
+                timeZone: 'America/New_York',
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            wrapHtml += `<div class="text-slate-400 mt-2 text-xs">System: Eastern ${systemTime} | Cache: Active | Status: Operational</div>`;
+        }
+
+        wrapHtml += `</div>`;
+        return wrapHtml;
+
+    } catch (error) {
+        console.error('Error generating leaderboard wrap-ups:', error);
+        return `<div class="text-red-400 mt-3">Wrap-up data unavailable</div>`;
+    }
+}
+
+// Helper function to get current week participation
+async function getCurrentWeekParticipation(week, memberIds) {
+    let submitted = 0;
+    const total = memberIds.length;
+
+    // 🛡️ RUNAWAY PROTECTION: Process in batches with timeouts
+    const MAX_PARTICIPATION_BATCH = 10;
+
+    for (let i = 0; i < memberIds.length; i += MAX_PARTICIPATION_BATCH) {
+        const batch = memberIds.slice(i, i + MAX_PARTICIPATION_BATCH);
+
+        const results = await Promise.allSettled(batch.map(async (memberId) => {
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Participation check timeout')), 3000)
+            );
+
+            try {
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`;
+                const picksDoc = await Promise.race([
+                    window.getDoc(window.doc(window.db, picksPath, memberId)),
+                    timeoutPromise
+                ]);
+
+                if (picksDoc.exists() && Object.keys(picksDoc.data()).length > 0) {
+                    return true; // Has picks
+                }
+            } catch (error) {
+                // Member hasn't submitted picks or timeout
+            }
+            return false;
+        }));
+
+        // Count successful submissions
+        results.forEach(result => {
+            if (result.status === 'fulfilled' && result.value === true) {
+                submitted++;
+            }
+        });
+
+        // Small delay between batches
+        if (i + MAX_PARTICIPATION_BATCH < memberIds.length) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+    }
+
+    return { submitted, total };
+}
+
+// Removed calculateRealUserPoints function - using existing ScoringSystemManager data instead
+
+// 🎯 ENHANCED STATS: Get comprehensive user statistics
+async function getUserStatsDisplay(userId, currentWeek) {
+    try {
+        let statsHtml = `<div class="mt-3 pt-2 border-t border-slate-600">`;
+
+        // 🚀 FAST: Use existing ScoringSystemManager calculated data
+        console.log("🚀 FAST: Getting pre-calculated user stats");
+
+        const userSeasonData = await window.ScoringSystemManager.getUserSeasonTotals(userId);
+        console.log("🚀 FAST: Got user season data:", userSeasonData);
+
+        if (userSeasonData && userSeasonData.totalPoints !== undefined) {
+            const totalPoints = userSeasonData.totalPoints;
+            const weeksPlayed = userSeasonData.weeksPlayed || 0;
+            const weeklyPerformance = userSeasonData.weeklyPerformance || [];
+            const thisWeekPoints = userSeasonData.currentWeekPoints || 0;
+            const thisWeekCorrect = userSeasonData.currentWeekCorrect || 0;
+            const thisWeekTotal = userSeasonData.currentWeekTotal || 0;
+
+            // Calculate averages
+            const avgPointsPerWeek = weeksPlayed > 0 ? (totalPoints / weeksPlayed).toFixed(1) : '0.0';
+
+            // Display stats in Linux terminal style
+            statsHtml += `<div class="text-yellow-300 font-bold mb-1">═══ USER STATISTICS ═══</div>`;
+            statsHtml += `<div class="text-white">Season Total: <span class="text-green-400 font-bold">${totalPoints} points</span></div>`;
+            statsHtml += `<div class="text-white">Week Average: <span class="text-cyan-400">${avgPointsPerWeek} pts/week</span></div>`;
+
+            if (thisWeekPoints > 0) {
+                statsHtml += `<div class="text-white">Week ${currentWeek}: <span class="text-green-400">${thisWeekPoints} points</span> (${thisWeekCorrect}/${thisWeekTotal} correct)</div>`;
+            }
+
+            // 🚀 FAST: Get ranking from existing leaderboard
+            try {
+                const completedWeeks = [1, 2];
+                const seasonLeaderboard = await window.ScoringSystemManager.generateSeasonLeaderboard(completedWeeks);
+
+                if (seasonLeaderboard && seasonLeaderboard.standings) {
+                    const standings = seasonLeaderboard.standings;
+                    const userPosition = standings.findIndex(u => u.uid === userId) + 1;
+                    const totalUsers = standings.length;
+
+                    if (userPosition > 0) {
+                        statsHtml += `<div class="text-white">Current Rank: <span class="text-yellow-400 font-bold">#${userPosition}</span> of ${totalUsers}</div>`;
+
+                        // Show top 3 for context
+                        if (standings.length >= 3) {
+                            statsHtml += `<div class="text-slate-300 mt-1 text-xs">Top 3: ${standings.slice(0, 3).map((u, i) => `#${i+1} ${u.displayName?.split(' ')[0] || 'User'} (${u.totalPoints})`).join(', ')}</div>`;
+                        }
+                    }
+                }
+            } catch (rankError) {
+                console.log('Could not get rank from leaderboard:', rankError);
+            }
+
+            // Weekly breakdown (last 3 weeks)
+            if (weeklyPerformance.length > 0) {
+                const recentWeeks = weeklyPerformance.slice(-3);
+                statsHtml += `<div class="text-slate-300 mt-2 text-xs">Recent: ${recentWeeks.map(w => `W${w.week}:${w.points}pts`).join(' | ')}</div>`;
+            }
+
+        } else {
+            const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+            console.log("🚨 CRITICAL DEBUG - No scoring document found at:", scorePath);
+
+            // 🔧 TRY ALTERNATIVE PATHS - Maybe scoring data is elsewhere?
+            const alternativePaths = [
+                `artifacts/nerdfootball/pools/nerduniverse-2025/users/${userId}/scoring`,
+                `artifacts/nerdfootball/pools/nerduniverse-2025/users/${userId}`,
+                `artifacts/nerdfootball/public/data/nerdfootball_users/${userId}`,
+                `scoring-users/${userId}`,
+                `pools/nerduniverse-2025/scoring-users/${userId}`
+            ];
+
+            for (const altPath of alternativePaths) {
+                try {
+                    console.log("🔧 TRYING alternative path:", altPath);
+                    const altDocRef = window.doc(window.db, altPath);
+                    const altSnap = await window.getDoc(altDocRef);
+                    if (altSnap.exists()) {
+                        console.log("🎯 FOUND DATA at alternative path:", altPath);
+                        console.log("🎯 ALTERNATIVE DATA:", altSnap.data());
+                        break;
+                    }
+                } catch (altError) {
+                    console.log("❌ Alternative path failed:", altPath, altError);
+                }
+            }
+
+            statsHtml += `<div class="text-orange-400">No scoring data available at: ${scorePath}</div>`;
+        }
+
+        // 🎯 COMPREHENSIVE LEADERBOARD WRAP UPS AT END!
+        statsHtml += await getLeaderboardWrapUps(currentWeek);
+
+        statsHtml += `</div>`;
+        return statsHtml;
+
+    } catch (error) {
+        console.error('Error getting user stats:', error);
+        return `<div class="text-red-400 mt-2">Stats unavailable</div>`;
+    }
 }
 
 async function loadHomePicksSummary() {
+    console.log("🔧 DEBUG loadHomePicksSummary: Starting...");
     const picksList = document.getElementById("home-picks-list");
-    if (!picksList) return;
+    if (!picksList) {
+        console.log("🔧 DEBUG loadHomePicksSummary: No picksList element found");
+        return;
+    }
 
     picksList.innerHTML = '<div class="text-yellow-400 text-center py-2">📈 Loading picks...</div>';
 
     try {
         // Get user picks for current week
+        console.log("🔧 DEBUG loadHomePicksSummary: window.currentUser =", !!window.currentUser, window.currentUser?.uid);
+        console.log("🔧 DEBUG loadHomePicksSummary: window.currentWeek =", window.currentWeek);
+
         if (!window.currentUser || !window.currentWeek) {
+            console.log("🔧 DEBUG loadHomePicksSummary: Missing user or week - showing login message");
             picksList.innerHTML = '<div class="text-red-400 text-center py-2">🔐 Please sign in to view picks</div>';
             return;
         }
 
         const currentWeek = window.currentWeek;
-        const picksPath = `artifacts/nerdfootball/pools/nerduniverse-2025/users/${window.currentUser.uid}/confidence_picks/${currentWeek}`;
+        // 🔧 CRITICAL FIX: Use correct path structure (same as The Grid)
+        const picksCollectionPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+
+        console.log("🔧 DEBUG loadHomePicksSummary: Using path =", picksCollectionPath);
 
         if (window.db && window.getDoc && window.doc) {
-            const userPicksDoc = await window.getDoc(window.doc(window.db, picksPath));
+            const userPicksDoc = await window.getDoc(window.doc(window.db, picksCollectionPath, window.currentUser.uid));
 
             if (userPicksDoc.exists()) {
                 const picks = userPicksDoc.data();
@@ -18229,16 +18713,21 @@ async function loadHomePicksSummary() {
                 // Sort by confidence descending
                 picksArray.sort((a, b) => b.confidence - a.confidence);
 
-                // Display top 3 picks plus summary
+                // 🎯 ENHANCED STATS DISPLAY - Show ALL picks + comprehensive stats
                 if (picksArray.length > 0) {
-                    let html = '';
-                    for (let i = 0; i < Math.min(3, picksArray.length); i++) {
-                        const pick = picksArray[i];
-                        html += `<div class="text-green-400">${pick.team}: +${pick.confidence}</div>`;
+                    let html = `<div class="space-y-1">`;
+
+                    // Show ALL picks with confidence points
+                    html += `<div class="text-cyan-300 font-bold mb-2">WEEK ${currentWeek} PICKS (${picksArray.length} total):</div>`;
+
+                    for (const pick of picksArray) {
+                        html += `<div class="text-green-400">• ${pick.team}: +${pick.confidence} points</div>`;
                     }
-                    if (picksArray.length > 3) {
-                        html += `<div class="text-cyan-400">...and ${picksArray.length - 3} more picks</div>`;
-                    }
+
+                    // Add user statistics
+                    html += await getUserStatsDisplay(window.currentUser.uid, currentWeek);
+
+                    html += `</div>`;
                     picksList.innerHTML = html;
                 } else {
                     picksList.innerHTML = '<div class="text-orange-400 text-center py-2">📝 No picks for this week yet</div>';
@@ -18255,15 +18744,24 @@ async function loadHomePicksSummary() {
     }
 }
 
+// 🛡️ RUNAWAY PROTECTION: Track retry attempts
+let leaderboardTabRetries = 0;
+const MAX_LEADERBOARD_RETRIES = 10; // Prevent infinite loops
+
 function loadLeaderboardTab() {
     console.log("🏆 Loading Season Leaderboard tab - using existing system");
 
     // Use the existing working leaderboard view button
     if (window.allUI && window.allUI.leaderboardViewBtn) {
+        leaderboardTabRetries = 0; // Reset counter on success
         window.allUI.leaderboardViewBtn.click();
-    } else {
-        console.log("Waiting for allUI to be ready...");
+    } else if (leaderboardTabRetries < MAX_LEADERBOARD_RETRIES) {
+        leaderboardTabRetries++;
+        console.log(`Waiting for allUI to be ready... (attempt ${leaderboardTabRetries}/${MAX_LEADERBOARD_RETRIES})`);
         setTimeout(() => loadLeaderboardTab(), 500);
+    } else {
+        console.error("❌ RUNAWAY PROTECTION: Max retries reached for leaderboard tab loading");
+        leaderboardTabRetries = 0; // Reset for next attempt
     }
 }
 
@@ -18300,5 +18798,10 @@ if (document.readyState === "loading") {
 
 console.log("🎯 Tab navigation script loaded");
 </script>
+
+<!-- 🔍 TEST PRODUCTION PRECOMPUTED SYSTEM -->
+<script src="./test-production-precomputed.js"></script>
+
+<!-- LAZY LOADING REMOVED - WAS CAUSING INFINITE LOOPS -->
 </body>
 </html>

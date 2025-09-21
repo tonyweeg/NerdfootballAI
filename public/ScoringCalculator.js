@@ -207,7 +207,11 @@ window.ScoringCalculator = {
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                return data.weeklyPoints?.[weekNumber] || null;
+                const weeklyData = data.weeklyPoints?.[weekNumber] || null;
+                console.log(`🔍 Week ${weekNumber} data for ${userId.slice(-6)}: ${weeklyData ? weeklyData.totalPoints + ' points' : 'NOT FOUND'}`);
+                return weeklyData;
+            } else {
+                console.log(`📭 No scoring document found for ${userId.slice(-6)}`);
             }
             return null;
         } catch (error) {
