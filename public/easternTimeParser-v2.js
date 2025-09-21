@@ -12,7 +12,7 @@ class EasternTimeParserV2 {
     }
 
     /**
-     * Parse ESPN timestamp with intelligent format detection
+     * Parse ESPN timestamp - ESPN Z = Eastern Time (NOT UTC)
      */
     parseESPNTimestamp(espnTimestamp) {
         if (!espnTimestamp) {
@@ -21,28 +21,18 @@ class EasternTimeParserV2 {
         }
 
         try {
-            // Parse as standard UTC first
-            const utcDate = new Date(espnTimestamp);
+            // ESPN Z timestamps are ALWAYS Eastern time, not UTC
+            // Simply remove Z and treat as Eastern time
+            const cleanTime = espnTimestamp.replace('Z', '');
+            const easternTime = new Date(cleanTime);
 
-            if (isNaN(utcDate.getTime())) {
+            if (isNaN(easternTime.getTime())) {
                 console.warn('Invalid ESPN timestamp:', espnTimestamp);
                 return new Date();
             }
 
-            // Check if this is a reasonable time (within 2 weeks of now)
-            const now = new Date();
-            const timeDiff = Math.abs(utcDate - now);
-            const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
-
-            // If the UTC interpretation seems reasonable, use it
-            if (daysDiff <= 14) {
-                console.log(`⏰ ESPN Time (correct UTC): ${espnTimestamp} → ${utcDate.toISOString()}`);
-                return utcDate;
-            }
-
-            // If UTC seems wrong, treat as Eastern Time that needs conversion
-            console.log(`⏰ ESPN Time (treating as Eastern): ${espnTimestamp}`);
-            return this.convertEasternToUTC(espnTimestamp);
+            console.log(`⏰ ESPN Time (Eastern): ${espnTimestamp} → ${easternTime.toLocaleString()}`);
+            return easternTime;
 
         } catch (error) {
             console.error('Error parsing ESPN timestamp:', error);
@@ -72,7 +62,7 @@ class EasternTimeParserV2 {
 
             // FIXED: Create Eastern Time date, then convert to UTC properly
             // Method 1: Use UTC constructor to create the proper UTC time
-            const utcDate = new Date(Date.UTC(year, month, day, hours + offset, minutes, seconds));
+            const utcDate = new Date(Date.UTC(year, month, day, hours - offset, minutes, seconds));
 
             console.log(`⏰ Eastern→UTC: ${easternTimestamp} (${isDST ? 'EDT' : 'EST'}) → ${utcDate.toISOString()}`);
             return utcDate;

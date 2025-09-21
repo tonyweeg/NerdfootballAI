@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Weekly Elimination Checker</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 5px solid #007cba;
+        }
+        .error { background: #fee; border-left-color: #c00; color: #c00; }
+        .success { background: #efe; border-left-color: #060; color: #060; }
+        .info { background: #eef; border-left-color: #006; color: #006; }
+        .highlight { background: #fff3cd; border-left-color: #856404; color: #856404; }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #005a87; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .week-selector {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .big-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007cba;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background: #007cba;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏈 NFL Survivor Pool Elimination Checker</h1>
+
+        <div class="week-selector">
+            <h3>Select Week to Check:</h3>
+            <button onclick="checkWeek(1)">Week 1</button>
+            <button onclick="checkWeek(2)">Week 2</button>
+            <button onclick="checkWeek(3)">Week 3</button>
+            <button onclick="checkAllWeeks()">All Weeks Summary</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            document.getElementById('results').appendChild(div);
+            console.log(message.replace(/<[^>]*>/g, '')); // Log without HTML
+        }
+
+        async function checkWeek(weekNumber) {
+            clearResults();
+            addResult(`🔍 <strong>CHECKING WEEK ${weekNumber} ELIMINATIONS</strong>`, 'highlight');
+
+            try {
+                // Get elimination status
+                const statusDoc = await db.doc('artifacts/nerdfootball/public/data/nerdSurvivor_status/status').get();
+
+                if (!statusDoc.exists) {
+                    addResult('📋 No survivor status document found', 'error');
+                    return;
+                }
+
+                const allStatuses = statusDoc.data();
+                const totalUsers = Object.keys(allStatuses).length;
+
+                // Filter for this week's eliminations
+                const weekEliminations = [];
+                let totalEliminated = 0;
+                let stillActive = 0;
+
+                for (const [userId, status] of Object.entries(allStatuses)) {
+                    if (status.eliminated) {
+                        totalEliminated++;
+                        if (status.eliminatedWeek === weekNumber) {
+                            weekEliminations.push({
+                                userId,
+                                eliminatedWeek: status.eliminatedWeek,
+                                eliminationReason: status.eliminationReason,
+                                eliminatedDate: status.eliminatedDate
+                            });
+                        }
+                    } else {
+                        stillActive++;
+                    }
+                }
+
+                // Summary
+                addResult(`📊 <strong>WEEK ${weekNumber} SUMMARY</strong>`, 'success');
+                addResult(`<div class="big-number">${weekEliminations.length}</div> Users eliminated in Week ${weekNumber}`, 'success');
+                addResult(`Total eliminated so far: <strong>${totalEliminated}</strong> | Still active: <strong>${stillActive}</strong>`, 'info');
+
+                if (weekEliminations.length > 0) {
+                    // Extract teams that caused eliminations
+                    const teamCounts = {};
+                    weekEliminations.forEach(user => {
+                        const reason = user.eliminationReason || '';
+                        const teamMatch = reason.match(/Picked (.+?)(?:,|$)/);
+                        if (teamMatch) {
+                            const team = teamMatch[1];
+                            teamCounts[team] = (teamCounts[team] || 0) + 1;
+                        }
+                    });
+
+                    // Show teams table
+                    if (Object.keys(teamCounts).length > 0) {
+                        let tableHTML = `
+                            <h3>💀 Teams That Caused Week ${weekNumber} Eliminations:</h3>
+                            <table>
+                                <tr><th>Team</th><th>Eliminations</th></tr>
+                        `;
+
+                        Object.entries(teamCounts)
+                            .sort((a, b) => b[1] - a[1])
+                            .forEach(([team, count]) => {
+                                tableHTML += `<tr><td>${team}</td><td><strong>${count}</strong></td></tr>`;
+                            });
+
+                        tableHTML += '</table>';
+                        addResult(tableHTML, 'info');
+                    }
+
+                    // Show eliminated users table
+                    let usersHTML = `
+                        <h3>🚫 Users Eliminated in Week ${weekNumber}:</h3>
+                        <table>
+                            <tr><th>User ID</th><th>Reason</th><th>Date</th></tr>
+                    `;
+
+                    weekEliminations.forEach(user => {
+                        const shortUserId = user.userId.substring(0, 8) + '...';
+                        const date = new Date(user.eliminatedDate).toLocaleDateString();
+                        usersHTML += `<tr><td>${shortUserId}</td><td>${user.eliminationReason}</td><td>${date}</td></tr>`;
+                    });
+
+                    usersHTML += '</table>';
+                    addResult(usersHTML, 'info');
+                }
+
+                // Check who made picks this week
+                await checkWeekPicks(weekNumber);
+
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        async function checkWeekPicks(weekNumber) {
+            try {
+                addResult(`🔍 Checking Week ${weekNumber} picks...`, 'info');
+
+                const poolMembersDoc = await db.doc('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members').get();
+
+                if (!poolMembersDoc.exists) {
+                    addResult('❌ Pool members not found', 'error');
+                    return;
+                }
+
+                const memberIds = Object.keys(poolMembersDoc.data());
+                const weekPicks = [];
+
+                for (const userId of memberIds) {
+                    try {
+                        const userPicksDoc = await db.doc(`artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`).get();
+
+                        if (userPicksDoc.exists) {
+                            const userPicksData = userPicksDoc.data();
+                            const userPicks = userPicksData.picks || {};
+                            const weekPick = userPicks[weekNumber];
+
+                            if (weekPick) {
+                                weekPicks.push({
+                                    userId: userId.substring(0, 8) + '...',
+                                    team: weekPick.team,
+                                    gameId: weekPick.gameId
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        // Skip errors for individual users
+                    }
+                }
+
+                // Group picks by team
+                const teamPicks = {};
+                weekPicks.forEach(pick => {
+                    teamPicks[pick.team] = (teamPicks[pick.team] || 0) + 1;
+                });
+
+                if (Object.keys(teamPicks).length > 0) {
+                    let picksHTML = `
+                        <h3>🏈 Week ${weekNumber} Team Picks:</h3>
+                        <table>
+                            <tr><th>Team</th><th>Number of Picks</th></tr>
+                    `;
+
+                    Object.entries(teamPicks)
+                        .sort((a, b) => b[1] - a[1])
+                        .forEach(([team, count]) => {
+                            picksHTML += `<tr><td>${team}</td><td><strong>${count}</strong></td></tr>`;
+                        });
+
+                    picksHTML += '</table>';
+                    addResult(picksHTML, 'info');
+
+                    addResult(`Total picks made for Week ${weekNumber}: <strong>${weekPicks.length}</strong>`, 'success');
+                } else {
+                    addResult(`No picks found for Week ${weekNumber}`, 'error');
+                }
+
+            } catch (error) {
+                addResult(`❌ Error checking picks: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkAllWeeks() {
+            clearResults();
+            addResult('🔍 <strong>CHECKING ALL WEEKS SUMMARY</strong>', 'highlight');
+
+            for (let week = 1; week <= 3; week++) {
+                await checkWeek(week);
+                addResult('<hr>', 'info');
+            }
+        }
+
+        // Auto-run Week 1 on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => checkWeek(1), 1000);
+        });
+    </script>
+</body>
+</html>

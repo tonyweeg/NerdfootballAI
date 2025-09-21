@@ -191,9 +191,9 @@ class EspnNerdApiClient {
             
             // Check if any games are live or completed
             const hasLiveGames = games.some(game => {
-                const gameTime = window.easternTimeParser ?
-                    window.easternTimeParser.parseESPNTimestamp(game.dt) :
-                    new Date(game.dt);
+                // ESPN Z = Eastern time, treat directly as Eastern
+                const cleanTime = game.dt.replace('Z', '');
+                const gameTime = new Date(cleanTime);
                 return now >= gameTime && game.winner === 'TBD';
             });
             

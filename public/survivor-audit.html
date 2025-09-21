@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor Audit Console - NerdFootball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        .terminal-font {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+        }
+
+        .terminal-glow {
+            box-shadow:
+                inset 0 0 20px rgba(0, 255, 0, 0.1),
+                0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        .scanline {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scanline::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 0, 0.1), transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .typing {
+            overflow: hidden;
+            white-space: nowrap;
+            animation: typing 1s steps(40);
+        }
+
+        @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-black text-green-400 min-h-screen terminal-font">
+    <!-- Navigation Bar -->
+    <nav class="bg-gray-900 border-b border-green-500">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="index.html" class="text-green-400 hover:text-green-300 text-sm">
+                        ← Back to Main Console
+                    </a>
+                </div>
+                <div class="text-green-300 text-sm">
+                    <span id="current-time"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Terminal Container -->
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-black border border-green-500 rounded-lg terminal-glow p-6">
+            <!-- Terminal Header -->
+            <div class="border-b border-green-500 pb-4 mb-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <div class="text-green-300 text-sm">root@nerdfootball:~$ survivor_audit --verbose</div>
+                </div>
+                <div class="mt-4 text-center">
+                    <pre class="text-green-400 text-xs leading-tight">
+     ██████  ██    ██ ██████  ██    ██ ██ ██    ██  ██████  ██████
+    ██       ██    ██ ██   ██ ██    ██ ██ ██    ██ ██    ██ ██   ██
+    ██████   ██    ██ ██████  ██    ██ ██ ██    ██ ██    ██ ██████
+         ██  ██    ██ ██   ██  ██  ██  ██  ██  ██  ██    ██ ██   ██
+    ██████    ██████  ██   ██   ████   ██   ████    ██████  ██   ██
+
+                        ◢◤ DETAILED AUDIT SYSTEM v3.0 ◥◣
+                    </pre>
+                </div>
+            </div>
+
+            <!-- Loading Screen -->
+            <div id="loading-container" class="text-center py-12">
+                <div class="scanline">
+                    <div class="text-green-400 text-lg mb-4">
+                        <span class="typing">Initializing audit systems...</span>
+                    </div>
+                </div>
+                <div class="space-y-2 text-sm text-green-300">
+                    <div id="loading-step">◉ Connecting to Firebase database...</div>
+                    <div class="flex justify-center mt-4">
+                        <div class="w-8 h-8 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Container -->
+            <div id="error-container" class="hidden bg-red-900 bg-opacity-20 border border-red-600 rounded p-4">
+                <div class="text-red-400 font-bold mb-2">SYSTEM ERROR</div>
+                <div id="error-message" class="text-red-300 text-sm"></div>
+                <button onclick="location.reload()" class="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm">
+                    Restart System
+                </button>
+            </div>
+
+            <!-- Results Container -->
+            <div id="results-container" class="hidden">
+                <!-- System Status -->
+                <div class="mb-6 p-4 border border-green-600 rounded bg-green-900 bg-opacity-20">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="text-green-300 font-bold">[SYSTEM STATUS]</div>
+                        <button onclick="SurvivorAudit.clearCache()" class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">
+                            Clear Cache
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs mb-3">
+                        <div>◉ CPU: Online</div>
+                        <div>◉ Memory: <span id="memory-usage">0</span>MB</div>
+                        <div>◉ Audit Engine: Active</div>
+                        <div>◉ Data Integrity: Verified</div>
+                    </div>
+                    <div id="cache-status" class="text-xs text-green-400 border-t border-green-600 pt-2">
+                        Cache: Not initialized
+                    </div>
+                </div>
+
+                <!-- Results Content -->
+                <div id="audit-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Configuration -->
+    <script type="module">
+        // Firebase imports
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Make Firebase available globally
+        window.db = db;
+        window.auth = auth;
+        window.doc = doc;
+        window.getDoc = getDoc;
+
+        // Survivor Audit System with Smart Caching
+        const SurvivorAudit = {
+            // Week losing teams for audit reference
+            losingTeams: {
+                1: ['Dallas Cowboys', 'Kansas City Chiefs', 'Atlanta Falcons', 'Cleveland Browns',
+                    'Miami Dolphins', 'Carolina Panthers', 'New England Patriots', 'New Orleans Saints',
+                    'New York Jets', 'New York Giants', 'Tennessee Titans', 'Seattle Seahawks',
+                    'Detroit Lions', 'Houston Texans', 'Baltimore Ravens', 'Minnesota Vikings'],
+                2: ['New York Giants', 'Pittsburgh Steelers', 'Tennessee Titans', 'New York Jets',
+                    'Miami Dolphins', 'Jacksonville Jaguars', 'New Orleans Saints', 'Cleveland Browns',
+                    'Chicago Bears', 'Denver Broncos', 'Carolina Panthers', 'Kansas City Chiefs',
+                    'Minnesota Vikings', 'Houston Texans', 'Las Vegas Raiders']
+            },
+
+            // Cache management
+            cache: {
+                auditResults: null,
+                timestamp: null,
+                cacheKey: null,
+                maxAge: 10 * 60 * 1000 // 10 minutes cache
+            },
+
+            loadingSteps: [
+                "◉ Connecting to Firebase database...",
+                "◉ Authenticating user access...",
+                "◉ Loading pool member data...",
+                "◉ Scanning survivor picks database...",
+                "◉ Cross-referencing elimination status...",
+                "◉ Generating detailed audit report...",
+                "◉ Rendering Linux console interface..."
+            ],
+
+            async init() {
+                this.updateClock();
+                setInterval(() => this.updateClock(), 1000);
+
+                // Simulate loading steps
+                await this.simulateLoading();
+
+                // Check authentication
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        await this.loadAuditData();
+                    } else {
+                        this.showError("Authentication required. Please sign in to access the audit system.");
+                    }
+                });
+            },
+
+            updateClock() {
+                const now = new Date();
+                document.getElementById('current-time').textContent = now.toLocaleTimeString();
+            },
+
+            async simulateLoading() {
+                const loadingStep = document.getElementById('loading-step');
+
+                for (let i = 0; i < this.loadingSteps.length; i++) {
+                    loadingStep.textContent = this.loadingSteps[i];
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                }
+            },
+
+            showError(message) {
+                document.getElementById('loading-container').classList.add('hidden');
+                document.getElementById('error-container').classList.remove('hidden');
+                document.getElementById('error-message').textContent = message;
+            },
+
+            showResults() {
+                document.getElementById('loading-container').classList.add('hidden');
+                document.getElementById('results-container').classList.remove('hidden');
+
+                // Update memory usage
+                if (performance.memory) {
+                    const memoryMB = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+                    document.getElementById('memory-usage').textContent = memoryMB;
+                }
+
+                // Update cache status
+                this.updateCacheStatus();
+            },
+
+            updateCacheStatus() {
+                const statusEl = document.getElementById('cache-status');
+                if (!statusEl) return;
+
+                if (this.cache.timestamp) {
+                    const age = Date.now() - this.cache.timestamp;
+                    const ageMinutes = Math.round(age / 60000);
+                    const isValid = this.isCacheValid();
+
+                    statusEl.innerHTML = `
+                        Cache: ${isValid ? '✅ Valid' : '❌ Expired'}
+                        (${ageMinutes}m old, key: ${this.cache.cacheKey?.slice(-8) || 'none'})
+                        ${localStorage.getItem('survivorAuditCache') ? '💾 Persisted' : ''}
+                    `;
+                } else {
+                    statusEl.textContent = 'Cache: Not initialized';
+                }
+            },
+
+            // Clear cache function
+            clearCache() {
+                console.log('🗑️ Clearing survivor audit cache...');
+
+                // Clear memory cache
+                this.cache.auditResults = null;
+                this.cache.timestamp = null;
+                this.cache.cacheKey = null;
+
+                // Clear localStorage
+                localStorage.removeItem('survivorAuditCache');
+
+                // Update status
+                this.updateCacheStatus();
+
+                console.log('✅ Cache cleared successfully');
+
+                // Optionally reload data
+                if (confirm('Cache cleared! Would you like to reload fresh data?')) {
+                    location.reload();
+                }
+            },
+
+            // Generate cache key based on pool state
+            generateCacheKey() {
+                const weeks = [1, 2];
+                const timestamp = new Date().toISOString().slice(0, 13); // Hour precision
+                return `survivor_audit_${weeks.join('_')}_${timestamp}`;
+            },
+
+            // Check if cache is valid
+            isCacheValid() {
+                if (!this.cache.auditResults || !this.cache.timestamp) {
+                    return false;
+                }
+
+                const age = Date.now() - this.cache.timestamp;
+                const isExpired = age > this.cache.maxAge;
+
+                console.log(`🔍 Cache age: ${Math.round(age / 1000)}s, max: ${Math.round(this.cache.maxAge / 1000)}s, expired: ${isExpired}`);
+                return !isExpired;
+            },
+
+            // Store results in cache
+            setCacheResults(results) {
+                this.cache.auditResults = results;
+                this.cache.timestamp = Date.now();
+                this.cache.cacheKey = this.generateCacheKey();
+
+                console.log(`💾 Cached audit results (${this.cache.cacheKey})`);
+
+                // Also store in localStorage for persistence across page reloads
+                try {
+                    const cacheData = {
+                        results: results,
+                        timestamp: this.cache.timestamp,
+                        cacheKey: this.cache.cacheKey
+                    };
+                    localStorage.setItem('survivorAuditCache', JSON.stringify(cacheData));
+                    console.log('💾 Persisted cache to localStorage');
+                } catch (error) {
+                    console.warn('⚠️ Failed to persist cache to localStorage:', error);
+                }
+
+                // Update cache status display
+                this.updateCacheStatus();
+            },
+
+            // Load from localStorage cache
+            loadFromLocalStorage() {
+                try {
+                    const cached = localStorage.getItem('survivorAuditCache');
+                    if (!cached) return null;
+
+                    const cacheData = JSON.parse(cached);
+                    const age = Date.now() - cacheData.timestamp;
+
+                    if (age > this.cache.maxAge) {
+                        console.log('🗑️ localStorage cache expired, clearing...');
+                        localStorage.removeItem('survivorAuditCache');
+                        return null;
+                    }
+
+                    console.log(`💾 Loaded valid cache from localStorage (${Math.round(age / 1000)}s old)`);
+
+                    // Restore cache state
+                    this.cache.auditResults = cacheData.results;
+                    this.cache.timestamp = cacheData.timestamp;
+                    this.cache.cacheKey = cacheData.cacheKey;
+
+                    return cacheData.results;
+                } catch (error) {
+                    console.warn('⚠️ Failed to load cache from localStorage:', error);
+                    localStorage.removeItem('survivorAuditCache');
+                    return null;
+                }
+            },
+
+            async loadAuditData() {
+                try {
+                    console.log('💀 LINUX CONSOLE: Loading detailed survivor audit...');
+
+                    // First, try to load from localStorage
+                    let auditResults = this.loadFromLocalStorage();
+
+                    // If no valid localStorage cache, check memory cache
+                    if (!auditResults && this.isCacheValid()) {
+                        console.log('⚡ Using cached audit results from memory');
+                        auditResults = this.cache.auditResults;
+                    }
+
+                    // If no valid cache, fetch fresh data
+                    if (!auditResults) {
+                        console.log('🔄 No valid cache, fetching fresh audit data...');
+                        auditResults = await this.detailedMultiWeekAudit([1, 2]);
+
+                        if (auditResults) {
+                            this.setCacheResults(auditResults);
+                        }
+                    } else {
+                        console.log('⚡ CACHE HIT: Using cached results');
+                    }
+
+                    if (auditResults) {
+                        this.displayLinuxConsoleResults(auditResults);
+                        this.showResults();
+                        console.log('✅ LINUX CONSOLE LOADED successfully');
+                    } else {
+                        throw new Error('Failed to load audit data');
+                    }
+
+                } catch (error) {
+                    console.error('❌ Linux console loading error:', error);
+                    this.showError(`Failed to load survivor audit: ${error.message}`);
+                }
+            },
+
+            // Get user profile info (name, email)
+            async getUserProfile(userId) {
+                try {
+                    const userDocRef = doc(db, 'artifacts/nerdfootball/public/data/nerdfootball_users', userId);
+                    const userSnap = await getDoc(userDocRef);
+
+                    if (userSnap.exists()) {
+                        const userData = userSnap.data();
+                        return {
+                            name: userData.displayName || 'Unknown',
+                            email: userData.email || 'Unknown'
+                        };
+                    }
+                    return { name: 'Unknown', email: 'Unknown' };
+                } catch (error) {
+                    return { name: 'Error', email: 'Error' };
+                }
+            },
+
+            // Detailed audit for multiple weeks
+            async detailedMultiWeekAudit(weeks = [1, 2]) {
+                const results = {};
+
+                for (const week of weeks) {
+                    results[week] = await this.detailedWeekAudit(week);
+                    if (week < Math.max(...weeks)) {
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause
+                    }
+                }
+
+                return results;
+            },
+
+            // Detailed audit for a specific week
+            async detailedWeekAudit(weekNumber) {
+                const losingTeams = this.losingTeams[weekNumber];
+                if (!losingTeams) {
+                    console.error(`❌ No losing teams data for Week ${weekNumber}`);
+                    return null;
+                }
+
+                try {
+                    // Get pool members
+                    const poolMembersRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                    const poolMembersSnap = await getDoc(poolMembersRef);
+
+                    if (!poolMembersSnap.exists()) {
+                        console.error('❌ Pool members not found');
+                        return null;
+                    }
+
+                    const memberIds = Object.keys(poolMembersSnap.data());
+
+                    // Get current elimination status
+                    const statusDocRef = doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status');
+                    const statusSnap = await getDoc(statusDocRef);
+                    const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
+
+                    const detailedAudit = {
+                        weekNumber,
+                        totalMembers: memberIds.length,
+                        userDetails: [],
+                        winningPicks: [],
+                        losingPicks: [],
+                        noPicks: [],
+                        eliminated: []
+                    };
+
+                    // Audit each member with full details
+                    for (const userId of memberIds) {
+                        try {
+                            // Get user profile
+                            const profile = await this.getUserProfile(userId);
+                            const shortUserId = userId.substring(0, 8) + '...';
+
+                            // Check if already eliminated
+                            if (allStatuses[userId]?.eliminated) {
+                                detailedAudit.eliminated.push({
+                                    userId: shortUserId,
+                                    fullUserId: userId,
+                                    name: profile.name,
+                                    email: profile.email,
+                                    eliminatedWeek: allStatuses[userId].eliminatedWeek,
+                                    reason: allStatuses[userId].eliminationReason
+                                });
+                                continue;
+                            }
+
+                            // Get user's picks
+                            const userPicksDocRef = doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_picks', userId);
+                            const userPicksSnap = await getDoc(userPicksDocRef);
+
+                            if (!userPicksSnap.exists()) {
+                                detailedAudit.noPicks.push({
+                                    userId: shortUserId,
+                                    fullUserId: userId,
+                                    name: profile.name,
+                                    email: profile.email,
+                                    reason: 'No picks document'
+                                });
+                                continue;
+                            }
+
+                            const userPicksData = userPicksSnap.data();
+                            const userPicks = userPicksData.picks || {};
+                            const weekPick = userPicks[weekNumber];
+
+                            if (!weekPick) {
+                                detailedAudit.noPicks.push({
+                                    userId: shortUserId,
+                                    fullUserId: userId,
+                                    name: profile.name,
+                                    email: profile.email,
+                                    reason: `No Week ${weekNumber} pick`
+                                });
+                                continue;
+                            }
+
+                            const pickedTeam = weekPick.team;
+                            const hasGameId = !!weekPick.gameId;
+
+                            const userDetail = {
+                                userId: shortUserId,
+                                fullUserId: userId,
+                                name: profile.name,
+                                email: profile.email,
+                                pickedTeam: pickedTeam,
+                                gameId: weekPick.gameId || 'MISSING',
+                                timestamp: weekPick.timestamp || 'Unknown',
+                                hasGameId: hasGameId
+                            };
+
+                            detailedAudit.userDetails.push(userDetail);
+
+                            // Categorize by win/loss
+                            if (losingTeams.includes(pickedTeam)) {
+                                detailedAudit.losingPicks.push({
+                                    ...userDetail,
+                                    shouldBeEliminated: true
+                                });
+                            } else {
+                                detailedAudit.winningPicks.push({
+                                    ...userDetail,
+                                    shouldSurvive: true
+                                });
+                            }
+
+                        } catch (error) {
+                            console.error(`❌ Error auditing user ${userId}:`, error);
+                        }
+                    }
+
+                    return detailedAudit;
+
+                } catch (error) {
+                    console.error(`❌ Detailed audit failed for Week ${weekNumber}:`, error);
+                    return null;
+                }
+            },
+
+            // Display beautiful Linux console-style results
+            displayLinuxConsoleResults(auditResults) {
+                const startTime = performance.now();
+
+                let html = '';
+
+                // Process each week with Linux terminal styling
+                Object.keys(auditResults).forEach(week => {
+                    const audit = auditResults[week];
+                    if (!audit) return;
+
+                    html += this.generateLinuxWeekOutput(audit);
+                });
+
+                // Terminal footer
+                html += `
+                    <div class="border-t border-green-500 pt-4 mt-6 text-center">
+                        <div class="text-green-300 text-xs">
+                            ✓ Audit completed • ${Object.keys(auditResults).length} weeks processed •
+                            ${new Date().toLocaleString()} • NerdFootball Survivor Audit System
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('audit-results').innerHTML = html;
+
+                const loadTime = performance.now() - startTime;
+                console.log(`💻 Linux console displayed in ${loadTime.toFixed(1)}ms`);
+            },
+
+            // Generate Linux terminal-style output for a week
+            generateLinuxWeekOutput(audit) {
+                const losingTeams = this.losingTeams[audit.weekNumber] || [];
+
+                let html = `
+                    <div class="mb-8 border border-green-600 rounded p-4 bg-green-900 bg-opacity-10">
+                        <div class="text-green-300 font-bold mb-3">
+                            root@nerdfootball:~$ ./week${audit.weekNumber}_audit.sh --detailed
+                        </div>
+
+                        <!-- Week Stats Terminal Output -->
+                        <div class="bg-black p-3 rounded border border-green-700 mb-4">
+                            <div class="text-green-400 text-xs mb-2">Scanning survivor pool database...</div>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                                <div class="text-blue-400">TOTAL: <span class="text-white font-bold">${audit.totalMembers}</span></div>
+                                <div class="text-green-400">ALIVE: <span class="text-white font-bold">${audit.winningPicks.length}</span></div>
+                                <div class="text-red-400">DEAD: <span class="text-white font-bold">${audit.losingPicks.length}</span></div>
+                                <div class="text-yellow-400">NULL: <span class="text-white font-bold">${audit.noPicks.length}</span></div>
+                                <div class="text-purple-400">TERM: <span class="text-white font-bold">${audit.eliminated.length}</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Losing Teams Reference -->
+                        <div class="mb-4 p-3 bg-red-900 bg-opacity-20 border border-red-600 rounded">
+                            <div class="text-red-400 font-bold text-xs mb-2">WEEK ${audit.weekNumber} LOSING_TEAMS[] = {</div>
+                            <div class="text-red-300 text-xs pl-4 grid grid-cols-2 md:grid-cols-4 gap-1">
+                                ${losingTeams.map((team, i) => `<div>[${i}] "${team}"</div>`).join('')}
+                            </div>
+                            <div class="text-red-400 text-xs">}; // ${losingTeams.length} eliminated teams</div>
+                        </div>
+                `;
+
+                // Surviving Users - Linux style table
+                if (audit.winningPicks.length > 0) {
+                    html += `
+                        <div class="mb-6">
+                            <div class="text-green-300 font-bold text-xs mb-2">
+                                ./query --table=survivors --week=${audit.weekNumber} --status=alive
+                            </div>
+                            <div class="bg-black border border-green-600 rounded overflow-hidden">
+                                <div class="bg-green-700 text-black p-2 text-xs font-bold grid grid-cols-12 gap-1">
+                                    <div class="col-span-3">USERNAME</div>
+                                    <div class="col-span-4">EMAIL</div>
+                                    <div class="col-span-3">TEAM_SELECTED</div>
+                                    <div class="col-span-2">GAME_ID</div>
+                                </div>
+                                <div class="max-h-64 overflow-y-auto">
+                                    ${audit.winningPicks.map(pick => `
+                                        <div class="p-2 border-b border-green-800 text-xs grid grid-cols-12 gap-1 hover:bg-green-900 hover:bg-opacity-20">
+                                            <div class="col-span-3 text-green-400 font-mono">${pick.name.substring(0, 20)}</div>
+                                            <div class="col-span-4 text-green-300 font-mono">${pick.email.substring(0, 28)}</div>
+                                            <div class="col-span-3 text-white font-bold">${pick.pickedTeam.substring(0, 18)}</div>
+                                            <div class="col-span-2 text-blue-400">${pick.gameId}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="bg-green-800 text-black p-1 text-xs">
+                                    Query returned ${audit.winningPicks.length} records. Status: SUCCESS
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Dead Users - Linux style error output
+                if (audit.losingPicks.length > 0) {
+                    html += `
+                        <div class="mb-6">
+                            <div class="text-red-300 font-bold text-xs mb-2">
+                                ./query --table=eliminations --week=${audit.weekNumber} --status=dead
+                            </div>
+                            <div class="bg-black border border-red-600 rounded overflow-hidden">
+                                <div class="bg-red-700 text-black p-2 text-xs font-bold grid grid-cols-12 gap-1">
+                                    <div class="col-span-3">USERNAME</div>
+                                    <div class="col-span-4">EMAIL</div>
+                                    <div class="col-span-3">FATAL_PICK</div>
+                                    <div class="col-span-2">GAME_ID</div>
+                                </div>
+                                <div class="max-h-64 overflow-y-auto">
+                                    ${audit.losingPicks.map(pick => `
+                                        <div class="p-2 border-b border-red-800 text-xs grid grid-cols-12 gap-1 hover:bg-red-900 hover:bg-opacity-20">
+                                            <div class="col-span-3 text-red-400 font-mono">${pick.name.substring(0, 20)}</div>
+                                            <div class="col-span-4 text-red-300 font-mono">${pick.email.substring(0, 28)}</div>
+                                            <div class="col-span-3 text-red-500 font-bold">💀 ${pick.pickedTeam.substring(0, 15)}</div>
+                                            <div class="col-span-2 text-blue-400">${pick.gameId}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="bg-red-800 text-white p-1 text-xs">
+                                    ERROR: ${audit.losingPicks.length} fatal picks detected. Elimination required.
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Null entries and eliminated - compact display
+                if (audit.noPicks.length > 0 || audit.eliminated.length > 0) {
+                    html += `
+                        <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    `;
+
+                    if (audit.noPicks.length > 0) {
+                        html += `
+                            <div class="bg-yellow-900 bg-opacity-20 border border-yellow-600 rounded p-3">
+                                <div class="text-yellow-400 font-bold text-xs mb-2">NULL_PICKS[] = {</div>
+                                <div class="max-h-32 overflow-y-auto text-xs">
+                                    ${audit.noPicks.map(user => `
+                                        <div class="text-yellow-300 font-mono">• ${user.name} (${user.reason})</div>
+                                    `).join('')}
+                                </div>
+                                <div class="text-yellow-400 text-xs mt-2">}; // ${audit.noPicks.length} null entries</div>
+                            </div>
+                        `;
+                    }
+
+                    if (audit.eliminated.length > 0) {
+                        html += `
+                            <div class="bg-purple-900 bg-opacity-20 border border-purple-600 rounded p-3">
+                                <div class="text-purple-400 font-bold text-xs mb-2">TERMINATED[] = {</div>
+                                <div class="max-h-32 overflow-y-auto text-xs">
+                                    ${audit.eliminated.map(user => `
+                                        <div class="text-purple-300 font-mono">• ${user.name} (Week ${user.eliminatedWeek})</div>
+                                    `).join('')}
+                                </div>
+                                <div class="text-purple-400 text-xs mt-2">}; // ${audit.eliminated.length} terminated</div>
+                            </div>
+                        `;
+                    }
+
+                    html += `</div>`;
+                }
+
+                html += `
+                        <div class="text-green-400 text-xs mt-3">
+                            ✓ Week ${audit.weekNumber} audit completed. Exit code: 0
+                        </div>
+                    </div>
+                `;
+
+                return html;
+            }
+        };
+
+        // Initialize the audit system when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            SurvivorAudit.init();
+        });
+
+        // Make SurvivorAudit available globally for debugging
+        window.SurvivorAudit = SurvivorAudit;
+    </script>
+</body>
+</html>

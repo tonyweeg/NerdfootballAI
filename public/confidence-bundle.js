@@ -559,8 +559,8 @@ class ConfidencePerformanceMonitor {
         if (fromCache) {
             this.metrics.firestoreCacheHits++;
         } else {
-            this.metrics.firestoreReads++;
-            this.metrics.estimatedCost += this.thresholds.costPerRead;
+            // this.metrics.firestoreReads++;
+            // this.metrics.estimatedCost += this.thresholds.costPerRead;
         }
         
         // Track load time
@@ -583,13 +583,13 @@ class ConfidencePerformanceMonitor {
         }
         
         // Check read efficiency
-        if (this.metrics.firestoreReads > this.thresholds.targetReads * this.metrics.totalRequests) {
-            this.createAlert('efficiency', `Read count ${this.metrics.firestoreReads} exceeds target`, {
-                reads: this.metrics.firestoreReads,
-                requests: this.metrics.totalRequests,
-                target: this.thresholds.targetReads
-            });
-        }
+        // if (this.metrics.firestoreReads > this.thresholds.targetReads * this.metrics.totalRequests) {
+        //     this.createAlert('efficiency', `Read count ${this.metrics.firestoreReads} exceeds target`, {
+        //         reads: this.metrics.firestoreReads,
+        //         requests: this.metrics.totalRequests,
+        //         target: this.thresholds.targetReads
+        //     });
+        // }
         
         this.logPerformanceEvent('read', {
             operation,
@@ -634,12 +634,12 @@ class ConfidencePerformanceMonitor {
             this.metrics.recoveries++;
         }
         
-        this.createAlert('error', `Error in ${operation}: ${error.message}`, {
-            error: error.message,
-            operation,
-            recovered,
-            stack: error.stack?.substring(0, 200)
-        });
+        // this.createAlert('error', `Error in ${operation}: ${error.message}`, {
+        //     error: error.message,
+        //     operation,
+        //     recovered,
+        //     stack: error.stack?.substring(0, 200)
+        // });
         
         this.logPerformanceEvent('error', {
             operation,

@@ -3,6 +3,10 @@
 
 window.ScoringSystemManager = {
 
+    // Cache to prevent duplicate leaderboard generation
+    _leaderboardCache: new Map(),
+    _cacheTimeout: 30000, // 30 seconds
+
     /**
      * Process complete scoring for a specific week
      * @param {number} weekNumber - Week to process
@@ -105,6 +109,14 @@ window.ScoringSystemManager = {
      */
     async generateSeasonLeaderboard(completedWeeks = []) {
         try {
+            // Check cache first
+            const cacheKey = `season_${completedWeeks.join('_')}`;
+            const cached = this._leaderboardCache.get(cacheKey);
+            if (cached && (Date.now() - cached.timestamp) < this._cacheTimeout) {
+                console.log(`🎯 CACHE HIT: Returning cached season leaderboard for weeks: ${completedWeeks.join(', ')}`);
+                return cached.data;
+            }
+
             console.log(`🏆 Generating season leaderboard for weeks: ${completedWeeks.join(', ')}`);
 
             const leaderboard = {
@@ -182,38 +194,7 @@ window.ScoringSystemManager = {
                     } else {
                         console.log(`❌ NO scoring data found for ${member.displayName || member.uid.slice(-6)} (${member.uid})`);
 
-                        // Special debug for the problem user
-                        if (member.uid === 'THoYhTIT46RdGeNuL9CyfPCJtZ73') {
-                            console.log('🚨 PROBLEM USER DETECTED: THoYhTIT46RdGeNuL9CyfPCJtZ73 has no scoring data but should have picks!');
-                            console.log('🔧 Attempting to auto-fix by processing missing scoring data...');
-
-                            // Try to automatically fix this user's scoring data
-                            try {
-                                await this.fixUserScoringData(member.uid, completedWeeks);
-                                console.log('✅ Auto-fix attempt completed, re-checking scoring data...');
-
-                                // Re-fetch the user's scoring data after fix attempt
-                                const retryDocSnap = await window.getDoc(docRef);
-                                if (retryDocSnap.exists()) {
-                                    const retryData = retryDocSnap.data();
-                                    const weeklyPoints = retryData.weeklyPoints || {};
-                                    console.log(`🎯 After fix: ${member.displayName || member.uid.slice(-6)} now has ${Object.keys(weeklyPoints).length} weeks of data`);
-
-                                    // Re-process the scoring for this user
-                                    for (const weekNumber of completedWeeks) {
-                                        const weekData = weeklyPoints[weekNumber.toString()] || weeklyPoints[weekNumber];
-                                        if (weekData && weekData.totalPoints !== undefined) {
-                                            totalPoints += weekData.totalPoints || 0;
-                                            totalCorrectPicks += weekData.correctPicks || 0;
-                                            totalPicks += weekData.totalPicks || 0;
-                                            weeksPlayed++;
-                                        }
-                                    }
-                                }
-                            } catch (fixError) {
-                                console.error('❌ Auto-fix failed:', fixError);
-                            }
-                        }
+                        // User has no scoring data - include with 0 points
 
                         // For users with no scoring data, we should still include them in the leaderboard with 0 points
                         // but log that they need processing
@@ -283,6 +264,12 @@ window.ScoringSystemManager = {
 
             // Save season leaderboard
             await this.saveSeasonLeaderboard(leaderboard);
+
+            // Cache the result
+            this._leaderboardCache.set(cacheKey, {
+                data: leaderboard,
+                timestamp: Date.now()
+            });
 
             console.log(`✅ Season leaderboard generated: ${leaderboard.standings.length} users, high score: ${leaderboard.metadata.highScore}`);
             return leaderboard;

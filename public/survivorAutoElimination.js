@@ -29,9 +29,9 @@ class SurvivorAutoElimination {
         return 'TBD';
     }
     
-    // Get survivor picks path for user
+    // Get survivor picks path for user (fixed to use correct collection structure)
     survivorPicksPath(uid) {
-        return `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${uid}`;
+        return `artifacts/nerdfootball/public/data/nerdSurvivor_picks`;
     }
     
     // Get survivor status path
@@ -119,7 +119,7 @@ class SurvivorAutoElimination {
                 console.log(`📡 Using ESPN API for Week ${weekNumber} game results`);
                 const espnGames = await window.espnApi.getWeekGames(weekNumber);
                 
-                if (espnGames && espnGames.length > 0) {
+                if (espnGames && Array.isArray(espnGames) && espnGames.length > 0) {
                     // Convert ESPN games to our format
                     espnGames.forEach(game => {
                         gameResults[game.id] = {
@@ -135,7 +135,32 @@ class SurvivorAutoElimination {
                     console.log(`✅ ESPN API: Loaded ${Object.keys(gameResults).length} games for Week ${weekNumber}`);
                 } else {
                     console.log(`⚠️ No ESPN games found for Week ${weekNumber}`);
-                    return { eliminatedCount: 0, details: [] };
+                }
+
+                // Always merge embedded JSON since ESPN uses different game IDs
+                console.log(`📝 Loading embedded JSON to ensure all game IDs are available for Week ${weekNumber}`);
+                try {
+                    const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+                    if (response.ok) {
+                        const weekData = await response.json();
+                        const games = weekData.games || [];
+
+                        // Convert embedded format and merge (embedded IDs take priority for user picks)
+                        games.forEach(game => {
+                            gameResults[game.id] = {
+                                id: game.id,
+                                homeTeam: game.h,
+                                awayTeam: game.a,
+                                homeScore: game.homeScore || 0,
+                                awayScore: game.awayScore || 0,
+                                status: game.status || 'TBD',
+                                winner: game.winner || 'TBD'
+                            };
+                        });
+                        console.log(`✅ Embedded JSON: Merged ${games.length} games for Week ${weekNumber}`);
+                    }
+                } catch (error) {
+                    console.error(`Error loading embedded JSON for Week ${weekNumber}:`, error);
                 }
             } else {
                 // Fallback to Firestore if ESPN API unavailable
@@ -143,12 +168,40 @@ class SurvivorAutoElimination {
                 const resultsDocRef = doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`);
                 const resultsSnap = await getDoc(resultsDocRef);
                 
-                if (!resultsSnap.exists()) {
-                    console.log(`No game results found for Week ${weekNumber}`);
-                    return { eliminatedCount: 0, details: [] };
+                if (resultsSnap.exists()) {
+                    gameResults = resultsSnap.data();
                 }
-                
-                gameResults = resultsSnap.data();
+
+                // Always try embedded JSON to fill gaps in Firestore data
+                console.log(`📝 Checking embedded JSON to fill any missing games for Week ${weekNumber}`);
+                try {
+                    const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+                    if (response.ok) {
+                        const weekData = await response.json();
+                        const games = weekData.games || [];
+
+                        // Convert embedded format and merge with any existing Firestore data
+                        games.forEach(game => {
+                            // Only add if not already in gameResults from Firestore
+                            if (!gameResults[game.id]) {
+                                gameResults[game.id] = {
+                                    id: game.id,
+                                    homeTeam: game.h,
+                                    awayTeam: game.a,
+                                    homeScore: game.homeScore || 0,
+                                    awayScore: game.awayScore || 0,
+                                    status: game.status || 'TBD',
+                                    winner: game.winner || 'TBD'
+                                };
+                            }
+                        });
+                        console.log(`✅ Embedded JSON: Added ${games.length} total games for Week ${weekNumber} (merged with Firestore)`);
+                    } else {
+                        console.log(`No embedded JSON found for Week ${weekNumber}`);
+                    }
+                } catch (error) {
+                    console.error(`Error loading embedded JSON for Week ${weekNumber}:`, error);
+                }
             }
             
             // Check if ANY games have finished (to determine if picks deadline has passed)
@@ -167,19 +220,22 @@ class SurvivorAutoElimination {
                 }
                 
                 try {
-                    // Get user's survivor picks
-                    const userPicksDocRef = doc(this.db, this.survivorPicksPath(userId));
+                    // Get user's survivor picks from collection
+                    const userPicksDocRef = doc(this.db, this.survivorPicksPath(userId), userId);
                     const userPicksSnap = await getDoc(userPicksDocRef);
-                    
+
                     if (!userPicksSnap.exists()) {
                         // If games have started and user has no picks document at all, eliminate them
                         if (hasFinishedGames) {
                             console.log(`❌ ELIMINATING USER ${userId}: No survivor picks document and games have started`);
                             
-                            eliminationUpdates[`${userId}.eliminated`] = true;
-                            eliminationUpdates[`${userId}.eliminatedWeek`] = weekNumber;
-                            eliminationUpdates[`${userId}.eliminatedDate`] = new Date().toISOString();
-                            eliminationUpdates[`${userId}.eliminationReason`] = `No pick made for Week ${weekNumber}`;
+                            // Create nested object structure for proper reading
+                            eliminationUpdates[userId] = {
+                                eliminated: true,
+                                eliminatedWeek: weekNumber,
+                                eliminatedDate: new Date().toISOString(),
+                                eliminationReason: `No pick made for Week ${weekNumber}`
+                            };
                             
                             eliminatedUsers.push({
                                 userId,
@@ -201,10 +257,13 @@ class SurvivorAutoElimination {
                         if (hasFinishedGames) {
                             console.log(`❌ ELIMINATING USER ${userId}: No pick for Week ${weekNumber} and games have started`);
                             
-                            eliminationUpdates[`${userId}.eliminated`] = true;
-                            eliminationUpdates[`${userId}.eliminatedWeek`] = weekNumber;
-                            eliminationUpdates[`${userId}.eliminatedDate`] = new Date().toISOString();
-                            eliminationUpdates[`${userId}.eliminationReason`] = `No pick made for Week ${weekNumber}`;
+                            // Create nested object structure for proper reading
+                            eliminationUpdates[userId] = {
+                                eliminated: true,
+                                eliminatedWeek: weekNumber,
+                                eliminatedDate: new Date().toISOString(),
+                                eliminationReason: `No pick made for Week ${weekNumber}`
+                            };
                             
                             eliminatedUsers.push({
                                 userId,
@@ -217,15 +276,21 @@ class SurvivorAutoElimination {
                         continue;
                     }
                     
+                    // Check if user has a valid game ID
+                    if (!weekPick.gameId) {
+                        console.log(`⚠️ User ${userId} has no gameId in their Week ${weekNumber} pick - skipping`);
+                        continue;
+                    }
+
                     // Check ONLY the specific game the user picked
                     const specificGame = gameResults[weekPick.gameId];
-                    
+
                     if (!specificGame) {
                         console.log(`⚠️ User ${userId} picked game ${weekPick.gameId} but game not found in results`);
                         continue;
                     }
                     
-                    if (specificGame.status === 'FINAL' && specificGame.winner && specificGame.winner !== 'TBD') {
+                    if ((specificGame.status === 'FINAL' || specificGame.status === 'Final') && specificGame.winner && specificGame.winner !== 'TBD') {
                         const userTeam = weekPick.team;
                         const winner = specificGame.winner;
                         
@@ -235,10 +300,13 @@ class SurvivorAutoElimination {
                             // User picked losing team - eliminate them
                             console.log(`❌ ELIMINATING USER ${userId}: Picked ${userTeam}, Winner was ${winner} (Game: ${weekPick.gameId})`);
                             
-                            eliminationUpdates[`${userId}.eliminated`] = true;
-                            eliminationUpdates[`${userId}.eliminatedWeek`] = weekNumber;
-                            eliminationUpdates[`${userId}.eliminatedDate`] = new Date().toISOString();
-                            eliminationUpdates[`${userId}.eliminationReason`] = `Lost in Week ${weekNumber}: Picked ${userTeam}, ${winner} won`;
+                            // Create nested object structure for proper reading
+                            eliminationUpdates[userId] = {
+                                eliminated: true,
+                                eliminatedWeek: weekNumber,
+                                eliminatedDate: new Date().toISOString(),
+                                eliminationReason: `Lost in Week ${weekNumber}: Picked ${userTeam}, ${winner} won`
+                            };
                             
                             eliminatedUsers.push({
                                 userId,
@@ -261,14 +329,22 @@ class SurvivorAutoElimination {
             // Apply elimination updates if any
             if (Object.keys(eliminationUpdates).length > 0) {
                 console.log(`📝 Updating survivor status with ${eliminatedUsers.length} eliminations...`);
-                
-                await setDoc(statusDocRef, eliminationUpdates, { merge: true });
-                
+                console.log(`📊 DEBUG: eliminationUpdates object:`, eliminationUpdates);
+                console.log(`📊 DEBUG: statusDocRef path:`, statusDocRef.path);
+
+                try {
+                    await setDoc(statusDocRef, eliminationUpdates, { merge: true });
+                    console.log(`✅ Database write successful for ${eliminatedUsers.length} eliminations`);
+                } catch (writeError) {
+                    console.error(`❌ Database write failed:`, writeError);
+                    throw writeError;
+                }
+
                 // Invalidate cache to trigger UI updates
                 if (this.gameStateCache) {
                     this.gameStateCache.invalidateAfterDataUpdate('survivor_eliminations', weekNumber);
                 }
-                
+
                 console.log(`💎 Auto-elimination complete: ${eliminatedUsers.length} users eliminated in Week ${weekNumber}`);
             } else {
                 console.log(`✅ No eliminations found for Week ${weekNumber}`);
@@ -346,8 +422,8 @@ class SurvivorAutoElimination {
         console.log(`🔍 Checking specific user ${userId} for Week ${targetWeek}...`);
         
         try {
-            // Get user's survivor picks
-            const userPicksDocRef = doc(this.db, this.survivorPicksPath(userId));
+            // Get user's survivor picks from collection
+            const userPicksDocRef = doc(this.db, this.survivorPicksPath(userId), userId);
             const userPicksSnap = await getDoc(userPicksDocRef);
             
             if (!userPicksSnap.exists()) {
@@ -368,11 +444,11 @@ class SurvivorAutoElimination {
                 
                 try {
                     let gameResults = {};
-                    
+
                     // Try ESPN API first
                     if (typeof window.espnApi !== 'undefined') {
                         const espnGames = await window.espnApi.getWeekGames(week);
-                        if (espnGames && espnGames.length > 0) {
+                        if (espnGames && Array.isArray(espnGames) && espnGames.length > 0) {
                             espnGames.forEach(game => {
                                 gameResults[game.id] = {
                                     id: game.id,
@@ -385,12 +461,47 @@ class SurvivorAutoElimination {
                                 };
                             });
                         }
-                    } else {
+                    }
+
+                    // Check if user's specific game exists in ESPN data
+                    const userGameExists = gameResults[weekPick.gameId];
+                    if (!userGameExists) {
+                        console.log(`🔄 User's Game ${weekPick.gameId} not found in ESPN data, using embedded JSON`);
+                    }
+
+                    if (!userGameExists) {
                         // Fallback to Firestore
                         const resultsDocRef = doc(this.db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`);
                         const resultsSnap = await getDoc(resultsDocRef);
                         if (resultsSnap.exists()) {
                             gameResults = resultsSnap.data();
+                        }
+
+                        // Always try embedded JSON to fill gaps in Firestore data
+                        try {
+                            const response = await fetch(`nfl_2025_week_${week}.json`);
+                            if (response.ok) {
+                                const weekData = await response.json();
+                                const games = weekData.games || [];
+
+                                // Convert embedded format and merge with any existing Firestore data
+                                games.forEach(game => {
+                                    // Only add if not already in gameResults from Firestore
+                                    if (!gameResults[game.id]) {
+                                        gameResults[game.id] = {
+                                            id: game.id,
+                                            homeTeam: game.h,
+                                            awayTeam: game.a,
+                                            homeScore: game.homeScore || 0,
+                                            awayScore: game.awayScore || 0,
+                                            status: game.status || 'TBD',
+                                            winner: game.winner || 'TBD'
+                                        };
+                                    }
+                                });
+                            }
+                        } catch (error) {
+                            console.log(`Could not load embedded data for Week ${week}`);
                         }
                     }
                     

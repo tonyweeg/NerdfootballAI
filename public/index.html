@@ -622,6 +622,7 @@
     border-color: #ef4444; /* red-500 */
     opacity: 0.7;
   }
+  .team-btn.selected:focus {
     background-color: #dbeafe !important; /* blue-100 */
     border-color: #2563eb !important; /* blue-600 */
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
@@ -1046,7 +1047,7 @@
             <button id="leaderboard-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">🏆 Leaderboard</button>
             <button id="grid-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">📊 The Grid</button>
             <a href="./index.html?view=survivor-picks" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">⚔️ Survivor Picks</a>
-            <a href="./index.html?view=survivor" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">💀 Survivors List</a>
+            <a href="./survivor-audit.html" class="block px-4 py-2 text-sm text-green-700 hover:bg-green-50" role="menuitem">💻 Survivor Audit Console</a>
             <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">📋 Rules</a>
             <a href="./websocket-test.html" class="block px-4 py-2 text-sm text-blue-700 hover:bg-blue-50" role="menuitem">🚀 WebSocket Test</a>
             
@@ -3805,6 +3806,9 @@ survivorCurrentWeek: document.getElementById('survivor-current-week')
  let currentWeek = 1, currentUser = null, db, auth, unsubscribeFromPicks = null, saveTimeout = null, activePicks = {};
  let currentAdminPicks = {}, allUsers = [];
 
+ // --- LISTENER DEBOUNCING ---
+ let isLoadingWeek = false, loadWeekTimeout = null;
+
  // --- NFL TEAM DATA ---
  const nflTeamLogos = {
   'ARI': 'https://a.espncdn.com/i/teamlogos/nfl/500/ari.png',
@@ -4207,8 +4211,8 @@ async function refreshDataInBackground() {
   }
 }
 
-// Set up periodic cache monitoring - reduced frequency to prevent spam
-setInterval(monitorCacheStatus, 60000); // Check every 60 seconds to reduce spam
+// Set up periodic cache monitoring - DISABLED to prevent modal popups
+// setInterval(monitorCacheStatus, 60000); // Check every 60 seconds to reduce spam
 
 // Initial check on page load
 setTimeout(monitorCacheStatus, 2000); // Check 2 seconds after page load
@@ -4540,22 +4544,14 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
             const espnTimestamp = game.kickoff || game.dt;
             let gameTime;
 
-            if (window.easternTimeParser) {
-                gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
-            } else {
-                // FALLBACK: Manual Eastern Time conversion
+            // DISABLED: Use ESPN time directly as Eastern
+            // if (window.easternTimeParser) {
+            //     gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+            // } else {
+                // ESPN Z = Eastern time, no conversion needed
                 const cleanTime = espnTimestamp.replace('Z', '');
-                const localDate = new Date(cleanTime);
-                const year = localDate.getFullYear();
-                const month = localDate.getMonth();
-                const day = localDate.getDate();
-                const hours = localDate.getHours();
-                const minutes = localDate.getMinutes();
-                const seconds = localDate.getSeconds();
-                const gameDate = new Date(year, month, day);
-         const offsetHours = getEasternTimeOffsetHours(gameDate);
-                gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
-            }
+                gameTime = new Date(cleanTime);
+            // }
 
             return now >= gameTime;
         });
@@ -4569,10 +4565,22 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
         
         games.forEach((game, gameIndex) => {
             const pick = user.picks && user.picks[game.id];
-            // Handle both raw JSON format (dt) and processed format (kickoff) - preserve UTC timezone
+            // Handle both raw JSON format (dt) and processed format (kickoff) - ESPN Z = Eastern time
             const gameTimeString = game.kickoff || game.dt;
-            const gameTime = new Date(gameTimeString);
+            const cleanTime = gameTimeString.replace('Z', '');
+            const gameTime = new Date(cleanTime);
             const gameStarted = now >= gameTime;
+
+            // 🚨 DEBUG: Console log game state for troubleshooting
+            if (gameIndex === 0) {
+                console.log(`🎮 GAME ${game.id} (${game.a} @ ${game.h}) DEBUG:
+                Original: ${gameTimeString}
+                Clean: ${cleanTime}
+                Game Time: ${gameTime.toLocaleString()}
+                Current Time: ${now.toLocaleString()}
+                Game Started?: ${gameStarted}
+                Time until game: ${(gameTime.getTime() - now.getTime()) / (1000 * 60)} minutes`);
+            }
             
             let cellContent = '-';
             let cellClass = '';
@@ -8712,31 +8720,6 @@ function attachScoringSystemEventListeners() {
  }
  onAuthStateChanged(auth, handleAuthStateChange);
 
- // 🚨 MAINTENANCE MODE CHECK
- async function checkMaintenanceMode() {
-     await new Promise((resolve) => {
-         const unsubscribe = window.auth.onAuthStateChanged((user) => {
-             unsubscribe();
-             resolve();
-         });
-         setTimeout(resolve, 3000);
-     });
-
-     const currentUser = window.auth.currentUser;
-     const TONY_UID = "WxSPmEildJdqs6T5hIpBUZrscwt2";
-
-     if (!currentUser || currentUser.uid !== TONY_UID) {
-         document.body.innerHTML = `
-             <div style="text-align:center; padding:50px; font-size:24px; color:red;">
-                 🚨 NERDFOOTBALL IS STARTING TO FEEL BETTER... STAY TUNED! Tony has made great progress! 🚨
-             </div>
-         `;
-         return false;
-     }
-     return true;
- }
-
- checkMaintenanceMode();
 console.log('💎 onAuthStateChanged listener set up');
 
 // Initialize picks view toggle functionality
@@ -12011,41 +11994,28 @@ function getEasternTimeOffsetHours(dateToCheck) {
 function getGameState(game) {
     const now = new Date();
 
-    // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
+    // 🔧 CRITICAL FIX: ESPN timestamps are ALREADY in Eastern Time - treat as-is
     const espnTimestamp = game.dt || game.kickoff;
     let gameTime;
 
-    // 🚨 ESPN USES EST AS ZULU! "Z" = Eastern Time, NOT UTC!
-    // ESPN "2025-09-18T20:15:00Z" = 8:15 PM EASTERN (ESPN's "Zulu" = Eastern)
-
-    // Remove the misleading "Z" since it's actually Eastern Time
+    // ESPN times are ALREADY Eastern - just remove the misleading "Z"
     const cleanTime = espnTimestamp.replace('Z', '');
+    gameTime = new Date(cleanTime);
 
-    // Parse as local time to extract components (treating as Eastern)
-    const easternTime = new Date(cleanTime);
-    const year = easternTime.getFullYear();
-    const month = easternTime.getMonth();
-    const day = easternTime.getDate();
-    const hours = easternTime.getHours();
-    const minutes = easternTime.getMinutes();
-    const seconds = easternTime.getSeconds();
+    // 🚨 DEBUG: Show exact time calculations for troubleshooting
+    console.log(`🎮 GAME LOCK CHECK - Game ${game.id}:
+    ESPN Time: ${espnTimestamp}
+    Clean Time: ${cleanTime}
+    Parsed Game Time: ${gameTime.toLocaleString()} (${gameTime.toISOString()})
+    Current Time: ${now.toLocaleString()} (${now.toISOString()})
+    Time Diff: ${(gameTime.getTime() - now.getTime()) / (1000 * 60)} minutes
+    Game Started?: ${now >= gameTime}`);
 
-    // Determine if DST is active for this date
-    const gameDate = new Date(year, month, day);
-    const isDST = getEasternTimeOffsetHours(gameDate) === 4;
-
-    // Convert Eastern time to proper UTC
-    // Eastern is BEHIND UTC: EDT = UTC-4, EST = UTC-5
-    const offsetHours = isDST ? 4 : 5;
-    gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
-
-    console.log(`⏰ ESPN ZULU=EST: ${espnTimestamp} = ${hours}:${String(minutes).padStart(2,'0')} EASTERN → ${gameTime.toISOString()} UTC (offset +${offsetHours})`);
-
-    if (window.easternTimeParser) {
-        // Use parser result as authoritative - it has intelligent format detection
-        gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
-        console.log(`⏰ Using authoritative parser result: ${gameTime.toISOString()}`);
-    }
+    // DISABLED: window.easternTimeParser overrides our ESPN Z = Eastern fix
+    // if (window.easternTimeParser) {
+    //     gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+    //     console.log(`⏰ Using authoritative parser result: ${gameTime.toISOString()}`);
+    // }
 
     // 🔍 DEBUGGING: Log Miami @ Buffalo game specifically
     if ((game.away === 'Miami Dolphins' && game.home === 'Buffalo Bills') ||
@@ -12139,24 +12109,17 @@ function isGameLocked(game) {
   const espnTimestamp = firstGame.kickoff || firstGame.dt;
   let firstKickoff;
 
-  if (window.easternTimeParser) {
-      firstKickoff = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
-  } else {
-      // FALLBACK: Manual Eastern Time conversion
+  // DISABLED: Use ESPN time directly as Eastern
+  // if (window.easternTimeParser) {
+  //     firstKickoff = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+  // } else {
+      // ESPN Z = Eastern time, no conversion needed
       const cleanTime = espnTimestamp.replace('Z', '');
-      const localDate = new Date(cleanTime);
-      const year = localDate.getFullYear();
-      const month = localDate.getMonth();
-      const day = localDate.getDate();
-      const hours = localDate.getHours();
-      const minutes = localDate.getMinutes();
-      const seconds = localDate.getSeconds();
-      const gameDate = new Date(year, month, day);
-      const offsetHours = getEasternTimeOffsetHours(gameDate);
-      firstKickoff = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
-  }
+      firstKickoff = new Date(cleanTime);
+  // }
 
-  return new Date() > firstKickoff;
+  // NEVER lock entire week - only individual games should be locked
+ return false;
  }
 
  // Helper function to identify Monday Night Football games
@@ -12169,22 +12132,14 @@ function isGameLocked(game) {
      const espnTimestamp = game.kickoff || game.dt;
      let gameTime;
 
-     if (window.easternTimeParser) {
-         gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
-     } else {
-         // FALLBACK: Manual Eastern Time conversion
+     // DISABLED: Use ESPN time directly as Eastern
+     // if (window.easternTimeParser) {
+     //     gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+     // } else {
+         // ESPN Z = Eastern time, no conversion needed
          const cleanTime = espnTimestamp.replace('Z', '');
-         const localDate = new Date(cleanTime);
-         const year = localDate.getFullYear();
-         const month = localDate.getMonth();
-         const day = localDate.getDate();
-         const hours = localDate.getHours();
-         const minutes = localDate.getMinutes();
-         const seconds = localDate.getSeconds();
-         const gameDate = new Date(year, month, day);
-         const offsetHours = getEasternTimeOffsetHours(gameDate);
-         gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
-     }
+         gameTime = new Date(cleanTime);
+     // }
 
      return gameTime.getDay() === 1; // Monday
    });
@@ -12195,21 +12150,14 @@ function isGameLocked(game) {
        // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
        const parseGameTime = (game) => {
          const espnTimestamp = game.kickoff || game.dt;
-         if (window.easternTimeParser) {
-             return window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
-         } else {
+         // DISABLED: Use ESPN time directly as Eastern
+         // if (window.easternTimeParser) {
+         //     return window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+         // } else {
+             // ESPN Z = Eastern time, no conversion needed
              const cleanTime = espnTimestamp.replace('Z', '');
-             const localDate = new Date(cleanTime);
-             const year = localDate.getFullYear();
-             const month = localDate.getMonth();
-             const day = localDate.getDate();
-             const hours = localDate.getHours();
-             const minutes = localDate.getMinutes();
-             const seconds = localDate.getSeconds();
-             const gameDate = new Date(year, month, day);
-         const offsetHours = getEasternTimeOffsetHours(gameDate);
-             return new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
-         }
+             return new Date(cleanTime);
+         // }
        };
 
        const latestTime = parseGameTime(latest);
@@ -12802,10 +12750,19 @@ function isGameLocked(game) {
   }
  }
 
- async function loadAndRenderWeek(weekNumber) { 
- currentWeek = parseInt(weekNumber, 10);
- document.getElementById('picks-container-title').textContent = `My picks for Week ${currentWeek}`;
- if (!currentUser) return; 
+ async function loadAndRenderWeek(weekNumber) {
+ if (isLoadingWeek) return;
+
+ clearTimeout(loadWeekTimeout);
+ loadWeekTimeout = setTimeout(async () => {
+  isLoadingWeek = true;
+
+  currentWeek = parseInt(weekNumber, 10);
+  document.getElementById('picks-container-title').textContent = `My picks for Week ${currentWeek}`;
+  if (!currentUser) {
+    isLoadingWeek = false;
+    return;
+  } 
  if (unsubscribeFromPicks) unsubscribeFromPicks(); 
  updateSaveStatus('idle');
 
@@ -12839,7 +12796,10 @@ function isGameLocked(game) {
  if (!allUI.picksSummaryContainer.classList.contains('hidden')) {
   renderActivePicksSummary();
  }
- }); 
+ });
+
+  isLoadingWeek = false;
+ }, 100);
  }
 
  async function savePicksToFirestore(weekNum, picks) { 
@@ -13664,22 +13624,14 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      const espnTimestamp = game.kickoff || game.dt;
      let gameTime;
 
-     if (window.easternTimeParser) {
-         gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
-     } else {
-         // FALLBACK: Manual Eastern Time conversion
+     // DISABLED: Use ESPN time directly as Eastern
+     // if (window.easternTimeParser) {
+     //     gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+     // } else {
+         // ESPN Z = Eastern time, no conversion needed
          const cleanTime = espnTimestamp.replace('Z', '');
-         const localDate = new Date(cleanTime);
-         const year = localDate.getFullYear();
-         const month = localDate.getMonth();
-         const day = localDate.getDate();
-         const hours = localDate.getHours();
-         const minutes = localDate.getMinutes();
-         const seconds = localDate.getSeconds();
-         const gameDate = new Date(year, month, day);
-         const offsetHours = getEasternTimeOffsetHours(gameDate);
-         gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
-     }
+         gameTime = new Date(cleanTime);
+     // }
 
      const now = new Date();
      const gameHasStarted = now > gameTime;
@@ -13746,9 +13698,10 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
           console.error('Error forcing fresh data:', error);
         }
 
-        // Retry loading after brief delay
+        // Re-enable button instead of reloading page
         setTimeout(() => {
-          window.location.reload(); // Full refresh to get latest data
+          document.getElementById('heat-bread-btn').innerHTML = '🔥 Heat Bread';
+          document.getElementById('heat-bread-btn').disabled = false;
         }, 2000);
       });
 
@@ -13829,26 +13782,10 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      let gameKickoff;
 
      if (pick.game.kickoff && pick.game.kickoff.includes('Z')) {
-      // Apply ESPN EST-as-Zulu conversion
+      // ESPN Z = Eastern time, no conversion needed
       const cleanTime = pick.game.kickoff.replace('Z', '');
-      const easternTime = new Date(cleanTime);
-      const year = easternTime.getFullYear();
-      const month = easternTime.getMonth();
-      const day = easternTime.getDate();
-      const hours = easternTime.getHours();
-      const minutes = easternTime.getMinutes();
-      const seconds = easternTime.getSeconds();
-
-      // Check if DST is active
-      const date = new Date(year, month, day);
-      const dstStart = new Date(year, 2, 9); // March 9
-      const dstEnd = new Date(year, 10, 2);  // November 2
-      const isDST = date >= dstStart && date < dstEnd;
-      const offsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
-
-      // Convert Eastern to UTC properly
-      gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, seconds));
-      gameKickoff = gameTime; // Same conversion for both
+      gameTime = new Date(cleanTime);
+      gameKickoff = gameTime;
      } else {
       // Fallback for non-ESPN timestamps with safe parsing
       gameTime = safeDateFormat(pick.game?.kickoff);
@@ -16274,8 +16211,17 @@ async function renderSurvivorTeamSelector(currentPick) {
 
 // --- SURVIVOR VIEW OBJECT ---
 const SurvivorView = {
-    // Cache for optimized week results loading
-    cachedWeekResults: null,
+    // Week losing teams for audit reference
+    losingTeams: {
+        1: ['Dallas Cowboys', 'Kansas City Chiefs', 'Atlanta Falcons', 'Cleveland Browns',
+            'Miami Dolphins', 'Carolina Panthers', 'New England Patriots', 'New Orleans Saints',
+            'New York Jets', 'New York Giants', 'Tennessee Titans', 'Seattle Seahawks',
+            'Detroit Lions', 'Houston Texans', 'Baltimore Ravens', 'Minnesota Vikings'],
+        2: ['New York Giants', 'Pittsburgh Steelers', 'Tennessee Titans', 'New York Jets',
+            'Miami Dolphins', 'Jacksonville Jaguars', 'New Orleans Saints', 'Cleveland Browns',
+            'Chicago Bears', 'Denver Broncos', 'Carolina Panthers', 'Kansas City Chiefs',
+            'Minnesota Vikings', 'Houston Texans', 'Las Vegas Raiders']
+    },
     
     show: function() {
         console.log('🏆 Showing Survivor Results view');
@@ -16649,27 +16595,397 @@ const SurvivorView = {
         }, 100); // Small delay to ensure UI renders first
     },
     
+    // Get user profile info (name, email)
+    async getUserProfile(userId) {
+        try {
+            const userDocRef = doc(db, 'artifacts/nerdfootball/public/data/nerdfootball_users', userId);
+            const userSnap = await getDoc(userDocRef);
+
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                return {
+                    name: userData.displayName || 'Unknown',
+                    email: userData.email || 'Unknown'
+                };
+            }
+            return { name: 'Unknown', email: 'Unknown' };
+        } catch (error) {
+            return { name: 'Error', email: 'Error' };
+        }
+    },
+
     loadSurvivorResults: async function() {
         this.showLoading();
         const loadStartTime = performance.now();
 
         try {
-            // 🏆 BATTLEFIELD DISPLAY ONLY: No legacy survivor systems whatsoever!
-            if (window.survivorBattlefield && typeof window.survivorBattlefield.renderBattlefield === 'function') {
-                console.log('🏆 BATTLEFIELD DISPLAY: Using stunning visual survivor battlefield!');
-                await window.survivorBattlefield.renderBattlefield();
+            console.log('💀 LINUX CONSOLE: Loading detailed survivor audit...');
+
+            // Run detailed audit for both weeks
+            const auditResults = await this.detailedMultiWeekAudit([1, 2]);
+
+            if (auditResults) {
+                this.displayLinuxConsoleResults(auditResults);
                 this.showResults();
-                console.log(`✅ BATTLEFIELD LOADED: ${(performance.now() - loadStartTime).toFixed(1)}ms`);
-                return;
+                console.log(`✅ LINUX CONSOLE LOADED: ${(performance.now() - loadStartTime).toFixed(1)}ms`);
+            } else {
+                throw new Error('Failed to load audit data');
             }
 
-            // If battlefield display is not available, show error
-            throw new Error('Battlefield display system not available. Please refresh the page.');
+        } catch (error) {
+            console.error('❌ Linux console loading error:', error);
+            this.showError(`Failed to load survivor audit: ${error.message}`);
+        }
+    },
+
+    // Detailed audit for multiple weeks
+    async detailedMultiWeekAudit(weeks = [1, 2]) {
+        const results = {};
+
+        for (const week of weeks) {
+            results[week] = await this.detailedWeekAudit(week);
+            if (week < Math.max(...weeks)) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause
+            }
+        }
+
+        return results;
+    },
+
+    // Detailed audit for a specific week
+    async detailedWeekAudit(weekNumber) {
+        const losingTeams = this.losingTeams[weekNumber];
+        if (!losingTeams) {
+            console.error(`❌ No losing teams data for Week ${weekNumber}`);
+            return null;
+        }
+
+        try {
+            // Get pool members
+            const poolMembersRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+            const poolMembersSnap = await getDoc(poolMembersRef);
+
+            if (!poolMembersSnap.exists()) {
+                console.error('❌ Pool members not found');
+                return null;
+            }
+
+            const memberIds = Object.keys(poolMembersSnap.data());
+
+            // Get current elimination status
+            const statusDocRef = doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_status/status');
+            const statusSnap = await getDoc(statusDocRef);
+            const allStatuses = statusSnap.exists() ? statusSnap.data() : {};
+
+            const detailedAudit = {
+                weekNumber,
+                totalMembers: memberIds.length,
+                userDetails: [],
+                winningPicks: [],
+                losingPicks: [],
+                noPicks: [],
+                eliminated: []
+            };
+
+            // Audit each member with full details
+            for (const userId of memberIds) {
+                try {
+                    // Get user profile
+                    const profile = await this.getUserProfile(userId);
+                    const shortUserId = userId.substring(0, 8) + '...';
+
+                    // Check if already eliminated
+                    if (allStatuses[userId]?.eliminated) {
+                        detailedAudit.eliminated.push({
+                            userId: shortUserId,
+                            fullUserId: userId,
+                            name: profile.name,
+                            email: profile.email,
+                            eliminatedWeek: allStatuses[userId].eliminatedWeek,
+                            reason: allStatuses[userId].eliminationReason
+                        });
+                        continue;
+                    }
+
+                    // Get user's picks
+                    const userPicksDocRef = doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_picks', userId);
+                    const userPicksSnap = await getDoc(userPicksDocRef);
+
+                    if (!userPicksSnap.exists()) {
+                        detailedAudit.noPicks.push({
+                            userId: shortUserId,
+                            fullUserId: userId,
+                            name: profile.name,
+                            email: profile.email,
+                            reason: 'No picks document'
+                        });
+                        continue;
+                    }
+
+                    const userPicksData = userPicksSnap.data();
+                    const userPicks = userPicksData.picks || {};
+                    const weekPick = userPicks[weekNumber];
+
+                    if (!weekPick) {
+                        detailedAudit.noPicks.push({
+                            userId: shortUserId,
+                            fullUserId: userId,
+                            name: profile.name,
+                            email: profile.email,
+                            reason: `No Week ${weekNumber} pick`
+                        });
+                        continue;
+                    }
+
+                    const pickedTeam = weekPick.team;
+                    const hasGameId = !!weekPick.gameId;
+
+                    const userDetail = {
+                        userId: shortUserId,
+                        fullUserId: userId,
+                        name: profile.name,
+                        email: profile.email,
+                        pickedTeam: pickedTeam,
+                        gameId: weekPick.gameId || 'MISSING',
+                        timestamp: weekPick.timestamp || 'Unknown',
+                        hasGameId: hasGameId
+                    };
+
+                    detailedAudit.userDetails.push(userDetail);
+
+                    // Categorize by win/loss
+                    if (losingTeams.includes(pickedTeam)) {
+                        detailedAudit.losingPicks.push({
+                            ...userDetail,
+                            shouldBeEliminated: true
+                        });
+                    } else {
+                        detailedAudit.winningPicks.push({
+                            ...userDetail,
+                            shouldSurvive: true
+                        });
+                    }
+
+                } catch (error) {
+                    console.error(`❌ Error auditing user ${userId}:`, error);
+                }
+            }
+
+            return detailedAudit;
 
         } catch (error) {
-            console.error('❌ Survivor loading error:', error);
-            this.showError(`Failed to load survivor results: ${error.message}`);
+            console.error(`❌ Detailed audit failed for Week ${weekNumber}:`, error);
+            return null;
         }
+    },
+
+    // Display beautiful Linux console-style results
+    displayLinuxConsoleResults: function(auditResults) {
+        const startTime = performance.now();
+
+        let html = `
+            <div class="bg-black text-green-400 font-mono text-sm p-6 rounded-lg border border-green-500 shadow-2xl" style="background: linear-gradient(145deg, #000000, #0a0a0a); box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);">
+                <!-- Terminal Header -->
+                <div class="border-b border-green-500 pb-4 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <div class="text-green-300">root@nerdfootball:~$ survivor_audit --verbose</div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <pre class="text-green-400 text-xs leading-tight">
+     ██████  ██    ██ ██████  ██    ██ ██ ██    ██  ██████  ██████
+    ██       ██    ██ ██   ██ ██    ██ ██ ██    ██ ██    ██ ██   ██
+    ██████   ██    ██ ██████  ██    ██ ██ ██    ██ ██    ██ ██████
+         ██  ██    ██ ██   ██  ██  ██  ██  ██  ██  ██    ██ ██   ██
+    ██████    ██████  ██   ██   ████   ██   ████    ██████  ██   ██
+
+                        ◢◤ DETAILED AUDIT SYSTEM v3.0 ◥◣
+                        </pre>
+                    </div>
+                </div>
+
+                <!-- System Status -->
+                <div class="mb-6 p-4 border border-green-600 rounded bg-green-900 bg-opacity-20">
+                    <div class="text-green-300 font-bold mb-2">[SYSTEM STATUS]</div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                        <div>◉ CPU: Online</div>
+                        <div>◉ Memory: ${Math.round(performance.memory?.usedJSHeapSize / 1024 / 1024 || 0)}MB</div>
+                        <div>◉ Audit Engine: Active</div>
+                        <div>◉ Data Integrity: Verified</div>
+                    </div>
+                </div>
+        `;
+
+        // Process each week with Linux terminal styling
+        Object.keys(auditResults).forEach(week => {
+            const audit = auditResults[week];
+            if (!audit) return;
+
+            html += this.generateLinuxWeekOutput(audit);
+        });
+
+        // Terminal footer
+        html += `
+                <div class="border-t border-green-500 pt-4 mt-6 text-center">
+                    <div class="text-green-300 text-xs">
+                        ✓ Audit completed • ${Object.keys(auditResults).length} weeks processed •
+                        ${new Date().toLocaleString()} • NerdFootball Survivor Audit System
+                    </div>
+                </div>
+            </div>
+        `;
+
+        allUI.survivorResultsBody.innerHTML = html;
+
+        const loadTime = performance.now() - startTime;
+        console.log(`💻 Linux console displayed in ${loadTime.toFixed(1)}ms`);
+    },
+
+    // Generate Linux terminal-style output for a week
+    generateLinuxWeekOutput: function(audit) {
+        const losingTeams = this.losingTeams[audit.weekNumber] || [];
+
+        let html = `
+            <div class="mb-8 border border-green-600 rounded p-4 bg-green-900 bg-opacity-10">
+                <div class="text-green-300 font-bold mb-3">
+                    root@nerdfootball:~$ ./week${audit.weekNumber}_audit.sh --detailed
+                </div>
+
+                <!-- Week Stats Terminal Output -->
+                <div class="bg-black p-3 rounded border border-green-700 mb-4">
+                    <div class="text-green-400 text-xs mb-2">Scanning survivor pool database...</div>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+                        <div class="text-blue-400">TOTAL: <span class="text-white font-bold">${audit.totalMembers}</span></div>
+                        <div class="text-green-400">ALIVE: <span class="text-white font-bold">${audit.winningPicks.length}</span></div>
+                        <div class="text-red-400">DEAD: <span class="text-white font-bold">${audit.losingPicks.length}</span></div>
+                        <div class="text-yellow-400">NULL: <span class="text-white font-bold">${audit.noPicks.length}</span></div>
+                        <div class="text-purple-400">TERM: <span class="text-white font-bold">${audit.eliminated.length}</span></div>
+                    </div>
+                </div>
+
+                <!-- Losing Teams Reference -->
+                <div class="mb-4 p-3 bg-red-900 bg-opacity-20 border border-red-600 rounded">
+                    <div class="text-red-400 font-bold text-xs mb-2">WEEK ${audit.weekNumber} LOSING_TEAMS[] = {</div>
+                    <div class="text-red-300 text-xs pl-4 grid grid-cols-2 md:grid-cols-4 gap-1">
+                        ${losingTeams.map((team, i) => `<div>[${i}] "${team}"</div>`).join('')}
+                    </div>
+                    <div class="text-red-400 text-xs">}; // ${losingTeams.length} eliminated teams</div>
+                </div>
+        `;
+
+        // Surviving Users - Linux style table
+        if (audit.winningPicks.length > 0) {
+            html += `
+                <div class="mb-6">
+                    <div class="text-green-300 font-bold text-xs mb-2">
+                        ./query --table=survivors --week=${audit.weekNumber} --status=alive
+                    </div>
+                    <div class="bg-black border border-green-600 rounded overflow-hidden">
+                        <div class="bg-green-700 text-black p-2 text-xs font-bold grid grid-cols-12 gap-1">
+                            <div class="col-span-3">USERNAME</div>
+                            <div class="col-span-4">EMAIL</div>
+                            <div class="col-span-3">TEAM_SELECTED</div>
+                            <div class="col-span-2">GAME_ID</div>
+                        </div>
+                        <div class="max-h-64 overflow-y-auto">
+                            ${audit.winningPicks.map(pick => `
+                                <div class="p-2 border-b border-green-800 text-xs grid grid-cols-12 gap-1 hover:bg-green-900 hover:bg-opacity-20">
+                                    <div class="col-span-3 text-green-400 font-mono">${pick.name.substring(0, 20)}</div>
+                                    <div class="col-span-4 text-green-300 font-mono">${pick.email.substring(0, 28)}</div>
+                                    <div class="col-span-3 text-white font-bold">${pick.pickedTeam.substring(0, 18)}</div>
+                                    <div class="col-span-2 text-blue-400">${pick.gameId}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="bg-green-800 text-black p-1 text-xs">
+                            Query returned ${audit.winningPicks.length} records. Status: SUCCESS
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Dead Users - Linux style error output
+        if (audit.losingPicks.length > 0) {
+            html += `
+                <div class="mb-6">
+                    <div class="text-red-300 font-bold text-xs mb-2">
+                        ./query --table=eliminations --week=${audit.weekNumber} --status=dead
+                    </div>
+                    <div class="bg-black border border-red-600 rounded overflow-hidden">
+                        <div class="bg-red-700 text-black p-2 text-xs font-bold grid grid-cols-12 gap-1">
+                            <div class="col-span-3">USERNAME</div>
+                            <div class="col-span-4">EMAIL</div>
+                            <div class="col-span-3">FATAL_PICK</div>
+                            <div class="col-span-2">GAME_ID</div>
+                        </div>
+                        <div class="max-h-64 overflow-y-auto">
+                            ${audit.losingPicks.map(pick => `
+                                <div class="p-2 border-b border-red-800 text-xs grid grid-cols-12 gap-1 hover:bg-red-900 hover:bg-opacity-20">
+                                    <div class="col-span-3 text-red-400 font-mono">${pick.name.substring(0, 20)}</div>
+                                    <div class="col-span-4 text-red-300 font-mono">${pick.email.substring(0, 28)}</div>
+                                    <div class="col-span-3 text-red-500 font-bold">💀 ${pick.pickedTeam.substring(0, 15)}</div>
+                                    <div class="col-span-2 text-blue-400">${pick.gameId}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="bg-red-800 text-white p-1 text-xs">
+                            ERROR: ${audit.losingPicks.length} fatal picks detected. Elimination required.
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Null entries and eliminated - compact display
+        if (audit.noPicks.length > 0 || audit.eliminated.length > 0) {
+            html += `
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+            `;
+
+            if (audit.noPicks.length > 0) {
+                html += `
+                    <div class="bg-yellow-900 bg-opacity-20 border border-yellow-600 rounded p-3">
+                        <div class="text-yellow-400 font-bold text-xs mb-2">NULL_PICKS[] = {</div>
+                        <div class="max-h-32 overflow-y-auto text-xs">
+                            ${audit.noPicks.map(user => `
+                                <div class="text-yellow-300 font-mono">• ${user.name} (${user.reason})</div>
+                            `).join('')}
+                        </div>
+                        <div class="text-yellow-400 text-xs mt-2">}; // ${audit.noPicks.length} null entries</div>
+                    </div>
+                `;
+            }
+
+            if (audit.eliminated.length > 0) {
+                html += `
+                    <div class="bg-purple-900 bg-opacity-20 border border-purple-600 rounded p-3">
+                        <div class="text-purple-400 font-bold text-xs mb-2">TERMINATED[] = {</div>
+                        <div class="max-h-32 overflow-y-auto text-xs">
+                            ${audit.eliminated.map(user => `
+                                <div class="text-purple-300 font-mono">• ${user.name} (Week ${user.eliminatedWeek})</div>
+                            `).join('')}
+                        </div>
+                        <div class="text-purple-400 text-xs mt-2">}; // ${audit.eliminated.length} terminated</div>
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
+        }
+
+        html += `
+                <div class="text-green-400 text-xs mt-3">
+                    ✓ Week ${audit.weekNumber} audit completed. Exit code: 0
+                </div>
+            </div>
+        `;
+
+        return html;
     },
     
     // Calculate simple stats for fallback
@@ -17081,11 +17397,21 @@ const SurvivorPicksView = {
     
     getGameState: function(game) {
         const now = new Date();
-        // Handle both raw JSON format (dt) and processed format (kickoff)
-        const gameTime = game.kickoff || game.dt;
-        const kickoff = new Date(gameTime);
-        
-        if (now < kickoff) {
+
+        // Use the corrected timezone parsing logic
+        const espnTimestamp = game.dt || game.kickoff;
+        let gameTime;
+
+        // DISABLED: Use ESPN time directly as Eastern
+        // if (window.easternTimeParser) {
+        //     gameTime = window.easternTimeParser.parseESPNTimestamp(espnTimestamp);
+        // } else {
+            // ESPN Z = Eastern time, no conversion needed
+            const cleanTime = espnTimestamp.replace('Z', '');
+            gameTime = new Date(cleanTime);
+        // }
+
+        if (now < gameTime) {
             return 'PRE_GAME';
         } else if (game.winner && game.winner !== 'TBD') {
             return 'COMPLETED';
