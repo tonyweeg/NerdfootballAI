@@ -6,9 +6,6 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 
-// For scheduled functions (Firebase Functions v2 style)
-const { onSchedule } = require('firebase-functions/v2/scheduler');
-
 // Initialize Firebase Admin
 admin.initializeApp();
 
