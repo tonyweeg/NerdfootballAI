@@ -13595,7 +13595,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
         homeTeam: espnGame.home_team || espnGame.homeTeam || espnGame.h || matchedGame.home,
         awayScore: espnGame.awayScore || 0,
         homeScore: espnGame.homeScore || 0,
-        winner: espnGame.winner,
+        winner: typeof espnGame.winner === 'string' ? espnGame.winner : (espnGame.winner?.name || espnGame.winner?.abbreviation || 'TBD'),
         status: espnGame.status || (espnGame.winner && espnGame.winner !== 'TBD' ? 'FINAL' : 'LIVE'),
         clock: espnGame.clock || espnGame.timeRemaining,
         quarter: espnGame.quarter || espnGame.period,
@@ -13618,7 +13618,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
    const activePicks = [];
    weekData.games.forEach(game => {
     const pick = userPicks[game.id];
-    if (pick && pick.winner) {
+    if (pick && pick.confidence) {
      // Check if game has started
      // 🔧 CRITICAL FIX: ESPN timestamps with "Z" are actually Eastern Time (not UTC)
      const espnTimestamp = game.kickoff || game.dt;
@@ -13645,7 +13645,7 @@ async function calculateLeaderboardOptimized(weekNumber = null) {
      // ALWAYS show user their own picks - this is "Your Active Picks" section
      activePicks.push({
       gameId: game.id,
-      team: pick.winner,
+      team: pick.winner || 'No selection',
       confidence: pick.confidence,
       game: game,
       gameHasStarted: gameHasStarted,
