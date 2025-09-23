@@ -20,8 +20,19 @@ const rtdb = admin.database();
  * Triggered by HTTP request or scheduled function
  */
 exports.syncGameScores = functions.https.onRequest(async (req, res) => {
+        // 🚨 CORS FIX: Add CORS headers for web app access
+        res.set('Access-Control-Allow-Origin', 'https://nerdfootball.web.app');
+        res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+        // Handle preflight OPTIONS request
+        if (req.method === 'OPTIONS') {
+            res.status(200).send();
+            return;
+        }
+
         console.log('🏈 Starting real-time game scores sync...');
-        
+
         try {
             // Get current NFL week
             const currentWeek = getCurrentNflWeek();
