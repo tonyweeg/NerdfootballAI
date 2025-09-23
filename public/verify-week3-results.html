@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Week 3 Results</title>
+</head>
+<body>
+    <h1>Week 3 Bible Data + User Results Verification</h1>
+    <div id="auth-status">Loading...</div>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+
+        // Authentication handler
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const authStatus = document.getElementById('auth-status');
+            if (user) {
+                authStatus.innerHTML = `<p style="color: green;">✅ Signed in as: ${user.email}</p>`;
+                verifyWeek3();
+            } else {
+                authStatus.innerHTML = `<button onclick="signIn()" style="background: blue; color: white; padding: 10px;">Sign In with Google</button>`;
+            }
+        });
+
+        window.signIn = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error('Sign in failed:', error);
+            }
+        };
+
+        async function verifyWeek3() {
+            if (!currentUser) return;
+            const results = document.getElementById('results');
+
+            try {
+                // Load Week 3 bible data
+                const response = await fetch('/nfl_2025_week_3.json');
+                const bibleData = await response.json();
+
+                console.log('🔥DEBUGKEY🔥 BIBLE DATA Week 3:', bibleData);
+
+                // Load all Week 3 picks
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const picksSnap = await getDocs(collection(db, picksPath));
+
+                let allUserResults = [];
+
+                picksSnap.forEach(doc => {
+                    const picks = doc.data();
+                    const userId = doc.id;
+
+                    let correctCount = 0;
+                    let totalPicks = 0;
+                    let pointsEarned = 0;
+
+                    // Analyze each game
+                    for (let gameId = 301; gameId <= 316; gameId++) {
+                        const gameKey = gameId.toString();
+                        const pick = picks[gameKey];
+                        const actualWinner = bibleData[gameKey]?.winner;
+
+                        if (pick && actualWinner) {
+                            totalPicks++;
+                            const isCorrect = pick.winner === actualWinner;
+                            if (isCorrect) {
+                                correctCount++;
+                                pointsEarned += pick.confidence || 0;
+                            }
+                        }
+                    }
+
+                    allUserResults.push({
+                        userId,
+                        userName: picks.userName || 'Unknown',
+                        correctCount,
+                        totalPicks,
+                        pointsEarned,
+                        winRate: totalPicks > 0 ? (correctCount / totalPicks * 100).toFixed(1) : 0
+                    });
+                });
+
+                // Sort by worst performance first
+                allUserResults.sort((a, b) => a.winRate - b.winRate);
+
+                console.log('🔥DEBUGKEY🔥 ALL USER RESULTS (worst first):', allUserResults);
+
+                let html = '<h2>Week 3 Results Summary</h2>';
+                html += '<h3>Bible Data Verification:</h3>';
+                html += '<ul>';
+                for (let gameId = 301; gameId <= 316; gameId++) {
+                    const game = bibleData[gameId.toString()];
+                    if (game) {
+                        html += `<li>Game ${gameId}: ${game.a} @ ${game.h} → Winner: <strong>${game.winner}</strong> (${game.awayScore}-${game.homeScore})</li>`;
+                    }
+                }
+                html += '</ul>';
+
+                html += '<h3>User Performance (Worst to Best):</h3>';
+                html += '<table border="1"><tr><th>User</th><th>Correct</th><th>Total</th><th>Win Rate</th><th>Points</th></tr>';
+
+                allUserResults.forEach(user => {
+                    const rowColor = user.winRate < 20 ? 'background-color: #ffcccc;' : '';
+                    html += `<tr style="${rowColor}">
+                        <td>${user.userName}</td>
+                        <td>${user.correctCount}</td>
+                        <td>${user.totalPicks}</td>
+                        <td>${user.winRate}%</td>
+                        <td>${user.pointsEarned}</td>
+                    </tr>`;
+                });
+
+                html += '</table>';
+
+                // Find users with 0 wins
+                const zeroWinUsers = allUserResults.filter(u => u.correctCount === 0);
+                if (zeroWinUsers.length > 0) {
+                    html += `<h3 style="color: red;">🚨 Users with 0 Wins (${zeroWinUsers.length}):</h3>`;
+                    html += '<ul>';
+                    zeroWinUsers.forEach(user => {
+                        html += `<li>${user.userName} (${user.totalPicks} picks)</li>`;
+                    });
+                    html += '</ul>';
+                }
+
+                results.innerHTML = html;
+
+            } catch (error) {
+                console.error('🔥DEBUGKEY🔥 ERROR:', error);
+                results.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

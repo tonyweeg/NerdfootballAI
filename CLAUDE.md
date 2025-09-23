@@ -592,3 +592,4 @@ After human regression testing passes:
 **Remember: "Diamond Level" means no mistakes, comprehensive testing, and absolute precision in everything we do.**
 - week 1 of the 2025 season is september 4th - 10th, and it goes for 18 weeks, and ends on january 7, 2026
 - remember Nerdfootball works in the 18 week season of the NFL, there either 16, 15, or 14 games per week.  Confidence values can only be 1-n where n=the number of games per week.
+- this is where you find survivor picks /artifacts/nerdfootball/public/data/nerdSurvivor_picks/
