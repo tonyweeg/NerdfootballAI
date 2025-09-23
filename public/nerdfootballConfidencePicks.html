@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏈 NerdFootball Confidence Picks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+    </script>
+    <style>
+        .locked-row {
+            background-color: #f3f4f6;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .locked-row input, .locked-row select {
+            background-color: #e5e7eb;
+            cursor: not-allowed;
+        }
+        .auto-save-indicator {
+            transition: all 0.3s ease;
+        }
+        .saving {
+            background-color: #fbbf24 !important;
+            color: white !important;
+        }
+        .saved {
+            background-color: #10b981 !important;
+            color: white !important;
+        }
+        .game-row {
+            transition: background-color 0.2s ease;
+        }
+        .game-row:hover:not(.locked-row) {
+            background-color: #f8fafc;
+        }
+        .confidence-input {
+            width: 80px;
+            text-align: center;
+        }
+        .team-select {
+            min-width: 200px;
+        }
+        .time-display {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-6xl mx-auto p-4">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">🏈 My Confidence Picks</h1>
+            <p class="text-gray-600">View past picks • Edit future games • Game-level locking</p>
+
+            <!-- Auth Status -->
+            <div id="authStatus" class="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded">
+                <p class="text-yellow-800">🔐 Checking authentication...</p>
+            </div>
+        </div>
+
+        <!-- Navigation & Controls -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <!-- Week Navigation -->
+                <div class="flex items-center gap-4">
+                    <button id="prevWeek" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 disabled:opacity-50" disabled>
+                        ← Previous
+                    </button>
+                    <select id="weekSelector" class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                    <button id="nextWeek" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 disabled:opacity-50">
+                        Next →
+                    </button>
+                </div>
+
+                <!-- Status & Actions -->
+                <div class="flex items-center gap-4">
+                    <div id="autoSaveStatus" class="px-3 py-1 rounded text-sm bg-gray-100">
+                        Ready
+                    </div>
+                    <div id="statusIndicator" class="px-3 py-1 rounded text-sm bg-gray-100">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Week Info -->
+            <div id="weekInfo" class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded hidden">
+                <!-- Populated when week loads -->
+            </div>
+        </div>
+
+        <!-- Picks Editor -->
+        <div id="picksEditor" class="hidden">
+            <!-- MNF Points -->
+            <div class="bg-white rounded-lg shadow p-4 mb-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">🏈 Monday Night Football Tiebreaker</h3>
+                        <p class="text-sm text-gray-600">Total points scored in Monday Night Football game</p>
+                    </div>
+                    <div>
+                        <input type="number" id="mnfPointsInput" class="confidence-input px-3 py-2 border border-gray-300 rounded-md text-center"
+                               placeholder="Points" min="0" max="100" step="1">
+                        <label class="block text-xs text-gray-500 mt-1 text-center">Total Points</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Games List -->
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div class="bg-gray-50 px-6 py-4 border-b">
+                    <h2 class="text-xl font-bold text-gray-800">📊 Week <span id="weekTitle">1</span> Games</h2>
+                    <p class="text-sm text-gray-600 mt-1">Pick winners and assign confidence values (1-16, each used once)</p>
+                </div>
+
+                <div id="gamesList" class="divide-y divide-gray-200">
+                    <!-- Games populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Validation Summary -->
+            <div id="validationSummary" class="mt-6 bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">🔍 Picks Validation</h3>
+                <div id="validationDetails" class="text-sm text-gray-700">
+                    <!-- Populated by validation logic -->
+                </div>
+            </div>
+        </div>
+
+        <!-- No Picks Message -->
+        <div id="noPicksMessage" class="hidden bg-white rounded-lg shadow p-8 text-center">
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">📝 No Picks Yet</h3>
+            <p class="text-gray-600 mb-4">You haven't made picks for this week yet.</p>
+            <button id="createPicksBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                🎯 Create My Picks
+            </button>
+        </div>
+    </div>
+
+    <!-- Load Eastern Time Parser -->
+    <script src="./easternTimeParser-v2.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let currentWeek = 1;
+        let weekBible = {};
+        let userPicks = {};
+        let poolMemberInfo = null;
+        let autoSaveTimeout = null;
+
+        // Get current NFL week (Week 1 started Sept 4, 2025)
+        function getCurrentWeek() {
+            const week1Start = new Date('2025-09-04');
+            const today = new Date();
+            const diffTime = today - week1Start;
+            const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
+            return Math.max(1, Math.min(18, diffWeeks));
+        }
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user) {
+                currentUser = user;
+                authStatus.innerHTML = `<p class="text-green-800">✅ Signed in as: ${user.email}</p>`;
+
+                // Check if user is a pool member
+                await checkPoolMembership();
+                if (poolMemberInfo) {
+                    await initializeUserApp();
+                } else {
+                    authStatus.innerHTML = `<p class="text-red-800">❌ You are not a pool member. Contact admin to join.</p>`;
+                }
+            } else {
+                authStatus.innerHTML = `<p class="text-red-800">❌ Please sign in to view your picks.</p>`;
+            }
+        });
+
+        async function checkPoolMembership() {
+            try {
+                const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersSnap = await getDoc(doc(db, membersPath));
+
+                if (membersSnap.exists()) {
+                    const members = membersSnap.data();
+                    poolMemberInfo = members[currentUser.uid];
+                }
+            } catch (error) {
+                console.error('Error checking pool membership:', error);
+            }
+        }
+
+        async function initializeUserApp() {
+            currentWeek = getCurrentWeek();
+            initializeWeekSelector();
+            setupEventListeners();
+            await loadWeekData();
+            updateStatus('Ready', 'success');
+        }
+
+        function initializeWeekSelector() {
+            const selector = document.getElementById('weekSelector');
+            selector.innerHTML = '';
+
+            for (let i = 1; i <= 18; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Week ${i}`;
+                if (i === currentWeek) option.selected = true;
+                selector.appendChild(option);
+            }
+
+            updateNavigationButtons();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('weekSelector').addEventListener('change', onWeekChange);
+            document.getElementById('prevWeek').addEventListener('click', () => changeWeek(-1));
+            document.getElementById('nextWeek').addEventListener('click', () => changeWeek(1));
+            document.getElementById('createPicksBtn').addEventListener('click', createBlankPicks);
+            document.getElementById('mnfPointsInput').addEventListener('blur', savePicksData);
+        }
+
+        function updateNavigationButtons() {
+            document.getElementById('prevWeek').disabled = currentWeek <= 1;
+            document.getElementById('nextWeek').disabled = currentWeek >= 18;
+        }
+
+        async function onWeekChange() {
+            const selectedWeek = parseInt(document.getElementById('weekSelector').value);
+            currentWeek = selectedWeek;
+            updateNavigationButtons();
+            await loadWeekData();
+        }
+
+        function changeWeek(direction) {
+            const newWeek = currentWeek + direction;
+            if (newWeek >= 1 && newWeek <= 18) {
+                currentWeek = newWeek;
+                document.getElementById('weekSelector').value = currentWeek;
+                updateNavigationButtons();
+                loadWeekData();
+            }
+        }
+
+        async function loadWeekData() {
+            updateStatus('Loading week data...', 'info');
+
+            try {
+                // Load bible data
+                await loadWeekBible();
+
+                // Load user picks
+                await loadUserPicks();
+
+                // Update UI
+                updateWeekInfo();
+                populatePicksEditor();
+
+            } catch (error) {
+                console.error('Error loading week data:', error);
+                updateStatus(`Error loading Week ${currentWeek}`, 'error');
+            }
+        }
+
+        async function loadWeekBible() {
+            try {
+                const response = await fetch(`/game-data/nfl_2025_week_${currentWeek}.json?v=${Date.now()}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                weekBible = await response.json();
+                console.log(`✅ Loaded Week ${currentWeek} bible`);
+            } catch (error) {
+                console.error(`Failed to load Week ${currentWeek} bible:`, error);
+                weekBible = {};
+            }
+        }
+
+        async function loadUserPicks() {
+            try {
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksDoc = doc(db, picksPath, currentUser.uid);
+                const picksSnap = await getDoc(picksDoc);
+
+                if (picksSnap.exists()) {
+                    userPicks = picksSnap.data();
+                    console.log(`✅ Loaded user picks for Week ${currentWeek}`);
+                } else {
+                    userPicks = {};
+                    console.log(`📝 No picks found for Week ${currentWeek}`);
+                }
+            } catch (error) {
+                console.error('Error loading user picks:', error);
+                userPicks = {};
+            }
+        }
+
+        function updateWeekInfo() {
+            const weekInfo = document.getElementById('weekInfo');
+            const currentNFLWeek = getCurrentWeek();
+            const isCurrentWeek = currentWeek === currentNFLWeek;
+            const isPastWeek = currentWeek < currentNFLWeek;
+            const isFutureWeek = currentWeek > currentNFLWeek;
+
+            let statusText = '';
+            let statusClass = '';
+
+            if (isPastWeek) {
+                statusText = `📊 Past Week - View Only (Current NFL Week: ${currentNFLWeek})`;
+                statusClass = 'bg-gray-50 border-gray-200 text-gray-700';
+            } else if (isCurrentWeek) {
+                statusText = `🔥 Current Week - Live Picks! (Games lock when they start)`;
+                statusClass = 'bg-green-50 border-green-200 text-green-700';
+            } else {
+                statusText = `📅 Future Week - Full Editing Available (Current NFL Week: ${currentNFLWeek})`;
+                statusClass = 'bg-blue-50 border-blue-200 text-blue-700';
+            }
+
+            weekInfo.className = `mt-4 p-3 border rounded ${statusClass}`;
+            weekInfo.innerHTML = `<p class="font-medium">${statusText}</p>`;
+            weekInfo.classList.remove('hidden');
+        }
+
+        function populatePicksEditor() {
+            const hasPicksData = Object.keys(userPicks).length > 0;
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+
+            if (!hasPicksData && gameIds.length === 0) {
+                showNoPicksMessage();
+                return;
+            }
+
+            if (!hasPicksData) {
+                showNoPicksMessage();
+                return;
+            }
+
+            showPicksEditor();
+            populateGamesList();
+            populateMNFPoints();
+            validatePicks();
+        }
+
+        function showPicksEditor() {
+            document.getElementById('picksEditor').classList.remove('hidden');
+            document.getElementById('noPicksMessage').classList.add('hidden');
+            document.getElementById('weekTitle').textContent = currentWeek;
+        }
+
+        function showNoPicksMessage() {
+            document.getElementById('picksEditor').classList.add('hidden');
+            document.getElementById('noPicksMessage').classList.remove('hidden');
+        }
+
+        function populateGamesList() {
+            const gamesList = document.getElementById('gamesList');
+            gamesList.innerHTML = '';
+
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+            const currentNFLWeek = getCurrentWeek();
+            const canEdit = currentWeek >= currentNFLWeek;
+
+            gameIds.forEach(gameId => {
+                const game = weekBible[gameId];
+                const pick = userPicks[gameId] || { winner: '', confidence: '' };
+
+                // Check if game has started using Eastern Time Parser
+                const gameStarted = window.easternTimeParser ?
+                    window.easternTimeParser.hasGameStarted(game.dt) : false;
+
+                // Determine if this row should be locked
+                const isLocked = canEdit ? gameStarted : true; // Lock if past week OR game started
+
+                const gameRow = document.createElement('div');
+                gameRow.className = `game-row px-6 py-4 ${isLocked ? 'locked-row' : ''}`;
+
+                // Format game time
+                let gameTimeDisplay = game.dt;
+                if (window.easternTimeParser) {
+                    gameTimeDisplay = window.easternTimeParser.formatGameTime(game.dt);
+                }
+
+                // Game status indicator
+                let statusIndicator = '';
+                if (game.status === 'final') {
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ FINAL</span>`;
+                } else if (gameStarted) {
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">🔒 LOCKED</span>`;
+                } else {
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">📝 OPEN</span>`;
+                }
+
+                gameRow.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <!-- Game Info -->
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h4 class="font-semibold text-gray-900">Game ${gameId}</h4>
+                                ${statusIndicator}
+                            </div>
+                            <div class="text-sm text-gray-600 mb-1">
+                                <span class="font-medium">${game.a}</span> @ <span class="font-medium">${game.h}</span>
+                            </div>
+                            <div class="time-display">${gameTimeDisplay}</div>
+                            ${game.winner ? `<div class="text-xs text-green-600 mt-1">🏆 Winner: ${game.winner}</div>` : ''}
+                        </div>
+
+                        <!-- Pick Controls -->
+                        <div class="flex items-center gap-4">
+                            <!-- Team Selection -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Pick</label>
+                                <select class="team-select px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        data-game-id="${gameId}" data-field="winner" ${isLocked ? 'disabled' : ''}>
+                                    <option value="">Select team...</option>
+                                    <option value="${game.a}" ${pick.winner === game.a ? 'selected' : ''}>${game.a}</option>
+                                    <option value="${game.h}" ${pick.winner === game.h ? 'selected' : ''}>${game.h}</option>
+                                </select>
+                            </div>
+
+                            <!-- Confidence -->
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Confidence</label>
+                                <input type="number" min="1" max="${gameIds.length}"
+                                       class="confidence-input px-3 py-2 border border-gray-300 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                       value="${pick.confidence || ''}"
+                                       data-game-id="${gameId}" data-field="confidence" ${isLocked ? 'disabled' : ''}>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                gamesList.appendChild(gameRow);
+            });
+
+            // Setup auto-save for editable fields
+            if (canEdit) {
+                document.querySelectorAll('[data-game-id]:not([disabled])').forEach(input => {
+                    setupAutoSave(input);
+                });
+            }
+
+            updateStatus(`Week ${currentWeek} loaded - ${canEdit ? 'Editable' : 'View Only'}`, 'success');
+        }
+
+        function populateMNFPoints() {
+            const mnfInput = document.getElementById('mnfPointsInput');
+            mnfInput.value = userPicks.mnfTotalPoints || '';
+
+            const currentNFLWeek = getCurrentWeek();
+            const canEdit = currentWeek >= currentNFLWeek;
+            mnfInput.disabled = !canEdit;
+        }
+
+        function setupAutoSave(input) {
+            input.addEventListener('blur', async () => {
+                const gameId = input.getAttribute('data-game-id');
+                const field = input.getAttribute('data-field');
+                let value = input.value;
+
+                if (field === 'confidence') {
+                    value = value ? parseInt(value) : null;
+                }
+
+                if (!userPicks[gameId]) {
+                    userPicks[gameId] = {};
+                }
+
+                userPicks[gameId][field] = value;
+                await savePicksData();
+                validatePicks();
+            });
+        }
+
+        async function savePicksData() {
+            if (!currentUser) return;
+
+            showAutoSaveStatus('saving');
+
+            try {
+                // Clear any previous timeout
+                if (autoSaveTimeout) {
+                    clearTimeout(autoSaveTimeout);
+                }
+
+                // Update metadata
+                userPicks.userId = currentUser.uid;
+                userPicks.userName = (poolMemberInfo && poolMemberInfo.name) ? poolMemberInfo.name : (currentUser.email || 'Unknown User');
+                userPicks.weekNumber = currentWeek;
+                userPicks.timestamp = Date.now();
+                userPicks.submittedAt = new Date().toISOString();
+
+                // Get MNF points
+                const mnfInput = document.getElementById('mnfPointsInput');
+                if (mnfInput.value) {
+                    userPicks.mnfTotalPoints = parseInt(mnfInput.value);
+                }
+
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksDoc = doc(db, picksPath, currentUser.uid);
+                await setDoc(picksDoc, userPicks);
+
+                showAutoSaveStatus('saved');
+
+                // Set timeout to return to ready state
+                autoSaveTimeout = setTimeout(() => {
+                    showAutoSaveStatus('ready');
+                }, 2000);
+
+            } catch (error) {
+                console.error('Auto-save failed:', error);
+                showAutoSaveStatus('error');
+            }
+        }
+
+        async function createBlankPicks() {
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+
+            userPicks = {
+                userId: currentUser.uid,
+                userName: (poolMemberInfo && poolMemberInfo.name) ? poolMemberInfo.name : (currentUser.email || 'Unknown User'),
+                weekNumber: currentWeek,
+                submittedAt: new Date().toISOString(),
+                mnfTotalPoints: 21,
+                timestamp: Date.now()
+            };
+
+            // Create blank picks
+            gameIds.forEach((gameId, index) => {
+                userPicks[gameId] = {
+                    winner: '',
+                    confidence: index + 1
+                };
+            });
+
+            await savePicksData();
+            populatePicksEditor();
+            updateStatus('Blank picks created', 'success');
+        }
+
+        function validatePicks() {
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata');
+            const confidenceValues = [];
+            const issues = [];
+            let completePicks = 0;
+
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                if (pick) {
+                    if (pick.winner) completePicks++;
+
+                    if (!pick.winner) {
+                        issues.push(`Game ${gameId}: No team selected`);
+                    }
+                    if (pick.confidence) {
+                        if (pick.confidence < 1 || pick.confidence > gameIds.length) {
+                            issues.push(`Game ${gameId}: Invalid confidence ${pick.confidence}`);
+                        } else {
+                            confidenceValues.push(pick.confidence);
+                        }
+                    } else {
+                        issues.push(`Game ${gameId}: No confidence value`);
+                    }
+                }
+            });
+
+            // Check for duplicates
+            const uniqueConfidence = [...new Set(confidenceValues)];
+            if (confidenceValues.length !== uniqueConfidence.length) {
+                issues.push('⚠️ Duplicate confidence values detected');
+            }
+
+            // Check for complete set
+            const expectedTotal = gameIds.length * (gameIds.length + 1) / 2;
+            const actualTotal = confidenceValues.reduce((sum, val) => sum + val, 0);
+
+            // Update validation display
+            const validationDetails = document.getElementById('validationDetails');
+            const progressPercent = Math.round((completePicks / gameIds.length) * 100);
+
+            let validationHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-lg font-medium">Progress: ${completePicks}/${gameIds.length} picks (${progressPercent}%)</span>
+                    <span class="text-sm">Confidence sum: ${actualTotal}/${expectedTotal}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-4">
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: ${progressPercent}%"></div>
+                </div>
+            `;
+
+            if (issues.length === 0 && completePicks === gameIds.length) {
+                validationHTML += `<p class="text-green-700 font-medium">✅ All picks complete and valid!</p>`;
+                document.getElementById('validationSummary').className = 'mt-6 bg-white rounded-lg shadow p-6 border-l-4 border-green-400';
+            } else {
+                if (issues.length > 0) {
+                    validationHTML += `
+                        <div class="text-red-700">
+                            <p class="font-medium mb-2">⚠️ Issues to fix:</p>
+                            <ul class="list-disc list-inside space-y-1 text-sm">
+                                ${issues.slice(0, 5).map(issue => `<li>${issue}</li>`).join('')}
+                                ${issues.length > 5 ? `<li>...and ${issues.length - 5} more</li>` : ''}
+                            </ul>
+                        </div>
+                    `;
+                }
+                document.getElementById('validationSummary').className = 'mt-6 bg-white rounded-lg shadow p-6 border-l-4 border-yellow-400';
+            }
+
+            validationDetails.innerHTML = validationHTML;
+        }
+
+        function showAutoSaveStatus(status) {
+            const statusEl = document.getElementById('autoSaveStatus');
+            statusEl.className = 'px-3 py-1 rounded text-sm auto-save-indicator';
+
+            switch (status) {
+                case 'saving':
+                    statusEl.textContent = '💾 Saving...';
+                    statusEl.classList.add('saving');
+                    break;
+                case 'saved':
+                    statusEl.textContent = '✅ Saved';
+                    statusEl.classList.add('saved');
+                    break;
+                case 'error':
+                    statusEl.textContent = '❌ Save failed';
+                    statusEl.classList.add('error');
+                    break;
+                default:
+                    statusEl.textContent = '🔄 Ready';
+                    statusEl.className = 'px-3 py-1 rounded text-sm bg-gray-100';
+            }
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('statusIndicator');
+            statusEl.textContent = message;
+
+            statusEl.className = 'px-3 py-1 rounded text-sm';
+
+            switch (type) {
+                case 'success':
+                    statusEl.classList.add('bg-green-100', 'text-green-800');
+                    break;
+                case 'error':
+                    statusEl.classList.add('bg-red-100', 'text-red-800');
+                    break;
+                case 'info':
+                    statusEl.classList.add('bg-blue-100', 'text-blue-800');
+                    break;
+                default:
+                    statusEl.classList.add('bg-gray-100', 'text-gray-800');
+            }
+        }
+    </script>
+</body>
+</html>

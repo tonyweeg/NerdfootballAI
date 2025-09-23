@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdFootball Survivor Pool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+    </script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .hover-lift {
+            transition: transform 0.2s ease-in-out;
+        }
+        .hover-lift:hover {
+            transform: translateY(-2px);
+        }
+        .locked-pick {
+            background: linear-gradient(45deg, #f3f4f6, #e5e7eb);
+            border: 2px solid #d1d5db;
+        }
+        .available-pick {
+            background: linear-gradient(45deg, #ecfdf5, #d1fae5);
+            border: 2px solid #10b981;
+        }
+        .current-pick {
+            background: linear-gradient(45deg, #eff6ff, #dbeafe);
+            border: 2px solid #3b82f6;
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <div class="gradient-bg text-white">
+        <div class="max-w-4xl mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">🏈 Survivor Pool</h1>
+                    <p class="text-blue-100 mt-1">Make your weekly picks to survive!</p>
+                </div>
+                <div class="text-right">
+                    <div id="userInfo" class="text-sm opacity-90">
+                        <div id="authStatus">🔐 Signing in...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-4xl mx-auto px-4 py-6">
+
+        <!-- Current Status Card -->
+        <div id="statusCard" class="bg-white rounded-xl card-shadow p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="text-2xl mr-2">📊</span>
+                Your Survivor Status
+            </h2>
+            <div id="statusContent" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Status info will be populated here -->
+            </div>
+        </div>
+
+        <!-- Current Week Pick -->
+        <div id="currentWeekCard" class="bg-white rounded-xl card-shadow p-6 mb-6 hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold flex items-center">
+                    <span class="text-2xl mr-2">🎯</span>
+                    <span id="currentWeekTitle">Week X - Current Pick</span>
+                </h2>
+                <div id="lockStatus" class="text-sm font-medium px-3 py-1 rounded-full">
+                    <!-- Lock status will be displayed here -->
+                </div>
+            </div>
+
+            <div id="currentWeekContent">
+                <!-- Current week pick content -->
+            </div>
+        </div>
+
+        <!-- Team Selection (when editing) -->
+        <div id="teamSelectionCard" class="bg-white rounded-xl card-shadow p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="text-2xl mr-2">🏈</span>
+                Select Your Team
+            </h2>
+
+            <div class="mb-4">
+                <div id="availableTeamsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Available teams will be populated here -->
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button id="savePickBtn" class="flex-1 bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                    💾 Save Pick
+                </button>
+                <button id="cancelEditBtn" class="bg-gray-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-600 transition-colors">
+                    ❌ Cancel
+                </button>
+            </div>
+        </div>
+
+        <!-- Week Navigation -->
+        <div id="weekNavigationCard" class="bg-white rounded-xl card-shadow p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="text-2xl mr-2">📅</span>
+                All Weeks
+            </h2>
+
+            <div id="weekGrid" class="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-9 gap-3">
+                <!-- Week buttons will be populated here -->
+            </div>
+        </div>
+
+        <!-- Pick History -->
+        <div id="historyCard" class="bg-white rounded-xl card-shadow p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="text-2xl mr-2">📈</span>
+                Your Pick History
+            </h2>
+
+            <div id="historyContent" class="space-y-3">
+                <!-- Pick history will be populated here -->
+            </div>
+        </div>
+
+        <!-- Game Information -->
+        <div id="gameInfoCard" class="bg-white rounded-xl card-shadow p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <span class="text-2xl mr-2">🕐</span>
+                This Week's Games
+            </h2>
+            <div id="gameInfoContent">
+                <!-- Game times and lock status will be shown here -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Hidden selected team -->
+    <input type="hidden" id="selectedTeam" value="">
+    <input type="hidden" id="selectedGameId" value="">
+
+    <!-- Load Eastern Time Parser -->
+    <script src="./easternTimeParser-v2.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // NFL Teams
+        const NFL_TEAMS = [
+            'Arizona Cardinals', 'Atlanta Falcons', 'Baltimore Ravens', 'Buffalo Bills',
+            'Carolina Panthers', 'Chicago Bears', 'Cincinnati Bengals', 'Cleveland Browns',
+            'Dallas Cowboys', 'Denver Broncos', 'Detroit Lions', 'Green Bay Packers',
+            'Houston Texans', 'Indianapolis Colts', 'Jacksonville Jaguars', 'Kansas City Chiefs',
+            'Las Vegas Raiders', 'Los Angeles Chargers', 'Los Angeles Rams', 'Miami Dolphins',
+            'Minnesota Vikings', 'New England Patriots', 'New Orleans Saints', 'New York Giants',
+            'New York Jets', 'Philadelphia Eagles', 'Pittsburgh Steelers', 'San Francisco 49ers',
+            'Seattle Seahawks', 'Tampa Bay Buccaneers', 'Tennessee Titans', 'Washington Commanders'
+        ];
+
+        let currentUser = null;
+        let isAuthenticated = false;
+        let userSurvivorData = null;
+        let currentWeek = 1;
+        let selectedWeek = null;
+        let isEditing = false;
+        let gameData = {};
+        let usedTeams = new Set();
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user) {
+                currentUser = user;
+                isAuthenticated = true;
+                authStatus.innerHTML = `✅ ${user.email?.split('@')[0] || 'User'}`;
+                await initializeUserInterface();
+            } else {
+                authStatus.innerHTML = `❌ Please sign in`;
+                isAuthenticated = false;
+            }
+        });
+
+        async function initializeUserInterface() {
+            try {
+                // Check if user is pool member
+                if (!(await isPoolMember())) {
+                    showError('You are not a member of the survivor pool.');
+                    return;
+                }
+
+                currentWeek = getCurrentWeek();
+                await loadUserSurvivorData();
+                await loadGameData();
+                calculateUsedTeams();
+
+                displayUserInterface();
+
+            } catch (error) {
+                console.error('Error initializing interface:', error);
+                showError(`Error loading data: ${error.message}`);
+            }
+        }
+
+        async function isPoolMember() {
+            try {
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = doc(db, poolMembersPath);
+                const membersSnap = await getDoc(membersDoc);
+
+                return membersSnap.exists() && membersSnap.data()[currentUser.uid];
+            } catch (error) {
+                console.error('Error checking pool membership:', error);
+                return false;
+            }
+        }
+
+        async function loadUserSurvivorData() {
+            try {
+                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${currentUser.uid}`;
+                const survivorDoc = doc(db, survivorPath);
+                const survivorSnap = await getDoc(survivorDoc);
+
+                if (survivorSnap.exists()) {
+                    userSurvivorData = survivorSnap.data();
+                } else {
+                    userSurvivorData = { picks: {} };
+                }
+            } catch (error) {
+                console.error('Error loading survivor data:', error);
+                userSurvivorData = { picks: {} };
+            }
+        }
+
+        async function loadGameData() {
+            try {
+                // Load game data for current week to check lock status
+                const gameDataPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gameDoc = doc(db, gameDataPath);
+                const gameSnap = await getDoc(gameDoc);
+
+                if (gameSnap.exists()) {
+                    gameData[currentWeek] = gameSnap.data();
+                }
+            } catch (error) {
+                console.error('Error loading game data:', error);
+                gameData[currentWeek] = {};
+            }
+        }
+
+        function calculateUsedTeams() {
+            usedTeams.clear();
+            const picks = userSurvivorData.picks || {};
+
+            Object.values(picks).forEach(pick => {
+                if (pick.team) {
+                    usedTeams.add(pick.team);
+                }
+            });
+        }
+
+        function getCurrentWeek() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04');
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        function isWeekLocked(week) {
+            // Check if any game in the week has started using Eastern Time Parser
+            const weekGames = gameData[week];
+            if (!weekGames || !window.easternTimeParser) {
+                return week < currentWeek; // Fallback: lock past weeks
+            }
+
+            // Check if any game has started
+            for (const gameId in weekGames) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+
+                const game = weekGames[gameId];
+                if (game.dt && window.easternTimeParser.hasGameStarted(game.dt)) {
+                    return true; // Week is locked if any game started
+                }
+            }
+
+            return false;
+        }
+
+        function displayUserInterface() {
+            displayStatusCard();
+            displayCurrentWeekCard();
+            displayWeekNavigation();
+            displayPickHistory();
+            displayGameInfo();
+
+            // Show all cards
+            document.getElementById('statusCard').classList.remove('hidden');
+            document.getElementById('currentWeekCard').classList.remove('hidden');
+            document.getElementById('weekNavigationCard').classList.remove('hidden');
+            document.getElementById('historyCard').classList.remove('hidden');
+            document.getElementById('gameInfoCard').classList.remove('hidden');
+        }
+
+        function displayStatusCard() {
+            const picks = userSurvivorData.picks || {};
+            const totalPicks = Object.keys(picks).length;
+            const alivePicks = Object.values(picks).filter(p => p.alive !== false).length;
+            const isEliminated = Object.values(picks).some(p => p.alive === false);
+
+            const statusContent = document.getElementById('statusContent');
+            statusContent.innerHTML = `
+                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-600">${totalPicks}</div>
+                    <div class="text-sm text-blue-800">Weeks Picked</div>
+                </div>
+                <div class="text-center p-4 ${isEliminated ? 'bg-red-50' : 'bg-green-50'} rounded-lg">
+                    <div class="text-2xl font-bold ${isEliminated ? 'text-red-600' : 'text-green-600'}">
+                        ${isEliminated ? '💀' : '✅'}
+                    </div>
+                    <div class="text-sm ${isEliminated ? 'text-red-800' : 'text-green-800'}">
+                        ${isEliminated ? 'Eliminated' : 'Still Alive'}
+                    </div>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <div class="text-2xl font-bold text-gray-600">${usedTeams.size}</div>
+                    <div class="text-sm text-gray-800">Teams Used</div>
+                </div>
+            `;
+        }
+
+        function displayCurrentWeekCard() {
+            const weekLocked = isWeekLocked(currentWeek);
+            const picks = userSurvivorData.picks || {};
+            const currentPick = picks[currentWeek.toString()];
+
+            document.getElementById('currentWeekTitle').textContent = `Week ${currentWeek} - Current Pick`;
+
+            const lockStatus = document.getElementById('lockStatus');
+            if (weekLocked) {
+                lockStatus.innerHTML = `<span class="bg-red-100 text-red-800">🔒 Locked</span>`;
+            } else {
+                lockStatus.innerHTML = `<span class="bg-green-100 text-green-800">🔓 Open</span>`;
+            }
+
+            const currentWeekContent = document.getElementById('currentWeekContent');
+
+            if (currentPick) {
+                const alive = currentPick.alive !== false;
+                currentWeekContent.innerHTML = `
+                    <div class="current-pick p-6 rounded-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold">${currentPick.team}</h3>
+                                <p class="text-sm text-gray-600">Game ID: ${currentPick.gameId || 'Not set'}</p>
+                                <p class="text-sm text-gray-600">Status: ${currentPick.result || 'Pending'}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl mb-1">${alive ? '✅' : '💀'}</div>
+                                <div class="text-sm font-medium ${alive ? 'text-green-600' : 'text-red-600'}">
+                                    ${alive ? 'Alive' : 'Eliminated'}
+                                </div>
+                            </div>
+                        </div>
+                        ${!weekLocked ? `
+                            <button onclick="startEditing(${currentWeek})" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                ✏️ Change Pick
+                            </button>
+                        ` : `
+                            <div class="text-center text-gray-500 text-sm">
+                                🔒 Week is locked - games have started
+                            </div>
+                        `}
+                    </div>
+                `;
+            } else {
+                if (!weekLocked) {
+                    currentWeekContent.innerHTML = `
+                        <div class="available-pick p-6 rounded-lg text-center">
+                            <div class="text-4xl mb-4">🎯</div>
+                            <h3 class="text-lg font-bold mb-2">No Pick Yet</h3>
+                            <p class="text-gray-600 mb-4">Select your team for Week ${currentWeek}</p>
+                            <button onclick="startEditing(${currentWeek})" class="bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors pulse-animation">
+                                🏈 Make Your Pick
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    currentWeekContent.innerHTML = `
+                        <div class="locked-pick p-6 rounded-lg text-center">
+                            <div class="text-4xl mb-4">🔒</div>
+                            <h3 class="text-lg font-bold mb-2">No Pick Made</h3>
+                            <p class="text-gray-600">Week ${currentWeek} is locked - games have started</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function displayWeekNavigation() {
+            const weekGrid = document.getElementById('weekGrid');
+            let html = '';
+
+            for (let week = 1; week <= 18; week++) {
+                const picks = userSurvivorData.picks || {};
+                const weekPick = picks[week.toString()];
+                const weekLocked = isWeekLocked(week);
+                const isCurrent = week === currentWeek;
+
+                let buttonClass = 'p-3 rounded-lg text-center transition-all hover-lift ';
+                let content = '';
+
+                if (weekPick) {
+                    const alive = weekPick.alive !== false;
+                    buttonClass += alive ? 'bg-green-100 border-2 border-green-300' : 'bg-red-100 border-2 border-red-300';
+                    content = `
+                        <div class="font-bold">Week ${week}</div>
+                        <div class="text-xs">${weekPick.team.split(' ').pop()}</div>
+                        <div class="text-lg">${alive ? '✅' : '💀'}</div>
+                    `;
+                } else if (weekLocked) {
+                    buttonClass += 'bg-gray-100 border-2 border-gray-300 opacity-60';
+                    content = `
+                        <div class="font-bold">Week ${week}</div>
+                        <div class="text-xs">Locked</div>
+                        <div class="text-lg">🔒</div>
+                    `;
+                } else {
+                    buttonClass += isCurrent ? 'bg-blue-100 border-2 border-blue-300' : 'bg-white border-2 border-gray-200';
+                    content = `
+                        <div class="font-bold">Week ${week}</div>
+                        <div class="text-xs">${isCurrent ? 'Current' : 'Future'}</div>
+                        <div class="text-lg">${isCurrent ? '🎯' : '📅'}</div>
+                    `;
+                }
+
+                const clickable = !weekLocked || weekPick;
+                html += `
+                    <button
+                        onclick="${clickable ? `selectWeek(${week})` : ''}"
+                        class="${buttonClass} ${!clickable ? 'cursor-not-allowed' : 'cursor-pointer'}"
+                        ${!clickable ? 'disabled' : ''}
+                    >
+                        ${content}
+                    </button>
+                `;
+            }
+
+            weekGrid.innerHTML = html;
+        }
+
+        function displayPickHistory() {
+            const picks = userSurvivorData.picks || {};
+            const historyContent = document.getElementById('historyContent');
+            let html = '';
+
+            for (let week = 1; week <= 18; week++) {
+                const weekKey = week.toString();
+                const weekPick = picks[weekKey];
+                const weekLocked = isWeekLocked(week);
+
+                if (weekPick || weekLocked) {
+                    if (weekPick) {
+                        const alive = weekPick.alive !== false;
+                        html += `
+                            <div class="flex items-center justify-between p-4 ${alive ? 'bg-green-50 border-l-4 border-green-400' : 'bg-red-50 border-l-4 border-red-400'} rounded-r-lg">
+                                <div class="flex items-center">
+                                    <div class="text-2xl mr-4">${alive ? '✅' : '💀'}</div>
+                                    <div>
+                                        <div class="font-semibold">Week ${week}</div>
+                                        <div class="text-sm text-gray-600">${weekPick.team}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-medium">${weekPick.result || 'Pending'}</div>
+                                    <div class="text-xs text-gray-500">Game ${weekPick.gameId || '—'}</div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (weekLocked) {
+                        html += `
+                            <div class="flex items-center justify-between p-4 bg-gray-50 border-l-4 border-gray-300 rounded-r-lg opacity-60">
+                                <div class="flex items-center">
+                                    <div class="text-2xl mr-4">🔒</div>
+                                    <div>
+                                        <div class="font-semibold">Week ${week}</div>
+                                        <div class="text-sm text-gray-600">No pick made</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-medium text-gray-500">Locked</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            }
+
+            if (!html) {
+                html = `
+                    <div class="text-center p-8 bg-gray-50 rounded-lg">
+                        <div class="text-4xl mb-4">🏈</div>
+                        <p class="text-gray-600">No picks made yet. Start with Week ${currentWeek}!</p>
+                    </div>
+                `;
+            }
+
+            historyContent.innerHTML = html;
+        }
+
+        function displayGameInfo() {
+            const gameInfoContent = document.getElementById('gameInfoContent');
+            const weekGames = gameData[currentWeek];
+
+            if (!weekGames || !window.easternTimeParser) {
+                gameInfoContent.innerHTML = `
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <p class="text-gray-600">Game information not available</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="space-y-3">';
+            let firstGameTime = null;
+
+            for (const gameId in weekGames) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+
+                const game = weekGames[gameId];
+                if (game.dt) {
+                    const gameTime = window.easternTimeParser.formatGameTime(game.dt);
+                    const hasStarted = window.easternTimeParser.hasGameStarted(game.dt);
+
+                    if (!firstGameTime || game.dt < firstGameTime) {
+                        firstGameTime = game.dt;
+                    }
+
+                    html += `
+                        <div class="flex items-center justify-between p-3 ${hasStarted ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'} rounded-lg">
+                            <div>
+                                <div class="font-medium">${game.a} @ ${game.h}</div>
+                                <div class="text-sm text-gray-600">${gameTime}</div>
+                            </div>
+                            <div class="text-sm font-medium ${hasStarted ? 'text-red-600' : 'text-blue-600'}">
+                                ${hasStarted ? '🔴 Started' : '🟢 Upcoming'}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            html += '</div>';
+
+            if (firstGameTime && !window.easternTimeParser.hasGameStarted(firstGameTime)) {
+                const timeUntil = window.easternTimeParser.getTimeUntilGameStart(firstGameTime);
+                const hoursUntil = Math.floor(timeUntil / (1000 * 60 * 60));
+                const minutesUntil = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
+
+                html = `
+                    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+                        <div class="font-bold text-yellow-800">⏰ Picks lock in ${hoursUntil}h ${minutesUntil}m</div>
+                        <div class="text-sm text-yellow-600">First game starts ${window.easternTimeParser.formatGameTime(firstGameTime)}</div>
+                    </div>
+                ` + html;
+            }
+
+            gameInfoContent.innerHTML = html;
+        }
+
+        // Global functions
+        window.selectWeek = function(week) {
+            selectedWeek = week;
+            currentWeek = week;
+            displayCurrentWeekCard();
+            displayGameInfo();
+        };
+
+        window.startEditing = function(week) {
+            selectedWeek = week;
+            isEditing = true;
+            showTeamSelection();
+        };
+
+        function showTeamSelection() {
+            const teamSelectionCard = document.getElementById('teamSelectionCard');
+            const availableTeamsGrid = document.getElementById('availableTeamsGrid');
+
+            let html = '';
+            NFL_TEAMS.forEach(team => {
+                const isUsed = usedTeams.has(team);
+                const isDisabled = isUsed;
+
+                html += `
+                    <button
+                        onclick="selectTeam('${team}')"
+                        class="team-btn p-4 rounded-lg border-2 transition-all hover-lift ${
+                            isDisabled
+                                ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed'
+                                : 'bg-white border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                        }"
+                        ${isDisabled ? 'disabled' : ''}
+                    >
+                        <div class="font-medium text-sm">${team}</div>
+                        ${isUsed ? '<div class="text-xs text-red-500">Already Used</div>' : ''}
+                    </button>
+                `;
+            });
+
+            availableTeamsGrid.innerHTML = html;
+            teamSelectionCard.classList.remove('hidden');
+
+            // Setup buttons
+            document.getElementById('savePickBtn').onclick = savePick;
+            document.getElementById('cancelEditBtn').onclick = cancelEdit;
+        }
+
+        window.selectTeam = function(team) {
+            if (usedTeams.has(team)) return;
+
+            // Clear previous selections
+            document.querySelectorAll('.team-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-200', 'border-blue-500');
+            });
+
+            // Highlight selected team
+            event.target.classList.add('bg-blue-200', 'border-blue-500');
+
+            document.getElementById('selectedTeam').value = team;
+
+            // Auto-generate game ID (week * 100 + estimated game number)
+            const gameId = selectedWeek * 100 + 1; // Simplified for now
+            document.getElementById('selectedGameId').value = gameId;
+        };
+
+        async function savePick() {
+            const team = document.getElementById('selectedTeam').value;
+            const gameId = document.getElementById('selectedGameId').value;
+
+            if (!team) {
+                alert('Please select a team first!');
+                return;
+            }
+
+            try {
+                // Update local data
+                if (!userSurvivorData.picks) userSurvivorData.picks = {};
+
+                userSurvivorData.picks[selectedWeek.toString()] = {
+                    team: team,
+                    gameId: gameId || null,
+                    result: 'Pending',
+                    alive: true,
+                    submittedAt: new Date().toISOString()
+                };
+
+                // Save to Firebase
+                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${currentUser.uid}`;
+                const survivorDoc = doc(db, survivorPath);
+                await setDoc(survivorDoc, userSurvivorData);
+
+                // Update UI
+                calculateUsedTeams();
+                cancelEdit();
+                displayUserInterface();
+
+                // Show success message
+                showSuccess(`✅ Pick saved: ${team} for Week ${selectedWeek}`);
+
+            } catch (error) {
+                console.error('Error saving pick:', error);
+                showError(`Failed to save pick: ${error.message}`);
+            }
+        }
+
+        function cancelEdit() {
+            isEditing = false;
+            document.getElementById('teamSelectionCard').classList.add('hidden');
+            document.getElementById('selectedTeam').value = '';
+            document.getElementById('selectedGameId').value = '';
+        }
+
+        function showSuccess(message) {
+            // Simple success notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg z-50';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        function showError(message) {
+            // Simple error notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

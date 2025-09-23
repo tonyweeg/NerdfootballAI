@@ -64,6 +64,25 @@
         corePlugins: { preflight: true },
         content: ['./*.html', './*.js']
     }
+
+    // 🚨 ADDITIONAL: Aggressive warning suppression for production
+    setTimeout(() => {
+        ['warn', 'error', 'log', 'info'].forEach(method => {
+            const original = console[method];
+            if (original) {
+                console[method] = function(...args) {
+                    const message = args.join(' ');
+                    if (message.includes('tailwindcss.com') ||
+                        message.includes('should not be used in production') ||
+                        message.includes('cdn.tailwindcss.com') ||
+                        message.includes('PostCSS plugin')) {
+                        return; // Block production warnings
+                    }
+                    original.apply(console, args);
+                };
+            }
+        });
+    }, 100);
  </script>
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -138,7 +157,6 @@
 <script src="./ScoringSystemManager.js"></script>
 <script src="./ScoringCalculator.js"></script>
 <script src="./WeeklyLeaderboardGenerator.js"></script>
-<script src="./fix-pool-members.js"></script>
 <script src="./leaderboard-scoring-integration.js"></script>
  <script src="./confidence-bundle.js"></script>
  <script src="./features-bundle.js"></script>
@@ -3538,10 +3556,30 @@ console.log('💎 GameStateCache already loaded - skipping duplicate load');
    }
 
    if (results) {
-     games = games.map(game => ({
-       ...game,
-       winner: results[game.id]?.winner || results[game.id] || undefined
-     }));
+     games = games.map(game => {
+       const result = results[game.id];
+       let winner = undefined;
+
+       if (result) {
+         // Handle different result formats with corruption protection
+         if (typeof result === 'string') {
+           winner = result;
+         } else if (typeof result === 'object' && result.winner) {
+           // 🚨 BUG FIX: Validate winner is a string, not "[object Object]"
+           if (typeof result.winner === 'string' && result.winner !== '[object Object]') {
+             winner = result.winner;
+           } else {
+             console.warn(`🚨 CORRUPTION: Game ${game.id} has invalid winner object:`, result.winner);
+             winner = undefined; // Clear corrupted data
+           }
+         }
+       }
+
+       return {
+         ...game,
+         winner: winner
+       };
+     });
    }
  } catch (error) {
    console.warn(`Failed to load results for Week ${weekNumber}:`, error);
@@ -6102,7 +6140,13 @@ window.showGameUpdateIndicator = showGameUpdateIndicator;
                 }
             } else if (typeof gameResult === 'object') {
                 // New format - winner and scores (override if Firebase has scores)
-                if (gameResult.winner) winner = gameResult.winner;
+                // 🚨 BUG FIX: Validate winner is a string, not "[object Object]"
+                if (gameResult.winner && typeof gameResult.winner === 'string' && gameResult.winner !== '[object Object]') {
+                    winner = gameResult.winner;
+                } else if (gameResult.winner) {
+                    console.warn(`🚨 CORRUPTION: Game ${game.id} has invalid winner object:`, gameResult.winner);
+                    winner = null; // Clear corrupted data
+                }
                 if (gameResult.awayScore !== undefined) awayScore = gameResult.awayScore;
                 if (gameResult.homeScore !== undefined) homeScore = gameResult.homeScore;
                 console.log(`🔍 DEBUG Game ${game.id}: Using Firebase object data - winner="${winner}", awayScore="${awayScore}", homeScore="${homeScore}"`);
