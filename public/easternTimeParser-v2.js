@@ -91,9 +91,12 @@ class EasternTimeParserV2 {
      */
     hasGameStarted(espnTimestamp) {
         try {
-            const gameTimeUTC = this.parseESPNTimestamp(espnTimestamp);
-            const nowUTC = new Date();
-            return nowUTC >= gameTimeUTC;
+            // Bible data has wrong timezone - subtract 4 hours to get correct game time
+            const cleanTime = espnTimestamp.replace('Z', '');
+            const wrongTime = new Date(cleanTime);
+            const correctedGameTime = new Date(wrongTime.getTime() - (4 * 60 * 60 * 1000));
+            const now = new Date();
+            return now >= correctedGameTime;
         } catch (error) {
             console.error('Error checking if game started:', error);
             return true; // Assume started to be safe
@@ -107,17 +110,22 @@ class EasternTimeParserV2 {
      */
     formatGameTime(espnTimestamp) {
         try {
-            // ESPN Z is already Eastern Time, so parse directly without conversion
+            // Bible data has wrong timezone - always subtract 4 hours to get correct Eastern Time
             const cleanTime = espnTimestamp.replace('Z', '');
-            const easternTime = new Date(cleanTime);
+            const wrongTime = new Date(cleanTime);
 
-            if (isNaN(easternTime.getTime())) {
+            if (isNaN(wrongTime.getTime())) {
                 console.warn('Invalid ESPN timestamp:', espnTimestamp);
                 return espnTimestamp;
             }
 
-            // Format directly as this is already Eastern Time
-            return easternTime.toLocaleString('en-US', {
+            // Subtract 4 hours to get correct Eastern Time
+            const correctedTime = new Date(wrongTime.getTime() - (4 * 60 * 60 * 1000));
+
+            console.log(`⏰ BIBLE FIX: ${espnTimestamp} → corrected to ${correctedTime.toLocaleString()}`);
+
+            // Format the corrected time
+            return correctedTime.toLocaleString('en-US', {
                 weekday: 'short',
                 month: 'short',
                 day: 'numeric',
@@ -186,3 +194,12 @@ if (typeof window !== 'undefined') {
 }
 
 console.log('🎯 EasternTimeParser V2 loaded - Fixed UTC/Eastern detection');
+
+// DEBUG: Test Game 401 timestamp when window is ready
+if (typeof window !== 'undefined' && window.easternTimeParser) {
+    console.log('🔍 DEBUG Game 401 Timestamp Test:');
+    const testTimestamp = '2025-09-26T00:15Z';
+    const expectedTimestamp = '2025-09-25T20:15Z'; // Thu Sep 25, 8:15 PM EDT
+    console.log(`Current: ${testTimestamp} → ${window.easternTimeParser.formatGameTime(testTimestamp)}`);
+    console.log(`Expected: ${expectedTimestamp} → ${window.easternTimeParser.formatGameTime(expectedTimestamp)}`);
+}
