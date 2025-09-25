@@ -312,8 +312,8 @@ class NerdFootballAIModal {
         const confidence = Math.max(awayWinProb, homeWinProb);
 
         // Generate projected score
-        const awayScore = 17 + Math.floor(Math.random() * 14); // 17-30
-        const homeScore = 17 + Math.floor(Math.random() * 14); // 17-30
+        let awayScore = 17 + Math.floor(Math.random() * 14); // 17-30
+        let homeScore = 17 + Math.floor(Math.random() * 14); // 17-30
 
         // Adjust score based on predicted winner
         if (predictedWinner === homeTeam && homeScore <= awayScore) {
@@ -328,8 +328,8 @@ class NerdFootballAIModal {
             homeTeam,
             predictedWinner,
             confidence: Math.round(confidence),
-            awayWinProbability: Math.round(normalizedAwayProb),
-            homeWinProbability: Math.round(normalizedHomeProb),
+            awayWinProbability: Math.round(awayWinProb),
+            homeWinProbability: Math.round(homeWinProb),
             projectedScore: {
                 away: awayScore,
                 home: homeScore
