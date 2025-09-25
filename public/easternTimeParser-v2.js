@@ -107,9 +107,17 @@ class EasternTimeParserV2 {
      */
     formatGameTime(espnTimestamp) {
         try {
-            const gameTimeUTC = this.parseESPNTimestamp(espnTimestamp);
-            return gameTimeUTC.toLocaleString('en-US', {
-                timeZone: 'America/New_York',
+            // ESPN Z is already Eastern Time, so parse directly without conversion
+            const cleanTime = espnTimestamp.replace('Z', '');
+            const easternTime = new Date(cleanTime);
+
+            if (isNaN(easternTime.getTime())) {
+                console.warn('Invalid ESPN timestamp:', espnTimestamp);
+                return espnTimestamp;
+            }
+
+            // Format directly as this is already Eastern Time
+            return easternTime.toLocaleString('en-US', {
                 weekday: 'short',
                 month: 'short',
                 day: 'numeric',
