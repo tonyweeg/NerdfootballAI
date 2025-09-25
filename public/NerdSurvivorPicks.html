@@ -493,6 +493,29 @@
             }
         }
 
+        function getOpponentForTeam(team, week) {
+            const weekGames = gameData[week];
+            if (!weekGames) return null;
+
+            for (const gameId in weekGames) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+                const game = weekGames[gameId];
+
+                // Skip if game data not populated yet (TBD placeholders)
+                if (!game.a || !game.h || game.a === 'TBD' || game.h === 'TBD') {
+                    continue;
+                }
+
+                if (game.a === team) {
+                    return game.h; // Team is away, return home team
+                }
+                if (game.h === team) {
+                    return game.a; // Team is home, return away team
+                }
+            }
+            return null; // No opponent found
+        }
+
         function calculateUsedTeams() {
             usedTeams.clear();
             const picks = userSurvivorData.picks || {};
@@ -835,6 +858,7 @@
             NFL_TEAMS.forEach(team => {
                 const isUsed = usedTeams.has(team);
                 const isDisabled = isUsed;
+                const opponent = getOpponentForTeam(team, selectedWeek) || team;
 
                 html += `
                     <button
@@ -849,13 +873,14 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <div class="font-medium text-sm">${team}</div>
+                                ${opponent !== team ? `<div class="text-xs text-gray-500">vs ${opponent}</div>` : ''}
                                 ${isUsed ? '<div class="text-xs text-red-500">Already Used</div>' : ''}
                             </div>
-                            ${currentUser && ADMIN_UIDS.includes(currentUser.uid) ? `
+                            ${currentUser && ADMIN_UIDS.includes(currentUser.uid) && opponent && opponent !== team ? `
                                 <!-- 🧠 AI BRAIN ICON -->
-                                <span onclick="openMLPredictionModal('survivor_${team}', '${team}', 'Game Info', event); event.stopPropagation();"
+                                <span onclick="showAIPrediction('survivor_week_${selectedWeek}_${team}', '${team}', '${opponent}', event); event.stopPropagation();"
                                       class="w-6 h-6 hover:bg-chamber-shadow transform hover:scale-125 transition-all duration-150 flex items-center justify-center group cursor-pointer rounded chamber-blood"
-                                      title="AI Prediction for ${team}">
+                                      title="🧠 AI Prediction: ${team} vs ${opponent}">
                                     <span class="text-sm group-hover:animate-pulse">🧠</span>
                                 </span>
                             ` : ''}
@@ -964,6 +989,9 @@
         window.currentUser = currentUser;
 
     </script>
+
+    <!-- Load Advanced AI Modal System -->
+    <script src="./nerdfootballai-modal.js"></script>
 
     <!-- 🤖 ML PREDICTION SYSTEM - GLOBAL SCOPE -->
     <script>
