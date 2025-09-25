@@ -141,14 +141,14 @@
             border: 1px solid #00ff41;
             box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
         }
-        .confidence-input {
+        .confidence-input, .confidence-select {
             width: 80px;
             text-align: center;
             background: rgba(26, 26, 26, 0.8) !important;
             color: #00ff41 !important;
             border: 1px solid #2a2a2a !important;
         }
-        .confidence-input:focus {
+        .confidence-input:focus, .confidence-select:focus {
             box-shadow: 0 0 10px rgba(0, 255, 65, 0.5) !important;
             border-color: #00ff41 !important;
         }
@@ -744,10 +744,13 @@
                             <!-- Confidence -->
                             <div>
                                 <label class="block text-xs font-medium text-wutang-text mb-1">Confidence</label>
-                                <input type="number" min="1" max="${gameIds.length}"
-                                       class="confidence-input px-3 py-2 border border-gray-300 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                       value="${pick.confidence || ''}"
-                                       data-game-id="${gameId}" data-field="confidence" ${isLocked ? 'disabled' : ''}>
+                                <select class="confidence-select px-3 py-2 border border-gray-300 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        data-game-id="${gameId}" data-field="confidence" ${isLocked ? 'disabled' : ''}>
+                                    <option value="">Select...</option>
+                                    ${Array.from({length: gameIds.length}, (_, i) => i + 1).map(confValue => `
+                                        <option value="${confValue}" ${pick.confidence == confValue ? 'selected' : ''}>${confValue}</option>
+                                    `).join('')}
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -776,23 +779,85 @@
         }
 
         function setupAutoSave(input) {
-            input.addEventListener('blur', async () => {
-                const gameId = input.getAttribute('data-game-id');
-                const field = input.getAttribute('data-field');
-                let value = input.value;
+            if (input.getAttribute('data-field') === 'confidence') {
+                // Special handling for confidence dropdowns with swap logic
+                input.addEventListener('change', async () => {
+                    await handleConfidenceChange(input);
+                });
+            } else {
+                // Regular auto-save for team selection
+                input.addEventListener('blur', async () => {
+                    const gameId = input.getAttribute('data-game-id');
+                    const field = input.getAttribute('data-field');
+                    const value = input.value;
 
-                if (field === 'confidence') {
-                    value = value ? parseInt(value) : null;
+                    if (!userPicks[gameId]) {
+                        userPicks[gameId] = {};
+                    }
+
+                    userPicks[gameId][field] = value;
+                    await savePicksData();
+                    validatePicks();
+                });
+            }
+        }
+
+        async function handleConfidenceChange(changedSelect) {
+            const gameId = changedSelect.getAttribute('data-game-id');
+            const newConfidence = parseInt(changedSelect.value);
+
+            if (!newConfidence) {
+                // If empty value selected, just clear this game's confidence
+                if (userPicks[gameId]) {
+                    userPicks[gameId].confidence = null;
                 }
-
-                if (!userPicks[gameId]) {
-                    userPicks[gameId] = {};
-                }
-
-                userPicks[gameId][field] = value;
                 await savePicksData();
                 validatePicks();
-            });
+                return;
+            }
+
+            // Find if another game already has this confidence value
+            let gameToSwap = null;
+            let oldConfidence = null;
+
+            // Get current confidence before change
+            if (userPicks[gameId] && userPicks[gameId].confidence) {
+                oldConfidence = userPicks[gameId].confidence;
+            }
+
+            // Find game that currently has the new confidence value
+            for (const [otherGameId, picks] of Object.entries(userPicks)) {
+                if (otherGameId !== gameId && picks.confidence === newConfidence) {
+                    gameToSwap = otherGameId;
+                    break;
+                }
+            }
+
+            // Update the picks data
+            if (!userPicks[gameId]) {
+                userPicks[gameId] = {};
+            }
+            userPicks[gameId].confidence = newConfidence;
+
+            // Swap if needed
+            if (gameToSwap) {
+                if (oldConfidence) {
+                    // Swap the values
+                    userPicks[gameToSwap].confidence = oldConfidence;
+                } else {
+                    // Just clear the other game's confidence
+                    userPicks[gameToSwap].confidence = null;
+                }
+
+                // Update the UI for the swapped game
+                const otherSelect = document.querySelector(`[data-game-id="${gameToSwap}"][data-field="confidence"]`);
+                if (otherSelect) {
+                    otherSelect.value = oldConfidence || '';
+                }
+            }
+
+            await savePicksData();
+            validatePicks();
         }
 
         async function savePicksData() {
