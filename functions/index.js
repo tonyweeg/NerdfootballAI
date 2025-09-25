@@ -1209,3 +1209,49 @@ function isNFLGameDay() {
 
 // Export helper for testing
 exports.isNFLGameDay = isNFLGameDay;
+
+// Import and export weekly leaderboard cache functions
+const {
+    generateWeeklyLeaderboardCache,
+    getWeeklyLeaderboard
+} = require('./weeklyLeaderboardCache');
+
+exports.generateWeeklyLeaderboardCache = generateWeeklyLeaderboardCache;
+exports.getWeeklyLeaderboard = getWeeklyLeaderboard;
+
+// Import and export season leaderboard cache functions
+const {
+    generateSeasonLeaderboardCache,
+    getSeasonLeaderboard
+} = require('./seasonLeaderboardCache');
+
+exports.generateSeasonLeaderboardCache = generateSeasonLeaderboardCache;
+exports.getSeasonLeaderboard = getSeasonLeaderboard;
+
+// Import and export survivor pool cache functions
+const {
+    getSurvivorPoolData
+} = require('./survivorPoolCache');
+
+exports.getSurvivorPoolData = getSurvivorPoolData;
+
+// Import and export Week 3 data fix function
+const {
+    fixWeek3Data
+} = require('./fixWeek3Data');
+
+exports.fixWeek3Data = fixWeek3Data;
+
+// Import and export weeks data verification function
+const {
+    verifyWeeksData
+} = require('./verifyWeeksData');
+
+exports.verifyWeeksData = verifyWeeksData;
+
+// Import and export weeks data diagnostic function
+const {
+    diagnosticWeeksData
+} = require('./diagnosticWeeksData');
+
+exports.diagnosticWeeksData = diagnosticWeeksData;

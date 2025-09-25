@@ -333,32 +333,30 @@ function getCurrentWeekNumber() {
 }
 
 /**
- * Load bible data for a specific week (same as season leaderboard)
+ * Load bible data for a specific week from Firestore (matches diagnostic path)
  */
 async function loadBibleDataForWeek(weekNumber) {
     try {
-        const https = require('https');
-        const url = `https://nerdfootball.web.app/nfl_2025_week_${weekNumber}.json?v=${Date.now()}`;
+        console.log(`📊 Loading Week ${weekNumber} game data from Firestore...`);
 
-        return new Promise((resolve, reject) => {
-            https.get(url, (response) => {
-                let data = '';
-                response.on('data', (chunk) => data += chunk);
-                response.on('end', () => {
-                    try {
-                        const bibleData = JSON.parse(data);
-                        console.log(`✅ Loaded Week ${weekNumber} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
-                        resolve(bibleData);
-                    } catch (parseError) {
-                        console.error(`❌ Error parsing Week ${weekNumber} bible data:`, parseError);
-                        reject(parseError);
-                    }
-                });
-                response.on('error', reject);
-            }).on('error', reject);
-        });
+        // Use the same path as diagnostic page
+        const gameResultsPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`;
+        const gameResultsRef = db.doc(gameResultsPath);
+        const gameResultsSnap = await gameResultsRef.get();
+
+        if (!gameResultsSnap.exists) {
+            throw new Error(`No game results found for Week ${weekNumber} at ${gameResultsPath}`);
+        }
+
+        const bibleData = gameResultsSnap.data();
+        const gameCount = Object.keys(bibleData).filter(k => k !== '_metadata').length;
+
+        console.log(`✅ Loaded Week ${weekNumber} bible data from Firestore: ${gameCount} games`);
+        console.log(`📊 Sample game data:`, JSON.stringify(Object.values(bibleData)[0], null, 2).substring(0, 200));
+
+        return bibleData;
     } catch (error) {
-        console.error(`❌ Error loading Week ${weekNumber} bible data:`, error);
+        console.error(`❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
         throw error;
     }
 }
