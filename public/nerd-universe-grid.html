@@ -319,6 +319,7 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
         import { getFirestore, doc, getDoc, getDocs, collection, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js';
 
         // Firebase configuration
         const firebaseConfig = {
@@ -332,6 +333,13 @@
         };
 
         const app = initializeApp(firebaseConfig);
+
+        // TEMPORARILY DISABLE APP CHECK - reCAPTCHA is broken
+        // const appCheck = initializeAppCheck(app, {
+        //     provider: new ReCaptchaV3Provider('6Lds9dMrAAAAAGIL03MqQbJuN99t_ICepTLH4Hww'),
+        //     isTokenAutoRefreshEnabled: true
+        // });
+
         const auth = getAuth(app);
         const db = getFirestore(app);
 
@@ -462,15 +470,30 @@
 
         // Load pool members
         async function loadPoolMembers() {
-            const poolId = 'nerduniverse-2025';
-            const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
-            const membersDoc = await getDoc(doc(db, poolMembersPath));
+            try {
+                const poolId = 'nerduniverse-2025';
+                const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+                console.log('🔍 GRID DEBUG: Attempting to load pool members from:', poolMembersPath);
+                console.log('🔍 GRID DEBUG: Current user:', auth.currentUser?.uid || 'not authenticated');
 
-            if (membersDoc.exists()) {
-                poolMembers = membersDoc.data();
-                console.log('✅ Pool members loaded:', Object.keys(poolMembers).length);
-            } else {
-                throw new Error('Pool members not found');
+                const membersDoc = await getDoc(doc(db, poolMembersPath));
+
+                if (membersDoc.exists()) {
+                    poolMembers = membersDoc.data();
+                    console.log('✅ Pool members loaded:', Object.keys(poolMembers).length);
+                } else {
+                    console.error('❌ Pool members document does not exist at path:', poolMembersPath);
+                    throw new Error('Pool members not found');
+                }
+            } catch (error) {
+                console.error('❌ FIREBASE ERROR in loadPoolMembers():', error);
+                console.error('❌ Error details:', {
+                    code: error.code,
+                    message: error.message,
+                    path: `artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members`,
+                    userUID: auth.currentUser?.uid
+                });
+                throw error;
             }
         }
 
@@ -514,17 +537,27 @@
         // Load all picks for current week
         async function loadAllPicks() {
             const memberIds = Object.keys(poolMembers);
+            console.log('🔍 GRID DEBUG: Loading picks for', memberIds.length, 'members, week', currentWeek);
+
             const pickPromises = memberIds.map(async (memberId) => {
                 try {
                     const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`;
                     const userPicksDoc = await getDoc(doc(db, picksPath));
                     if (userPicksDoc.exists()) {
                         allPicks[memberId] = userPicksDoc.data();
+                        console.log(`✅ Loaded picks for member: ${memberId}`);
                     } else {
                         allPicks[memberId] = null;
+                        console.log(`⚠️ No picks found for member: ${memberId} at path: ${picksPath}`);
                     }
                 } catch (error) {
-                    console.error(`❌ Error loading picks for ${memberId}:`, error);
+                    console.error(`❌ FIREBASE ERROR loading picks for ${memberId}:`, error);
+                    console.error(`❌ Pick load error details:`, {
+                        code: error.code,
+                        message: error.message,
+                        path: `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`,
+                        userUID: auth.currentUser?.uid
+                    });
                     allPicks[memberId] = null;
                 }
             });

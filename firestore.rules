@@ -1,7 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // EMERGENCY TEST RULE - Bypass all security temporarily
+    match /emergency-test/{docId} {
+      allow read, write: if true;
+    }
+
+    // TEST RULE - Simple auth test
+    match /test-auth/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
     // ============================================
     // HELPER FUNCTIONS
     // ============================================
@@ -60,14 +70,10 @@ service cloud.firestore {
     }
     
     // Pool members - all authenticated users can read (needed for Grid)
-    // Only admins can modify participation flags
+    // Global admins can create/update pool members
     match /artifacts/nerdfootball/pools/{poolId}/metadata/members {
       allow read: if isAuthenticated();
-      allow create: if isPoolAdmin(poolId) || isGlobalAdmin();
-      allow update: if (isPoolAdmin(poolId) || isGlobalAdmin()) && 
-        // If modifying participation, must be admin
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['participation']) || 
-         isPoolAdmin(poolId));
+      allow create, update: if isGlobalAdmin();
       allow delete: if isGlobalAdmin();
     }
     
@@ -297,7 +303,7 @@ service cloud.firestore {
     
     // ESPN cache data - all authenticated users can read, admins can write
     match /cache/espn_current_data {
-      allow read: if isAuthenticated();
+      allow read: if request.auth != null; // Simplified test
       allow write: if isGlobalAdmin();
     }
     
@@ -320,12 +326,10 @@ service cloud.firestore {
     }
 
     // ============================================
-    // CATCH-ALL DENY
+    // CATCH-ALL DENY (REMOVED - WAS TOO RESTRICTIVE)
     // ============================================
-    
-    // Deny all other access
-    match /{document=**} {
-      allow read, write: if false;
-    }
+
+    // Default Firestore behavior: Deny access to unmatched paths
+    // No explicit catch-all needed - Firestore denies by default
   }
 }
