@@ -228,28 +228,24 @@
 
     <!-- Main Content -->
     <div id="main-content" class="hidden max-w-7xl mx-auto px-4 py-6">
-        <!-- Stats Bar -->
+        <!-- Strategic Insights Bar -->
         <div class="bg-white rounded-lg shadow-sm p-4 mb-6 border border-grey-200">
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                 <div>
-                    <div class="text-2xl font-bold text-grey-800" id="total-users">0</div>
-                    <div class="text-sm text-grey-600">Pool Members</div>
+                    <div class="text-2xl font-bold text-blue-600" id="your-ranking">-</div>
+                    <div class="text-sm text-grey-600">Your Ranking</div>
                 </div>
                 <div>
-                    <div class="text-2xl font-bold text-grey-800" id="total-games">0</div>
-                    <div class="text-sm text-grey-600">Games This Week</div>
+                    <div class="text-2xl font-bold text-green-600" id="current-leader">-</div>
+                    <div class="text-sm text-grey-600">Season Leader</div>
                 </div>
                 <div>
-                    <div class="text-2xl font-bold text-green-600" id="completed-games">0</div>
-                    <div class="text-sm text-grey-600">Completed</div>
+                    <div class="text-2xl font-bold text-orange-600" id="upset-alerts">-</div>
+                    <div class="text-sm text-grey-600">Upset Alerts</div>
                 </div>
                 <div>
-                    <div class="text-2xl font-bold text-yellow-600" id="live-games">0</div>
-                    <div class="text-sm text-grey-600">Live</div>
-                </div>
-                <div>
-                    <div class="text-2xl font-bold text-grey-600" id="upcoming-games">0</div>
-                    <div class="text-sm text-grey-600">Upcoming</div>
+                    <div class="text-2xl font-bold text-purple-600" id="contrarian-picks">-</div>
+                    <div class="text-sm text-grey-600">Your Edge</div>
                 </div>
             </div>
         </div>
@@ -361,9 +357,24 @@
         async function initialize() {
             try {
                 await waitForFirebaseAuth();
+
+                // Debug authentication state
+                const currentUserId = auth.currentUser?.uid || 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+                const currentWeekNum = getCurrentWeekNumber();
+                console.log('🔐 GRID SECURITY INIT:', {
+                    authenticatedUser: auth.currentUser?.uid || 'none',
+                    fallbackToTony: currentUserId,
+                    currentWeek: currentWeekNum,
+                    securityActive: currentWeek === currentWeekNum
+                });
+
                 await loadPoolMembers();
                 await loadBibleData();
                 await loadAllPicks();
+
+                // Update week display to show the week being viewed
+                document.getElementById('week-display').textContent = `Week ${currentWeek} • 2025 Season`;
+
                 renderGrid();
                 updateStats();
                 setupWeekNavigation();
@@ -426,7 +437,7 @@
             const weeksSinceStart = Math.floor(daysSinceStart / 7);
             const week = Math.max(1, Math.min(18, weeksSinceStart + 1));
 
-            document.getElementById('week-display').textContent = `Week ${week} • 2025 Season`;
+            // Don't update display here - let initialize() handle it
             return week;
         }
 
@@ -487,7 +498,9 @@
                 } else {
                     // Week 4+ format: direct game objects
                     bibleData = rawData;
-                    gameIds = Object.keys(bibleData).filter(k => k !== '_metadata');
+                    gameIds = Object.keys(bibleData)
+                        .filter(k => k !== '_metadata')
+                        .sort((a, b) => parseInt(a) - parseInt(b)); // Sort numerically for consistent column order
                 }
 
                 console.log('✅ Bible data loaded:', gameIds.length, 'games for Week', currentWeek);
@@ -550,21 +563,57 @@
         function renderTableBody() {
             const tbody = document.getElementById('table-body');
             const memberIds = Object.keys(poolMembers);
+
+            // Sort: Tony (current user) first, then alphabetically by name
+            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+            const currentUserId = auth.currentUser?.uid || tonyUID;
+
+            console.log(`👤 GRID SORT LOGIC:`, {
+                authenticatedUser: auth.currentUser?.uid || 'none',
+                currentUserId: currentUserId,
+                tonyUID: tonyUID,
+                totalMembers: memberIds.length
+            });
+
+            const sortedMemberIds = memberIds.sort((a, b) => {
+                // Tony always at top (whether authenticated or fallback)
+                if (a === tonyUID) {
+                    console.log(`✅ Tony (${a}) - moving to top`);
+                    return -1;
+                }
+                if (b === tonyUID) {
+                    console.log(`✅ Tony (${b}) - moving to top`);
+                    return 1;
+                }
+
+                // Others sorted alphabetically
+                const nameA = (poolMembers[a].name || poolMembers[a].email || 'Unknown').toLowerCase();
+                const nameB = (poolMembers[b].name || poolMembers[b].email || 'Unknown').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+
+            console.log(`🔄 Sorted member IDs (Tony first):`, sortedMemberIds);
+
             let rowsHTML = '';
 
-            memberIds.forEach(memberId => {
+            sortedMemberIds.forEach(memberId => {
                 const member = poolMembers[memberId];
                 const userPicks = allPicks[memberId];
                 const correctCount = getCorrectPicks(userPicks);
+                const isCurrentUser = memberId === currentUserId;
+                const isTony = memberId === tonyUID;
 
-                rowsHTML += `<tr>`;
-                rowsHTML += `<td class="user-name">
-                    ${member.name || member.email || 'Unknown'}
+                // Tony gets blue highlight regardless of auth state
+                const highlightRow = isTony;
+
+                rowsHTML += `<tr ${highlightRow ? `style="background-color: #f0f9ff; border-left: 3px solid #3b82f6;"` : ''}>`;
+                rowsHTML += `<td class="user-name ${highlightRow ? 'font-bold text-blue-700' : ''}">
+                    ${highlightRow ? '👤 ' : ''}${member.name || member.email || 'Unknown'}
                     <button class="details-button" onclick="window.showUserDetails('${memberId}')">Details</button>
                 </td>`;
 
                 gameIds.forEach(gameId => {
-                    rowsHTML += createPickCellHTML(gameId, userPicks);
+                    rowsHTML += createPickCellHTML(gameId, userPicks, memberId);
                 });
 
                 rowsHTML += `</tr>`;
@@ -574,9 +623,36 @@
         }
 
         // Create individual pick cell HTML
-        function createPickCellHTML(gameId, userPicks) {
+        function createPickCellHTML(gameId, userPicks, memberId) {
+            // CRITICAL SECURITY CHECK - Always check authentication for current week
+            const currentWeekNum = getCurrentWeekNumber();
+            const isCurrentWeek = currentWeek === currentWeekNum;
+            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+            const currentUserId = auth.currentUser?.uid || tonyUID;
+            const isCurrentUser = memberId === currentUserId;
+            const shouldHidePick = isCurrentWeek && !isCurrentUser;
+
+            // Enhanced debug logging for current week
+            if (isCurrentWeek && gameId === gameIds[0]) { // Log once per user (first game)
+                console.log(`🔒 GRID SECURITY CHECK:`, {
+                    currentWeek: currentWeek,
+                    currentWeekNum: currentWeekNum,
+                    isCurrentWeek: isCurrentWeek,
+                    memberId: memberId,
+                    currentUserId: currentUserId,
+                    isCurrentUser: isCurrentUser,
+                    shouldHidePick: shouldHidePick,
+                    authState: auth.currentUser ? 'authenticated' : 'fallback-to-tony'
+                });
+            }
+
             if (!userPicks || !userPicks[gameId]) {
-                return `<td class="pick-cell pick-pending">No Pick</td>`;
+                return shouldHidePick ?
+                    `<td class="pick-cell pick-pending" style="opacity: 0.3; filter: grayscale(100%);">
+                        <span style="font-size: 12px;">🔒</span>
+                        <div style="font-size: 10px; color: #64748b;">Hidden</div>
+                    </td>` :
+                    `<td class="pick-cell pick-pending">No Pick</td>`;
             }
 
             const pick = userPicks[gameId];
@@ -584,6 +660,14 @@
             const isGameComplete = game.winner && game.winner !== 'TBD';
             const isGameLive = game.status === 'IN_PROGRESS' || game.status === 'HALFTIME';
             const isCorrect = isGameComplete && game.winner === pick.winner;
+
+            // HIDE PICKS FOR CURRENT WEEK (except current user)
+            if (shouldHidePick) {
+                return `<td class="pick-cell pick-pending" style="opacity: 0.3; filter: grayscale(100%);">
+                    <span style="font-size: 12px;">🔒</span>
+                    <div style="font-size: 10px; color: #64748b;">Hidden</div>
+                </td>`;
+            }
 
             let cellClass = 'pick-cell ';
             let statusIcon = '';
@@ -708,28 +792,152 @@
             return correct;
         }
 
-        // Update stats
+        // Update strategic insights
         function updateStats() {
+            console.log('🎯 updateStats() called - calculating strategic insights...');
             const memberIds = Object.keys(poolMembers);
-            let completed = 0, live = 0, upcoming = 0;
+            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+            console.log('📊 Pool data:', { memberIds: memberIds.length, gameIds: gameIds.length });
+
+            // Calculate user rankings based on correct picks and points
+            const userRankings = calculateUserRankings(memberIds);
+            const yourRanking = userRankings.find(r => r.userId === tonyUID);
+            const leader = userRankings[0];
+
+            console.log('🏆 Rankings calculated:', { yourRanking, leader, totalRankings: userRankings.length });
+
+            // Calculate consensus and contrarian picks
+            const consensus = calculateConsensus(memberIds);
+            const upsetAlerts = getUpsetAlerts(consensus);
+            const yourContrarian = getContrarianPicks(tonyUID, consensus);
+
+            // Update displays
+            document.getElementById('your-ranking').textContent =
+                yourRanking ? `${yourRanking.rank} of ${memberIds.length}` : '-';
+
+            document.getElementById('current-leader').textContent =
+                leader ? `${leader.name} (${leader.points}pts)` : '-';
+
+            document.getElementById('upset-alerts').textContent =
+                upsetAlerts > 0 ? `${upsetAlerts} alerts` : 'None';
+
+            document.getElementById('contrarian-picks').textContent =
+                yourContrarian > 0 ? `${yourContrarian} picks` : 'Following crowd';
+
+            document.getElementById('last-updated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        // Calculate user rankings based on points earned
+        function calculateUserRankings(memberIds) {
+            const rankings = memberIds.map(memberId => {
+                const member = poolMembers[memberId];
+                const userPicks = allPicks[memberId];
+                let points = 0;
+                let correctPicks = 0;
+
+                if (userPicks) {
+                    gameIds.forEach(gameId => {
+                        const pick = userPicks[gameId];
+                        const game = bibleData[gameId];
+                        if (pick && game.winner && game.winner !== 'TBD' && game.winner === pick.winner) {
+                            points += pick.confidence || 0;
+                            correctPicks++;
+                        }
+                    });
+                }
+
+                return {
+                    userId: memberId,
+                    name: member.name || member.email?.split('@')[0] || 'Unknown',
+                    points,
+                    correctPicks
+                };
+            });
+
+            // Sort by points (desc), then by correct picks (desc)
+            rankings.sort((a, b) => {
+                if (b.points !== a.points) return b.points - a.points;
+                return b.correctPicks - a.correctPicks;
+            });
+
+            // Add rank
+            rankings.forEach((user, index) => {
+                user.rank = index + 1;
+            });
+
+            return rankings;
+        }
+
+        // Calculate pick consensus percentages
+        function calculateConsensus(memberIds) {
+            const consensus = {};
 
             gameIds.forEach(gameId => {
                 const game = bibleData[gameId];
-                if (game.winner && game.winner !== 'TBD') {
-                    completed++;
-                } else if (game.status === 'IN_PROGRESS' || game.status === 'HALFTIME') {
-                    live++;
-                } else {
-                    upcoming++;
+                if (!game.h || !game.a) return;
+
+                const picks = { [game.h]: 0, [game.a]: 0 };
+                let totalPicks = 0;
+
+                memberIds.forEach(memberId => {
+                    const userPicks = allPicks[memberId];
+                    if (userPicks && userPicks[gameId] && userPicks[gameId].winner) {
+                        const winner = userPicks[gameId].winner;
+                        if (picks.hasOwnProperty(winner)) {
+                            picks[winner]++;
+                            totalPicks++;
+                        }
+                    }
+                });
+
+                if (totalPicks > 0) {
+                    consensus[gameId] = {
+                        home: game.h,
+                        away: game.a,
+                        homePercent: Math.round((picks[game.h] / totalPicks) * 100),
+                        awayPercent: Math.round((picks[game.a] / totalPicks) * 100),
+                        totalPicks
+                    };
                 }
             });
 
-            document.getElementById('total-users').textContent = memberIds.length;
-            document.getElementById('total-games').textContent = gameIds.length;
-            document.getElementById('completed-games').textContent = completed;
-            document.getElementById('live-games').textContent = live;
-            document.getElementById('upcoming-games').textContent = upcoming;
-            document.getElementById('last-updated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+            return consensus;
+        }
+
+        // Get upset alerts (picks with <30% consensus)
+        function getUpsetAlerts(consensus) {
+            let alerts = 0;
+            Object.values(consensus).forEach(game => {
+                const minPercent = Math.min(game.homePercent, game.awayPercent);
+                if (minPercent > 0 && minPercent < 30) {
+                    alerts++;
+                }
+            });
+            return alerts;
+        }
+
+        // Get user's contrarian picks (picks with <50% consensus)
+        function getContrarianPicks(userId, consensus) {
+            const userPicks = allPicks[userId];
+            if (!userPicks) return 0;
+
+            let contrarian = 0;
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                const gameConsensus = consensus[gameId];
+
+                if (pick && gameConsensus && pick.winner) {
+                    const pickPercent = pick.winner === gameConsensus.home ?
+                        gameConsensus.homePercent : gameConsensus.awayPercent;
+
+                    if (pickPercent < 50) {
+                        contrarian++;
+                    }
+                }
+            });
+
+            return contrarian;
         }
 
         // Show user details modal (moved to global scope)
