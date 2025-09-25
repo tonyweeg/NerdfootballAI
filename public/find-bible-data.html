@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Find Bible Data</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Find Bible Data Paths</h1>
+    <button onclick="findBibleData()" style="background: blue; color: white; padding: 8px;">🔍 Search for Bible Data</button>
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function findBibleData() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔐 Authenticating and searching...</p>';
+
+            try {
+                await autoLogin();
+
+                let results = '<h2>🔍 Bible Data Search Results</h2>';
+                console.log('🔍 BIBLE-SEARCH-STARTING');
+
+                // Try different possible paths
+                const possiblePaths = [
+                    'artifacts/nerdfootball/public/data/nerdfootball_bible/1',
+                    'artifacts/nerdfootball/public/data/nerdfootball_bible/week1',
+                    'artifacts/nerdfootball/public/data/nerdfootball_bible',
+                    'artifacts/nerdfootball/bible/1',
+                    'nerdfootball_bible/1',
+                    'bible/1',
+                    'data/nerdfootball_bible/1',
+                    'public/data/nerdfootball_bible/1'
+                ];
+
+                for (const path of possiblePaths) {
+                    try {
+                        const doc = await firebase.firestore().doc(path).get();
+                        if (doc.exists()) {
+                            const data = doc.data();
+                            results += `<h3 style="color: green;">✅ FOUND: ${path}</h3>`;
+                            results += `<pre style="background: #f0f0f0; padding: 10px;">${JSON.stringify(data, null, 2)}</pre>`;
+                            console.log(`✅ BIBLE DATA FOUND AT: ${path}`, data);
+                        } else {
+                            results += `<p style="color: red;">❌ NOT FOUND: ${path}</p>`;
+                            console.log(`❌ NO DATA AT: ${path}`);
+                        }
+                    } catch (error) {
+                        results += `<p style="color: orange;">⚠️ ERROR ACCESSING: ${path} - ${error.message}</p>`;
+                        console.log(`⚠️ ERROR AT: ${path}`, error);
+                    }
+                }
+
+                // Also try collection approach
+                try {
+                    results += '<h3>🗂️ Checking Collections</h3>';
+                    const collections = ['bible', 'nerdfootball_bible', 'data'];
+                    for (const collectionName of collections) {
+                        try {
+                            const snapshot = await firebase.firestore().collection(collectionName).limit(1).get();
+                            if (!snapshot.empty) {
+                                results += `<p style="color: green;">✅ COLLECTION EXISTS: ${collectionName}</p>`;
+                                console.log(`✅ COLLECTION FOUND: ${collectionName}`);
+                            }
+                        } catch (error) {
+                            console.log(`❌ COLLECTION ERROR: ${collectionName}`, error);
+                        }
+                    }
+                } catch (error) {
+                    console.log('Collection search error:', error);
+                }
+
+                output.innerHTML = results;
+                console.log('🔍 BIBLE-SEARCH-COMPLETE');
+
+            } catch (error) {
+                console.error('❌ SEARCH-ERROR:', error);
+                output.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

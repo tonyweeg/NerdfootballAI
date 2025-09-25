@@ -49,6 +49,118 @@
             color: #6b7280;
         }
     </style>
+
+    <!-- 🤖 ML PREDICTION SYSTEM - CONFIDENCE POOL -->
+    <script>
+        console.log('🧠 CONFIDENCE ML: Loading AI prediction system...');
+
+        // Team database for confidence analysis
+        const confidenceTeamDB = {
+            'Buffalo Bills': { offense: 92, defense: 88, form: 85 },
+            'Kansas City Chiefs': { offense: 95, defense: 82, form: 95 },
+            'San Francisco 49ers': { offense: 88, defense: 92, form: 88 },
+            'Philadelphia Eagles': { offense: 90, defense: 85, form: 82 },
+            'Dallas Cowboys': { offense: 82, defense: 78, form: 85 },
+            'Miami Dolphins': { offense: 85, defense: 75, form: 70 },
+            'Green Bay Packers': { offense: 88, defense: 85, form: 80 },
+            'Baltimore Ravens': { offense: 86, defense: 90, form: 80 }
+        };
+
+        function generateConfidencePrediction(awayTeam, homeTeam, gameId) {
+            const away = confidenceTeamDB[awayTeam] || { offense: 75, defense: 75, form: 75 };
+            const home = confidenceTeamDB[homeTeam] || { offense: 75, defense: 75, form: 75 };
+
+            // Calculate win probability
+            let homeWinProb = 50;
+            homeWinProb += ((home.offense - away.defense) * 0.3);
+            homeWinProb += ((home.defense - away.offense) * 0.3);
+            homeWinProb += ((home.form - away.form) * 0.2);
+            homeWinProb += 3; // Home field advantage
+
+            homeWinProb = Math.max(15, Math.min(95, homeWinProb));
+            const awayWinProb = 100 - homeWinProb;
+            const winner = homeWinProb > 50 ? homeTeam : awayTeam;
+            const confidence = Math.max(homeWinProb, awayWinProb);
+
+            return {
+                gameId, awayTeam, homeTeam, winner,
+                confidence: Math.round(confidence),
+                homeWinProb: Math.round(homeWinProb),
+                awayWinProb: Math.round(awayWinProb),
+                homeData: home, awayData: away
+            };
+        }
+
+        window.openMLPredictionModal = function(gameId, awayTeam, homeTeam, event) {
+            if (event) event.stopPropagation();
+
+            console.log(`🧠 CONFIDENCE AI: Analyzing Game ${gameId}: ${awayTeam} @ ${homeTeam}...`);
+            const prediction = generateConfidencePrediction(awayTeam, homeTeam, gameId);
+
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full">
+                    <div class="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 rounded-t-lg">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">🧠</span>
+                                <div>
+                                    <h2 class="text-xl font-bold">Confidence AI Prediction</h2>
+                                    <p class="text-green-100 text-sm">Diamond-Level Game Analytics</p>
+                                </div>
+                            </div>
+                            <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <div class="text-center mb-6">
+                            <h3 class="text-lg font-bold text-gray-800 mb-2">Game ${prediction.gameId}</h3>
+                            <div class="flex items-center justify-center gap-4 mb-4">
+                                <span class="text-xl font-bold text-blue-700">${prediction.awayTeam}</span>
+                                <span class="text-gray-500">@</span>
+                                <span class="text-xl font-bold text-green-700">${prediction.homeTeam}</span>
+                            </div>
+                            <div class="text-2xl font-bold text-green-700 mb-2">
+                                🏆 Predicted Winner: ${prediction.winner}
+                            </div>
+                            <div class="text-xl text-green-600">${prediction.confidence}% Confidence</div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-blue-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-blue-600">${prediction.awayWinProb}%</div>
+                                <div class="text-sm text-blue-500">${prediction.awayTeam} Win Probability</div>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-green-600">${prediction.homeWinProb}%</div>
+                                <div class="text-sm text-green-500">${prediction.homeTeam} Win Probability</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 text-sm">
+                            <div class="bg-gray-50 p-3 rounded">⚡ <strong>Offensive Power:</strong> ${prediction.homeTeam} ${prediction.homeData.offense} vs ${prediction.awayTeam} ${prediction.awayData.offense}</div>
+                            <div class="bg-gray-50 p-3 rounded">🛡️ <strong>Defensive Strength:</strong> ${prediction.homeTeam} ${prediction.homeData.defense} vs ${prediction.awayTeam} ${prediction.awayData.defense}</div>
+                            <div class="bg-gray-50 p-3 rounded">📈 <strong>Recent Form:</strong> ${prediction.homeTeam} ${prediction.homeData.form}% vs ${prediction.awayTeam} ${prediction.awayData.form}%</div>
+                            <div class="bg-gray-50 p-3 rounded">🧠 <strong>AI Analysis:</strong> ${prediction.winner} predicted with ${prediction.confidence}% confidence based on offensive/defensive matchups and recent form</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        };
+
+        console.log('🧠 CONFIDENCE ML: AI prediction system ready');
+    </script>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="max-w-6xl mx-auto p-4">
@@ -144,6 +256,34 @@
         </div>
     </div>
 
+    <!-- ML Prediction Modal -->
+    <div id="ml-prediction-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-90vh overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🤖</span>
+                        <div>
+                            <h2 class="text-xl font-bold">NerdFootball AI Prediction</h2>
+                            <p class="text-blue-100 text-sm">Powered by Diamond-Level ML Analytics v1.0</p>
+                        </div>
+                    </div>
+                    <button id="close-ml-prediction-btn" class="text-white hover:text-gray-200 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 max-h-96 overflow-y-auto" id="ml-prediction-content">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
     <!-- Load Eastern Time Parser -->
     <script src="./easternTimeParser-v2.js"></script>
 
@@ -166,6 +306,9 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        // Admin user IDs who can see AI predictions
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
 
         let currentUser = null;
         let currentWeek = 1;
@@ -420,7 +563,17 @@
                         <!-- Game Info -->
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
-                                <h4 class="font-semibold text-gray-900">Game ${gameId}</h4>
+                                <div class="flex items-center gap-2">
+                                    <h4 class="font-semibold text-gray-900">Game ${gameId}</h4>
+                                    ${currentUser && ADMIN_UIDS.includes(currentUser.uid) ? `
+                                        <!-- 🧠 AI BRAIN ICON -->
+                                        <span onclick="openMLPredictionModal('${gameId}', '${game.a}', '${game.h}', event)"
+                                              class="w-5 h-5 hover:bg-blue-100 transform hover:scale-125 transition-all duration-150 flex items-center justify-center group cursor-pointer rounded"
+                                              title="AI Prediction for ${game.a} @ ${game.h}">
+                                            <span class="text-xs group-hover:animate-pulse">🧠</span>
+                                        </span>
+                                    ` : ''}
+                                </div>
                                 ${statusIndicator}
                             </div>
                             <div class="text-sm text-gray-600 mb-1">
@@ -677,6 +830,443 @@
                     statusEl.classList.add('bg-gray-100', 'text-gray-800');
             }
         }
+
+        // 🤖 ML PREDICTION SYSTEM - INTEGRATION
+
+        // ML Modal Elements
+        const mlPredictionModal = document.getElementById('ml-prediction-modal');
+        const closeMlPredictionBtn = document.getElementById('close-ml-prediction-btn');
+        const mlPredictionContent = document.getElementById('ml-prediction-content');
+
+        // ML Modal Event Listeners
+        if (closeMlPredictionBtn) {
+            closeMlPredictionBtn.addEventListener('click', closeMlPredictionModal);
+        }
+
+        if (mlPredictionModal) {
+            mlPredictionModal.addEventListener('click', (e) => {
+                if (e.target === mlPredictionModal) {
+                    closeMlPredictionModal();
+                }
+            });
+        }
+
+        // Team name to abbreviation mapping
+        const teamNameToAbbr = {
+            'Buffalo Bills': 'BUF', 'Miami Dolphins': 'MIA', 'New England Patriots': 'NE', 'New York Jets': 'NYJ',
+            'Baltimore Ravens': 'BAL', 'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Pittsburgh Steelers': 'PIT',
+            'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX', 'Tennessee Titans': 'TEN',
+            'Denver Broncos': 'DEN', 'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+            'Dallas Cowboys': 'DAL', 'New York Giants': 'NYG', 'Philadelphia Eagles': 'PHI', 'Washington Commanders': 'WAS',
+            'Chicago Bears': 'CHI', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB', 'Minnesota Vikings': 'MIN',
+            'Atlanta Falcons': 'ATL', 'Carolina Panthers': 'CAR', 'New Orleans Saints': 'NO', 'Tampa Bay Buccaneers': 'TB',
+            'Arizona Cardinals': 'ARI', 'Los Angeles Rams': 'LAR', 'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA'
+        };
+
+        // NFL Team Database for ML predictions
+        const nflTeamDatabase = {
+            'Buffalo Bills': {
+                offense: 92, defense: 88, recentForm: 85, homeAdvantage: 3.2,
+                passingOffense: 91, rushingOffense: 78, passingDefense: 85, rushingDefense: 90,
+                turnoverDiff: 8, injuryImpact: 2, coachingRating: 88, clutchFactor: 92
+            },
+            'Kansas City Chiefs': {
+                offense: 95, defense: 82, recentForm: 95, homeAdvantage: 4.1,
+                passingOffense: 98, rushingOffense: 76, passingDefense: 80, rushingDefense: 84,
+                turnoverDiff: 12, injuryImpact: 1, coachingRating: 98, clutchFactor: 99
+            },
+            'San Francisco 49ers': {
+                offense: 88, defense: 92, recentForm: 88, homeAdvantage: 3.8,
+                passingOffense: 86, rushingOffense: 91, passingDefense: 93, rushingDefense: 90,
+                turnoverDiff: 6, injuryImpact: 4, coachingRating: 94, clutchFactor: 87
+            },
+            'Philadelphia Eagles': {
+                offense: 90, defense: 85, recentForm: 82, homeAdvantage: 3.5,
+                passingOffense: 89, rushingOffense: 92, passingDefense: 83, rushingDefense: 87,
+                turnoverDiff: 4, injuryImpact: 3, coachingRating: 86, clutchFactor: 84
+            }
+        };
+
+        // Generate ML Prediction
+        function generateMLPrediction(awayTeam, homeTeam, gameId) {
+            const awayData = nflTeamDatabase[awayTeam] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+
+            const homeData = nflTeamDatabase[homeTeam] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+
+            // Calculate advantage scores
+            const offenseAdvantage = homeData.offense - awayData.offense;
+            const defenseAdvantage = homeData.defense - awayData.defense;
+            const formAdvantage = homeData.recentForm - awayData.recentForm;
+            const homeFieldAdvantage = homeData.homeAdvantage;
+
+            // Calculate win probability
+            let homeWinProb = 50;
+            homeWinProb += (offenseAdvantage * 0.25);
+            homeWinProb += (defenseAdvantage * 0.25);
+            homeWinProb += (formAdvantage * 0.15);
+            homeWinProb += (homeFieldAdvantage * 3);
+
+            homeWinProb = Math.max(15, Math.min(95, homeWinProb));
+            const awayWinProb = 100 - homeWinProb;
+
+            return {
+                winner: homeWinProb > 50 ? homeTeam : awayTeam,
+                confidence: Math.round(Math.max(homeWinProb, awayWinProb)),
+                homeWinProbability: Math.round(homeWinProb * 10) / 10,
+                awayWinProbability: Math.round(awayWinProb * 10) / 10,
+                factors: [
+                    `Offensive Power: ${teamNameToAbbr[homeTeam]} ${homeData.offense} vs ${teamNameToAbbr[awayTeam]} ${awayData.offense}`,
+                    `Defensive Strength: ${teamNameToAbbr[homeTeam]} ${homeData.defense} vs ${teamNameToAbbr[awayTeam]} ${awayData.defense}`,
+                    `Recent Form: ${teamNameToAbbr[homeTeam]} ${homeData.recentForm}% vs ${teamNameToAbbr[awayTeam]} ${awayData.recentForm}%`,
+                    `Home Field Advantage: +${homeData.homeAdvantage} points for ${teamNameToAbbr[homeTeam]}`
+                ],
+                reasoning: `${homeWinProb > 50 ? teamNameToAbbr[homeTeam] : teamNameToAbbr[awayTeam]} prediction based on key statistical advantages`
+            };
+        }
+
+        // Open ML Prediction Modal
+        window.openMLPredictionModal = function(gameId, awayTeam, homeTeam, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+
+            if (!currentUser) {
+                updateStatus('Please sign in to view AI predictions', 'error');
+                return;
+            }
+
+            // Admin-only AI features
+            if (!ADMIN_UIDS.includes(currentUser.uid)) {
+                updateStatus('AI predictions are currently in beta testing', 'info');
+                return;
+            }
+
+            console.log(`🧠 BRAIN_ICON_DEBUG: Opening ML prediction for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
+
+            const mlPrediction = generateMLPrediction(awayTeam, homeTeam, gameId);
+
+            const awayAbbr = teamNameToAbbr[awayTeam] || awayTeam;
+            const homeAbbr = teamNameToAbbr[homeTeam] || homeTeam;
+
+            const modalContent = `
+                <!-- Game Header -->
+                <div class="bg-gradient-to-r from-slate-50 to-blue-50 rounded-lg p-6 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="text-center">
+                                <div class="text-lg font-bold text-slate-800">${awayTeam}</div>
+                                <div class="text-sm text-slate-600">@</div>
+                            </div>
+                            <div>
+                                <div class="text-lg font-bold text-slate-800">${homeTeam}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-slate-600">Game ${gameId}</div>
+                            <div class="text-sm text-slate-600">Week ${currentWeek}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ML Win Prediction -->
+                <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                        <span class="mr-2">🤖</span>ML Win Prediction v1.0
+                    </h3>
+
+                    <!-- Win Probability Display -->
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-white rounded-lg p-4 border border-blue-200 text-center">
+                            <div class="text-lg font-bold text-blue-700">${awayAbbr}</div>
+                            <div class="text-3xl font-bold text-blue-600 mb-2">
+                                ${mlPrediction.awayWinProbability}%
+                            </div>
+                            <div class="text-sm text-blue-500">Win Probability</div>
+                        </div>
+                        <div class="bg-white rounded-lg p-4 border border-green-200 text-center">
+                            <div class="text-lg font-bold text-green-700">${homeAbbr}</div>
+                            <div class="text-3xl font-bold text-green-600 mb-2">
+                                ${mlPrediction.homeWinProbability}%
+                            </div>
+                            <div class="text-sm text-green-500">Win Probability</div>
+                        </div>
+                    </div>
+
+                    <!-- Predicted Winner -->
+                    <div class="text-center mb-4">
+                        <div class="text-2xl font-bold mb-2 text-green-700">
+                            🏆 Predicted Winner: ${mlPrediction.winner}
+                        </div>
+                        <div class="text-lg font-semibold text-green-600">
+                            ${mlPrediction.confidence}% Confidence
+                        </div>
+                    </div>
+
+                    <!-- Key Factors -->
+                    <div class="bg-white rounded-lg p-4 border border-green-200 mb-4">
+                        <div class="text-sm font-semibold text-green-800 mb-3">🎯 Key Factors Analyzed:</div>
+                        <div class="grid grid-cols-1 gap-2">
+                            ${mlPrediction.factors.map(factor => `
+                                <div class="text-sm text-green-700 bg-green-50 px-3 py-2 rounded border">
+                                    ${factor}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- AI Reasoning -->
+                    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <div class="text-sm font-semibold text-slate-800 mb-2">🧠 AI Analysis:</div>
+                        <div class="text-sm text-slate-700 italic">
+                            ${mlPrediction.reasoning}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            mlPredictionContent.innerHTML = modalContent;
+            mlPredictionModal.classList.remove('hidden');
+        };
+
+        // Make currentUser available globally for ML predictions
+        window.currentUser = currentUser;
+
+        // Close ML Prediction Modal
+        window.closeMlPredictionModal = function() {
+            if (mlPredictionModal) {
+                mlPredictionModal.classList.add('hidden');
+            }
+        };
+    </script>
+
+    <!-- 🤖 ML PREDICTION SYSTEM - GLOBAL SCOPE -->
+    <script>
+        // Global ML Prediction Functions for Confidence Pool
+
+        // Team name to abbreviation mapping
+        const confidenceTeamNameToAbbr = {
+            'Buffalo Bills': 'BUF', 'Miami Dolphins': 'MIA', 'New England Patriots': 'NE', 'New York Jets': 'NYJ',
+            'Baltimore Ravens': 'BAL', 'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Pittsburgh Steelers': 'PIT',
+            'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX', 'Tennessee Titans': 'TEN',
+            'Denver Broncos': 'DEN', 'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+            'Dallas Cowboys': 'DAL', 'New York Giants': 'NYG', 'Philadelphia Eagles': 'PHI', 'Washington Commanders': 'WAS',
+            'Chicago Bears': 'CHI', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB', 'Minnesota Vikings': 'MIN',
+            'Atlanta Falcons': 'ATL', 'Carolina Panthers': 'CAR', 'New Orleans Saints': 'NO', 'Tampa Bay Buccaneers': 'TB',
+            'Arizona Cardinals': 'ARI', 'Los Angeles Rams': 'LAR', 'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA'
+        };
+
+        // NFL Team Database for confidence predictions
+        const confidenceNflTeamDatabase = {
+            'Buffalo Bills': {
+                offense: 92, defense: 88, recentForm: 85, homeAdvantage: 3.2,
+                turnoverDiff: 8, injuryImpact: 2, coachingRating: 88, clutchFactor: 92
+            },
+            'Kansas City Chiefs': {
+                offense: 95, defense: 82, recentForm: 95, homeAdvantage: 4.1,
+                turnoverDiff: 12, injuryImpact: 1, coachingRating: 98, clutchFactor: 99
+            },
+            'San Francisco 49ers': {
+                offense: 88, defense: 92, recentForm: 88, homeAdvantage: 3.8,
+                turnoverDiff: 6, injuryImpact: 4, coachingRating: 94, clutchFactor: 87
+            },
+            'Philadelphia Eagles': {
+                offense: 90, defense: 85, recentForm: 82, homeAdvantage: 3.5,
+                turnoverDiff: 4, injuryImpact: 3, coachingRating: 86, clutchFactor: 84
+            }
+        };
+
+        // Generate ML Prediction for Confidence Pool
+        function generateConfidenceMLPrediction(awayTeam, homeTeam, gameId) {
+            const awayData = confidenceNflTeamDatabase[awayTeam] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+
+            const homeData = confidenceNflTeamDatabase[homeTeam] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+
+            // Calculate advantage scores
+            const offenseAdvantage = homeData.offense - awayData.offense;
+            const defenseAdvantage = homeData.defense - awayData.defense;
+            const formAdvantage = homeData.recentForm - awayData.recentForm;
+            const homeFieldAdvantage = homeData.homeAdvantage;
+
+            // Calculate win probability
+            let homeWinProb = 50;
+            homeWinProb += (offenseAdvantage * 0.25);
+            homeWinProb += (defenseAdvantage * 0.25);
+            homeWinProb += (formAdvantage * 0.15);
+            homeWinProb += (homeFieldAdvantage * 3);
+
+            homeWinProb = Math.max(15, Math.min(95, homeWinProb));
+            const awayWinProb = 100 - homeWinProb;
+
+            return {
+                winner: homeWinProb > 50 ? homeTeam : awayTeam,
+                confidence: Math.round(Math.max(homeWinProb, awayWinProb)),
+                homeWinProbability: Math.round(homeWinProb * 10) / 10,
+                awayWinProbability: Math.round(awayWinProb * 10) / 10,
+                factors: [
+                    `Offensive Power: ${confidenceTeamNameToAbbr[homeTeam]} ${homeData.offense} vs ${confidenceTeamNameToAbbr[awayTeam]} ${awayData.offense}`,
+                    `Defensive Strength: ${confidenceTeamNameToAbbr[homeTeam]} ${homeData.defense} vs ${confidenceTeamNameToAbbr[awayTeam]} ${awayData.defense}`,
+                    `Recent Form: ${confidenceTeamNameToAbbr[homeTeam]} ${homeData.recentForm}% vs ${confidenceTeamNameToAbbr[awayTeam]} ${awayData.recentForm}%`,
+                    `Home Field Advantage: +${homeData.homeAdvantage} points for ${confidenceTeamNameToAbbr[homeTeam]}`
+                ],
+                reasoning: `${homeWinProb > 50 ? confidenceTeamNameToAbbr[homeTeam] : confidenceTeamNameToAbbr[awayTeam]} prediction based on key statistical advantages`
+            };
+        }
+
+        // Global function to override module-scoped one
+        window.openMLPredictionModal = function(gameId, awayTeam, homeTeam, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+
+            console.log(`🧠 BRAIN_ICON_DEBUG: Opening confidence ML prediction for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
+
+            // Check if Firebase is loaded and user is authenticated
+            if (typeof window.currentUser === 'undefined' || !window.currentUser) {
+                console.log('🧠 BRAIN_ICON_DEBUG: User not authenticated yet, showing basic prediction');
+                showBasicConfidencePrediction(gameId, awayTeam, homeTeam);
+                return;
+            }
+
+            // Check admin status
+            const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+            if (!ADMIN_UIDS.includes(window.currentUser.uid)) {
+                console.log('🧠 BRAIN_ICON_DEBUG: Non-admin user, showing message');
+                alert('AI predictions are currently in beta testing');
+                return;
+            }
+
+            showBasicConfidencePrediction(gameId, awayTeam, homeTeam);
+        };
+
+        function showBasicConfidencePrediction(gameId, awayTeam, homeTeam) {
+            const mlPrediction = generateConfidenceMLPrediction(awayTeam, homeTeam, gameId);
+
+            const awayAbbr = confidenceTeamNameToAbbr[awayTeam] || awayTeam;
+            const homeAbbr = confidenceTeamNameToAbbr[homeTeam] || homeTeam;
+
+            const modalContent = `
+                <!-- Game Header -->
+                <div class="bg-gradient-to-r from-slate-50 to-blue-50 rounded-lg p-6 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="text-center">
+                                <div class="text-lg font-bold text-slate-800">${awayTeam}</div>
+                                <div class="text-sm text-slate-600">@</div>
+                            </div>
+                            <div>
+                                <div class="text-lg font-bold text-slate-800">${homeTeam}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-slate-600">Game ${gameId}</div>
+                            <div class="text-sm text-slate-600">Confidence Pick</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ML Win Prediction -->
+                <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                        <span class="mr-2">🤖</span>ML Win Prediction v1.0
+                    </h3>
+
+                    <!-- Win Probability Display -->
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-white rounded-lg p-4 border border-blue-200 text-center">
+                            <div class="text-lg font-bold text-blue-700">${awayAbbr}</div>
+                            <div class="text-3xl font-bold text-blue-600 mb-2">
+                                ${mlPrediction.awayWinProbability}%
+                            </div>
+                            <div class="text-sm text-blue-500">Win Probability</div>
+                        </div>
+                        <div class="bg-white rounded-lg p-4 border border-green-200 text-center">
+                            <div class="text-lg font-bold text-green-700">${homeAbbr}</div>
+                            <div class="text-3xl font-bold text-green-600 mb-2">
+                                ${mlPrediction.homeWinProbability}%
+                            </div>
+                            <div class="text-sm text-green-500">Win Probability</div>
+                        </div>
+                    </div>
+
+                    <!-- Predicted Winner -->
+                    <div class="text-center mb-4">
+                        <div class="text-2xl font-bold mb-2 text-green-700">
+                            🏆 Predicted Winner: ${mlPrediction.winner}
+                        </div>
+                        <div class="text-lg font-semibold text-green-600">
+                            ${mlPrediction.confidence}% Confidence
+                        </div>
+                    </div>
+
+                    <!-- Key Factors -->
+                    <div class="bg-white rounded-lg p-4 border border-green-200 mb-4">
+                        <div class="text-sm font-semibold text-green-800 mb-3">🎯 Key Factors Analyzed:</div>
+                        <div class="grid grid-cols-1 gap-2">
+                            ${mlPrediction.factors.map(factor => `
+                                <div class="text-sm text-green-700 bg-green-50 px-3 py-2 rounded border">
+                                    ${factor}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- AI Reasoning -->
+                    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <div class="text-sm font-semibold text-slate-800 mb-2">🧠 AI Analysis:</div>
+                        <div class="text-sm text-slate-700 italic">
+                            ${mlPrediction.reasoning}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const modal = document.getElementById('ml-prediction-modal');
+            const modalContent_el = document.getElementById('ml-prediction-content');
+            if (modal && modalContent_el) {
+                modalContent_el.innerHTML = modalContent;
+                modal.classList.remove('hidden');
+            }
+        }
+
+        // Override the close function too
+        window.closeMlPredictionModal = function() {
+            const modal = document.getElementById('ml-prediction-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        };
+
+        // Setup modal event listeners when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('ml-prediction-modal');
+            const closeBtn = document.getElementById('close-ml-prediction-btn');
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', window.closeMlPredictionModal);
+            }
+
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        window.closeMlPredictionModal();
+                    }
+                });
+            }
+        });
+
+        console.log('🧠 ML PREDICTION DEBUG: Global confidence ML prediction functions loaded');
     </script>
 </body>
 </html>

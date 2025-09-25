@@ -5,6 +5,45 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 
+// NFL Team Helmet URLs
+function getHelmetUrl(teamName) {
+    const teamMap = {
+        "Arizona Cardinals": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fari_Arizona_Cardinals.png?alt=media&token=38143dcd-6075-4fa3-9f3c-98518a6ec3f3",
+        "Atlanta Falcons": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fatl_Atlanta_Falcons.png?alt=media",
+        "Baltimore Ravens": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fbal_Baltimore_Ravens.png?alt=media",
+        "Buffalo Bills": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fbuf_Buffalo_Bills.png?alt=media",
+        "Carolina Panthers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcar_Carolina_Panthers.png?alt=media",
+        "Chicago Bears": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fchi_Chicago_Bears.png?alt=media",
+        "Cincinnati Bengals": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcin_Cincinnati_Bengals.png?alt=media",
+        "Cleveland Browns": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcle_Cleveland_Browns.png?alt=media",
+        "Dallas Cowboys": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fdal_Dallas_Cowboys.png?alt=media",
+        "Denver Broncos": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fden_Denver_Broncos.png?alt=media",
+        "Detroit Lions": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fdet_Detroit_Lions.png?alt=media",
+        "Green Bay Packers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fgb_Green_Bay_Packers.png?alt=media",
+        "Houston Texans": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fhou_Houston_Texans.png?alt=media",
+        "Indianapolis Colts": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Find_Indianapolis_Colts.png?alt=media",
+        "Jacksonville Jaguars": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fjax_Jacksonville_Jaguars.png?alt=media",
+        "Kansas City Chiefs": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fkc_Kansas_City_Chiefs.png?alt=media",
+        "Las Vegas Raiders": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flv_Las_Vegas_Raiders.png?alt=media",
+        "Los Angeles Chargers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flac_Los_Angeles_Chargers.png?alt=media",
+        "Los Angeles Rams": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flar_Los_Angeles_Rams.png?alt=media",
+        "Miami Dolphins": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fmia_Miami_Dolphins.png?alt=media",
+        "Minnesota Vikings": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fmin_Minnesota_Vikings.png?alt=media",
+        "New England Patriots": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fne_New_England_Patriots.png?alt=media",
+        "New Orleans Saints": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fno_New_Orleans_Saints.png?alt=media",
+        "New York Giants": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fnyg_New_York_Giants.png?alt=media",
+        "New York Jets": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fnyj_New_York_Jets.png?alt=media",
+        "Philadelphia Eagles": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fphi_Philadelphia_Eagles.png?alt=media",
+        "Pittsburgh Steelers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fpit_Pittsburgh_Steelers.png?alt=media",
+        "San Francisco 49ers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fsf_San_Francisco_49ers.png?alt=media",
+        "Seattle Seahawks": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fsea_Seattle_Seahawks.png?alt=media",
+        "Tampa Bay Buccaneers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ftb_Tampa_Bay_Buccaneers.png?alt=media",
+        "Tennessee Titans": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ften_Tennessee_Titans.png?alt=media",
+        "Washington Commanders": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fwas_Washington_Commanders.png?alt=media"
+    };
+    return teamMap[teamName] || null;
+}
+
 // Initialize Firebase Admin
 if (!initializeApp.apps || initializeApp.apps.length === 0) {
     initializeApp();
@@ -182,6 +221,7 @@ async function generateSurvivorPoolData(poolId) {
                 displayName: memberName,
                 email: memberInfo.email || '',
                 week1Pick: 'NO_PICKS_FOUND',
+                allWinningPicks: [],
                 status: 'NO_PICKS_FOUND',
                 eliminatedWeek: 0,
                 eliminatedBy: 'N/A'
@@ -202,14 +242,13 @@ async function generateSurvivorPoolData(poolId) {
             const picks = picksData.picks || picksData;
             console.log(`📋 Raw picks data structure for ${memberName}:`, JSON.stringify(picks, null, 2));
 
-            // Data is already organized by week: {1: {gameId: "111", team: "Denver Broncos"}, 2: {...}}
-            const week1Team = picks['1']?.team || null;
-            const week2Team = picks['2']?.team || null;
-            const week3Team = picks['3']?.team || null;
+            // Get all available weeks from NFL results and sort them
+            const completedWeeks = Object.keys(nflResults).map(w => parseInt(w)).sort((a, b) => a - b);
+            console.log(`🗓️ Available weeks with NFL results: ${completedWeeks.join(', ')}`);
 
-            console.log(`🏈 ${memberName} picks - Week 1: ${JSON.stringify(week1Team)}, Week 2: ${JSON.stringify(week2Team)}, Week 3: ${JSON.stringify(week3Team)}`);
-
-            if (!week1Team) {
+            // Check if user has week 1 pick (required to participate)
+            const week1Pick = picks['1'];
+            if (!week1Pick || !week1Pick.team) {
                 console.log(`⚠️ ${memberName} has NO Week 1 pick`);
                 survivorRecord.week1Pick = 'NO_WEEK1_PICK';
                 survivorRecord.status = 'NO_WEEK1_PICK';
@@ -218,88 +257,55 @@ async function generateSurvivorPoolData(poolId) {
                 continue;
             }
 
-            // Extract team name from Week 1
-            const week1TeamName = typeof week1Team === 'string' ? week1Team : (week1Team.teamPicked || week1Team.team || 'UNKNOWN_FORMAT');
+            const week1TeamName = typeof week1Pick.team === 'string' ? week1Pick.team : (week1Pick.team.teamPicked || week1Pick.team.team || 'UNKNOWN_FORMAT');
             survivorRecord.week1Pick = week1TeamName;
-
             console.log(`✅ ${memberName} Week 1 pick: ${week1TeamName}`);
 
-            // SIMPLE ELIMINATION LOGIC - check each completed week
+            // DYNAMIC ELIMINATION LOGIC - check each completed week in order
             let isEliminated = false;
             let eliminatedWeek = 0;
             let eliminatedBy = 'N/A';
+            let allWinningPicks = [];
 
-            // Week 1 check - BULLETPROOF ELIMINATION LOGIC
-            if (nflResults[1] && week1TeamName) {
-                if (nflResults[1].losingTeams.includes(week1TeamName)) {
+            for (const weekNumber of completedWeeks) {
+                if (isEliminated) break; // Stop checking if already eliminated
+
+                const weekPick = picks[weekNumber.toString()];
+                if (!weekPick || !weekPick.team) {
+                    console.log(`⚠️ ${memberName} has NO pick for Week ${weekNumber}`);
+                    continue; // Skip weeks with no picks (might eliminate them later for missing picks)
+                }
+
+                const teamName = typeof weekPick.team === 'string' ? weekPick.team : (weekPick.team.teamPicked || weekPick.team.team || 'UNKNOWN');
+                const weekResults = nflResults[weekNumber];
+
+                console.log(`🏈 ${memberName} Week ${weekNumber} pick: ${teamName}`);
+
+                if (weekResults.losingTeams.includes(teamName)) {
                     // PICKED A LOSER = DEAD IMMEDIATELY
                     isEliminated = true;
-                    eliminatedWeek = 1;
-                    eliminatedBy = week1TeamName;
-                    console.log(`💀 ${memberName} ELIMINATED Week 1 - picked LOSER ${week1TeamName}`);
-                } else if (nflResults[1].winningTeams.includes(week1TeamName)) {
-                    // PICKED A WINNER = SURVIVE
-                    console.log(`✅ ${memberName} SURVIVED Week 1 - picked WINNER ${week1TeamName}`);
+                    eliminatedWeek = weekNumber;
+                    eliminatedBy = teamName;
+                    console.log(`💀 ${memberName} ELIMINATED Week ${weekNumber} - picked LOSER ${teamName}`);
+                    break;
+                } else if (weekResults.winningTeams.includes(teamName)) {
+                    // PICKED A WINNER = SURVIVE THIS WEEK
+                    const helmetUrl = getHelmetUrl(teamName);
+                    allWinningPicks.push({
+                        week: weekNumber,
+                        team: teamName,
+                        helmetUrl: helmetUrl
+                    });
+                    console.log(`✅ ${memberName} SURVIVED Week ${weekNumber} - picked WINNER ${teamName}`);
                 } else {
-                    // PICKED A TEAM WITH NO RESULT = DEAD (safety elimination)
-                    isEliminated = true;
-                    eliminatedWeek = 1;
-                    eliminatedBy = `${week1TeamName} (NO_RESULT)`;
-                    console.log(`💀 ${memberName} ELIMINATED Week 1 - picked ${week1TeamName} (NO GAME RESULT)`);
-                }
-            } else if (week1TeamName) {
-                // HAS PICK BUT NO NFL RESULTS = DEAD (safety elimination)
-                isEliminated = true;
-                eliminatedWeek = 1;
-                eliminatedBy = `${week1TeamName} (NO_NFL_DATA)`;
-                console.log(`💀 ${memberName} ELIMINATED Week 1 - no NFL data for ${week1TeamName}`);
-            }
-
-            // Week 2 check - ONLY if SURVIVED Week 1 (BULLETPROOF)
-            if (!isEliminated && week2Team && nflResults[2]) {
-                const week2TeamName = typeof week2Team === 'string' ? week2Team : (week2Team.teamPicked || week2Team.team);
-                if (week2TeamName) {
-                    if (nflResults[2].losingTeams.includes(week2TeamName)) {
-                        // PICKED A LOSER = DEAD IMMEDIATELY
-                        isEliminated = true;
-                        eliminatedWeek = 2;
-                        eliminatedBy = week2TeamName;
-                        console.log(`💀 ${memberName} ELIMINATED Week 2 - picked LOSER ${week2TeamName}`);
-                    } else if (nflResults[2].winningTeams.includes(week2TeamName)) {
-                        // PICKED A WINNER = SURVIVE TO WEEK 3
-                        console.log(`✅ ${memberName} SURVIVED Week 2 - picked WINNER ${week2TeamName}`);
-                    } else {
-                        // PICKED TEAM WITH NO RESULT = DEAD (safety elimination)
-                        isEliminated = true;
-                        eliminatedWeek = 2;
-                        eliminatedBy = `${week2TeamName} (NO_RESULT)`;
-                        console.log(`💀 ${memberName} ELIMINATED Week 2 - picked ${week2TeamName} (NO GAME RESULT)`);
-                    }
+                    // TEAM NOT IN RESULTS = GAME NOT FINAL YET, STILL ALIVE
+                    console.log(`⏳ ${memberName} Week ${weekNumber} pick ${teamName} - game not final yet, still alive`);
+                    // DO NOT ELIMINATE - continue to check remaining weeks
                 }
             }
 
-            // Week 3 check - ONLY if SURVIVED Week 1 & 2 (BULLETPROOF)
-            if (!isEliminated && week3Team && nflResults[3]) {
-                const week3TeamName = typeof week3Team === 'string' ? week3Team : (week3Team.teamPicked || week3Team.team);
-                if (week3TeamName) {
-                    if (nflResults[3].losingTeams.includes(week3TeamName)) {
-                        // PICKED A LOSER = DEAD IMMEDIATELY
-                        isEliminated = true;
-                        eliminatedWeek = 3;
-                        eliminatedBy = week3TeamName;
-                        console.log(`💀 ${memberName} ELIMINATED Week 3 - picked LOSER ${week3TeamName}`);
-                    } else if (nflResults[3].winningTeams.includes(week3TeamName)) {
-                        // PICKED A WINNER = SURVIVE TO WEEK 4
-                        console.log(`✅ ${memberName} SURVIVED Week 3 - picked WINNER ${week3TeamName}`);
-                    } else {
-                        // PICKED TEAM WITH NO RESULT = DEAD (safety elimination)
-                        isEliminated = true;
-                        eliminatedWeek = 3;
-                        eliminatedBy = `${week3TeamName} (NO_RESULT)`;
-                        console.log(`💀 ${memberName} ELIMINATED Week 3 - picked ${week3TeamName} (NO GAME RESULT)`);
-                    }
-                }
-            }
+            // Store all winning picks in the record
+            survivorRecord.allWinningPicks = allWinningPicks;
 
             // Final status with participation status update logic
             if (isEliminated) {
@@ -400,12 +406,15 @@ async function loadNFLResultsForAllWeeks() {
                         }
 
                         console.log(`🎯 Processing game ${gameId}:`, JSON.stringify(game, null, 2));
-                        if (game.status === 'final' && game.winner) {
+                        // CRITICAL: Only eliminate on FINAL or FINAL/OT games
+                        if ((game.status === 'final' || game.status === 'final/ot') && game.winner) {
                             // Collect winners and losers using correct field names
                             winningTeams.push(game.winner);
                             const loser = game.winner === game.h ? game.a : game.h;
                             losingTeams.push(loser);
-                            console.log(`✅ Winner: ${game.winner}, Loser: ${loser}`);
+                            console.log(`✅ FINAL Game - Winner: ${game.winner}, Loser: ${loser}, Status: ${game.status}`);
+                        } else {
+                            console.log(`⏳ Game ${gameId} not final - Status: ${game.status}, Winner: ${game.winner || 'TBD'}`);
                         }
                     });
 

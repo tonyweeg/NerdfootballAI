@@ -189,37 +189,42 @@ async function generateSeasonLeaderboardData() {
                 weeklyBreakdown: {}
             };
 
-            // Get user's data from weekly leaderboards for each completed week
-            for (const weekNumber of completedWeeks) {
-                try {
-                    const weeklyPath = `artifacts/nerdfootball/pools/nerduniverse-2025/leaderboards/weekly-${weekNumber}`;
-                    const weeklyDocSnap = await db.doc(weeklyPath).get();
+            // FIXED: Read directly from corrected scoring documents instead of outdated weekly cache
+            try {
+                const userScoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${memberId}`;
+                const userScoringSnap = await db.doc(userScoringPath).get();
 
-                    if (weeklyDocSnap.exists) {
-                        const weeklyData = weeklyDocSnap.data();
-                        const standings = weeklyData.standings || [];
+                if (userScoringSnap.exists) {
+                    const userScoringData = userScoringSnap.data();
 
-                        // Find this user in the weekly standings
-                        const userStanding = standings.find(standing => standing.userId === memberId);
+                    // Use the corrected data from our pipeline fix
+                    seasonData.totalPoints = userScoringData.totalPoints || 0;
+                    seasonData.totalCorrectPicks = userScoringData.seasonStats?.gamesWon || 0;
+                    seasonData.totalPicks = userScoringData.seasonStats?.totalGames || 0;
+                    seasonData.weeksPlayed = userScoringData.seasonStats?.weeksPlayed || 0;
 
-                        if (userStanding) {
-                            seasonData.totalPoints += userStanding.totalPoints || 0;
-                            seasonData.totalCorrectPicks += userStanding.correctPicks || 0;
-                            seasonData.totalPicks += userStanding.totalPicks || 0;
-                            seasonData.weeksPlayed++;
-
-                            seasonData.weeklyBreakdown[`week${weekNumber}`] = {
-                                points: userStanding.totalPoints || 0,
-                                correct: userStanding.correctPicks || 0,
-                                total: userStanding.totalPicks || 0,
-                                accuracy: userStanding.totalPicks > 0 ?
-                                    ((userStanding.correctPicks / userStanding.totalPicks) * 100) : 0
-                            };
+                    // Build weekly breakdown from corrected weekly data
+                    if (userScoringData.weeklyPoints) {
+                        for (const weekNumber of completedWeeks) {
+                            const weekData = userScoringData.weeklyPoints[weekNumber];
+                            if (weekData) {
+                                seasonData.weeklyBreakdown[`week${weekNumber}`] = {
+                                    points: weekData.totalPoints || 0,
+                                    correct: weekData.gamesWon || 0,
+                                    total: weekData.gamesPlayed || 0,
+                                    accuracy: weekData.gamesPlayed > 0 ?
+                                        ((weekData.gamesWon / weekData.gamesPlayed) * 100) : 0
+                                };
+                            }
                         }
                     }
-                } catch (weekError) {
-                    console.error(`❌ Error getting Week ${weekNumber} data for user ${memberId}:`, weekError);
+
+                    console.log(`✅ User ${memberId.slice(-6)}: ${seasonData.totalPoints} points (${seasonData.totalCorrectPicks}/${seasonData.totalPicks} picks)`);
+                } else {
+                    console.log(`⚠️ No scoring document found for user ${memberId}`);
                 }
+            } catch (userError) {
+                console.error(`❌ Error getting scoring data for user ${memberId}:`, userError);
             }
 
             // Calculate average accuracy

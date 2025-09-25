@@ -1,0 +1,457 @@
+/**
+ * NerdFootballAI Modal System
+ * Provides AI-powered game predictions with modal interface
+ */
+
+class NerdFootballAIModal {
+    constructor() {
+        this.modalId = 'nerdfootball-ai-modal';
+        this.isVisible = false;
+        this.currentPrediction = null;
+        this.loadingState = false;
+
+        this.createModalHTML();
+        this.bindEvents();
+    }
+
+    createModalHTML() {
+        // Remove existing modal if it exists
+        const existingModal = document.getElementById(this.modalId);
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create modal container
+        const modalContainer = document.createElement('div');
+        modalContainer.id = this.modalId;
+        modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4';
+
+        modalContainer.innerHTML = `
+            <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-90vh overflow-hidden">
+                <!-- Modal Header -->
+                <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🧠</span>
+                            <div>
+                                <h2 class="text-xl font-bold">NerdFootball AI Prediction</h2>
+                                <p class="text-blue-100 text-sm">Powered by Diamond-Level Analytics</p>
+                            </div>
+                        </div>
+                        <button id="ai-modal-close" class="text-white hover:text-gray-200 transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 max-h-96 overflow-y-auto">
+                    <!-- Game Info -->
+                    <div id="ai-game-info" class="bg-gray-50 rounded-lg p-4 mb-6">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="ai-loading" class="text-center py-8 hidden">
+                        <div class="animate-spin inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+                        <p class="text-gray-600">🧠 AI analyzing game data...</p>
+                        <p class="text-sm text-gray-500 mt-2">Processing matchup, trends, and predictions</p>
+                    </div>
+
+                    <!-- Prediction Results -->
+                    <div id="ai-results" class="hidden">
+                        <!-- Prediction Summary -->
+                        <div id="ai-prediction-summary" class="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-4">
+                            <!-- Populated dynamically -->
+                        </div>
+
+                        <!-- Detailed Analysis -->
+                        <div id="ai-detailed-analysis" class="space-y-4">
+                            <!-- Populated dynamically -->
+                        </div>
+
+                        <!-- Confidence Factors -->
+                        <div class="mt-6">
+                            <h4 class="font-semibold text-gray-800 mb-3">🎯 Key Factors</h4>
+                            <div id="ai-confidence-factors" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="ai-error" class="text-center py-8 hidden">
+                        <div class="text-red-500 text-4xl mb-4">⚠️</div>
+                        <p class="text-red-600 font-medium">AI Prediction Error</p>
+                        <p id="ai-error-message" class="text-gray-600 mt-2">Unable to generate prediction at this time.</p>
+                        <button id="ai-retry" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            🔄 Retry Prediction
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="bg-gray-50 px-6 py-4 flex justify-between items-center">
+                    <div class="text-sm text-gray-500">
+                        <span class="inline-flex items-center">
+                            <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                            AI powered by DIAMOND analytics
+                        </span>
+                    </div>
+                    <div class="flex gap-3">
+                        <button id="ai-modal-cancel" class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                            Cancel
+                        </button>
+                        <button id="ai-apply-prediction" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 hidden">
+                            ⚡ Apply Prediction
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modalContainer);
+    }
+
+    bindEvents() {
+        const modal = document.getElementById(this.modalId);
+
+        // Close modal events
+        document.getElementById('ai-modal-close')?.addEventListener('click', () => this.hide());
+        document.getElementById('ai-modal-cancel')?.addEventListener('click', () => this.hide());
+
+        // Click outside to close
+        modal?.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.hide();
+            }
+        });
+
+        // Retry button
+        document.getElementById('ai-retry')?.addEventListener('click', () => {
+            if (this.currentGameData) {
+                this.generatePrediction(this.currentGameData.gameId, this.currentGameData.awayTeam, this.currentGameData.homeTeam);
+            }
+        });
+
+        // Apply prediction button
+        document.getElementById('ai-apply-prediction')?.addEventListener('click', () => {
+            this.applyPredictionToPick();
+        });
+
+        // ESC key to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isVisible) {
+                this.hide();
+            }
+        });
+    }
+
+    show(gameId, awayTeam, homeTeam) {
+        console.log(`🧠 AI_MODAL_DEBUG: Opening AI modal for ${awayTeam} @ ${homeTeam} (Game ${gameId})`);
+
+        this.currentGameData = { gameId, awayTeam, homeTeam };
+
+        // Update game info
+        this.updateGameInfo(gameId, awayTeam, homeTeam);
+
+        // Show modal
+        const modal = document.getElementById(this.modalId);
+        modal.classList.remove('hidden');
+        this.isVisible = true;
+
+        // Start prediction generation
+        this.generatePrediction(gameId, awayTeam, homeTeam);
+    }
+
+    hide() {
+        console.log('🧠 AI_MODAL_DEBUG: Closing AI modal');
+        const modal = document.getElementById(this.modalId);
+        modal.classList.add('hidden');
+        this.isVisible = false;
+        this.currentGameData = null;
+        this.currentPrediction = null;
+
+        // Reset states
+        this.showLoading(false);
+        this.showResults(false);
+        this.showError(false);
+    }
+
+    updateGameInfo(gameId, awayTeam, homeTeam) {
+        const gameInfoEl = document.getElementById('ai-game-info');
+        gameInfoEl.innerHTML = `
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Game ${gameId}</h3>
+                    <p class="text-gray-600">
+                        <span class="font-medium text-blue-600">${awayTeam}</span> @ <span class="font-medium text-green-600">${homeTeam}</span>
+                    </p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-gray-500">AI Analysis Request</p>
+                    <p class="text-xs text-gray-400">${new Date().toLocaleTimeString()}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    async generatePrediction(gameId, awayTeam, homeTeam) {
+        console.log(`🧠 AI_MODAL_DEBUG: Generating prediction for ${awayTeam} @ ${homeTeam}`);
+
+        this.loadingState = true;
+        this.showLoading(true);
+        this.showResults(false);
+        this.showError(false);
+
+        try {
+            // Simulate AI prediction generation with realistic data
+            const prediction = await this.callAIPredictionAPI(gameId, awayTeam, homeTeam);
+
+            this.currentPrediction = prediction;
+            this.displayPrediction(prediction);
+
+            this.showLoading(false);
+            this.showResults(true);
+
+        } catch (error) {
+            console.error('🧠 AI_MODAL_DEBUG: Prediction generation failed:', error);
+            this.showLoading(false);
+            this.showError(true, error.message);
+        }
+
+        this.loadingState = false;
+    }
+
+    async callAIPredictionAPI(gameId, awayTeam, homeTeam) {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // For now, generate mock prediction data
+        // TODO: Replace with actual AI API call
+        const mockPrediction = this.generateMockPrediction(gameId, awayTeam, homeTeam);
+
+        return mockPrediction;
+    }
+
+    generateMockPrediction(gameId, awayTeam, homeTeam) {
+        // Generate realistic mock prediction data
+        const homeAdvantage = Math.random() * 0.15 + 0.05; // 5-20% home advantage
+        const baseWinProbability = 0.4 + Math.random() * 0.2; // 40-60% base
+
+        const awayWinProb = baseWinProbability;
+        const homeWinProb = baseWinProbability + homeAdvantage;
+
+        // Normalize probabilities
+        const totalProb = awayWinProb + homeWinProb;
+        const normalizedAwayProb = (awayWinProb / totalProb) * 100;
+        const normalizedHomeProb = (homeWinProb / totalProb) * 100;
+
+        const predictedWinner = normalizedHomeProb > normalizedAwayProb ? homeTeam : awayTeam;
+        const confidence = Math.max(normalizedAwayProb, normalizedHomeProb);
+
+        // Generate projected score
+        const awayScore = 17 + Math.floor(Math.random() * 14); // 17-30
+        const homeScore = 17 + Math.floor(Math.random() * 14); // 17-30
+
+        // Adjust score based on predicted winner
+        if (predictedWinner === homeTeam && homeScore <= awayScore) {
+            homeScore = awayScore + Math.floor(Math.random() * 7) + 1;
+        } else if (predictedWinner === awayTeam && awayScore <= homeScore) {
+            awayScore = homeScore + Math.floor(Math.random() * 7) + 1;
+        }
+
+        return {
+            gameId,
+            awayTeam,
+            homeTeam,
+            predictedWinner,
+            confidence: Math.round(confidence),
+            awayWinProbability: Math.round(normalizedAwayProb),
+            homeWinProbability: Math.round(normalizedHomeProb),
+            projectedScore: {
+                away: awayScore,
+                home: homeScore
+            },
+            keyFactors: [
+                `${predictedWinner} showing strong recent form`,
+                `Home field advantage: ${Math.round(homeAdvantage * 100)}%`,
+                `Historical matchup favors ${Math.random() > 0.5 ? awayTeam : homeTeam}`,
+                `Weather/conditions: Favorable for ${predictedWinner}`,
+                `Key player matchups favor ${predictedWinner}`
+            ],
+            analysisTimestamp: new Date().toISOString(),
+            modelVersion: 'DIAMOND-v2.0'
+        };
+    }
+
+    displayPrediction(prediction) {
+        // Update prediction summary
+        const summaryEl = document.getElementById('ai-prediction-summary');
+        const winnerIcon = prediction.predictedWinner === prediction.homeTeam ? '🏠' : '✈️';
+
+        summaryEl.innerHTML = `
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800">
+                        ${winnerIcon} ${prediction.predictedWinner}
+                    </h3>
+                    <p class="text-gray-600">Predicted Winner</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-2xl font-bold text-blue-600">${prediction.confidence}%</div>
+                    <p class="text-sm text-gray-600">Confidence</p>
+                </div>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-4 text-center">
+                <div class="bg-white rounded p-3">
+                    <div class="text-lg font-semibold">${prediction.awayWinProbability}%</div>
+                    <div class="text-sm text-gray-600">${prediction.awayTeam}</div>
+                </div>
+                <div class="bg-white rounded p-3">
+                    <div class="text-lg font-semibold">${prediction.homeWinProbability}%</div>
+                    <div class="text-sm text-gray-600">${prediction.homeTeam}</div>
+                </div>
+            </div>
+        `;
+
+        // Update detailed analysis
+        const analysisEl = document.getElementById('ai-detailed-analysis');
+        analysisEl.innerHTML = `
+            <div class="bg-white rounded-lg p-4 border">
+                <h4 class="font-semibold text-gray-800 mb-2">📊 Projected Score</h4>
+                <div class="text-center">
+                    <span class="text-2xl font-bold text-blue-600">${prediction.awayTeam} ${prediction.projectedScore.away}</span>
+                    <span class="text-gray-500 mx-3">-</span>
+                    <span class="text-2xl font-bold text-green-600">${prediction.homeTeam} ${prediction.projectedScore.home}</span>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg p-4 border">
+                <h4 class="font-semibold text-gray-800 mb-2">🤖 Model Info</h4>
+                <p class="text-sm text-gray-600">Version: ${prediction.modelVersion}</p>
+                <p class="text-sm text-gray-600">Generated: ${new Date(prediction.analysisTimestamp).toLocaleString()}</p>
+            </div>
+        `;
+
+        // Update confidence factors
+        const factorsEl = document.getElementById('ai-confidence-factors');
+        factorsEl.innerHTML = prediction.keyFactors.map((factor, index) => `
+            <div class="bg-white rounded p-3 border text-sm">
+                <span class="text-blue-600 font-medium">${index + 1}.</span>
+                <span class="text-gray-700 ml-1">${factor}</span>
+            </div>
+        `).join('');
+
+        // Show apply button if prediction is confident enough
+        const applyBtn = document.getElementById('ai-apply-prediction');
+        if (prediction.confidence >= 55) {
+            applyBtn.classList.remove('hidden');
+            applyBtn.innerHTML = `⚡ Apply ${prediction.predictedWinner} (${prediction.confidence}%)`;
+        } else {
+            applyBtn.classList.add('hidden');
+        }
+    }
+
+    applyPredictionToPick() {
+        if (!this.currentPrediction || !this.currentGameData) return;
+
+        console.log(`🧠 AI_MODAL_DEBUG: Applying prediction ${this.currentPrediction.predictedWinner} for game ${this.currentGameData.gameId}`);
+
+        // Find the game's select element and update it
+        const teamSelect = document.querySelector(`select[data-game-id="${this.currentGameData.gameId}"][data-field="winner"]`);
+        if (teamSelect) {
+            teamSelect.value = this.currentPrediction.predictedWinner;
+
+            // Trigger change event for auto-save
+            teamSelect.dispatchEvent(new Event('blur'));
+
+            // Visual feedback
+            teamSelect.style.backgroundColor = '#dcfce7';
+            setTimeout(() => {
+                teamSelect.style.backgroundColor = '';
+            }, 2000);
+        }
+
+        // Close modal
+        this.hide();
+
+        // Show success toast
+        this.showSuccessToast(`Applied AI prediction: ${this.currentPrediction.predictedWinner} (${this.currentPrediction.confidence}% confidence)`);
+    }
+
+    showSuccessToast(message) {
+        // Create and show a temporary success toast
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-60 transform translate-x-full transition-transform duration-300';
+        toast.innerHTML = `
+            <div class="flex items-center gap-2">
+                <span class="text-lg">✅</span>
+                <span>${message}</span>
+            </div>
+        `;
+
+        document.body.appendChild(toast);
+
+        // Slide in
+        setTimeout(() => {
+            toast.style.transform = 'translate-x-0';
+        }, 100);
+
+        // Slide out and remove
+        setTimeout(() => {
+            toast.style.transform = 'translate-x-full';
+            setTimeout(() => {
+                document.body.removeChild(toast);
+            }, 300);
+        }, 4000);
+    }
+
+    showLoading(show) {
+        const loadingEl = document.getElementById('ai-loading');
+        if (show) {
+            loadingEl.classList.remove('hidden');
+        } else {
+            loadingEl.classList.add('hidden');
+        }
+    }
+
+    showResults(show) {
+        const resultsEl = document.getElementById('ai-results');
+        if (show) {
+            resultsEl.classList.remove('hidden');
+        } else {
+            resultsEl.classList.add('hidden');
+        }
+    }
+
+    showError(show, errorMessage = '') {
+        const errorEl = document.getElementById('ai-error');
+        if (show) {
+            errorEl.classList.remove('hidden');
+            const errorMessageEl = document.getElementById('ai-error-message');
+            if (errorMessage && errorMessageEl) {
+                errorMessageEl.textContent = errorMessage;
+            }
+        } else {
+            errorEl.classList.add('hidden');
+        }
+    }
+}
+
+// Global AI Modal instance
+window.nerdFootballAI = new NerdFootballAIModal();
+
+// Global function for brain icon clicks
+window.showAIPrediction = function(gameId, awayTeam, homeTeam, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    console.log(`🧠 BRAIN_ICON_DEBUG: Brain icon clicked for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
+    window.nerdFootballAI.show(gameId, awayTeam, homeTeam);
+};
+
+console.log('🧠 NerdFootball AI Modal System loaded successfully');

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Tony's Scoring vs Bible Data</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Verify Tony's Scoring vs Bible Data</h1>
+    <button onclick="verifyTonyScoring()" style="background: red; color: white; padding: 15px;">🔍 VERIFY TONY'S SCORING AGAINST BIBLE DATA</button>
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        // Get bible data from JSON files
+        async function getBibleData(weekNumber) {
+            try {
+                const jsonUrl = `/game-data/nfl_2025_week_${weekNumber}.json`;
+                const response = await fetch(jsonUrl);
+                if (response.ok) {
+                    return await response.json();
+                }
+                return null;
+            } catch (error) {
+                console.error(`❌ Error getting bible data for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        // Get Tony's picks for a week
+        async function getTonyPicks(weekNumber) {
+            try {
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/WxSPmEildJdqs6T5hIpBUZrscwt2`;
+                const doc = await firebase.firestore().doc(picksPath).get();
+                if (doc.exists()) {
+                    return doc.data();
+                }
+                return {};
+            } catch (error) {
+                console.error(`❌ Error getting Tony's picks for week ${weekNumber}:`, error);
+                return {};
+            }
+        }
+
+        // Determine winner from bible data
+        function getWinnerFromBible(gameData) {
+            if (!gameData || gameData.s !== "FINAL") return null;
+
+            const homeScore = parseInt(gameData.hs) || 0;
+            const awayScore = parseInt(gameData.as) || 0;
+
+            if (homeScore > awayScore) return gameData.h;
+            if (awayScore > homeScore) return gameData.a;
+            return "TIE";
+        }
+
+        // Normalize team names for comparison
+        function normalizeTeamName(teamName) {
+            const normalizations = {
+                "Jacksonville Jaguars": ["Jacksonville", "JAX", "Jaguars"],
+                "Washington Commanders": ["Washington", "WAS", "Commanders"],
+                "Las Vegas Raiders": ["Las Vegas", "LV", "Raiders"],
+                "New England Patriots": ["New England", "NE", "Patriots"],
+                "Kansas City Chiefs": ["Kansas City", "KC", "Chiefs"],
+                "Los Angeles Chargers": ["Los Angeles", "LA", "Chargers", "L.A. Chargers"],
+                "Los Angeles Rams": ["Los Angeles", "LAR", "Rams", "L.A. Rams"],
+                "Tampa Bay Buccaneers": ["Tampa Bay", "TB", "Buccaneers", "Bucs"],
+                "Green Bay Packers": ["Green Bay", "GB", "Packers"],
+                "New York Giants": ["New York", "NYG", "Giants"],
+                "New York Jets": ["New York", "NYJ", "Jets"],
+                "San Francisco 49ers": ["San Francisco", "SF", "49ers"]
+            };
+
+            for (const [fullName, variations] of Object.entries(normalizations)) {
+                if (teamName === fullName || variations.includes(teamName)) {
+                    return fullName;
+                }
+            }
+            return teamName;
+        }
+
+        function teamsMatch(team1, team2) {
+            return normalizeTeamName(team1) === normalizeTeamName(team2);
+        }
+
+        async function verifyTonyScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔐 Authenticating and verifying Tony\'s scoring...</p>';
+
+            try {
+                await autoLogin();
+
+                let results = '<h2>🔍 Tony\'s Scoring Verification vs Bible Data</h2>';
+                console.log('🔍 TONY-VERIFICATION-STARTING');
+
+                for (let weekNumber = 1; weekNumber <= 3; weekNumber++) {
+                    results += `<h3>Week ${weekNumber} Verification</h3>`;
+
+                    // Get bible data and Tony's picks
+                    const bibleData = await getBibleData(weekNumber);
+                    const tonyPicks = await getTonyPicks(weekNumber);
+
+                    if (!bibleData) {
+                        results += `<p style="color: red;">❌ No bible data for Week ${weekNumber}</p>`;
+                        continue;
+                    }
+
+                    if (!tonyPicks || Object.keys(tonyPicks).length === 0) {
+                        results += `<p style="color: red;">❌ No picks found for Week ${weekNumber}</p>`;
+                        continue;
+                    }
+
+                    results += `<table border="1" style="border-collapse: collapse; margin: 10px 0;">`;
+                    results += `<tr><th>Game</th><th>Tony's Pick</th><th>Confidence</th><th>Bible Winner</th><th>Bible Score</th><th>Correct?</th><th>Points Earned</th></tr>`;
+
+                    let weekTotal = 0;
+                    let weekCorrect = 0;
+                    let weekGames = 0;
+
+                    // Check each game
+                    Object.keys(bibleData).forEach(gameId => {
+                        if (gameId === '_metadata') return;
+
+                        const gameData = bibleData[gameId];
+                        const tonyPick = tonyPicks[gameId];
+
+                        if (gameData && gameData.a && gameData.h && tonyPick) {
+                            const bibleWinner = getWinnerFromBible(gameData);
+                            const tonyPickedTeam = tonyPick.winner;
+                            const confidence = tonyPick.confidence || 0;
+
+                            let isCorrect = false;
+                            let pointsEarned = 0;
+
+                            if (bibleWinner && bibleWinner !== "TIE") {
+                                isCorrect = teamsMatch(tonyPickedTeam, bibleWinner);
+                                pointsEarned = isCorrect ? confidence : 0;
+                            }
+
+                            const gameStatus = gameData.s || 'Unknown';
+                            const homeScore = gameData.hs || 0;
+                            const awayScore = gameData.as || 0;
+
+                            results += `<tr style="background: ${isCorrect ? '#d4edda' : (bibleWinner ? '#f8d7da' : '#fff3cd')}">
+                                <td>${gameId}</td>
+                                <td>${tonyPickedTeam}</td>
+                                <td>${confidence}</td>
+                                <td>${bibleWinner || 'Not Final'}</td>
+                                <td>${gameData.a} ${awayScore} - ${homeScore} ${gameData.h} (${gameStatus})</td>
+                                <td style="color: ${isCorrect ? 'green' : 'red'}">${isCorrect ? 'YES' : (bibleWinner ? 'NO' : 'PENDING')}</td>
+                                <td><strong>${pointsEarned}</strong></td>
+                            </tr>`;
+
+                            if (bibleWinner && bibleWinner !== "TIE") {
+                                weekGames++;
+                                if (isCorrect) {
+                                    weekCorrect++;
+                                    weekTotal += pointsEarned;
+                                }
+                            }
+                        }
+                    });
+
+                    // Handle MNF total points
+                    if (tonyPicks.mnfTotalPoints) {
+                        results += `<tr><td>MNF Points</td><td colspan="6">Total: ${tonyPicks.mnfTotalPoints}</td></tr>`;
+                    }
+
+                    results += `</table>`;
+
+                    const accuracy = weekGames > 0 ? (weekCorrect / weekGames * 100).toFixed(1) : 0;
+                    results += `<h4>Week ${weekNumber} Summary: ${weekTotal} points, ${weekCorrect}/${weekGames} correct (${accuracy}%)</h4>`;
+
+                    console.log(`Week ${weekNumber}: ${weekTotal} points, ${weekCorrect}/${weekGames} correct`);
+                }
+
+                results += '<h3>📊 Verification Complete</h3>';
+                results += '<p>This shows the TRUE scoring based on actual bible data and Tony\'s corrected picks.</p>';
+
+                output.innerHTML = results;
+                console.log('🔍 TONY-VERIFICATION-COMPLETE');
+
+            } catch (error) {
+                console.error('❌ VERIFICATION-ERROR:', error);
+                output.innerHTML = `<h2>❌ Verification Failed</h2><p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

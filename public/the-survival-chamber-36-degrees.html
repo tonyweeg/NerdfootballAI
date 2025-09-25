@@ -50,9 +50,185 @@
         body {
             background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
         }
+
+        /* Terminal Header Styles */
+        .header-terminal {
+            position: relative;
+            background: rgba(10, 10, 10, 0.95);
+            border-bottom: 2px solid #00ff41;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0, 255, 65, 0.1);
+            z-index: 1000;
+        }
+
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.05;
+            pointer-events: none;
+        }
+
+        .terminal-window {
+            background: rgba(26, 26, 26, 0.95);
+            border: 1px solid #2a2a2a;
+            backdrop-filter: blur(10px);
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .neon-button {
+            background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+        }
+
+        .neon-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .neon-button:hover::before {
+            left: 100%;
+        }
+
+        .neon-button:hover {
+            background: linear-gradient(45deg, #2a2a2a, #3a3a3a);
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.3),
+                inset 0 0 20px rgba(0, 255, 65, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .command-line::before {
+            content: '$ ';
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        /* Terminal color utility classes */
+        .terminal-text { color: #ffffff; }
+        .terminal-accent { color: #00ff41; }
+        .terminal-secondary { color: #00d4ff; }
+        .terminal-danger { color: #ff4757; }
+        .terminal-warning { color: #ffa502; }
+        .terminal-muted { color: #888888; }
+        .terminal-bg { background: #0a0a0a; }
+        .terminal-surface { background: #1a1a1a; }
+        .terminal-border { border-color: #2a2a2a; }
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
+    <!-- Matrix Background Effect -->
+    <canvas id="matrix-bg" class="matrix-bg"></canvas>
+
+    <!-- Header - Linux Terminal Style -->
+    <header class="header-terminal">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <!-- Logo and title - left aligned -->
+                <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 md:h-10 w-auto">
+                    <h1 class="text-3xl md:text-4xl font-bold terminal-text glow-text">NerdfootballAI</h1>
+                </a>
+                <!-- Right side elements -->
+                <div class="flex items-center space-x-4">
+                    <!-- Status Indicators -->
+                    <div class="flex items-center space-x-2">
+                        <!-- Game Update Indicator -->
+                        <div id="game-update-indicator" class="hidden opacity-0 transition-opacity duration-500" title="Game Updated">
+                            <span class="text-lg terminal-text">🏈</span>
+                            <div class="live-game-data mt-1 space-y-0.5 text-xs terminal-muted"></div>
+                        </div>
+                        <!-- Cache Status Indicator -->
+                        <div id="cache-status-indicator" class="relative group" title="Cache Status">
+                            <div id="cache-status-glyph" class="w-3 h-3 rounded-full bg-terminal-accent animate-pulse cursor-pointer refreshing shadow-lg shadow-terminal-accent/30"></div>
+                            <div class="absolute right-0 mt-2 w-48 bg-terminal-surface text-terminal-text text-xs rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-terminal-border">
+                                <div id="cache-status-tooltip">Refreshing cache...</div>
+                            </div>
+                        </div>
+
+                        <!-- Theme Variant Toggle -->
+                        <button id="theme-variant-toggle" class="ml-2 p-1 rounded bg-opacity-20 hover:bg-opacity-30 transition-all duration-200 text-sm terminal-text" title="Toggle Light/Dark Variant" style="display: none;">
+                            🌙
+                        </button>
+                    </div>
+                    <span class="text-sm font-medium terminal-secondary glow-text">v3.0</span>
+                    <div class="flex items-center space-x-2 relative">
+                        <span id="user-display" class="text-sm font-medium terminal-text command-line">Welcome, User</span>
+
+                        <!-- Logout Button -->
+                        <button id="main-logout-btn" onclick="handleLogout()" class="neon-button px-3 py-1 text-xs rounded-md hover:bg-terminal-danger/20 transition-all duration-200 flex items-center space-x-1">
+                            <span>🚪</span>
+                            <span>Logout</span>
+                        </button>
+
+                        <!-- Hamburger Menu - Terminal Style -->
+                        <button id="menu-btn" class="neon-button p-2 rounded-md">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
+                        </button>
+                        <div id="menu-panel" class="absolute top-full right-0 mt-2 w-64 terminal-window rounded-md shadow-2xl hidden" style="z-index: 9999;">
+                            <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                <!-- Main Features Only -->
+                                <a href="./nerd-universe-grid.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200 bg-terminal-accent/20 border-l-4 border-terminal-accent" role="menuitem">
+                                    <span class="text-lg">📊</span>
+                                    <span class="font-semibold">Picks Grid</span>
+                                </a>
+                                <a href="./index.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🎯</span>
+                                    <span>Make Picks</span>
+                                </a>
+                                <a href="./nerdSurvivor.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🏈</span>
+                                    <span>Survivor Pool</span>
+                                </a>
+                                <a href="./the-survival-chamber-36-degrees.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200 bg-terminal-danger/20 border-l-4 border-yellow-400" role="menuitem">
+                                    <span class="text-lg">⚔️</span>
+                                    <span>The 36 Chambers</span>
+                                </a>
+                                <a href="./leaderboard.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🏆</span>
+                                    <span>Season Leaderboard</span>
+                                </a>
+                                <a href="./weekly-leaderboard.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🎮</span>
+                                    <span>Weekly Leaderboard</span>
+                                </a>
+
+                                <!-- Account Section -->
+                                <div class="border-t border-terminal-border my-1"></div>
+                                <button id="logout-btn" onclick="handleLogout()" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 hover:bg-terminal-danger/20 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🚪</span>
+                                    <span>Logout</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
     <div class="container mx-auto px-4 py-8">
         <!-- Header -->
         <div class="text-center mb-8">
@@ -125,7 +301,7 @@
     <script type="module">
         // Firebase imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -145,14 +321,32 @@
         let survivorsData = [];
         let currentUser = null;
 
+        // Make signOut available globally for logout functionality
+        window.signOut = signOut;
+
+        // Admin UIDs (same as other pages)
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
+            'CX0etIyJbGg33nmHCo4eezPWrsr2',
+            'sm17z8ovI8NAGmyQvogD86lIurr1',
+            'dN91P1yGG4YBttxeGWmpAM2xhl22'
+        ];
+
         // Authentication check
         onAuthStateChanged(auth, (user) => {
             currentUser = user;
+            const userDisplay = document.getElementById('user-display');
+
             if (user) {
                 console.log('🔐 User authenticated:', user.email);
+                const isAdmin = ADMIN_UIDS.includes(user.uid);
+                userDisplay.textContent = `${user.email}`;
+                userDisplay.classList.add('terminal-accent');
                 loadSurvivorData();
             } else {
                 console.log('🚫 User not authenticated - redirecting to login');
+                userDisplay.textContent = 'Not signed in';
+                userDisplay.classList.add('terminal-danger');
                 // Redirect to main page for authentication
                 window.location.href = '/';
             }
@@ -184,13 +378,26 @@
                 // Add alive survivors
                 survivorData.alive.forEach(survivor => {
                     const week1Pick = survivor.week1Pick || null;
+                    const allWinningPicks = survivor.allWinningPicks || [];
+
+                    // Create helmet display for winning picks
+                    let winningPicksDisplay = '🚫 No Picks';
+                    if (allWinningPicks.length > 0) {
+                        winningPicksDisplay = allWinningPicks.map(pick =>
+                            `<img src="${pick.helmetUrl}" alt="${pick.team}" style="width:32px;height:32px;display:inline-block;margin:1px;" title="Week ${pick.week}: ${pick.team}">`
+                        ).join(' ');
+                    } else if (week1Pick) {
+                        winningPicksDisplay = week1Pick; // Fallback to text if no helmet data
+                    }
+
                     survivorsData.push({
                         userId: survivor.userId,
                         name: survivor.displayName || survivor.name || 'Unknown Survivor',
                         email: survivor.email || '',
                         week1Pick: week1Pick,
+                        allWinningPicks: winningPicksDisplay,
                         status: 'ALIVE',
-                        temperature: week1Pick ? '🔥 Warming' : '❄️ No Pick',
+                        temperature: allWinningPicks.length > 0 ? '🔥 Warming' : '❄️ No Pick',
                         isEliminated: false
                     });
                 });
@@ -198,11 +405,24 @@
                 // Add eliminated survivors
                 survivorData.eliminated.forEach(survivor => {
                     const week1Pick = survivor.week1Pick || null;
+                    const allWinningPicks = survivor.allWinningPicks || [];
+
+                    // Create helmet display for winning picks (for eliminated survivors too)
+                    let winningPicksDisplay = '🚫 No Picks';
+                    if (allWinningPicks.length > 0) {
+                        winningPicksDisplay = allWinningPicks.map(pick =>
+                            `<img src="${pick.helmetUrl}" alt="${pick.team}" style="width:32px;height:32px;display:inline-block;margin:1px;" title="Week ${pick.week}: ${pick.team}">`
+                        ).join(' ');
+                    } else if (week1Pick) {
+                        winningPicksDisplay = week1Pick; // Fallback to text if no helmet data
+                    }
+
                     survivorsData.push({
                         userId: survivor.userId,
                         name: survivor.displayName || survivor.name || 'Unknown Survivor',
                         email: survivor.email || '',
                         week1Pick: week1Pick,
+                        allWinningPicks: winningPicksDisplay,
                         status: `ELIMINATED (Week ${survivor.eliminatedWeek})`,
                         temperature: '🧊 Frozen Solid',
                         isEliminated: true,
@@ -218,6 +438,7 @@
                         name: member.displayName || member.name || 'Unknown',
                         email: member.email || '',
                         week1Pick: null,
+                        allWinningPicks: '🚫 No Picks',
                         status: 'NOT_PARTICIPATING',
                         temperature: '🌡️ Not Entered',
                         isEliminated: false
@@ -257,7 +478,7 @@
 
             // Generate table rows
             const tbody = document.getElementById('survivor-body');
-            tbody.innerHTML = sortedSurvivors.map(survivor => {
+            const tableRows = sortedSurvivors.map(survivor => {
                 let statusClass, statusText, statusIcon;
 
                 if (survivor.status === 'ALIVE') {
@@ -274,19 +495,21 @@
                     statusIcon = '🌫️';
                 }
 
-                const week1Display = survivor.week1Pick || '🚫 No Pick';
+                const picksDisplay = survivor.allWinningPicks || '🚫 No Pick';
                 const eliminationInfo = survivor.isEliminated ?
                     ` (Week ${survivor.eliminatedWeek}: ${survivor.eliminatedBy})` : '';
 
                 return `
                     <tr class="border-b border-gray-600 ${statusClass}">
                         <td class="px-4 py-3 font-medium">${survivor.name}</td>
-                        <td class="px-4 py-3">${week1Display}</td>
+                        <td class="px-4 py-3">${picksDisplay}</td>
                         <td class="px-4 py-3">${statusText}${eliminationInfo}</td>
                         <td class="px-4 py-3">${statusIcon} ${survivor.temperature}</td>
                     </tr>
                 `;
             }).join('');
+
+            tbody.innerHTML = tableRows;
 
             // Show results
             document.getElementById('loading').classList.add('hidden');
@@ -303,6 +526,95 @@
         }
 
         // No need for DOMContentLoaded since authentication will trigger loadSurvivorData
+
+        // Header menu functionality (from nerd-universe.html)
+        document.getElementById('menu-btn').addEventListener('click', function() {
+            const menu = document.getElementById('menu-panel');
+            menu.classList.toggle('hidden');
+        });
+
+        // Close menus when clicking outside
+        document.addEventListener('click', function(event) {
+            const menuBtn = document.getElementById('menu-btn');
+            const menuPanel = document.getElementById('menu-panel');
+
+            // Close hamburger menu
+            if (!menuBtn.contains(event.target) && !menuPanel.contains(event.target)) {
+                menuPanel.classList.add('hidden');
+            }
+        });
+
+        // Global logout function for header buttons
+        window.handleLogout = async function() {
+            if (confirm('Are you sure you want to logout?')) {
+                try {
+                    // Close hamburger menu if open
+                    const menuPanel = document.getElementById('menu-panel');
+                    menuPanel.classList.add('hidden');
+
+                    await window.signOut(auth);
+                    window.location.href = './login.html';
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    alert('Error logging out. Please try again.');
+                }
+            }
+        };
+    </script>
+
+    <!-- Matrix Background JavaScript -->
+    <script>
+        // Matrix background effect
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        setCanvasSize();
+        window.addEventListener('resize', setCanvasSize);
+
+        // Matrix characters
+        const matrixChars = '01010101010101010101NERDFOOTBALLAI';
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        const drops = [];
+
+        // Initialize drops
+        for (let i = 0; i < columns; i++) {
+            drops[i] = 1;
+        }
+
+        function drawMatrix() {
+            // Create fading effect
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Set text properties
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.8)';
+            ctx.font = fontSize + 'px monospace';
+
+            // Draw characters
+            for (let i = 0; i < drops.length; i++) {
+                const text = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+                const x = i * fontSize;
+                const y = drops[i] * fontSize;
+
+                ctx.fillText(text, x, y);
+
+                // Reset drop if it reaches bottom or randomly
+                if (y > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+
+                drops[i]++;
+            }
+        }
+
+        // Start animation
+        setInterval(drawMatrix, 50);
     </script>
 </body>
 </html>
