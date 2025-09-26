@@ -269,6 +269,21 @@
             </div>
         </div>
 
+        <!-- Current Week Picks (shown when games have started) -->
+        <div id="current-week-picks" class="mb-8 hidden">
+            <div class="bg-black p-6 rounded-lg" style="background: linear-gradient(45deg, #1a1000, #2a2000); border: 2px solid #FFD700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);">
+                <h3 class="text-2xl font-bold text-yellow-400 mb-4" style="text-shadow: 1px 1px 2px #000;">
+                    ⚔️ Week <span id="current-week-number">4</span> Battle Picks
+                </h3>
+                <p class="text-yellow-300 mb-4">
+                    <span id="current-picks-count">0</span> Alive Survivors have entered the chamber...
+                </p>
+                <div id="current-picks-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Current week picks will be loaded here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Survivor Table -->
         <div id="survivor-table" class="hidden">
             <div class="bg-gray-800 rounded-lg overflow-hidden survival-glow">
@@ -302,6 +317,7 @@
         // Firebase imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -317,6 +333,12 @@
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make Firebase functions available globally for use in other functions
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
 
         let survivorsData = [];
         let currentUser = null;
@@ -351,6 +373,151 @@
                 window.location.href = '/';
             }
         });
+
+        // Convert team names to ESPN abbreviations for helmet URLs
+        function getTeamAbbreviation(teamName) {
+            const teamAbbreviations = {
+                'Arizona Cardinals': 'ARI',
+                'Atlanta Falcons': 'ATL',
+                'Baltimore Ravens': 'BAL',
+                'Buffalo Bills': 'BUF',
+                'Carolina Panthers': 'CAR',
+                'Chicago Bears': 'CHI',
+                'Cincinnati Bengals': 'CIN',
+                'Cleveland Browns': 'CLE',
+                'Dallas Cowboys': 'DAL',
+                'Denver Broncos': 'DEN',
+                'Detroit Lions': 'DET',
+                'Green Bay Packers': 'GB',
+                'Houston Texans': 'HOU',
+                'Indianapolis Colts': 'IND',
+                'Jacksonville Jaguars': 'JAX',
+                'Kansas City Chiefs': 'KC',
+                'Las Vegas Raiders': 'LV',
+                'Los Angeles Chargers': 'LAC',
+                'Los Angeles Rams': 'LAR',
+                'Miami Dolphins': 'MIA',
+                'Minnesota Vikings': 'MIN',
+                'New England Patriots': 'NE',
+                'New Orleans Saints': 'NO',
+                'New York Giants': 'NYG',
+                'New York Jets': 'NYJ',
+                'Philadelphia Eagles': 'PHI',
+                'Pittsburgh Steelers': 'PIT',
+                'San Francisco 49ers': 'SF',
+                'Seattle Seahawks': 'SEA',
+                'Tampa Bay Buccaneers': 'TB',
+                'Tennessee Titans': 'TEN',
+                'Washington Commanders': 'WSH'
+            };
+            return teamAbbreviations[teamName] || 'NFL';
+        }
+
+        // Get current NFL week number
+        function getCurrentWeekNumber() {
+            const seasonStart = new Date('2025-09-04'); // Week 1 starts Sept 4, 2025
+            const now = new Date();
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        async function loadCurrentWeekPicks() {
+            const currentWeek = getCurrentWeekNumber();
+            console.log(`🔍 Checking current week ${currentWeek} for started games in Firestore...`);
+
+            try {
+                // Check live game status from Firestore (where nerd-game-updater updates)
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesRef = window.doc(window.db, gamesPath);
+                const gamesSnap = await window.getDoc(gamesRef);
+
+                if (!gamesSnap.exists()) {
+                    console.log(`❌ No game data found in Firestore for week ${currentWeek}`);
+                    return;
+                }
+
+                const gamesData = gamesSnap.data();
+                const games = Object.entries(gamesData)
+                    .filter(([key]) => !key.startsWith('_'))
+                    .map(([id, game]) => ({ id, ...game }));
+
+                console.log(`📊 Found ${games.length} games in Firestore for week ${currentWeek}`);
+
+                // Check if any games have started (using actual status values)
+                const hasStartedGames = games.some(game => {
+                    const status = game.status || 'scheduled';
+                    const started = status === 'IN_PROGRESS' ||
+                                   status === 'STATUS_FINAL' ||
+                                   status === 'FINAL' ||
+                                   status === 'FINAL/OT' ||
+                                   status === 'HALFTIME';
+
+                    if (started) {
+                        console.log(`🎯 Game ${game.id} has started: ${status}`);
+                    }
+                    return started;
+                });
+
+                if (!hasStartedGames) {
+                    console.log(`⏸️ No games started yet for week ${currentWeek}`);
+                    return;
+                }
+
+                console.log(`🎯 Games have started! Loading current week ${currentWeek} picks...`);
+
+                // Load current week picks for alive survivors
+                const aliveUIDs = survivorsData
+                    .filter(s => s.status === 'ALIVE')
+                    .map(s => s.userId);
+
+                console.log(`👥 Found ${aliveUIDs.length} alive survivors:`, aliveUIDs);
+
+                // Load picks for alive survivors
+                for (const userId of aliveUIDs) {
+                    try {
+                        const picksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
+                        console.log(`🔍 Loading picks for ${userId} from: ${picksPath}`);
+                        const userPicksDoc = await window.getDoc(window.doc(window.db, picksPath));
+
+                        if (userPicksDoc.exists()) {
+                            const pickData = userPicksDoc.data();
+                            console.log(`📋 Pick data for ${userId}:`, Object.keys(pickData));
+
+                            // Week 4 picks are under pickData.picks[currentWeek], not pickData[currentWeek]
+                            const picks = pickData.picks || {};
+                            const currentWeekPick = picks[currentWeek];
+
+                            if (currentWeekPick) {
+                                console.log(`🎯 Week ${currentWeek} pick found:`, currentWeekPick);
+                                if (currentWeekPick.team) {
+                                    // Find the survivor in our data and add current week pick
+                                    const survivorIndex = survivorsData.findIndex(s => s.userId === userId);
+                                    if (survivorIndex !== -1) {
+                                        survivorsData[survivorIndex].currentWeekPick = {
+                                            team: currentWeekPick.team,
+                                            week: currentWeek
+                                        };
+                                        console.log(`✅ Added Week ${currentWeek} pick for ${survivorsData[survivorIndex].name}: ${currentWeekPick.team}`);
+                                    }
+                                } else {
+                                    console.log(`⚠️ Week ${currentWeek} pick missing team:`, currentWeekPick);
+                                }
+                            } else {
+                                console.log(`❌ No Week ${currentWeek} pick found for ${userId}`);
+                            }
+                        } else {
+                            console.log(`❌ No pick document found for ${userId}`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error loading picks for ${userId}:`, error);
+                    }
+                }
+
+            } catch (error) {
+                console.error('❌ Error checking current week games:', error);
+            }
+        }
 
         async function loadSurvivorData() {
             console.log('🧊 Loading survival chamber data via Firebase Function...');
@@ -445,6 +612,15 @@
                     });
                 });
 
+                // Check for current week picks if any games have started
+                console.log('🔍 About to call loadCurrentWeekPicks()...');
+                try {
+                    await loadCurrentWeekPicks();
+                    console.log('✅ loadCurrentWeekPicks() completed');
+                } catch (error) {
+                    console.error('❌ Error in loadCurrentWeekPicks():', error);
+                }
+
                 displaySurvivorData();
 
             } catch (error) {
@@ -495,7 +671,20 @@
                     statusIcon = '🌫️';
                 }
 
-                const picksDisplay = survivor.allWinningPicks || '🚫 No Pick';
+                // Show past winning picks + current week pick if games started
+                let picksDisplay = survivor.allWinningPicks || '🚫 No Pick';
+
+                if (survivor.currentWeekPick && survivor.status === 'ALIVE') {
+                    // Get helmet URL for current week pick
+                    const helmetUrl = `https://a.espncdn.com/i/teamlogos/nfl/500/${getTeamAbbreviation(survivor.currentWeekPick.team)}.png`;
+                    const currentPickDisplay = `<img src="${helmetUrl}" alt="${survivor.currentWeekPick.team}" style="width:32px;height:32px;display:inline-block;margin:1px;border:2px solid #FFD700;" title="Week ${survivor.currentWeekPick.week}: ${survivor.currentWeekPick.team} (CURRENT)">`;
+
+                    if (picksDisplay === '🚫 No Pick') {
+                        picksDisplay = currentPickDisplay;
+                    } else {
+                        picksDisplay = picksDisplay + ' ' + currentPickDisplay;
+                    }
+                }
                 const eliminationInfo = survivor.isEliminated ?
                     ` (Week ${survivor.eliminatedWeek}: ${survivor.eliminatedBy})` : '';
 
@@ -511,12 +700,54 @@
 
             tbody.innerHTML = tableRows;
 
+            // Show current week picks if games have started
+            displayCurrentWeekPicks();
+
             // Show results
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('stats').classList.remove('hidden');
             document.getElementById('survivor-table').classList.remove('hidden');
 
             console.log(`✅ Chamber loaded: ${aliveSurvivors.length} alive, ${eliminatedSurvivors.length} eliminated, ${nonParticipating.length} not participating`);
+        }
+
+        function displayCurrentWeekPicks() {
+            const currentWeek = getCurrentWeekNumber();
+
+            // Debug logging
+            const aliveCount = survivorsData.filter(s => s.status === 'ALIVE').length;
+            const aliveWithPicksCount = survivorsData.filter(s => s.status === 'ALIVE' && s.currentWeekPick).length;
+            console.log(`📊 Week ${currentWeek} display: ${aliveCount} alive, ${aliveWithPicksCount} with current picks`);
+
+            const aliveWithCurrentPicks = survivorsData
+                .filter(s => s.status === 'ALIVE' && s.currentWeekPick)
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            const currentPicksContainer = document.getElementById('current-week-picks');
+
+            if (aliveWithCurrentPicks.length === 0) {
+                console.log(`❌ No current week picks to display - hiding container`);
+                currentPicksContainer.style.display = 'none';
+                return;
+            }
+
+            const picksList = aliveWithCurrentPicks.map(survivor => {
+                const helmetUrl = `https://a.espncdn.com/i/teamlogos/nfl/500/${getTeamAbbreviation(survivor.currentWeekPick.team)}.png`;
+                return `
+                    <div class="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg border border-yellow-500" style="background: linear-gradient(45deg, #1a1000, #2a2000);">
+                        <img src="${helmetUrl}" alt="${survivor.currentWeekPick.team}" style="width:32px;height:32px;" />
+                        <div>
+                            <div class="text-yellow-300 font-semibold">${survivor.name}</div>
+                            <div class="text-yellow-500 text-sm">${survivor.currentWeekPick.team}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('current-picks-list').innerHTML = picksList;
+            document.getElementById('current-picks-count').textContent = aliveWithCurrentPicks.length;
+            document.getElementById('current-week-number').textContent = currentWeek;
+            currentPicksContainer.style.display = 'block';
         }
 
         function showError(message) {

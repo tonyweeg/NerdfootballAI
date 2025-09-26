@@ -208,19 +208,27 @@ async function generateWeeklyLeaderboardData(weekNumber) {
                 picks: {}
             };
 
-            if (userPicksDoc.exists) {
-                const picks = userPicksDoc.data();
-                const analysis = analyzePicksForScoring(picks, bibleData);
+            // Use the FIXED scoring data source instead of recalculating
+            const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${memberId}`;
+            const scoringDoc = await db.doc(scoringPath).get();
 
-                weeklyData = {
-                    ...weeklyData,
-                    totalPoints: analysis.totalPointsEarned || 0,
-                    correctPicks: analysis.correctPicks || 0,
-                    totalPicks: analysis.totalPicks || 0,
-                    pickAccuracy: analysis.totalPicks > 0 ? ((analysis.correctPicks / analysis.totalPicks) * 100) : 0,
-                    hasPicks: true,
-                    picks: analysis.pickResults || {}
-                };
+            if (scoringDoc.exists) {
+                const scoringData = scoringDoc.data();
+                const weekData = scoringData.weeklyPoints && scoringData.weeklyPoints[weekNumber.toString()];
+
+                if (weekData) {
+                    weeklyData = {
+                        ...weeklyData,
+                        totalPoints: weekData.totalPoints || 0,
+                        correctPicks: weekData.gamesWon || 0,
+                        totalPicks: weekData.gamesPlayed || 0,
+                        pickAccuracy: weekData.gamesPlayed > 0 ? ((weekData.gamesWon / weekData.gamesPlayed) * 100) : 0,
+                        hasPicks: true,
+                        lastUpdated: weekData.lastUpdated
+                    };
+                } else {
+                    console.log(`⚠️ No scoring data for Week ${weekNumber} for user ${memberId}`);
+                }
             }
 
             userWeeklyResults.push(weeklyData);

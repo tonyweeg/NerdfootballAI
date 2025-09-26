@@ -1141,9 +1141,21 @@ exports.autoGameCompletion = onSchedule('every 5 minutes', async (event) => {
                     results.errors.push(`Survivor: ${survivorError.message}`);
                 }
 
-                // Step 3: Update leaderboards
+                // Step 3: Process weekly scoring for completed games
                 try {
-                    console.log('🏆 Step 3: Updating leaderboards...');
+                    console.log('🏆 Step 3: Processing weekly scoring...');
+                    const scoringResponse = await fetch(`https://us-central1-nerdfootball.cloudfunctions.net/processWeeklyScoring`);
+                    const scoringData = await scoringResponse.json();
+                    results.scoringResults = scoringData;
+                    console.log(`✅ Weekly scoring: ${scoringData.usersProcessed || 0} users processed, ${scoringData.completedGames || 0} completed games`);
+                } catch (scoringError) {
+                    console.error('❌ Weekly scoring failed:', scoringError);
+                    results.errors.push(`Weekly Scoring: ${scoringError.message}`);
+                }
+
+                // Step 4: Update leaderboards
+                try {
+                    console.log('🏆 Step 4: Updating leaderboards...');
                     const leaderboardResponse = await fetch(`https://us-central1-nerdfootball.cloudfunctions.net/syncLeaderboard`);
                     const leaderboardData = await leaderboardResponse.json();
                     results.leaderboardResults = leaderboardData;
@@ -1154,7 +1166,7 @@ exports.autoGameCompletion = onSchedule('every 5 minutes', async (event) => {
                 }
 
             } else {
-                console.log('📊 No significant game updates - skipping survivor/leaderboard updates');
+                console.log('📊 No significant game updates - skipping survivor/leaderboard/scoring updates');
             }
 
         } catch (syncError) {
@@ -1168,6 +1180,8 @@ exports.autoGameCompletion = onSchedule('every 5 minutes', async (event) => {
         console.log(`   🔄 Significant updates: ${results.syncResults?.significantUpdates || 0}`);
         console.log(`   💀 Users eliminated: ${results.survivorResults?.usersEliminated || 0}`);
         console.log(`   ✅ Users advanced: ${results.survivorResults?.usersAdvanced || 0}`);
+        console.log(`   🏆 Users scored: ${results.scoringResults?.usersProcessed || 0}`);
+        console.log(`   🎯 Completed games: ${results.scoringResults?.completedGames || 0}`);
         console.log(`   ❌ Errors: ${results.errors.length}`);
 
         if (results.errors.length > 0) {
@@ -1255,3 +1269,44 @@ const {
 } = require('./diagnosticWeeksData');
 
 exports.diagnosticWeeksData = diagnosticWeeksData;
+
+// Import and export ESPN score monitor functions
+const {
+    updateScores,
+    updateScoresCallable,
+    scheduledScoreUpdate,
+    monitorESPNScores
+} = require('./espnScoreMonitor');
+
+exports.updateScores = updateScores;
+exports.updateScoresCallable = updateScoresCallable;
+exports.scheduledScoreUpdate = scheduledScoreUpdate;
+exports.monitorESPNScores = monitorESPNScores;
+
+// Import and export Week 4 games cleanup function
+const {
+    cleanWeek4Games
+} = require('./cleanWeek4Games');
+
+exports.cleanWeek4Games = cleanWeek4Games;
+
+// Import and export live scores update function
+const {
+    updateLiveScores
+} = require('./updateLiveScores');
+
+exports.updateLiveScores = updateLiveScores;
+
+// Import and export force update function
+const {
+    forceUpdateGame401
+} = require('./forceUpdateGame401');
+
+exports.forceUpdateGame401 = forceUpdateGame401;
+
+// Import and export weekly scoring function (JUST RUN WEEK 4)
+const {
+    processWeeklyScoring
+} = require('./justRunWeek4');
+
+exports.processWeeklyScoring = processWeeklyScoring;

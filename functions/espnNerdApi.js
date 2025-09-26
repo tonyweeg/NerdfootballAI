@@ -166,7 +166,7 @@ class EspnNerdApi {
         // Extract enhanced data points
         const enhancedData = {
             // Basic game info
-            id: baseId + parseInt(espnGame.id.slice(-2)),
+            id: espnGame.id.toString().slice(0, 3),
             espnId: espnGame.id,
             name: espnGame.name || `${awayTeam} at ${homeTeam}`,
             shortName: espnGame.shortName || `${awayTeam} @ ${homeTeam}`,

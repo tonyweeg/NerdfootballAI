@@ -197,27 +197,43 @@ async function generateSeasonLeaderboardData() {
                 if (userScoringSnap.exists) {
                     const userScoringData = userScoringSnap.data();
 
-                    // Use the corrected data from our pipeline fix
-                    seasonData.totalPoints = userScoringData.totalPoints || 0;
-                    seasonData.totalCorrectPicks = userScoringData.seasonStats?.gamesWon || 0;
-                    seasonData.totalPicks = userScoringData.seasonStats?.totalGames || 0;
-                    seasonData.weeksPlayed = userScoringData.seasonStats?.weeksPlayed || 0;
+                    // MANUALLY aggregate weekly totals (no stored season total)
+                    let totalSeasonPoints = 0;
+                    let totalSeasonCorrect = 0;
+                    let totalSeasonPicks = 0;
+                    let weeksWithData = 0;
 
-                    // Build weekly breakdown from corrected weekly data
+                    // Build weekly breakdown and aggregate season totals
                     if (userScoringData.weeklyPoints) {
                         for (const weekNumber of completedWeeks) {
-                            const weekData = userScoringData.weeklyPoints[weekNumber];
+                            const weekData = userScoringData.weeklyPoints[weekNumber.toString()];
                             if (weekData) {
+                                const weekPoints = weekData.totalPoints || 0;
+                                const weekCorrect = weekData.gamesWon || 0;
+                                const weekTotal = weekData.gamesPlayed || 0;
+
+                                // Aggregate season totals
+                                totalSeasonPoints += weekPoints;
+                                totalSeasonCorrect += weekCorrect;
+                                totalSeasonPicks += weekTotal;
+                                weeksWithData++;
+
+                                // Store weekly breakdown
                                 seasonData.weeklyBreakdown[`week${weekNumber}`] = {
-                                    points: weekData.totalPoints || 0,
-                                    correct: weekData.gamesWon || 0,
-                                    total: weekData.gamesPlayed || 0,
-                                    accuracy: weekData.gamesPlayed > 0 ?
-                                        ((weekData.gamesWon / weekData.gamesPlayed) * 100) : 0
+                                    points: weekPoints,
+                                    correct: weekCorrect,
+                                    total: weekTotal,
+                                    accuracy: weekTotal > 0 ? ((weekCorrect / weekTotal) * 100) : 0
                                 };
                             }
                         }
                     }
+
+                    // Assign aggregated totals
+                    seasonData.totalPoints = totalSeasonPoints;
+                    seasonData.totalCorrectPicks = totalSeasonCorrect;
+                    seasonData.totalPicks = totalSeasonPicks;
+                    seasonData.weeksPlayed = weeksWithData;
 
                     console.log(`✅ User ${memberId.slice(-6)}: ${seasonData.totalPoints} points (${seasonData.totalCorrectPicks}/${seasonData.totalPicks} picks)`);
                 } else {

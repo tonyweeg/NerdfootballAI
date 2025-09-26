@@ -401,6 +401,7 @@
         ];
 
         // Admin user IDs who can see AI predictions
+        console.log('🚀 SURVIVOR_DEBUG: Script loading started');
         const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
 
         let currentUser = null;
@@ -538,7 +539,10 @@
         function isWeekLocked(week) {
             // Check if any game in the week has started using Eastern Time Parser
             const weekGames = gameData[week];
+            console.log(`🔒 LOCK_CHECK: Week ${week}, hasGameData: ${!!weekGames}, hasParser: ${!!window.easternTimeParser}`);
+
             if (!weekGames || !window.easternTimeParser) {
+                console.log(`🔒 LOCK_CHECK: Using fallback logic - week ${week} vs current ${currentWeek}`);
                 return week < currentWeek; // Fallback: lock past weeks
             }
 
@@ -547,11 +551,16 @@
                 if (gameId.startsWith('_')) continue; // Skip metadata
 
                 const game = weekGames[gameId];
-                if (game.dt && window.easternTimeParser.hasGameStarted(game.dt)) {
-                    return true; // Week is locked if any game started
+                if (game.dt) {
+                    const hasStarted = window.easternTimeParser.hasGameStarted(game.dt);
+                    console.log(`🔒 LOCK_CHECK: Game ${gameId} (${game.dt}) hasStarted: ${hasStarted}`);
+                    if (hasStarted) {
+                        return true; // Week is locked if any game started
+                    }
                 }
             }
 
+            console.log(`🔒 LOCK_CHECK: Week ${week} is NOT locked`);
             return false;
         }
 
@@ -598,6 +607,7 @@
         }
 
         function displayCurrentWeekCard() {
+            console.log(`🎯 DISPLAY_CARD: Checking lock for currentWeek: ${currentWeek}`);
             const weekLocked = isWeekLocked(currentWeek);
             const picks = userSurvivorData.picks || {};
             const currentPick = picks[currentWeek.toString()];
@@ -845,6 +855,11 @@
         };
 
         window.startEditing = function(week) {
+            // Check if week is locked before allowing editing
+            if (isWeekLocked(week)) {
+                showError(`Week ${week} is locked - games have started`);
+                return;
+            }
             selectedWeek = week;
             isEditing = true;
             showTeamSelection();
@@ -898,6 +913,11 @@
         }
 
         window.selectTeam = function(team) {
+            // Check if week is locked before allowing team selection
+            if (isWeekLocked(selectedWeek)) {
+                showError(`Week ${selectedWeek} is locked - games have started`);
+                return;
+            }
             if (usedTeams.has(team)) return;
 
             // Clear previous selections

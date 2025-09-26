@@ -267,6 +267,127 @@ class NerdFootballAIModal {
                 offense: 86, defense: 90, recentForm: 80, homeAdvantage: 3.1,
                 passingOffense: 82, rushingOffense: 95, passingDefense: 88, rushingDefense: 92,
                 turnoverDiff: 5, injuryImpact: 3, coachingRating: 82, clutchFactor: 85
+            },
+            // Week 4 Teams - 2025 Season
+            'Seattle Seahawks': {
+                offense: 82, defense: 80, recentForm: 78, homeAdvantage: 3.6,
+                passingOffense: 85, rushingOffense: 75, passingDefense: 78, rushingDefense: 82,
+                turnoverDiff: 2, injuryImpact: 4, coachingRating: 78, clutchFactor: 80
+            },
+            'Arizona Cardinals': {
+                offense: 78, defense: 76, recentForm: 74, homeAdvantage: 2.9,
+                passingOffense: 80, rushingOffense: 72, passingDefense: 74, rushingDefense: 78,
+                turnoverDiff: -3, injuryImpact: 5, coachingRating: 72, clutchFactor: 75
+            },
+            'Minnesota Vikings': {
+                offense: 84, defense: 82, recentForm: 85, homeAdvantage: 3.2,
+                passingOffense: 87, rushingOffense: 78, passingDefense: 80, rushingDefense: 84,
+                turnoverDiff: 4, injuryImpact: 3, coachingRating: 81, clutchFactor: 83
+            },
+            'Pittsburgh Steelers': {
+                offense: 81, defense: 88, recentForm: 82, homeAdvantage: 3.8,
+                passingOffense: 79, rushingOffense: 85, passingDefense: 86, rushingDefense: 90,
+                turnoverDiff: 6, injuryImpact: 2, coachingRating: 85, clutchFactor: 87
+            },
+            'Washington Commanders': {
+                offense: 79, defense: 77, recentForm: 76, homeAdvantage: 2.7,
+                passingOffense: 81, rushingOffense: 74, passingDefense: 75, rushingDefense: 79,
+                turnoverDiff: -1, injuryImpact: 4, coachingRating: 74, clutchFactor: 77
+            },
+            'Atlanta Falcons': {
+                offense: 83, defense: 79, recentForm: 81, homeAdvantage: 3.1,
+                passingOffense: 86, rushingOffense: 77, passingDefense: 77, rushingDefense: 81,
+                turnoverDiff: 1, injuryImpact: 3, coachingRating: 76, clutchFactor: 79
+            },
+            'New Orleans Saints': {
+                offense: 80, defense: 84, recentForm: 75, homeAdvantage: 3.5,
+                passingOffense: 83, rushingOffense: 73, passingDefense: 82, rushingDefense: 86,
+                turnoverDiff: 2, injuryImpact: 5, coachingRating: 77, clutchFactor: 78
+            },
+            'Cleveland Browns': {
+                offense: 76, defense: 85, recentForm: 72, homeAdvantage: 3.0,
+                passingOffense: 74, rushingOffense: 82, passingDefense: 83, rushingDefense: 87,
+                turnoverDiff: -2, injuryImpact: 6, coachingRating: 73, clutchFactor: 74
+            },
+            'Detroit Lions': {
+                offense: 89, defense: 78, recentForm: 88, homeAdvantage: 3.4,
+                passingOffense: 91, rushingOffense: 84, passingDefense: 76, rushingDefense: 80,
+                turnoverDiff: 7, injuryImpact: 2, coachingRating: 84, clutchFactor: 89
+            },
+            'Carolina Panthers': {
+                offense: 73, defense: 79, recentForm: 70, homeAdvantage: 2.8,
+                passingOffense: 75, rushingOffense: 68, passingDefense: 77, rushingDefense: 81,
+                turnoverDiff: -5, injuryImpact: 7, coachingRating: 69, clutchFactor: 71
+            },
+            'New England Patriots': {
+                offense: 77, defense: 81, recentForm: 74, homeAdvantage: 3.3,
+                passingOffense: 76, rushingOffense: 79, passingDefense: 79, rushingDefense: 83,
+                turnoverDiff: 1, injuryImpact: 4, coachingRating: 79, clutchFactor: 76
+            },
+            'Los Angeles Chargers': {
+                offense: 85, defense: 83, recentForm: 82, homeAdvantage: 2.9,
+                passingOffense: 88, rushingOffense: 78, passingDefense: 81, rushingDefense: 85,
+                turnoverDiff: 3, injuryImpact: 3, coachingRating: 80, clutchFactor: 84
+            },
+            'New York Giants': {
+                offense: 74, defense: 77, recentForm: 71, homeAdvantage: 3.1,
+                passingOffense: 76, rushingOffense: 70, passingDefense: 75, rushingDefense: 79,
+                turnoverDiff: -4, injuryImpact: 6, coachingRating: 71, clutchFactor: 73
+            },
+            'Tampa Bay Buccaneers': {
+                offense: 87, defense: 80, recentForm: 84, homeAdvantage: 3.2,
+                passingOffense: 92, rushingOffense: 75, passingDefense: 78, rushingDefense: 82,
+                turnoverDiff: 4, injuryImpact: 3, coachingRating: 82, clutchFactor: 86
+            },
+            'Tennessee Titans': {
+                offense: 75, defense: 78, recentForm: 73, homeAdvantage: 2.9,
+                passingOffense: 77, rushingOffense: 71, passingDefense: 76, rushingDefense: 80,
+                turnoverDiff: -3, injuryImpact: 5, coachingRating: 72, clutchFactor: 74
+            },
+            'Houston Texans': {
+                offense: 86, defense: 82, recentForm: 87, homeAdvantage: 3.1,
+                passingOffense: 89, rushingOffense: 79, passingDefense: 80, rushingDefense: 84,
+                turnoverDiff: 5, injuryImpact: 2, coachingRating: 83, clutchFactor: 88
+            },
+            'Indianapolis Colts': {
+                offense: 81, defense: 79, recentForm: 78, homeAdvantage: 3.0,
+                passingOffense: 83, rushingOffense: 76, passingDefense: 77, rushingDefense: 81,
+                turnoverDiff: 0, injuryImpact: 4, coachingRating: 76, clutchFactor: 79
+            },
+            'Los Angeles Rams': {
+                offense: 84, defense: 81, recentForm: 79, homeAdvantage: 3.3,
+                passingOffense: 87, rushingOffense: 77, passingDefense: 79, rushingDefense: 83,
+                turnoverDiff: 2, injuryImpact: 4, coachingRating: 81, clutchFactor: 82
+            },
+            'Jacksonville Jaguars': {
+                offense: 78, defense: 76, recentForm: 72, homeAdvantage: 2.8,
+                passingOffense: 80, rushingOffense: 73, passingDefense: 74, rushingDefense: 78,
+                turnoverDiff: -4, injuryImpact: 6, coachingRating: 70, clutchFactor: 75
+            },
+            'Chicago Bears': {
+                offense: 79, defense: 83, recentForm: 77, homeAdvantage: 3.2,
+                passingOffense: 78, rushingOffense: 82, passingDefense: 81, rushingDefense: 85,
+                turnoverDiff: 1, injuryImpact: 4, coachingRating: 75, clutchFactor: 78
+            },
+            'Las Vegas Raiders': {
+                offense: 76, defense: 80, recentForm: 73, homeAdvantage: 2.7,
+                passingOffense: 78, rushingOffense: 72, passingDefense: 78, rushingDefense: 82,
+                turnoverDiff: -2, injuryImpact: 5, coachingRating: 73, clutchFactor: 75
+            },
+            'New York Jets': {
+                offense: 81, defense: 86, recentForm: 75, homeAdvantage: 3.1,
+                passingOffense: 79, rushingOffense: 85, passingDefense: 84, rushingDefense: 88,
+                turnoverDiff: 3, injuryImpact: 4, coachingRating: 76, clutchFactor: 79
+            },
+            'Cincinnati Bengals': {
+                offense: 88, defense: 79, recentForm: 85, homeAdvantage: 3.0,
+                passingOffense: 93, rushingOffense: 76, passingDefense: 77, rushingDefense: 81,
+                turnoverDiff: 6, injuryImpact: 2, coachingRating: 82, clutchFactor: 87
+            },
+            'Denver Broncos': {
+                offense: 83, defense: 84, recentForm: 80, homeAdvantage: 4.2,
+                passingOffense: 82, rushingOffense: 85, passingDefense: 82, rushingDefense: 86,
+                turnoverDiff: 4, injuryImpact: 3, coachingRating: 78, clutchFactor: 81
             }
         };
     }
