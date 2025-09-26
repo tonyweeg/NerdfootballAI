@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛠️ Confidence Picks Admin - CRUD Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+    </script>
+    <style>
+        .auto-save-indicator {
+            transition: all 0.3s ease;
+        }
+        .saving {
+            background-color: #fbbf24 !important;
+            color: white !important;
+        }
+        .saved {
+            background-color: #10b981 !important;
+            color: white !important;
+        }
+        .error {
+            background-color: #ef4444 !important;
+            color: white !important;
+        }
+        .pick-input {
+            transition: background-color 0.2s ease;
+        }
+        .pick-input:focus {
+            background-color: #dbeafe;
+        }
+        .confidence-input {
+            width: 60px;
+            text-align: center;
+        }
+        .team-select {
+            min-width: 180px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">🛠️ Confidence Picks Admin Tool</h1>
+            <p class="text-gray-600">Full CRUD management for all weeks • Auto-save on field exit • Minimal clicks</p>
+
+            <!-- Auth Status -->
+            <div id="authStatus" class="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded">
+                <p class="text-yellow-800">🔐 Checking authentication...</p>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <!-- Week Selector -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Week</label>
+                    <select id="weekSelector" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                </div>
+
+                <!-- User Selector -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">User</label>
+                    <select id="userSelector" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                        <option value="">Select week first...</option>
+                    </select>
+                </div>
+
+                <!-- Actions -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Actions</label>
+                    <div class="flex gap-2">
+                        <button id="loadPicks" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50" disabled>
+                            📊 Load
+                        </button>
+                        <button id="createBlank" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50" disabled>
+                            ➕ New
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <div id="statusIndicator" class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm">
+                        Ready
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick User Info -->
+            <div id="userInfo" class="hidden bg-blue-50 border border-blue-200 rounded p-3 mt-4">
+                <!-- Populated when user is selected -->
+            </div>
+        </div>
+
+        <!-- Picks Editor -->
+        <div id="picksEditor" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">📝 Picks Editor</h2>
+                <div class="flex items-center gap-4">
+                    <div id="autoSaveStatus" class="px-3 py-1 rounded text-sm bg-gray-100">
+                        Auto-save ready
+                    </div>
+                    <button id="deleteUser" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                        🗑️ Reset to Blank
+                    </button>
+                </div>
+            </div>
+
+            <!-- Metadata Editor -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">User Name</label>
+                    <input type="text" id="userNameInput" class="w-full px-3 py-2 border border-gray-300 rounded-md pick-input">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">MNF Points</label>
+                    <input type="number" id="mnfPointsInput" class="w-full px-3 py-2 border border-gray-300 rounded-md pick-input" min="0" max="100">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Week Number</label>
+                    <input type="number" id="weekNumberInput" class="w-full px-3 py-2 border border-gray-300 rounded-md pick-input" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Submitted At</label>
+                    <input type="datetime-local" id="submittedAtInput" class="w-full px-3 py-2 border border-gray-300 rounded-md pick-input">
+                </div>
+            </div>
+
+            <!-- Games Grid -->
+            <div id="gamesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Populated by JavaScript -->
+            </div>
+
+            <!-- Confidence Validation -->
+            <div id="validationStatus" class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h3 class="font-semibold text-yellow-800 mb-2">🔍 Validation Status</h3>
+                <div id="validationDetails" class="text-sm text-yellow-700">
+                    <!-- Populated by validation logic -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Admin UIDs
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
+            'CX0etIyJbGg33nmHCo4eezPWrsr2',
+            'sm17z8ovI8NAGmyQvogD86lIurr1',
+            'dN91P1yGG4YBttxeGWmpAM2xhl22'
+        ];
+
+        let isAuthenticated = false;
+        let currentUser = null;
+        let currentWeek = 1;
+        let currentUserId = null;
+        let poolMembers = {};
+        let weekBible = {};
+        let usersList = {};
+        let currentPicks = {};
+        let autoSaveTimeout = null;
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user && ADMIN_UIDS.includes(user.uid)) {
+                authStatus.innerHTML = `<p class="text-green-800">✅ Admin authenticated: ${user.email}</p>`;
+                isAuthenticated = true;
+                currentUser = user;
+                await initializeAdminApp();
+            } else {
+                authStatus.innerHTML = `<p class="text-red-800">❌ Admin access required. Please sign in with admin account.</p>`;
+                isAuthenticated = false;
+            }
+        });
+
+        async function initializeAdminApp() {
+            try {
+                updateStatus('Initializing admin tool...', 'info');
+                await loadPoolMembers();
+                await loadAllUsers();
+                initializeWeekSelector();
+                setupEventListeners();
+                updateStatus('Ready for picks management', 'success');
+            } catch (error) {
+                console.error('Initialization failed:', error);
+                updateStatus(`Initialization failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadPoolMembers() {
+            const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+            const membersSnap = await getDoc(doc(db, membersPath));
+            if (membersSnap.exists()) {
+                poolMembers = membersSnap.data();
+                console.log(`✅ Loaded ${Object.keys(poolMembers).length} pool members`);
+            }
+        }
+
+        async function loadAllUsers() {
+            const usersCollection = collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users');
+            const usersSnap = await getDocs(usersCollection);
+            usersList = {};
+            usersSnap.forEach(userDoc => {
+                const userData = userDoc.data();
+                usersList[userDoc.id] = {
+                    name: userData.userName || userData.displayName || userData.name || 'Unknown User',
+                    email: userData.email || userData.emailAddress || 'No Email',
+                    isPoolMember: !!poolMembers[userDoc.id]
+                };
+            });
+            console.log(`✅ Loaded ${Object.keys(usersList).length} total users`);
+        }
+
+        function initializeWeekSelector() {
+            const selector = document.getElementById('weekSelector');
+            for (let i = 1; i <= 18; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Week ${i}`;
+                if (i === 1) option.selected = true;
+                selector.appendChild(option);
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('weekSelector').addEventListener('change', onWeekChange);
+            document.getElementById('userSelector').addEventListener('change', onUserChange);
+            document.getElementById('loadPicks').addEventListener('click', loadUserPicks);
+            document.getElementById('createBlank').addEventListener('click', createBlankPicks);
+            document.getElementById('deleteUser').addEventListener('click', resetUserPicks);
+
+            // Auto-save listeners will be added dynamically to pick inputs
+        }
+
+        async function onWeekChange() {
+            const selectedWeek = parseInt(document.getElementById('weekSelector').value);
+            currentWeek = selectedWeek;
+
+            updateStatus(`Loading Week ${selectedWeek} data...`, 'info');
+
+            try {
+                await loadWeekBible();
+                await populateUserSelector();
+                hidePicksEditor();
+                updateStatus(`Week ${selectedWeek} ready`, 'success');
+            } catch (error) {
+                console.error('Week change failed:', error);
+                updateStatus(`Failed to load Week ${selectedWeek}: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadWeekBible() {
+            try {
+                const response = await fetch(`/game-data/nfl_2025_week_${currentWeek}.json?v=${Date.now()}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                weekBible = await response.json();
+                console.log(`✅ Loaded Week ${currentWeek} bible:`, Object.keys(weekBible).filter(k => k !== '_metadata').length, 'games');
+            } catch (error) {
+                console.error(`Failed to load Week ${currentWeek} bible:`, error);
+                weekBible = {};
+            }
+        }
+
+        async function populateUserSelector() {
+            const selector = document.getElementById('userSelector');
+            selector.innerHTML = '<option value="">Select user...</option>';
+
+            // Load existing picks to see who has data
+            const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+            let existingPicks = new Set();
+
+            try {
+                const picksSnap = await getDocs(collection(db, picksPath));
+                picksSnap.forEach(doc => existingPicks.add(doc.id));
+            } catch (error) {
+                console.warn('Could not load existing picks:', error);
+            }
+
+            // Sort users: pool members first, then by name
+            const sortedUsers = Object.entries(usersList).sort((a, b) => {
+                const [idA, userA] = a;
+                const [idB, userB] = b;
+
+                // Pool members first
+                if (userA.isPoolMember && !userB.isPoolMember) return -1;
+                if (!userA.isPoolMember && userB.isPoolMember) return 1;
+
+                // Then by name
+                return userA.name.localeCompare(userB.name);
+            });
+
+            sortedUsers.forEach(([userId, user]) => {
+                const option = document.createElement('option');
+                option.value = userId;
+
+                const hasPicksIndicator = existingPicks.has(userId) ? '📊' : '⚪';
+                const poolIndicator = user.isPoolMember ? '✅' : '❌';
+
+                option.textContent = `${hasPicksIndicator} ${poolIndicator} ${user.name} (${user.email})`;
+                option.className = user.isPoolMember ? 'text-green-700 font-medium' : 'text-gray-600';
+
+                selector.appendChild(option);
+            });
+
+            selector.disabled = false;
+            document.getElementById('loadPicks').disabled = false;
+            document.getElementById('createBlank').disabled = false;
+        }
+
+        async function onUserChange() {
+            const selectedUserId = document.getElementById('userSelector').value;
+            currentUserId = selectedUserId;
+
+            if (!selectedUserId) {
+                hidePicksEditor();
+                return;
+            }
+
+            const user = usersList[selectedUserId];
+            const userInfo = document.getElementById('userInfo');
+            userInfo.className = 'bg-blue-50 border border-blue-200 rounded p-3 mt-4';
+            userInfo.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-semibold text-blue-800">${user.name}</h3>
+                        <p class="text-sm text-blue-600">${user.email}</p>
+                        <p class="text-xs text-blue-500">User ID: ${selectedUserId}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm ${user.isPoolMember ? 'text-green-600' : 'text-red-600'}">
+                            ${user.isPoolMember ? '✅ Pool Member' : '❌ Not Pool Member'}
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadUserPicks() {
+            if (!currentUserId) {
+                alert('Please select a user first');
+                return;
+            }
+
+            updateStatus('Loading picks...', 'info');
+
+            try {
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksDoc = doc(db, picksPath, currentUserId);
+                const picksSnap = await getDoc(picksDoc);
+
+                if (picksSnap.exists()) {
+                    currentPicks = picksSnap.data();
+                    populatePicksEditor();
+                    showPicksEditor();
+                    updateStatus('Picks loaded successfully', 'success');
+                } else {
+                    updateStatus('No picks found for this user', 'warning');
+                    currentPicks = {};
+                    populatePicksEditor();
+                    showPicksEditor();
+                }
+            } catch (error) {
+                console.error('Failed to load picks:', error);
+                updateStatus(`Failed to load picks: ${error.message}`, 'error');
+            }
+        }
+
+        async function createBlankPicks() {
+            if (!currentUserId) {
+                alert('Please select a user first');
+                return;
+            }
+
+            const user = usersList[currentUserId];
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+
+            currentPicks = {
+                userId: currentUserId,
+                userName: user.name,
+                weekNumber: currentWeek,
+                submittedAt: new Date().toISOString(),
+                mnfTotalPoints: 21,
+                timestamp: Date.now()
+            };
+
+            // Create blank picks
+            gameIds.forEach((gameId, index) => {
+                currentPicks[gameId] = {
+                    winner: '',
+                    confidence: index + 1
+                };
+            });
+
+            populatePicksEditor();
+            showPicksEditor();
+            updateStatus('Blank picks created', 'success');
+        }
+
+        function populatePicksEditor() {
+            // Populate metadata
+            document.getElementById('userNameInput').value = currentPicks.userName || '';
+            document.getElementById('mnfPointsInput').value = currentPicks.mnfTotalPoints || '';
+            document.getElementById('weekNumberInput').value = currentWeek;
+
+            // Format datetime for input
+            if (currentPicks.submittedAt) {
+                const date = new Date(currentPicks.submittedAt);
+                document.getElementById('submittedAtInput').value = date.toISOString().slice(0, 16);
+            }
+
+            // Setup auto-save for metadata
+            setupAutoSave('userNameInput', 'userName');
+            setupAutoSave('mnfPointsInput', 'mnfTotalPoints');
+            setupAutoSave('submittedAtInput', 'submittedAt');
+
+            populateGamesGrid();
+            validatePicks();
+        }
+
+        function populateGamesGrid() {
+            const gamesGrid = document.getElementById('gamesGrid');
+            gamesGrid.innerHTML = '';
+
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+
+            gameIds.forEach(gameId => {
+                const game = weekBible[gameId];
+                const pick = currentPicks[gameId] || { winner: '', confidence: '' };
+
+                const gameDiv = document.createElement('div');
+                gameDiv.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4';
+                gameDiv.innerHTML = `
+                    <div class="mb-2">
+                        <h4 class="font-semibold text-gray-800">Game ${gameId}</h4>
+                        <p class="text-xs text-gray-600">${game.a} @ ${game.h}</p>
+                        ${game.winner ? `<p class="text-xs text-green-600">Winner: ${game.winner}</p>` : ''}
+                    </div>
+
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Team Pick</label>
+                            <select class="team-select w-full px-2 py-1 border border-gray-300 rounded text-sm pick-input"
+                                    data-game-id="${gameId}" data-field="winner">
+                                <option value="">Select team...</option>
+                                <option value="${game.a}" ${pick.winner === game.a ? 'selected' : ''}>${game.a}</option>
+                                <option value="${game.h}" ${pick.winner === game.h ? 'selected' : ''}>${game.h}</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Confidence</label>
+                            <input type="number" min="1" max="${gameIds.length}"
+                                   class="confidence-input px-2 py-1 border border-gray-300 rounded text-sm pick-input"
+                                   value="${pick.confidence || ''}"
+                                   data-game-id="${gameId}" data-field="confidence">
+                        </div>
+                    </div>
+                `;
+
+                gamesGrid.appendChild(gameDiv);
+            });
+
+            // Setup auto-save for all pick inputs
+            document.querySelectorAll('.pick-input[data-game-id]').forEach(input => {
+                setupPickAutoSave(input);
+            });
+        }
+
+        function setupAutoSave(inputId, field) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            input.addEventListener('blur', async () => {
+                let value = input.value;
+
+                // Special handling for different field types
+                if (field === 'mnfTotalPoints') {
+                    value = value ? parseInt(value) : null;
+                } else if (field === 'submittedAt' && value) {
+                    value = new Date(value).toISOString();
+                }
+
+                currentPicks[field] = value;
+                await savePicksData();
+            });
+        }
+
+        function setupPickAutoSave(input) {
+            input.addEventListener('blur', async () => {
+                const gameId = input.getAttribute('data-game-id');
+                const field = input.getAttribute('data-field');
+                let value = input.value;
+
+                if (field === 'confidence') {
+                    value = value ? parseInt(value) : null;
+                }
+
+                if (!currentPicks[gameId]) {
+                    currentPicks[gameId] = {};
+                }
+
+                currentPicks[gameId][field] = value;
+                await savePicksData();
+                validatePicks();
+            });
+        }
+
+        async function savePicksData() {
+            if (!currentUserId || !currentWeek) return;
+
+            showAutoSaveStatus('saving');
+
+            try {
+                // Clear any previous timeout
+                if (autoSaveTimeout) {
+                    clearTimeout(autoSaveTimeout);
+                }
+
+                // Add timestamp
+                currentPicks.timestamp = Date.now();
+                currentPicks.weekNumber = currentWeek;
+                currentPicks.userId = currentUserId;
+
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksDoc = doc(db, picksPath, currentUserId);
+                await setDoc(picksDoc, currentPicks);
+
+                showAutoSaveStatus('saved');
+
+                // Set timeout to return to ready state
+                autoSaveTimeout = setTimeout(() => {
+                    showAutoSaveStatus('ready');
+                }, 2000);
+
+            } catch (error) {
+                console.error('Auto-save failed:', error);
+                showAutoSaveStatus('error');
+            }
+        }
+
+        async function resetUserPicks() {
+            if (!currentUserId) return;
+
+            const confirmed = confirm(`⚠️ RESET PICKS FOR ${usersList[currentUserId].name}?\n\nThis will create a blank picks document, removing all existing picks.\n\nContinue?`);
+            if (!confirmed) return;
+
+            updateStatus('Resetting picks...', 'info');
+
+            try {
+                await createBlankPicks();
+                await savePicksData();
+                updateStatus('Picks reset to blank template', 'success');
+            } catch (error) {
+                console.error('Reset failed:', error);
+                updateStatus(`Reset failed: ${error.message}`, 'error');
+            }
+        }
+
+        function validatePicks() {
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata');
+            const confidenceValues = [];
+            const issues = [];
+
+            gameIds.forEach(gameId => {
+                const pick = currentPicks[gameId];
+                if (pick) {
+                    if (!pick.winner) {
+                        issues.push(`Game ${gameId}: No team selected`);
+                    }
+                    if (pick.confidence) {
+                        if (pick.confidence < 1 || pick.confidence > gameIds.length) {
+                            issues.push(`Game ${gameId}: Invalid confidence ${pick.confidence}`);
+                        } else {
+                            confidenceValues.push(pick.confidence);
+                        }
+                    } else {
+                        issues.push(`Game ${gameId}: No confidence value`);
+                    }
+                }
+            });
+
+            // Check for duplicates
+            const uniqueConfidence = [...new Set(confidenceValues)];
+            if (confidenceValues.length !== uniqueConfidence.length) {
+                issues.push('Duplicate confidence values detected');
+            }
+
+            // Check for complete set
+            const expectedTotal = gameIds.length * (gameIds.length + 1) / 2;
+            const actualTotal = confidenceValues.reduce((sum, val) => sum + val, 0);
+            if (actualTotal !== expectedTotal && confidenceValues.length === gameIds.length) {
+                issues.push(`Confidence sum incorrect: ${actualTotal}/${expectedTotal}`);
+            }
+
+            // Update validation display
+            const validationDetails = document.getElementById('validationDetails');
+            if (issues.length === 0) {
+                validationDetails.innerHTML = `<p class="text-green-700">✅ All picks valid (${confidenceValues.length}/${gameIds.length} games)</p>`;
+                document.getElementById('validationStatus').className = 'mt-6 p-4 bg-green-50 border border-green-200 rounded-lg';
+            } else {
+                validationDetails.innerHTML = `
+                    <p class="text-red-700 font-medium">⚠️ ${issues.length} validation issues:</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        ${issues.map(issue => `<li class="text-red-600">${issue}</li>`).join('')}
+                    </ul>
+                `;
+                document.getElementById('validationStatus').className = 'mt-6 p-4 bg-red-50 border border-red-200 rounded-lg';
+            }
+        }
+
+        function showPicksEditor() {
+            document.getElementById('picksEditor').classList.remove('hidden');
+        }
+
+        function hidePicksEditor() {
+            document.getElementById('picksEditor').classList.add('hidden');
+        }
+
+        function showAutoSaveStatus(status) {
+            const statusEl = document.getElementById('autoSaveStatus');
+            statusEl.className = 'px-3 py-1 rounded text-sm auto-save-indicator';
+
+            switch (status) {
+                case 'saving':
+                    statusEl.textContent = '💾 Saving...';
+                    statusEl.classList.add('saving');
+                    break;
+                case 'saved':
+                    statusEl.textContent = '✅ Saved';
+                    statusEl.classList.add('saved');
+                    break;
+                case 'error':
+                    statusEl.textContent = '❌ Save failed';
+                    statusEl.classList.add('error');
+                    break;
+                default:
+                    statusEl.textContent = '🔄 Auto-save ready';
+                    statusEl.className = 'px-3 py-1 rounded text-sm bg-gray-100';
+            }
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('statusIndicator');
+            statusEl.textContent = message;
+
+            statusEl.className = 'px-3 py-2 border border-gray-300 rounded-md text-sm';
+
+            switch (type) {
+                case 'success':
+                    statusEl.classList.add('bg-green-100', 'text-green-800', 'border-green-300');
+                    break;
+                case 'error':
+                    statusEl.classList.add('bg-red-100', 'text-red-800', 'border-red-300');
+                    break;
+                case 'warning':
+                    statusEl.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-300');
+                    break;
+                case 'info':
+                    statusEl.classList.add('bg-blue-100', 'text-blue-800', 'border-blue-300');
+                    break;
+                default:
+                    statusEl.classList.add('bg-gray-100', 'text-gray-800');
+            }
+        }
+    </script>
+</body>
+</html>

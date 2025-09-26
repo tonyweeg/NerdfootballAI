@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Week 4 Scoring Diagnostic</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #333; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .warning { color: #ff0; }
+        .info { color: #4af; }
+        button { padding: 10px 20px; margin: 10px; }
+        pre { background: #111; padding: 10px; white-space: pre-wrap; }
+        .game { margin: 10px 0; padding: 10px; border: 1px solid #333; }
+        .final { border-color: #0f0; background: #001100; }
+        .broken { border-color: #f00; background: #110000; }
+        .pick { margin: 5px 0; padding: 5px; background: #222; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Week 4 Scoring Diagnostic</h1>
+
+    <div class="section">
+        <div id="authStatus">Loading...</div>
+        <button onclick="runFullDiagnostic()">🔍 Run Full Week 4 Diagnostic</button>
+        <button onclick="testScoring()">🏆 Test Scoring Logic</button>
+    </div>
+
+    <div id="diagnosticResults"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+
+        // Auto-auth
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+        async function checkAdminAccess() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const adminUID = urlParams.get('admin');
+            if (adminUID && ADMIN_UIDS.includes(adminUID)) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            }
+            return new Promise((resolve) => {
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    unsubscribe();
+                    resolve(user && ADMIN_UIDS.includes(user.uid));
+                });
+            });
+        }
+
+        (async () => {
+            const isAdmin = await checkAdminAccess();
+            document.getElementById('authStatus').innerHTML = isAdmin ?
+                '<span class="success">✅ Admin authenticated</span>' :
+                '<span class="error">❌ Admin access required</span>';
+        })();
+
+        window.runFullDiagnostic = async function() {
+            let html = '<div class="section"><h2>🔍 Week 4 Complete Diagnostic</h2>';
+
+            try {
+                // Step 1: Check Week 4 Games
+                html += '<h3>📊 Step 1: Week 4 Games Analysis</h3>';
+                const gamesRef = doc(db, 'artifacts/nerdfootball/public/data/nerdfootball_games/4');
+                const gamesSnap = await getDoc(gamesRef);
+
+                if (!gamesSnap.exists) {
+                    html += '<div class="error">❌ No Week 4 games found!</div>';
+                    return;
+                }
+
+                const games = gamesSnap.data();
+                const gameIds = Object.keys(games).filter(k => !k.startsWith('_'));
+
+                let finalGames = 0;
+                let finalWithWinner = 0;
+                let brokenFinalGames = [];
+
+                html += '<div>';
+                gameIds.forEach(gameId => {
+                    const game = games[gameId];
+                    const status = (game.status || 'scheduled').toUpperCase();
+                    const isFinal = status.includes('FINAL');
+                    const hasWinner = !!game.winner;
+
+                    if (isFinal) {
+                        finalGames++;
+                        if (hasWinner) finalWithWinner++;
+                        else brokenFinalGames.push(gameId);
+                    }
+
+                    const cssClass = isFinal ? (hasWinner ? 'final' : 'broken') : '';
+
+                    html += `<div class="game ${cssClass}">
+                        <strong>Game ${gameId}</strong>: ${game.a || 'Away'} @ ${game.h || 'Home'}<br>
+                        Status: "${game.status || 'scheduled'}" ${isFinal ? '✅ FINAL' : '❌ Not Final'}<br>
+                        Winner: ${game.winner || 'None'} ${hasWinner ? '✅ Has Winner' : '❌ No Winner'}<br>
+                        Score: ${game.awayScore || 0} - ${game.homeScore || 0}
+                    </div>`;
+                });
+
+                html += `</div>
+                <div class="info">📊 Games Summary: ${gameIds.length} total, ${finalGames} final, ${finalWithWinner} scorable</div>`;
+
+                if (brokenFinalGames.length > 0) {
+                    html += `<div class="error">🚨 BROKEN: ${brokenFinalGames.length} final games without winners: ${brokenFinalGames.join(', ')}</div>`;
+                }
+
+                // Step 2: Check Tony's Picks
+                html += '<h3>🎯 Step 2: Tony\\'s Week 4 Picks Analysis</h3>';
+                const picksRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/4/submissions/${TONY_UID}`);
+                const picksSnap = await getDoc(picksRef);
+
+                if (!picksSnap.exists) {
+                    html += '<div class="error">❌ Tony has no Week 4 picks!</div>';
+                } else {
+                    const picks = picksSnap.data();
+                    const pickCount = Object.keys(picks).length;
+
+                    html += `<div class="success">✅ Tony has ${pickCount} picks for Week 4</div><div>`;
+
+                    Object.entries(picks).forEach(([gameId, pick]) => {
+                        const game = games[gameId];
+                        const canScore = game && game.status && game.status.toUpperCase().includes('FINAL') && game.winner;
+                        const isCorrect = canScore && pick.team === game.winner;
+                        const points = isCorrect ? (pick.confidence || 0) : 0;
+
+                        html += `<div class="pick ${canScore ? (isCorrect ? 'success' : 'error') : 'warning'}">
+                            Game ${gameId}: Picked ${pick.team} (confidence ${pick.confidence})<br>
+                            ${canScore ? `Winner: ${game.winner} → ${isCorrect ? `✅ CORRECT (+${points} points)` : '❌ WRONG (0 points)'}` : '⏳ Game not final yet'}
+                        </div>`;
+                    });
+
+                    html += '</div>';
+                }
+
+                // Step 3: Check Current Scoring Document
+                html += '<h3>📈 Step 3: Current Scoring Document</h3>';
+                const scoringRef = doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`);
+                const scoringSnap = await getDoc(scoringRef);
+
+                if (!scoringSnap.exists) {
+                    html += '<div class="error">❌ No scoring document for Tony!</div>';
+                } else {
+                    const scoring = scoringSnap.data();
+                    const weeklyPoints = scoring.weeklyPoints || {};
+
+                    html += `<div class="info">📊 Scoring Document Status:</div>`;
+                    for (let week = 1; week <= 4; week++) {
+                        const weekData = weeklyPoints[week.toString()] || weeklyPoints[week];
+                        if (weekData) {
+                            html += `<div class="success">Week ${week}: ${weekData.totalPoints} points (${weekData.correctPicks}/${weekData.totalPicks})</div>`;
+                        } else {
+                            html += `<div class="error">Week ${week}: ❌ NO DATA</div>`;
+                        }
+                    }
+                }
+
+                // Summary
+                html += '<h3>🎯 DIAGNOSTIC SUMMARY</h3>';
+                if (finalWithWinner === 0) {
+                    html += '<div class="error">🚨 ROOT CAUSE: No Week 4 games are both FINAL and have winners set!</div>';
+                } else if (!picksSnap.exists) {
+                    html += '<div class="error">🚨 ROOT CAUSE: Tony has no Week 4 picks!</div>';
+                } else {
+                    html += `<div class="info">✅ ${finalWithWinner} games ready for scoring, Tony has picks</div>`;
+                    html += '<div class="warning">⚠️ Scoring function should work - may need manual trigger</div>';
+                }
+
+            } catch (error) {
+                html += `<div class="error">❌ Diagnostic Error: ${error.message}</div>`;
+            }
+
+            html += '</div>';
+            document.getElementById('diagnosticResults').innerHTML = html;
+        };
+
+        window.testScoring = async function() {
+            let html = '<div class="section"><h2>🧪 Scoring Logic Test</h2>';
+
+            try {
+                // Manual scoring calculation
+                const gamesRef = doc(db, 'artifacts/nerdfootball/public/data/nerdfootball_games/4');
+                const gamesSnap = await getDoc(gamesRef);
+                const games = gamesSnap.data();
+
+                const picksRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/4/submissions/${TONY_UID}`);
+                const picksSnap = await getDoc(picksRef);
+                const picks = picksSnap.data();
+
+                let totalPoints = 0;
+                let correctPicks = 0;
+                let totalPicks = 0;
+                let scorableGames = 0;
+
+                html += '<h3>🎯 Manual Scoring Calculation:</h3>';
+
+                Object.entries(picks || {}).forEach(([gameId, pick]) => {
+                    if (!pick.team || !pick.confidence) return;
+
+                    totalPicks++;
+                    const game = games[gameId];
+                    const isGameFinal = game && game.status && game.status.toUpperCase().includes('FINAL');
+                    const hasWinner = game && game.winner;
+
+                    if (isGameFinal && hasWinner) {
+                        scorableGames++;
+                        const isCorrect = pick.team === game.winner;
+                        const confidence = parseInt(pick.confidence) || 0;
+
+                        if (isCorrect) {
+                            correctPicks++;
+                            totalPoints += confidence;
+                        }
+
+                        html += `<div class="pick ${isCorrect ? 'success' : 'error'}">
+                            Game ${gameId}: ${pick.team} (${confidence}) vs Winner: ${game.winner}
+                            → ${isCorrect ? `✅ +${confidence} pts` : '❌ 0 pts'}
+                        </div>`;
+                    } else {
+                        html += `<div class="pick warning">
+                            Game ${gameId}: ${pick.team} (${pick.confidence})
+                            → ⏳ Not scorable (Final: ${isGameFinal}, Winner: ${hasWinner})
+                        </div>`;
+                    }
+                });
+
+                html += `<div class="info">
+                    <h3>📊 Calculated Results:</h3>
+                    • Total Picks: ${totalPicks}<br>
+                    • Scorable Games: ${scorableGames}<br>
+                    • Correct Picks: ${correctPicks}<br>
+                    • Total Points: ${totalPoints}<br>
+                    • Accuracy: ${totalPicks > 0 ? Math.round((correctPicks/totalPicks)*100) : 0}%
+                </div>`;
+
+                if (totalPoints > 0) {
+                    html += '<div class="success">✅ Tony SHOULD have Week 4 points! Scoring system needs to run.</div>';
+                } else {
+                    html += '<div class="error">❌ No points possible yet - games not final or no correct picks</div>';
+                }
+
+            } catch (error) {
+                html += `<div class="error">❌ Test Error: ${error.message}</div>`;
+            }
+
+            html += '</div>';
+            document.getElementById('diagnosticResults').innerHTML += html;
+        };
+    </script>
+</body>
+</html>

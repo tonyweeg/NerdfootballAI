@@ -224,7 +224,11 @@
         window.db = firebase.firestore();
         window.auth = firebase.auth();
 
-        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2',
+            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2',
+            'bEVzcZtSExT8cIjamWnGbWZ3J5s1'
+        ];
         let selectedWeeks = new Set();
 
         // Console output management
@@ -384,7 +388,12 @@
             try {
                 await autoLogin();
 
-                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+                const currentUser = window.auth.currentUser;
+                if (!currentUser || !ADMIN_UIDS.includes(currentUser.uid)) {
+                    logToConsole('ADMIN ACCESS REQUIRED', 'error');
+                    return;
+                }
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${currentUser.uid}`;
                 const scoringDoc = await firebase.firestore().doc(scoringPath).get();
 
                 if (!scoringDoc.exists) {

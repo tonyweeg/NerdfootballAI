@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐉 36 Chambers Messaging - NerdFootball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true },
+            theme: {
+                extend: {
+                    colors: {
+                        'chamber': {
+                            'bg': '#0a0a0a',
+                            'surface': '#1a1a1a',
+                            'border': '#2a2a2a',
+                            'accent': '#ffd700', // Wu Tang gold
+                            'secondary': '#00d4ff',
+                            'danger': '#ff4757',
+                            'warning': '#ffa502',
+                            'text': '#ffffff',
+                            'muted': '#888888',
+                            'dragon': '#ff6b35' // Dragon orange
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(45deg, #0a0a0a 0%, #1a1a1a 50%, #2d1810 100%);
+            background-attachment: fixed;
+        }
+
+        .chamber-window {
+            background: linear-gradient(135deg, rgba(26, 26, 26, 0.95) 0%, rgba(45, 24, 16, 0.8) 100%);
+            border: 2px solid #ffd700;
+            backdrop-filter: blur(10px);
+            box-shadow:
+                0 0 30px rgba(255, 215, 0, 0.2),
+                inset 0 2px 0 rgba(255, 215, 0, 0.1),
+                0 0 60px rgba(255, 107, 53, 0.1);
+        }
+
+        .wu-button {
+            background: linear-gradient(145deg, #2a2d47 0%, #1a1d37 100%);
+            border: 2px solid #ffd700;
+            color: #ffd700;
+            box-shadow:
+                0 4px 8px rgba(0, 0, 0, 0.4),
+                0 0 15px rgba(255, 215, 0, 0.3),
+                inset 0 2px 4px rgba(255, 255, 255, 0.1);
+            transform: translateY(0);
+            transition: all 0.2s ease;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+            font-weight: 700;
+        }
+
+        .wu-button:hover {
+            box-shadow:
+                0 6px 12px rgba(0, 0, 0, 0.5),
+                0 0 25px rgba(255, 215, 0, 0.5),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            text-shadow: 0 0 15px rgba(255, 215, 0, 1);
+        }
+
+        .wu-button:active {
+            transform: translateY(2px);
+            box-shadow:
+                0 2px 4px rgba(0, 0, 0, 0.4),
+                0 0 10px rgba(255, 215, 0, 0.4);
+        }
+
+        .dragon-input {
+            background: rgba(26, 26, 26, 0.95);
+            border: 2px solid #ffd700;
+            color: #ffd700;
+            box-shadow:
+                0 0 15px rgba(255, 215, 0, 0.2),
+                inset 0 0 10px rgba(255, 107, 53, 0.1);
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        }
+
+        .dragon-input:focus {
+            outline: none;
+            box-shadow:
+                0 0 25px rgba(255, 215, 0, 0.4),
+                inset 0 0 15px rgba(255, 107, 53, 0.2);
+            border-color: #ff6b35;
+        }
+
+        .chamber-text { color: #ffffff; }
+        .wu-accent { color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.6); }
+        .dragon-accent { color: #ff6b35; text-shadow: 0 0 10px rgba(255, 107, 53, 0.6); }
+        .chamber-muted { color: #888888; }
+
+        .glow-text {
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        .wu-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #ffd700 rgba(26, 26, 26, 0.5);
+        }
+
+        .wu-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .wu-scroll::-webkit-scrollbar-track {
+            background: rgba(26, 26, 26, 0.5);
+            border-radius: 4px;
+        }
+
+        .wu-scroll::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #ffd700, #ff6b35);
+            border-radius: 4px;
+        }
+
+        .chamber-selector {
+            background: linear-gradient(135deg, rgba(26, 26, 26, 0.95), rgba(45, 24, 16, 0.8));
+            border: 2px solid #ffd700;
+            color: #ffd700;
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        }
+
+        .chamber-selector:focus {
+            outline: none;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+            border-color: #ff6b35;
+        }
+
+        .typing-dragon {
+            animation: dragonPulse 1.5s infinite;
+        }
+
+        @keyframes dragonPulse {
+            0%, 100% {
+                opacity: 1;
+                text-shadow: 0 0 10px #ffd700;
+            }
+            50% {
+                opacity: 0.6;
+                text-shadow: 0 0 5px #ff6b35;
+            }
+        }
+
+        .chamber-badge {
+            background: linear-gradient(45deg, #ffd700, #ff6b35);
+            color: #000;
+            font-weight: bold;
+            text-shadow: none;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="min-h-screen chamber-text">
+    <!-- Header - 36 Chambers Style -->
+    <header class="chamber-window border-b-4 border-chamber-accent">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <a href="./nerd-universe.html" class="wu-button p-2 rounded-md">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                    </a>
+                    <h1 class="text-3xl font-bold wu-accent glow-text">🐉 36 Chambers Messaging</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm dragon-accent glow-text">Enter the Wu</span>
+                    <div id="online-indicator" class="w-4 h-4 bg-chamber-accent rounded-full animate-pulse shadow-lg shadow-chamber-accent/50"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Interface - Chamber Layout -->
+    <main class="container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-180px)]">
+
+            <!-- Pool Members Chamber (Left Side) -->
+            <div class="lg:col-span-3">
+                <div class="chamber-window rounded-lg p-4 h-full">
+                    <h2 class="text-lg font-bold mb-4 wu-accent glow-text flex items-center">
+                        <span class="text-2xl mr-2">⚡</span>
+                        Wu Tang Clan
+                    </h2>
+
+                    <!-- Recipient Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold wu-accent mb-2">Chamber Selection</label>
+                        <select id="email-recipients" class="chamber-selector w-full p-2 rounded-lg text-sm">
+                            <option value="all">🐉 All Chambers</option>
+                            <option value="admins">👑 Abbots Only</option>
+                            <option value="specific">🎯 Select Warriors</option>
+                        </select>
+                    </div>
+
+                    <!-- Specific User Selection -->
+                    <div id="specific-users-section" class="mb-4 hidden">
+                        <label class="block text-sm font-bold dragon-accent mb-2">Choose Your Clan</label>
+                        <div id="user-checkboxes" class="max-h-48 overflow-y-auto wu-scroll chamber-window rounded p-3"></div>
+                    </div>
+
+                    <!-- Pool Members List -->
+                    <div id="pool-members-list" class="space-y-2 max-h-64 overflow-y-auto wu-scroll">
+                        <div class="text-sm chamber-muted typing-dragon">Loading the 36 chambers...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message Composer Chamber (Right Side) -->
+            <div class="lg:col-span-9">
+                <div class="chamber-window rounded-lg p-6 h-full flex flex-col">
+                    <h2 class="text-2xl font-bold mb-6 wu-accent glow-text flex items-center">
+                        <span class="text-3xl mr-3">📧</span>
+                        Wu Tang Pool Email Composer
+                    </h2>
+
+                    <!-- Subject Input -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold wu-accent mb-2">Subject (36 Chamber Wisdom)</label>
+                        <input
+                            type="text"
+                            id="email-subject"
+                            placeholder="Enter your message title..."
+                            class="dragon-input w-full p-3 rounded-lg font-mono"
+                            maxlength="100"
+                        >
+                    </div>
+
+                    <!-- Message Body -->
+                    <div class="mb-4 flex-1">
+                        <label class="block text-sm font-bold wu-accent mb-2">Message (Spread the Wu)</label>
+                        <textarea
+                            id="email-body"
+                            placeholder="Share your Wu Tang wisdom with the clan..."
+                            class="dragon-input w-full h-48 p-3 rounded-lg font-mono resize-none wu-scroll"
+                            maxlength="2000"
+                        ></textarea>
+                        <div class="text-xs chamber-muted mt-2 text-right">
+                            <span id="char-counter">0</span>/2000 characters
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-4">
+                        <button id="load-recipients-btn" class="wu-button px-6 py-3 rounded-lg font-bold">
+                            🔄 LOAD CLAN
+                        </button>
+                        <button id="preview-email-btn" class="wu-button px-6 py-3 rounded-lg font-bold">
+                            👁️ PREVIEW
+                        </button>
+                        <button id="send-email-btn" class="wu-button px-6 py-3 rounded-lg font-bold flex-1">
+                            🐉 SEND TO CHAMBERS
+                        </button>
+                    </div>
+
+                    <!-- Status Display -->
+                    <div id="email-status" class="mt-4 p-3 rounded-lg hidden">
+                        <span id="status-message"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const functions = getFunctions(app);
+
+        // Admin UIDs - The Abbots
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
+            'CX0etIyJbGg33nmHCo4eezPWrsr2',
+            'sm17z8ovI8NAGmyQvogD86lIurr1',
+            'dN91P1yGG4YBttxeGWmpAM2xhl22'
+        ];
+
+        let currentUser = null;
+        let isAdmin = false;
+        let poolMembers = [];
+        let selectedUserIds = [];
+
+        // DOM Elements
+        const recipientsSelect = document.getElementById('email-recipients');
+        const specificUsersSection = document.getElementById('specific-users-section');
+        const userCheckboxes = document.getElementById('user-checkboxes');
+        const poolMembersList = document.getElementById('pool-members-list');
+        const emailSubject = document.getElementById('email-subject');
+        const emailBody = document.getElementById('email-body');
+        const charCounter = document.getElementById('char-counter');
+        const emailStatus = document.getElementById('email-status');
+        const statusMessage = document.getElementById('status-message');
+
+        // Initialize Wu Tang Messaging System
+        function initializeWuSystem() {
+            setupEventListeners();
+            loadPoolMembers();
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            recipientsSelect.addEventListener('change', handleRecipientChange);
+            emailBody.addEventListener('input', updateCharCounter);
+
+            document.getElementById('load-recipients-btn').addEventListener('click', loadPoolMembers);
+            document.getElementById('preview-email-btn').addEventListener('click', previewEmail);
+            document.getElementById('send-email-btn').addEventListener('click', sendPoolEmail);
+        }
+
+        // Handle recipient selection change
+        function handleRecipientChange() {
+            if (recipientsSelect.value === 'specific') {
+                specificUsersSection.classList.remove('hidden');
+                updateSpecificUsersList();
+            } else {
+                specificUsersSection.classList.add('hidden');
+                selectedUserIds = [];
+            }
+        }
+
+        // Load pool members
+        async function loadPoolMembers() {
+            try {
+                showStatus('info', '🐉 Loading the 36 chambers...');
+
+                const getPoolMembersEmails = httpsCallable(functions, 'getPoolMembersEmails');
+                const result = await getPoolMembersEmails({ poolId: 'nerduniverse-2025' });
+
+                if (result.data.success) {
+                    poolMembers = result.data.members;
+                    displayPoolMembers();
+                    updateSpecificUsersList();
+                    showStatus('success', `🏆 Loaded ${poolMembers.length} Wu Tang warriors`);
+                } else {
+                    throw new Error('Failed to load pool members');
+                }
+            } catch (error) {
+                console.error('Error loading pool members:', error);
+                showStatus('error', '💀 Failed to load chambers: ' + error.message);
+            }
+        }
+
+        // Display pool members
+        function displayPoolMembers() {
+            if (poolMembers.length === 0) {
+                poolMembersList.innerHTML = '<div class="text-sm chamber-muted">No warriors found</div>';
+                return;
+            }
+
+            const membersHTML = poolMembers.map(member => {
+                const isAbbot = ADMIN_UIDS.includes(member.uid);
+                const badge = isAbbot ? '<span class="chamber-badge text-xs px-2 py-1 rounded-full ml-2">ABBOT</span>' : '';
+
+                return `
+                    <div class="flex items-center justify-between p-3 chamber-window rounded text-sm">
+                        <span class="wu-accent font-bold">
+                            ${member.name || member.email || 'Unknown Warrior'}${badge}
+                        </span>
+                        <div class="w-2 h-2 rounded-full bg-chamber-accent animate-pulse"></div>
+                    </div>
+                `;
+            }).join('');
+
+            poolMembersList.innerHTML = membersHTML;
+        }
+
+        // Update specific users list
+        function updateSpecificUsersList() {
+            if (poolMembers.length === 0) return;
+
+            const checkboxesHTML = poolMembers.map(member => {
+                const isAbbot = ADMIN_UIDS.includes(member.uid);
+                const badge = isAbbot ? ' 👑' : '';
+
+                return `
+                    <label class="flex items-center space-x-3 p-2 hover:bg-chamber-accent/10 rounded cursor-pointer">
+                        <input type="checkbox" value="${member.uid}" class="form-checkbox text-chamber-accent">
+                        <span class="wu-accent font-medium">${member.name || member.email}${badge}</span>
+                    </label>
+                `;
+            }).join('');
+
+            userCheckboxes.innerHTML = checkboxesHTML;
+
+            // Add event listeners to checkboxes
+            userCheckboxes.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        selectedUserIds.push(e.target.value);
+                    } else {
+                        selectedUserIds = selectedUserIds.filter(id => id !== e.target.value);
+                    }
+                });
+            });
+        }
+
+        // Preview email
+        function previewEmail() {
+            const subject = emailSubject.value;
+            const body = emailBody.value;
+            const recipients = recipientsSelect.value;
+
+            if (!subject || !body) {
+                showStatus('error', '⚠️ Subject and message are required for preview');
+                return;
+            }
+
+            let recipientCount = 0;
+            let recipientText = '';
+
+            if (recipients === 'all') {
+                recipientCount = poolMembers.length;
+                recipientText = 'All Wu Tang Chambers';
+            } else if (recipients === 'admins') {
+                recipientCount = poolMembers.filter(m => ADMIN_UIDS.includes(m.uid)).length;
+                recipientText = 'Abbots Only';
+            } else if (recipients === 'specific') {
+                recipientCount = selectedUserIds.length;
+                recipientText = `${recipientCount} Selected Warriors`;
+            }
+
+            const preview = `
+🐉 WU TANG EMAIL PREVIEW 🐉
+
+To: ${recipientText} (${recipientCount} recipients)
+Subject: ${subject}
+
+Message:
+${body}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ready to send to the 36 chambers?
+            `;
+
+            alert(preview);
+        }
+
+        // Send pool email
+        async function sendPoolEmail() {
+            const subject = emailSubject.value;
+            const body = emailBody.value;
+            const recipients = recipientsSelect.value;
+
+            if (!subject || !body) {
+                showStatus('error', '⚠️ Subject and message are required');
+                return;
+            }
+
+            if (recipients === 'specific' && selectedUserIds.length === 0) {
+                showStatus('error', '⚠️ Please select at least one warrior for specific recipients');
+                return;
+            }
+
+            try {
+                showStatus('info', '🐉 Sending Wu Tang wisdom to the chambers...');
+
+                const sendPoolEmail = httpsCallable(functions, 'sendPoolEmail');
+                const result = await sendPoolEmail({
+                    subject: subject,
+                    body: body,
+                    recipients: recipients,
+                    specificUserIds: recipients === 'specific' ? selectedUserIds : [],
+                    poolId: 'nerduniverse-2025'
+                });
+
+                if (result.data.success) {
+                    showStatus('success', `🏆 Wu Tang message delivered! ${result.data.successfulDeliveries}/${result.data.totalRecipients} chambers reached`);
+
+                    // Clear form
+                    emailSubject.value = '';
+                    emailBody.value = '';
+                    recipientsSelect.value = 'all';
+                    handleRecipientChange();
+                    updateCharCounter();
+                } else {
+                    throw new Error('Email sending failed');
+                }
+
+            } catch (error) {
+                console.error('Error sending email:', error);
+                showStatus('error', `💀 Failed to spread the Wu: ${error.message}`);
+            }
+        }
+
+        // Update character counter
+        function updateCharCounter() {
+            const count = emailBody.value.length;
+            charCounter.textContent = count;
+
+            if (count > 1600) {
+                charCounter.classList.add('dragon-accent');
+                charCounter.classList.remove('wu-accent');
+            } else {
+                charCounter.classList.add('wu-accent');
+                charCounter.classList.remove('dragon-accent');
+            }
+        }
+
+        // Show status messages
+        function showStatus(type, message) {
+            statusMessage.textContent = message;
+            emailStatus.className = 'mt-4 p-3 rounded-lg';
+
+            if (type === 'success') {
+                emailStatus.classList.add('bg-green-900/30', 'border-2', 'border-green-500', 'text-green-400');
+            } else if (type === 'error') {
+                emailStatus.classList.add('bg-red-900/30', 'border-2', 'border-red-500', 'text-red-400');
+            } else {
+                emailStatus.classList.add('bg-blue-900/30', 'border-2', 'border-blue-500', 'text-blue-400');
+            }
+
+            emailStatus.classList.remove('hidden');
+
+            // Auto-hide after 5 seconds for success/info messages
+            if (type !== 'error') {
+                setTimeout(() => {
+                    emailStatus.classList.add('hidden');
+                }, 5000);
+            }
+        }
+
+        // Auth state listener
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                isAdmin = ADMIN_UIDS.includes(user.uid);
+
+                if (isAdmin) {
+                    initializeWuSystem();
+                } else {
+                    showStatus('error', '🚫 Only Abbots can access the 36 chambers messaging system');
+                }
+            } else {
+                window.location.href = './index.html';
+            }
+        });
+    </script>
+</body>
+</html>

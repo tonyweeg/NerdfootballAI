@@ -254,7 +254,7 @@
         let currentGames = {};
         let selectedWeek = 4; // Default to current week
         let autoSaveTimeout = null;
-        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2', 'bEVzcZtSExT8cIjamWnGbWZ3J5s1'];
 
         // Set default week to current
         weekSelect.value = selectedWeek;
@@ -333,8 +333,13 @@
 
         function createEmptyWeekStructure() {
             const games = {};
-            for (let i = 401; i <= 416; i++) {
-                games[i.toString()] = {
+            // Dynamic game ID generation based on selected week
+            const baseId = selectedWeek * 100;
+            const gameCount = 16; // All weeks have 16 games
+
+            for (let i = 1; i <= gameCount; i++) {
+                const gameId = (baseId + i).toString();
+                games[gameId] = {
                     a: '', // away team
                     h: '', // home team
                     awayScore: null,
@@ -346,12 +351,21 @@
                     lastUpdated: new Date().toISOString()
                 };
             }
+
+            // Add metadata
+            games._metadata = {
+                week: selectedWeek,
+                totalGames: gameCount,
+                lastUpdated: new Date().toISOString(),
+                dataSource: 'nerd-game-updater-empty'
+            };
+
             return games;
         }
 
         function renderGames() {
             const gameEntries = Object.entries(currentGames)
-                .filter(([key]) => !key.startsWith('_') && key.match(/^40[1-9]$|^41[0-6]$/))
+                .filter(([key]) => !key.startsWith('_') && /^\d{3}$/.test(key)) // Match any 3-digit game ID
                 .sort(([a], [b]) => parseInt(a) - parseInt(b));
 
             gamesContainer.innerHTML = gameEntries.map(([gameId, game]) => {

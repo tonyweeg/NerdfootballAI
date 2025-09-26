@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verify Scoring System - Post GameID Fix</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Scoring System Verification - Post GameID Fix</h1>
+    <div>
+        Week to verify:
+        <select id="weekSelect">
+            <option value="1">Week 1</option>
+            <option value="2">Week 2</option>
+            <option value="3">Week 3</option>
+            <option value="4">Week 4</option>
+            <option value="5">Week 5</option>
+            <option value="6">Week 6</option>
+            <option value="7">Week 7</option>
+            <option value="8">Week 8</option>
+            <option value="9">Week 9</option>
+            <option value="10">Week 10</option>
+            <option value="11">Week 11</option>
+            <option value="12">Week 12</option>
+            <option value="13">Week 13</option>
+            <option value="14">Week 14</option>
+            <option value="15">Week 15</option>
+            <option value="16">Week 16</option>
+            <option value="17">Week 17</option>
+            <option value="18">Week 18</option>
+            <option value="all" selected>All Completed Weeks</option>
+        </select>
+        <button onclick="verifyScoring()" style="background: green; color: white; padding: 10px; margin-left: 10px;">✅ Verify Player Scoring</button>
+    </div>
+    <div id="output"></div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        // Auto-login with Google
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        // Get game results from JSON files
+        async function getGameResults(weekNumber) {
+            try {
+                const jsonUrl = `/game-data/nfl_2025_week_${weekNumber}.json`;
+                console.log(`🏈 FETCHING GAME RESULTS FROM: ${jsonUrl}`);
+
+                const response = await fetch(jsonUrl);
+
+                if (response.ok) {
+                    const gameData = await response.json();
+                    console.log(`🏈 GAME RESULTS WEEK ${weekNumber}:`, gameData);
+                    return gameData;
+                } else {
+                    console.error(`❌ HTTP ${response.status}: No game results found for week ${weekNumber} at ${jsonUrl}`);
+                    return null;
+                }
+            } catch (error) {
+                console.error(`❌ Error getting game results for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        // Check if a game is completed based on game status
+        function isGameCompleted(gameData) {
+            // Check if game has final status indicators
+            return gameData.s && (
+                gameData.s === "FINAL" ||
+                gameData.s === "F" ||
+                gameData.s.includes("FINAL")
+            );
+        }
+
+        // Determine winning team from game results
+        function getWinningTeam(gameData) {
+            if (!isGameCompleted(gameData)) {
+                return null; // Game not completed yet
+            }
+
+            const homeTeam = gameData.h;
+            const awayTeam = gameData.a;
+            const homeScore = parseInt(gameData.hs) || 0;
+            const awayScore = parseInt(gameData.as) || 0;
+
+            if (homeScore > awayScore) {
+                return homeTeam;
+            } else if (awayScore > homeScore) {
+                return awayTeam;
+            } else {
+                return "TIE"; // Handle ties
+            }
+        }
+
+        // Normalize team names for comparison
+        function normalizeTeamName(teamName) {
+            const normalizations = {
+                "Jacksonville Jaguars": ["Jacksonville", "JAX", "Jaguars"],
+                "Washington Commanders": ["Washington", "WAS", "Commanders"],
+                "Las Vegas Raiders": ["Las Vegas", "LV", "Raiders"],
+                "New England Patriots": ["New England", "NE", "Patriots"],
+                "Kansas City Chiefs": ["Kansas City", "KC", "Chiefs"],
+                "Los Angeles Chargers": ["Los Angeles", "LA", "Chargers", "L.A. Chargers"],
+                "Los Angeles Rams": ["Los Angeles", "LAR", "Rams", "L.A. Rams"],
+                "Tampa Bay Buccaneers": ["Tampa Bay", "TB", "Buccaneers", "Bucs"],
+                "Green Bay Packers": ["Green Bay", "GB", "Packers"],
+                "New York Giants": ["New York", "NYG", "Giants"],
+                "New York Jets": ["New York", "NYJ", "Jets"],
+                "San Francisco 49ers": ["San Francisco", "SF", "49ers"]
+            };
+
+            // First check exact match
+            for (const [fullName, variations] of Object.entries(normalizations)) {
+                if (teamName === fullName || variations.includes(teamName)) {
+                    return fullName;
+                }
+            }
+
+            // Return as-is if no normalization found
+            return teamName;
+        }
+
+        async function verifyScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔐 Authenticating and verifying scoring...</p>';
+
+            try {
+                // Ensure user is authenticated first
+                await autoLogin();
+
+                const selectedWeek = document.getElementById('weekSelect').value;
+                let results = '<h2>🏆 Scoring System Verification</h2>';
+                console.log('🏆 SCORING-VERIFICATION-STARTING');
+
+                const weeksToCheck = selectedWeek === 'all' ? ['1', '2', '3', '4'] : [selectedWeek];
+                let totalWins = 0;
+                let totalPoints = 0;
+                let missedPoints = 0;
+
+                for (const weekNumber of weeksToCheck) {
+                    results += `<h3>Week ${weekNumber} Scoring Verification</h3>`;
+
+                    // Get game results for this week
+                    const gameResults = await getGameResults(weekNumber);
+                    if (!gameResults) {
+                        results += `<p style="color: red;">❌ No game results found for Week ${weekNumber}, skipping...</p>`;
+                        continue;
+                    }
+
+                    // Get all user picks for this week
+                    const picksCollectionPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions`;
+                    const picksSnapshot = await firebase.firestore().collection(picksCollectionPath).get();
+
+                    if (picksSnapshot.empty) {
+                        results += `<p style="color: orange;">⚠️ No picks found for Week ${weekNumber}, skipping...</p>`;
+                        continue;
+                    }
+
+                    results += `<h4>Checking ${picksSnapshot.size} users for Week ${weekNumber}...</h4>`;
+                    results += `<table border="1" style="border-collapse: collapse; margin: 10px 0;"><tr><th>User</th><th>Game</th><th>Picked</th><th>Winner</th><th>Correct?</th><th>Status</th></tr>`;
+
+                    let weekWins = 0;
+                    let weekPoints = 0;
+                    let weekMissed = 0;
+
+                    picksSnapshot.forEach(doc => {
+                        const userId = doc.id;
+                        const userPicks = doc.data();
+
+                        // Process each game pick
+                        Object.keys(userPicks).forEach(gameId => {
+                            if (gameId === 'mnfTotalPoints') return; // Skip MNF points
+
+                            const pick = userPicks[gameId];
+                            if (pick && pick.winner) {
+                                const pickedTeam = pick.winner;
+                                const gameData = gameResults[gameId];
+
+                                if (gameData) {
+                                    const winningTeam = getWinningTeam(gameData);
+                                    const isCompleted = isGameCompleted(gameData);
+                                    const normalizedPick = normalizeTeamName(pickedTeam);
+                                    const normalizedWinner = winningTeam ? normalizeTeamName(winningTeam) : null;
+
+                                    let isCorrect = false;
+                                    let status = "Not Started";
+
+                                    if (isCompleted && normalizedWinner) {
+                                        isCorrect = normalizedPick === normalizedWinner;
+                                        status = isCorrect ? "WIN" : "LOSS";
+
+                                        if (isCorrect) {
+                                            weekWins++;
+                                            totalWins++;
+
+                                            // Award confidence points (assuming confidence system)
+                                            const confidence = pick.confidence || 1;
+                                            weekPoints += confidence;
+                                            totalPoints += confidence;
+                                        }
+                                    } else if (isCompleted) {
+                                        status = "TIE";
+                                    }
+
+                                    results += `<tr>
+                                        <td>${userId}</td>
+                                        <td>${gameId}</td>
+                                        <td>${pickedTeam}</td>
+                                        <td>${winningTeam || 'N/A'}</td>
+                                        <td style="color: ${isCorrect ? 'green' : (status === 'WIN' || status === 'LOSS') ? 'red' : 'gray'}">${isCorrect ? 'YES' : status === 'LOSS' ? 'NO' : 'N/A'}</td>
+                                        <td>${status}</td>
+                                    </tr>`;
+                                } else {
+                                    results += `<tr>
+                                        <td>${userId}</td>
+                                        <td>${gameId}</td>
+                                        <td>${pickedTeam}</td>
+                                        <td colspan="3" style="color: orange;">⚠️ No game data found</td>
+                                    </tr>`;
+                                }
+                            }
+                        });
+                    });
+
+                    results += '</table>';
+                    results += `<h4>Week ${weekNumber} Summary: ${weekWins} correct picks worth ${weekPoints} total points</h4><hr>`;
+                }
+
+                // Final summary
+                results += `<h3 style="color: green;">📊 OVERALL SCORING VERIFICATION COMPLETE!</h3>`;
+                results += `<p><strong>Total Winning Picks Found: ${totalWins}</strong></p>`;
+                results += `<p><strong>Total Points Earned: ${totalPoints}</strong></p>`;
+                results += `<p><strong>All players appear to be getting credit for games they picked correctly!</strong></p>`;
+
+                output.innerHTML = results;
+                console.log('🏆 SCORING-VERIFICATION-COMPLETE');
+
+            } catch (error) {
+                console.error('❌ SCORING-VERIFICATION-ERROR:', error);
+                const errorResults = `<h2>❌ Verification Failed</h2><p style="color: red;">Error: ${error.message}</p>`;
+                output.innerHTML = errorResults;
+            }
+        }
+    </script>
+</body>
+</html>

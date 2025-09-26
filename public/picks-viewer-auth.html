@@ -72,11 +72,9 @@
 
         // Admin UIDs (add your UID here)
         const ADMIN_UIDS = [
-            'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
-            'CX0etIyJbGg33nmHCo4eezPWrsr2',
-            'sm17z8ovI8NAGmyQvogD86lIurr1',
-            'dN91P1yGG4YBttxeGWmpAM2xhl22',
-            // Add more admin UIDs as needed
+            'WxSPmEildJdqs6T5hIpBUZrscwt2',
+            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2',
+            'bEVzcZtSExT8cIjamWnGbWZ3J5s1'
         ];
 
         // Auth state listener
@@ -196,37 +194,27 @@
         }
 
         async function loadBibleData() {
-            const cacheBuster = Date.now();
-            const url = `/nfl_2025_week_${currentWeek}.json?v=${cacheBuster}`;
-            console.log(`🔍 Loading bible data from: ${url}`);
+            console.log(`🔍 Loading Week ${currentWeek} bible data from Firestore...`);
 
             try {
-                const response = await fetch(url);
-                console.log(`📡 Response status: ${response.status} for ${url}`);
+                // Load from Firestore (single source of truth)
+                const gamesRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`);
+                const gamesSnap = await getDoc(gamesRef);
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText} for ${url}`);
+                if (!gamesSnap.exists()) {
+                    throw new Error(`No games found for Week ${currentWeek} in Firestore`);
                 }
 
-                const rawText = await response.text();
-                console.log(`📄 Raw response text (first 200 chars):`, rawText.substring(0, 200));
-
-                const bibleData = JSON.parse(rawText);
+                const bibleData = gamesSnap.data();
                 console.log(`✅ Loaded Week ${currentWeek} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
 
                 // Debug bible data structure
-                console.log('🔍 Raw bible data keys:', Object.keys(bibleData));
+                console.log('🔍 Bible data keys:', Object.keys(bibleData));
                 console.log('🔍 First 3 bible entries:', Object.entries(bibleData).slice(0, 3));
-
-                // Defensive check for corruption
-                if (Object.keys(bibleData).includes('week') || Object.keys(bibleData).includes('games')) {
-                    console.error('🚨 CORRUPTION DETECTED: Bible data contains week/games fields!');
-                    console.error('🚨 Raw response:', rawText);
-                }
 
                 return bibleData;
             } catch (error) {
-                console.error(`❌ Error loading Week ${currentWeek} bible data from ${url}:`, error);
+                console.error(`❌ Error loading Week ${currentWeek} bible data from Firestore:`, error);
                 throw error;
             }
         }
@@ -581,18 +569,9 @@
             const issues = [];
             const gameIds = Object.keys(picks).filter(key => !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints', 'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated', 'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key));
 
-            // Determine expected game IDs from bible data
+            // All weeks now use consistent Firestore structure
             const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata') : [];
             const expectedGameCount = expectedGameIds.length;
-
-            // Debug logging for Week 3 issue
-            if (currentWeek === 3) {
-                console.log('🔍 Week 3 Debug:');
-                console.log('  bibleData keys:', bibleData ? Object.keys(bibleData) : 'null');
-                console.log('  expectedGameIds:', expectedGameIds);
-                console.log('  expectedGameCount:', expectedGameCount);
-                console.log('  user gameIds:', gameIds);
-            }
 
             // Check for expected game IDs
             const missingGames = expectedGameIds.filter(id => !gameIds.includes(id));

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remove Invalid Pool Members</title>
+</head>
+<body>
+    <h1>Remove Invalid Pool Members</h1>
+    <button id="removeBtn" onclick="removeInvalidMembers()">Remove 3 Invalid Keys</button>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+        import { getFirestore, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.removeInvalidMembers = async function() {
+            try {
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = '<p>Starting removal process...</p>';
+
+                // Authenticate first
+                if (!auth.currentUser) {
+                    resultsDiv.innerHTML = '<p style="color: red;">Please sign in first!</p>';
+                    return;
+                }
+
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const docRef = doc(db, poolMembersPath);
+
+                // Use FieldValue.delete() to remove the specific keys
+                const { deleteField } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+
+                const updateData = {
+                    memberCount: deleteField(),
+                    lastUpdated: deleteField(),
+                    members: deleteField()
+                };
+
+                await updateDoc(docRef, updateData);
+
+                resultsDiv.innerHTML = `
+                    <p style="color: green;">✅ Successfully removed 3 invalid keys:</p>
+                    <ul>
+                        <li>"memberCount"</li>
+                        <li>"lastUpdated"</li>
+                        <li>"members"</li>
+                    </ul>
+                    <p>The pool members document now contains only valid user records.</p>
+                `;
+
+                console.log("✅ Invalid pool member keys removed successfully");
+
+            } catch (error) {
+                console.error('❌ Removal error:', error);
+                document.getElementById('results').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        };
+    </script>
+</body>
+</html>

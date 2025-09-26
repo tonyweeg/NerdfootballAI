@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Grid Security Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8">
+    <h1 class="text-2xl font-bold mb-4">Grid Security Test</h1>
+    <div id="auth-debug"></div>
+    <div id="week-debug"></div>
+    <div id="security-debug"></div>
+    <button onclick="testSecurity()" class="px-4 py-2 bg-blue-500 text-white rounded">Test Security Logic</button>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Get current NFL week number
+        function getCurrentWeekNumber() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04T00:00:00Z');
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        async function waitForAuth() {
+            return new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    resolve(user);
+                });
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve(null);
+                }, 3000);
+            });
+        }
+
+        window.testSecurity = async function() {
+            const user = await waitForAuth();
+            const currentWeek = getCurrentWeekNumber();
+            const gridWeek = 4; // Assuming we're testing Week 4
+            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+            const currentUserId = user?.uid || tonyUID;
+
+            document.getElementById('auth-debug').innerHTML = `
+                <div class="bg-blue-50 p-4 mb-4 rounded">
+                    <h2 class="font-bold">🔐 Authentication State</h2>
+                    <p>User: ${user ? user.displayName || user.email : 'Not authenticated'}</p>
+                    <p>User UID: ${user?.uid || 'null'}</p>
+                    <p>Fallback UID: ${tonyUID}</p>
+                    <p>Current User ID: ${currentUserId}</p>
+                </div>
+            `;
+
+            document.getElementById('week-debug').innerHTML = `
+                <div class="bg-yellow-50 p-4 mb-4 rounded">
+                    <h2 class="font-bold">📅 Week Logic</h2>
+                    <p>Current NFL Week: ${currentWeek}</p>
+                    <p>Grid Week: ${gridWeek}</p>
+                    <p>Is Current Week: ${gridWeek === currentWeek}</p>
+                </div>
+            `;
+
+            // Test security for different users
+            const testUsers = [
+                { id: tonyUID, name: 'Tony (should see picks)' },
+                { id: 'fake-user-1', name: 'Other User 1 (should see 🔒)' },
+                { id: 'fake-user-2', name: 'Other User 2 (should see 🔒)' }
+            ];
+
+            let securityHTML = '<div class="bg-red-50 p-4 mb-4 rounded"><h2 class="font-bold">🛡️ Security Test Results</h2>';
+
+            testUsers.forEach(testUser => {
+                const isCurrentUser = testUser.id === currentUserId;
+                const isCurrentWeek = gridWeek === currentWeek;
+                const shouldHidePick = isCurrentWeek && !isCurrentUser;
+
+                securityHTML += `
+                    <div class="mb-2 p-2 border rounded ${shouldHidePick ? 'bg-red-100' : 'bg-green-100'}">
+                        <p><strong>${testUser.name}</strong></p>
+                        <p>User ID: ${testUser.id}</p>
+                        <p>Is Current User: ${isCurrentUser}</p>
+                        <p>Should Hide Pick: ${shouldHidePick}</p>
+                        <p>Result: ${shouldHidePick ? '🔒 HIDDEN' : '👁️ VISIBLE'}</p>
+                    </div>
+                `;
+            });
+
+            securityHTML += '</div>';
+            document.getElementById('security-debug').innerHTML = securityHTML;
+        };
+
+        // Auto-run test
+        setTimeout(() => {
+            window.testSecurity();
+        }, 1000);
+    </script>
+</body>
+</html>

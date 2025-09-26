@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Confidence Grid - NerdFootball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'grey': {
+                            '50': '#f8fafc',
+                            '100': '#f1f5f9',
+                            '200': '#e2e8f0',
+                            '300': '#cbd5e1',
+                            '400': '#94a3b8',
+                            '500': '#64748b',
+                            '600': '#475569',
+                            '700': '#334155',
+                            '800': '#1e293b',
+                            '900': '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+
+        /* Simple Table Grid */
+        .picks-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        .picks-table th {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 8px 4px;
+            text-align: center;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .picks-table td {
+            border: 1px solid #e2e8f0;
+            padding: 4px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .user-name {
+            background: #f8fafc;
+            font-weight: 600;
+            text-align: left !important;
+            padding: 8px !important;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            min-width: 150px;
+        }
+
+
+        .pick-cell {
+            min-width: 70px;
+            font-size: 0.75rem;
+            line-height: 1.2;
+        }
+
+        .pick-correct {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .pick-incorrect {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        .pick-pending {
+            background: #f8fafc;
+            color: #475569;
+        }
+
+        .pick-live {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .team-short {
+            font-weight: 600;
+            display: block;
+        }
+
+        .confidence-num {
+            font-size: 0.7rem;
+            opacity: 0.8;
+        }
+
+        /* Expanded User View */
+        .user-expanded {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90vw;
+            max-width: 800px;
+            max-height: 90vh;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 50;
+            overflow-y: auto;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.5);
+            z-index: 40;
+        }
+
+        /* Loading States */
+        .loading {
+            background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .picks-table {
+                font-size: 0.7rem;
+            }
+
+            .user-name {
+                min-width: 120px;
+                padding: 6px !important;
+            }
+
+            .pick-cell {
+                min-width: 60px;
+                font-size: 0.65rem;
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-grey-200">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="/nerd-universe.html" class="text-grey-600 hover:text-grey-800 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </a>
+                    <h1 class="text-2xl font-bold text-grey-800">📊 Confidence Grid</h1>
+                    <div class="flex items-center space-x-2">
+                        <button id="week-prev" class="px-3 py-1 text-sm bg-grey-100 hover:bg-grey-200 rounded-md border border-grey-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            ← Prev Week
+                        </button>
+                        <div class="text-sm font-semibold text-grey-800 bg-grey-100 px-3 py-1 rounded-md border border-grey-300" id="week-display">Week 4 • 2025 Season</div>
+                        <button id="week-next" class="px-3 py-1 text-sm bg-grey-100 hover:bg-grey-200 rounded-md border border-grey-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            Next Week →
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-grey-600" id="last-updated">Loading...</div>
+                    <div class="text-sm text-grey-600" id="user-info">Authenticating...</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="flex items-center justify-center min-h-screen">
+        <div class="text-center">
+            <div class="loading w-32 h-2 rounded mb-4"></div>
+            <p class="text-grey-600">Loading confidence picks...</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content" class="hidden max-w-7xl mx-auto px-4 py-6">
+        <!-- Strategic Insights Bar -->
+        <div class="bg-white rounded-lg shadow-sm p-4 mb-6 border border-grey-200">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                <div>
+                    <div class="text-2xl font-bold text-blue-600" id="your-ranking">-</div>
+                    <div class="text-sm text-grey-600">Your Ranking</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-green-600" id="current-leader">-</div>
+                    <div class="text-sm text-grey-600">Season Leader</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-orange-600" id="upset-alerts">-</div>
+                    <div class="text-sm text-grey-600">Upset Alerts</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-purple-600" id="contrarian-picks">-</div>
+                    <div class="text-sm text-grey-600">Your Edge</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid Container -->
+        <div class="bg-white rounded-lg shadow-sm border border-grey-200 overflow-hidden">
+            <div class="p-4 border-b border-grey-200 bg-grey-50">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-grey-800">Weekly Picks Grid</h2>
+                    <div class="flex items-center space-x-4 text-sm text-grey-600">
+                        <div class="flex items-center space-x-1">
+                            <div class="w-3 h-3 bg-green-200 border border-green-400 rounded"></div>
+                            <span>Correct</span>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <div class="w-3 h-3 bg-red-100 border border-red-400 rounded"></div>
+                            <span>Incorrect</span>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <div class="w-3 h-3 bg-yellow-100 border border-yellow-400 rounded"></div>
+                            <span>Live</span>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <div class="w-3 h-3 bg-grey-100 border border-grey-400 rounded"></div>
+                            <span>Upcoming</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scrollable Table -->
+            <div class="overflow-x-auto">
+                <table id="picks-table" class="picks-table">
+                    <thead id="table-header">
+                        <!-- Table headers will be populated by JavaScript -->
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Table rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="mt-6 text-center text-sm text-grey-600">
+            <p>Click on any user's name to view their detailed picks breakdown</p>
+        </div>
+    </div>
+
+    <!-- Expanded User Modal -->
+    <div id="user-modal" class="hidden">
+        <div class="overlay" onclick="closeUserModal()"></div>
+        <div class="user-expanded">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-xl font-bold text-grey-800" id="modal-user-name">User Details</h2>
+                    <button onclick="closeUserModal()" class="text-grey-600 hover:text-grey-800">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="modal-user-content">
+                    <!-- Detailed user content will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, getDocs, collection, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+
+        // TEMPORARILY DISABLE APP CHECK - reCAPTCHA is broken
+        // const appCheck = initializeAppCheck(app, {
+        //     provider: new ReCaptchaV3Provider('6Lds9dMrAAAAAGIL03MqQbJuN99t_ICepTLH4Hww'),
+        //     isTokenAutoRefreshEnabled: true
+        // });
+
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make available globally
+        window.auth = auth;
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.getDocs = getDocs;
+        window.collection = collection;
+        window.query = query;
+        window.where = where;
+        window.orderBy = orderBy;
+
+        // Global variables
+        let currentWeek = getCurrentWeekNumber();
+        let poolMembers = {};
+        let bibleData = {};
+        let allPicks = {};
+        let gameIds = [];
+        let isLoadingWeek = false; // Prevent concurrent week loads
+
+        // Initialize the application
+        async function initialize() {
+            try {
+                await waitForFirebaseAuth();
+
+                // Debug authentication state
+                const currentUserId = auth.currentUser?.uid || 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+                const currentWeekNum = getCurrentWeekNumber();
+                console.log('🔐 GRID SECURITY INIT:', {
+                    authenticatedUser: auth.currentUser?.uid || 'none',
+                    fallbackToTony: currentUserId,
+                    currentWeek: currentWeekNum,
+                    securityActive: currentWeek === currentWeekNum
+                });
+
+                await loadPoolMembers();
+                await loadBibleData();
+                await loadAllPicks();
+
+                // Update week display to show the week being viewed
+                document.getElementById('week-display').textContent = `Week ${currentWeek} • 2025 Season`;
+
+                renderGrid();
+                updateStats();
+                setupWeekNavigation();
+                hideLoading();
+            } catch (error) {
+                console.error('❌ Error initializing grid:', error);
+                showError('Failed to load picks data. Please refresh the page.');
+            }
+        }
+
+        // Setup week navigation
+        function setupWeekNavigation() {
+            const prevButton = document.getElementById('week-prev');
+            const nextButton = document.getElementById('week-next');
+
+            prevButton.addEventListener('click', () => changeWeek(currentWeek - 1));
+            nextButton.addEventListener('click', () => changeWeek(currentWeek + 1));
+
+            updateWeekButtons();
+        }
+
+        // Change to a different week
+        async function changeWeek(newWeek) {
+            const maxWeek = getCurrentWeekNumber();
+
+            if (newWeek < 1 || newWeek > maxWeek) return;
+
+            currentWeek = newWeek;
+            document.getElementById('week-display').textContent = `Week ${currentWeek} • 2025 Season`;
+
+            // Show loading state
+            document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="text-center p-8 text-grey-600">Loading Week ' + currentWeek + ' data...</td></tr>';
+
+            try {
+                // Reload data for new week
+                await loadBibleData();
+                await loadAllPicks();
+                renderGrid();
+                updateStats();
+                updateWeekButtons();
+            } catch (error) {
+                console.error('❌ Error loading Week', currentWeek, 'data:', error);
+                showError(`Failed to load Week ${currentWeek} data. Please try again.`);
+            }
+        }
+
+        // Update week navigation buttons
+        function updateWeekButtons() {
+            const maxWeek = getCurrentWeekNumber();
+
+            document.getElementById('week-prev').disabled = currentWeek <= 1;
+            document.getElementById('week-next').disabled = currentWeek >= maxWeek;
+        }
+
+        // Get current NFL week number
+        function getCurrentWeekNumber() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04T00:00:00Z');
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            const week = Math.max(1, Math.min(18, weeksSinceStart + 1));
+
+            // Don't update display here - let initialize() handle it
+            return week;
+        }
+
+        // Wait for Firebase Auth
+        async function waitForFirebaseAuth() {
+            return new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    if (user) {
+                        document.getElementById('user-info').textContent = user.displayName || user.email;
+                    } else {
+                        document.getElementById('user-info').textContent = 'Not signed in';
+                    }
+                    resolve();
+                });
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve();
+                }, 5000);
+            });
+        }
+
+        // Load pool members
+        async function loadPoolMembers() {
+            try {
+                const poolId = 'nerduniverse-2025';
+                const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+                console.log('🔍 GRID DEBUG: Attempting to load pool members from:', poolMembersPath);
+                console.log('🔍 GRID DEBUG: Current user:', auth.currentUser?.uid || 'not authenticated');
+
+                const membersDoc = await getDoc(doc(db, poolMembersPath));
+
+                if (membersDoc.exists()) {
+                    poolMembers = membersDoc.data();
+                    console.log('✅ Pool members loaded:', Object.keys(poolMembers).length);
+                } else {
+                    console.error('❌ Pool members document does not exist at path:', poolMembersPath);
+                    throw new Error('Pool members not found');
+                }
+            } catch (error) {
+                console.error('❌ FIREBASE ERROR in loadPoolMembers():', error);
+                console.error('❌ Error details:', {
+                    code: error.code,
+                    message: error.message,
+                    path: `artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members`,
+                    userUID: auth.currentUser?.uid
+                });
+                throw error;
+            }
+        }
+
+        // Load bible data for current week
+        async function loadBibleData() {
+            if (isLoadingWeek) {
+                console.log(`⏸️ LOAD BIBLE - Week ${currentWeek} already loading, skipping...`);
+                return;
+            }
+
+            isLoadingWeek = true;
+            console.log(`🔄 LOAD BIBLE - Starting Week ${currentWeek} bible data load...`);
+
+            try {
+                // Load games from Firestore - use games table which has current status
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesDoc = await getDoc(doc(db, gamesPath));
+
+                if (!gamesDoc.exists()) {
+                    throw new Error(`No games data found at ${gamesPath}`);
+                }
+
+                // Direct Firestore format - no JSON parsing needed
+                bibleData = gamesDoc.data();
+                gameIds = Object.keys(bibleData)
+                    .filter(k => !k.startsWith('_') && !k.includes('401772')) // Filter out metadata and ESPN IDs
+                    .filter(k => {
+                        const gameNum = parseInt(k);
+                        const weekStart = currentWeek * 100 + 1; // Week 3 = 301, Week 4 = 401
+                        const weekEnd = currentWeek * 100 + 16;   // Week 3 = 316, Week 4 = 416
+                        return gameNum >= weekStart && gameNum <= weekEnd;
+                    })
+                    .sort((a, b) => parseInt(a) - parseInt(b)); // Sort numerically
+
+                console.log('🔍 DEBUG - Raw Bible Data Keys:', Object.keys(bibleData));
+                console.log('🔍 DEBUG - Filtered Game IDs (pre-sort):', Object.keys(bibleData).filter(k => !k.startsWith('_') && !k.includes('401772')));
+                console.log('🔍 DEBUG - Final Sorted Game IDs:', gameIds);
+
+                console.log('✅ Bible data loaded:', gameIds.length, 'games for Week', currentWeek);
+                console.log('📊 Game IDs:', gameIds);
+
+                // DEBUG: Show bible data for game 106
+                if (bibleData['106']) {
+                    console.log('🏈 BIBLE GAME 106:', bibleData['106']);
+                    console.log('   Home:', bibleData['106'].h, 'Away:', bibleData['106'].a);
+                } else {
+                    console.log('❌ BIBLE GAME 106: NOT FOUND');
+                }
+            } catch (error) {
+                console.error('❌ Error loading bible data:', error);
+                throw error;
+            } finally {
+                isLoadingWeek = false;
+                console.log(`🏁 LOAD BIBLE - Week ${currentWeek} load complete, lock released`);
+            }
+        }
+
+        // Load all picks for current week
+        async function loadAllPicks() {
+            const memberIds = Object.keys(poolMembers);
+            console.log('🔍 GRID DEBUG: Loading picks for', memberIds.length, 'members, week', currentWeek);
+
+            const pickPromises = memberIds.map(async (memberId) => {
+                try {
+                    const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`;
+                    const userPicksDoc = await getDoc(doc(db, picksPath));
+                    if (userPicksDoc.exists()) {
+                        allPicks[memberId] = userPicksDoc.data();
+                        console.log(`✅ Loaded picks for member: ${memberId}`);
+                    } else {
+                        allPicks[memberId] = null;
+                        console.log(`⚠️ No picks found for member: ${memberId} at path: ${picksPath}`);
+                    }
+                } catch (error) {
+                    console.error(`❌ FIREBASE ERROR loading picks for ${memberId}:`, error);
+                    console.error(`❌ Pick load error details:`, {
+                        code: error.code,
+                        message: error.message,
+                        path: `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`,
+                        userUID: auth.currentUser?.uid
+                    });
+                    allPicks[memberId] = null;
+                }
+            });
+
+            await Promise.all(pickPromises);
+            console.log('✅ Picks loaded for', Object.keys(allPicks).length, 'users');
+
+            // DEBUG: Show Tony's actual picks and what teams he picked
+            const tonyPicks = allPicks['WxSPmEildJdqs6T5hIpBUZrscwt2'];
+            if (tonyPicks) {
+                console.log('🔍 TONY FULL PICKS DEBUG:', Object.keys(tonyPicks).filter(k => k !== 'mnfTotalPoints').map(gameId => ({
+                    gameId,
+                    winner: tonyPicks[gameId]?.winner,
+                    confidence: tonyPicks[gameId]?.confidence
+                })));
+
+                // Find Jacksonville pick
+                const jaxPick = Object.keys(tonyPicks).find(gameId =>
+                    tonyPicks[gameId]?.winner?.includes('Jacksonville') ||
+                    tonyPicks[gameId]?.winner?.includes('Jaguars')
+                );
+                if (jaxPick) {
+                    console.log('🎯 FOUND JAX PICK:', jaxPick, tonyPicks[jaxPick]);
+                }
+            }
+        }
+
+        // Render the picks table
+        function renderGrid() {
+            console.log(`🎯 RENDER GRID - Starting render for Week ${currentWeek} with gameIds:`, gameIds);
+            renderTableHeader();
+            renderTableBody();
+            console.log(`✅ RENDER GRID - Completed render for Week ${currentWeek}`);
+        }
+
+        // Render table header
+        function renderTableHeader() {
+            console.log('🏁 HEADER RENDER - gameIds:', gameIds);
+            const header = document.getElementById('table-header');
+            let headerHTML = '<tr><th class="user-name">Player</th>';
+
+            gameIds.forEach(gameId => {
+                const game = bibleData[gameId];
+                if (game && game.h && game.a) {
+                    const homeShort = getTeamShort(game.h);
+                    const awayShort = getTeamShort(game.a);
+                    headerHTML += `<th class="pick-cell">${awayShort}<br>@<br>${homeShort}</th>`;
+                } else {
+                    headerHTML += `<th class="pick-cell">Game<br>${gameId}</th>`;
+                }
+            });
+
+            headerHTML += '</tr>';
+            header.innerHTML = headerHTML;
+        }
+
+        // Render table body
+        function renderTableBody() {
+            const tbody = document.getElementById('table-body');
+            const memberIds = Object.keys(poolMembers);
+
+            // Sort: Tony (current user) first, then alphabetically by name
+            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+            const currentUserId = auth.currentUser?.uid || tonyUID;
+
+            console.log(`👤 GRID SORT LOGIC:`, {
+                authenticatedUser: auth.currentUser?.uid || 'none',
+                currentUserId: currentUserId,
+                tonyUID: tonyUID,
+                totalMembers: memberIds.length
+            });
+
+            const sortedMemberIds = memberIds.sort((a, b) => {
+                // Tony always at top (whether authenticated or fallback)
+                if (a === tonyUID) {
+                    console.log(`✅ Tony (${a}) - moving to top`);
+                    return -1;
+                }
+                if (b === tonyUID) {
+                    console.log(`✅ Tony (${b}) - moving to top`);
+                    return 1;
+                }
+
+                // Others sorted alphabetically
+                const nameA = (poolMembers[a].name || poolMembers[a].email || 'Unknown').toLowerCase();
+                const nameB = (poolMembers[b].name || poolMembers[b].email || 'Unknown').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+
+            console.log(`🔄 Sorted member IDs (Tony first):`, sortedMemberIds);
+
+            let rowsHTML = '';
+
+            sortedMemberIds.forEach(memberId => {
+                const member = poolMembers[memberId];
+                const userPicks = allPicks[memberId];
+                const correctCount = getCorrectPicks(userPicks);
+                const isCurrentUser = memberId === currentUserId;
+                const isTony = memberId === tonyUID;
+
+                // Tony gets blue highlight regardless of auth state
+                const highlightRow = isTony;
+
+                rowsHTML += `<tr ${highlightRow ? `style="background-color: #f0f9ff; border-left: 3px solid #3b82f6;"` : ''}>`;
+                rowsHTML += `<td class="user-name ${highlightRow ? 'font-bold text-blue-700' : ''}">
+                    ${highlightRow ? '👤 ' : ''}${member.name || member.email || 'Unknown'}
+                </td>`;
+
+                console.log(`📋 BODY RENDER - Member: ${member.name || member.email || memberId}, gameIds:`, gameIds);
+                gameIds.forEach(gameId => {
+                    rowsHTML += createPickCellHTML(gameId, userPicks, memberId);
+                });
+
+                rowsHTML += `</tr>`;
+            });
+
+            tbody.innerHTML = rowsHTML;
+        }
+
+        // Create individual pick cell HTML
+        function createPickCellHTML(gameId, userPicks, memberId) {
+            // DEBUG: Log specific game mismatches
+            if (memberId === 'WxSPmEildJdqs6T5hIpBUZrscwt2' && gameId === '106') { // Only game 106 for Tony
+                console.log(`🚨 GAME 106 MISMATCH DEBUG:`);
+                console.log(`   Header should show: LV @ NE`);
+                console.log(`   Tony's pick for 106:`, userPicks[gameId]);
+                console.log(`   Bible data for 106:`, bibleData[gameId]);
+                console.log(`   Tony's data shows: JAX (this is the problem!)`);
+            }
+
+            // CRITICAL SECURITY CHECK - Always check authentication for current week
+            const currentWeekNum = getCurrentWeekNumber();
+            const isCurrentWeek = currentWeek === currentWeekNum;
+            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+            const currentUserId = auth.currentUser?.uid || tonyUID;
+            const isCurrentUser = memberId === currentUserId;
+
+            // Get game data from bibleData to check status
+            const game = bibleData[gameId];
+            const gameHasStarted = game && (game.status === 'IN_PROGRESS' ||
+                                           game.status === 'FINAL' ||
+                                           game.status === 'FINAL/OT' ||
+                                           game.status === 'STATUS_FINAL' ||
+                                           game.status === 'HALFTIME');
+
+            // Debug logging for Game 401 (the one that should have started)
+            if (gameId === '401' && memberId === 'WxSPmEildJdqs6T5hIpBUZrscwt2') {
+                console.log(`🎯 GAME 401 DEBUG:`, {
+                    gameId: gameId,
+                    gameStatus: game?.status,
+                    gameHasStarted: gameHasStarted,
+                    shouldHidePick: isCurrentWeek && !isCurrentUser && !gameHasStarted
+                });
+            }
+
+            const shouldHidePick = isCurrentWeek && !isCurrentUser && !gameHasStarted;
+
+            // Enhanced debug logging for current week
+            if (isCurrentWeek && gameId === gameIds[0]) { // Log once per user (first game)
+                console.log(`🔒 GRID SECURITY CHECK:`, {
+                    currentWeek: currentWeek,
+                    currentWeekNum: currentWeekNum,
+                    isCurrentWeek: isCurrentWeek,
+                    memberId: memberId,
+                    currentUserId: currentUserId,
+                    isCurrentUser: isCurrentUser,
+                    shouldHidePick: shouldHidePick,
+                    authState: auth.currentUser ? 'authenticated' : 'fallback-to-tony'
+                });
+            }
+
+            if (!userPicks || !userPicks[gameId]) {
+                return shouldHidePick ?
+                    `<td class="pick-cell pick-pending" style="opacity: 0.3; filter: grayscale(100%);">
+                        <span style="font-size: 12px;">🔒</span>
+                        <div style="font-size: 10px; color: #64748b;">Hidden</div>
+                    </td>` :
+                    `<td class="pick-cell pick-pending">No Pick</td>`;
+            }
+
+            const pick = userPicks[gameId];
+            // game variable already declared above at line 707
+            const isGameComplete = game.winner && game.winner !== 'TBD';
+            const isGameLive = game.status === 'IN_PROGRESS' || game.status === 'HALFTIME';
+            const isCorrect = isGameComplete && game.winner === pick.winner;
+
+            // HIDE PICKS FOR CURRENT WEEK (except current user)
+            if (shouldHidePick) {
+                return `<td class="pick-cell pick-pending" style="opacity: 0.3; filter: grayscale(100%);">
+                    <span style="font-size: 12px;">🔒</span>
+                    <div style="font-size: 10px; color: #64748b;">Hidden</div>
+                </td>`;
+            }
+
+            let cellClass = 'pick-cell ';
+            let statusIcon = '';
+
+            if (isGameComplete) {
+                cellClass += isCorrect ? 'pick-correct' : 'pick-incorrect';
+                statusIcon = isCorrect ? '✅' : '❌';
+            } else if (isGameLive) {
+                cellClass += 'pick-live';
+                statusIcon = '🔴';
+            } else {
+                cellClass += 'pick-pending';
+            }
+
+            const teamShort = getTeamShort(pick.winner);
+
+            return `<td class="${cellClass}">
+                <span class="team-short">${teamShort}</span>
+                <span class="confidence-num">${pick.confidence || 0}</span>
+                ${statusIcon ? `<div>${statusIcon}</div>` : ''}
+            </td>`;
+        }
+
+        // Get shortened team name
+        function getTeamShort(teamName) {
+            const teamShorts = {
+                'Arizona Cardinals': 'ARI',
+                'Atlanta Falcons': 'ATL',
+                'Baltimore Ravens': 'BAL',
+                'Buffalo Bills': 'BUF',
+                'Carolina Panthers': 'CAR',
+                'Chicago Bears': 'CHI',
+                'Cincinnati Bengals': 'CIN',
+                'Cleveland Browns': 'CLE',
+                'Dallas Cowboys': 'DAL',
+                'Denver Broncos': 'DEN',
+                'Detroit Lions': 'DET',
+                'Green Bay Packers': 'GB',
+                'Houston Texans': 'HOU',
+                'Indianapolis Colts': 'IND',
+                'Jacksonville Jaguars': 'JAX',
+                'Kansas City Chiefs': 'KC',
+                'Las Vegas Raiders': 'LV',
+                'Los Angeles Chargers': 'LAC',
+                'Los Angeles Rams': 'LAR',
+                'Miami Dolphins': 'MIA',
+                'Minnesota Vikings': 'MIN',
+                'New England Patriots': 'NE',
+                'New Orleans Saints': 'NO',
+                'New York Giants': 'NYG',
+                'New York Jets': 'NYJ',
+                'Philadelphia Eagles': 'PHI',
+                'Pittsburgh Steelers': 'PIT',
+                'San Francisco 49ers': 'SF',
+                'Seattle Seahawks': 'SEA',
+                'Tampa Bay Buccaneers': 'TB',
+                'Tennessee Titans': 'TEN',
+                'Washington Commanders': 'WSH'
+            };
+
+            return teamShorts[teamName] || teamName?.substring(0, 3) || 'TBD';
+        }
+
+        // Get team helmet URL with actual NFL team mappings
+        function getTeamHelmetUrl(teamName) {
+            const teamMappings = {
+                'Arizona Cardinals': 'ARI',
+                'Atlanta Falcons': 'ATL',
+                'Baltimore Ravens': 'BAL',
+                'Buffalo Bills': 'BUF',
+                'Carolina Panthers': 'CAR',
+                'Chicago Bears': 'CHI',
+                'Cincinnati Bengals': 'CIN',
+                'Cleveland Browns': 'CLE',
+                'Dallas Cowboys': 'DAL',
+                'Denver Broncos': 'DEN',
+                'Detroit Lions': 'DET',
+                'Green Bay Packers': 'GB',
+                'Houston Texans': 'HOU',
+                'Indianapolis Colts': 'IND',
+                'Jacksonville Jaguars': 'JAX',
+                'Kansas City Chiefs': 'KC',
+                'Las Vegas Raiders': 'LV',
+                'Los Angeles Chargers': 'LAC',
+                'Los Angeles Rams': 'LAR',
+                'Miami Dolphins': 'MIA',
+                'Minnesota Vikings': 'MIN',
+                'New England Patriots': 'NE',
+                'New Orleans Saints': 'NO',
+                'New York Giants': 'NYG',
+                'New York Jets': 'NYJ',
+                'Philadelphia Eagles': 'PHI',
+                'Pittsburgh Steelers': 'PIT',
+                'San Francisco 49ers': 'SF',
+                'Seattle Seahawks': 'SEA',
+                'Tampa Bay Buccaneers': 'TB',
+                'Tennessee Titans': 'TEN',
+                'Washington Commanders': 'WSH'
+            };
+
+            const teamCode = teamMappings[teamName];
+            if (teamCode) {
+                // Use ESPN helmet URL pattern
+                return `https://a.espncdn.com/i/teamlogos/nfl/500/${teamCode.toLowerCase()}.png`;
+            }
+
+            // Fallback to placeholder
+            return `data:image/svg+xml;base64,${btoa(`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#64748b"/><text x="12" y="16" text-anchor="middle" fill="white" font-size="8">${teamCode || teamName.charAt(0)}</text></svg>`)}`;
+        }
+
+        // Get correct picks count
+        function getCorrectPicks(userPicks) {
+            if (!userPicks) return 0;
+            let correct = 0;
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                const game = bibleData[gameId];
+                if (pick && game.winner === pick.winner) {
+                    correct++;
+                }
+            });
+            return correct;
+        }
+
+        // Update strategic insights
+        function updateStats() {
+            console.log('🎯 updateStats() called - calculating strategic insights...');
+            const memberIds = Object.keys(poolMembers);
+            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+            console.log('📊 Pool data:', { memberIds: memberIds.length, gameIds: gameIds.length });
+
+            // Calculate user rankings based on correct picks and points
+            const userRankings = calculateUserRankings(memberIds);
+            const yourRanking = userRankings.find(r => r.userId === tonyUID);
+            const leader = userRankings[0];
+
+            console.log('🏆 Rankings calculated:', { yourRanking, leader, totalRankings: userRankings.length });
+
+            // Calculate consensus and contrarian picks
+            const consensus = calculateConsensus(memberIds);
+            const upsetAlerts = getUpsetAlerts(consensus);
+            const yourContrarian = getContrarianPicks(tonyUID, consensus);
+
+            // Update displays
+            document.getElementById('your-ranking').textContent =
+                yourRanking ? `${yourRanking.rank} of ${memberIds.length}` : '-';
+
+            document.getElementById('current-leader').textContent =
+                leader ? `${leader.name} (${leader.points}pts)` : '-';
+
+            document.getElementById('upset-alerts').textContent =
+                upsetAlerts > 0 ? `${upsetAlerts} alerts` : 'None';
+
+            document.getElementById('contrarian-picks').textContent =
+                yourContrarian > 0 ? `${yourContrarian} picks` : 'Following crowd';
+
+            document.getElementById('last-updated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        // Calculate user rankings based on points earned
+        function calculateUserRankings(memberIds) {
+            const rankings = memberIds.map(memberId => {
+                const member = poolMembers[memberId];
+                const userPicks = allPicks[memberId];
+                let points = 0;
+                let correctPicks = 0;
+
+                if (userPicks) {
+                    gameIds.forEach(gameId => {
+                        const pick = userPicks[gameId];
+                        const game = bibleData[gameId];
+                        if (pick && game.winner && game.winner !== 'TBD' && game.winner === pick.winner) {
+                            points += pick.confidence || 0;
+                            correctPicks++;
+                        }
+                    });
+                }
+
+                return {
+                    userId: memberId,
+                    name: member.name || member.email?.split('@')[0] || 'Unknown',
+                    points,
+                    correctPicks
+                };
+            });
+
+            // Sort by points (desc), then by correct picks (desc)
+            rankings.sort((a, b) => {
+                if (b.points !== a.points) return b.points - a.points;
+                return b.correctPicks - a.correctPicks;
+            });
+
+            // Add rank
+            rankings.forEach((user, index) => {
+                user.rank = index + 1;
+            });
+
+            return rankings;
+        }
+
+        // Calculate pick consensus percentages
+        function calculateConsensus(memberIds) {
+            const consensus = {};
+
+            gameIds.forEach(gameId => {
+                const game = bibleData[gameId];
+                if (!game.h || !game.a) return;
+
+                const picks = { [game.h]: 0, [game.a]: 0 };
+                let totalPicks = 0;
+
+                memberIds.forEach(memberId => {
+                    const userPicks = allPicks[memberId];
+                    if (userPicks && userPicks[gameId] && userPicks[gameId].winner) {
+                        const winner = userPicks[gameId].winner;
+                        if (picks.hasOwnProperty(winner)) {
+                            picks[winner]++;
+                            totalPicks++;
+                        }
+                    }
+                });
+
+                if (totalPicks > 0) {
+                    consensus[gameId] = {
+                        home: game.h,
+                        away: game.a,
+                        homePercent: Math.round((picks[game.h] / totalPicks) * 100),
+                        awayPercent: Math.round((picks[game.a] / totalPicks) * 100),
+                        totalPicks
+                    };
+                }
+            });
+
+            return consensus;
+        }
+
+        // Get upset alerts (picks with <30% consensus)
+        function getUpsetAlerts(consensus) {
+            let alerts = 0;
+            Object.values(consensus).forEach(game => {
+                const minPercent = Math.min(game.homePercent, game.awayPercent);
+                if (minPercent > 0 && minPercent < 30) {
+                    alerts++;
+                }
+            });
+            return alerts;
+        }
+
+        // Get user's contrarian picks (picks with <50% consensus)
+        function getContrarianPicks(userId, consensus) {
+            const userPicks = allPicks[userId];
+            if (!userPicks) return 0;
+
+            let contrarian = 0;
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                const gameConsensus = consensus[gameId];
+
+                if (pick && gameConsensus && pick.winner) {
+                    const pickPercent = pick.winner === gameConsensus.home ?
+                        gameConsensus.homePercent : gameConsensus.awayPercent;
+
+                    if (pickPercent < 50) {
+                        contrarian++;
+                    }
+                }
+            });
+
+            return contrarian;
+        }
+
+        // Show user details modal (moved to global scope)
+        window.showUserDetails = function(memberId) {
+            const member = poolMembers[memberId];
+            const userPicks = allPicks[memberId];
+
+            document.getElementById('modal-user-name').textContent = member.name || 'Unknown User';
+
+            if (!userPicks) {
+                document.getElementById('modal-user-content').innerHTML = `
+                    <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                        <p class="text-red-800 font-semibold">❌ No Picks Found</p>
+                        <p class="text-red-600 text-sm">This user has not made any picks for Week ${currentWeek}</p>
+                    </div>
+                `;
+                document.getElementById('user-modal').classList.remove('hidden');
+                return;
+            }
+
+            const analysis = analyzeUserPicks(userPicks);
+
+            const modalContent = `
+                <div class="bg-white rounded-lg border-l-4 ${analysis.totalPointsEarned > 0 ? 'border-green-500' : 'border-grey-300'}">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold">${member.name || 'Unknown'}</h3>
+                            <p class="text-xs text-grey-500 font-mono mb-1">${memberId}</p>
+                            <p class="text-xs text-blue-600 mb-1">${member.email || 'No email'}</p>
+                            <p class="text-sm text-green-600">✅ Pool Member</p>
+                            ${userPicks.mnfTotalPoints ? `<p class="text-sm text-blue-600 font-medium">🏈 MNF Points: ${userPicks.mnfTotalPoints}</p>` : ''}
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-grey-600">Games: ${gameIds.length}</p>
+                            <p class="text-sm text-blue-600">✅ Correct: ${analysis.correctPicks}/${gameIds.length}</p>
+                            <p class="text-sm text-purple-600">🏆 Points Earned: ${analysis.totalPointsEarned}</p>
+                            <p class="text-xs text-green-600">📊 Confidence Sum: ${analysis.confidenceSum}/${getMaxConfidenceSum()}</p>
+                            <p class="text-sm ${analysis.isClean ? 'text-green-600' : 'text-red-600'}">${analysis.isClean ? '✅ Clean' : '❌ Issues'}</p>
+                        </div>
+                    </div>
+
+                    ${analysis.winningPicks.length > 0 ? `
+                        <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded">
+                            <h4 class="text-sm font-semibold text-green-800 mb-2">✅ Winning Picks (${analysis.winningPicks.length}) - ${analysis.winningPoints} points</h4>
+                            <p class="text-xs text-green-700">${analysis.winningPicks.join(', ')}</p>
+                        </div>
+                    ` : ''}
+
+                    ${analysis.losingPicks.length > 0 ? `
+                        <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+                            <h4 class="text-sm font-semibold text-red-800 mb-2">❌ Losing Picks (${analysis.losingPicks.length}) - ${analysis.losingPoints} points lost</h4>
+                            <p class="text-xs text-red-700">${analysis.losingPicks.join(', ')}</p>
+                        </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-4 md:grid-cols-8 gap-2 text-xs">
+                        ${generatePicksGrid(userPicks)}
+                    </div>
+
+                    <details class="mt-4">
+                        <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-800">View Raw Data</summary>
+                        <pre class="mt-2 p-3 bg-grey-100 rounded text-xs overflow-x-auto">${JSON.stringify(userPicks, null, 2)}</pre>
+                    </details>
+                </div>
+            `;
+
+            document.getElementById('modal-user-content').innerHTML = modalContent;
+            document.getElementById('user-modal').classList.remove('hidden');
+        };
+
+        // Analyze user picks for detailed view
+        function analyzeUserPicks(userPicks) {
+            let correctPicks = 0;
+            let totalPointsEarned = 0;
+            let confidenceSum = 0;
+            let winningPicks = [];
+            let losingPicks = [];
+            let winningPoints = 0;
+            let losingPoints = 0;
+
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                const game = bibleData[gameId];
+
+                if (pick && pick.winner && pick.confidence) {
+                    confidenceSum += pick.confidence;
+
+                    if (game.winner && game.winner !== 'TBD') {
+                        const isCorrect = game.winner === pick.winner;
+                        if (isCorrect) {
+                            correctPicks++;
+                            totalPointsEarned += pick.confidence;
+                            winningPicks.push(`${pick.winner} (${pick.confidence})`);
+                            winningPoints += pick.confidence;
+                        } else {
+                            losingPicks.push(`${pick.winner} (${pick.confidence}) → ${game.winner}`);
+                            losingPoints += pick.confidence;
+                        }
+                    }
+                }
+            });
+
+            return {
+                correctPicks,
+                totalPointsEarned,
+                confidenceSum,
+                winningPicks,
+                losingPicks,
+                winningPoints,
+                losingPoints,
+                isClean: confidenceSum === getMaxConfidenceSum()
+            };
+        }
+
+        // Generate picks grid for detailed view
+        function generatePicksGrid(userPicks) {
+            return gameIds.map(gameId => {
+                const pick = userPicks[gameId];
+                const game = bibleData[gameId];
+
+                if (!pick || !pick.winner) {
+                    return `<div class="p-2 bg-grey-100 border-grey-300 border rounded">
+                        <div class="font-semibold text-grey-800">${gameId} ❓</div>
+                        <div class="text-xs text-grey-800">No Pick</div>
+                    </div>`;
+                }
+
+                const isGameComplete = game.winner && game.winner !== 'TBD';
+                const isCorrect = isGameComplete && game.winner === pick.winner;
+                const status = isGameComplete ? (isCorrect ? '✅' : '❌') : '⏳';
+                const bgColor = isGameComplete ? (isCorrect ? 'bg-green-200 border-green-400' : 'bg-red-100 border-red-400') : 'bg-grey-100 border-grey-300';
+                const textColor = isGameComplete ? (isCorrect ? 'text-green-900' : 'text-red-800') : 'text-grey-800';
+
+                return `<div class="p-2 ${bgColor} border rounded">
+                    <div class="font-semibold ${textColor}">${gameId} ${status}</div>
+                    <div class="text-xs ${textColor}">C: ${pick.confidence}</div>
+                    <div class="text-xs ${textColor} truncate" title="${pick.winner}">
+                        ${pick.winner.substring(0, 8)}
+                    </div>
+                    ${!isCorrect && isGameComplete ? `<div class="text-xs ${textColor} opacity-75" title="Actual winner">→ ${game.winner.substring(0, 8)}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        // Get maximum confidence sum for the week
+        function getMaxConfidenceSum() {
+            const n = gameIds.length;
+            return (n * (n + 1)) / 2; // Sum of 1 + 2 + ... + n
+        }
+
+        // Close user details modal
+        window.closeUserModal = function() {
+            document.getElementById('user-modal').classList.add('hidden');
+        };
+
+        // Show/hide loading
+        function hideLoading() {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loading-screen').innerHTML = `
+                <div class="text-center">
+                    <div class="text-red-600 mb-4">⚠️ Error</div>
+                    <p class="text-grey-600">${message}</p>
+                </div>
+            `;
+        }
+
+        // Initialize when page loads
+        initialize();
+    </script>
+</body>
+</html>

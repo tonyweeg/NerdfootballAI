@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Season Leaderboard - NerdfootballAI Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true },
+            theme: {
+                extend: {
+                    colors: {
+                        'terminal': {
+                            'bg': '#0a0a0a',
+                            'surface': '#1a1a1a',
+                            'border': '#2a2a2a',
+                            'accent': '#00ff41',
+                            'secondary': '#00d4ff',
+                            'danger': '#ff4757',
+                            'warning': '#ffa502',
+                            'text': '#ffffff',
+                            'muted': '#888888'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(45deg, #0a0a0a 0%, #1a1a1a 50%, #0d1117 100%);
+            background-attachment: fixed;
+        }
+
+        .terminal-window {
+            background: rgba(26, 26, 26, 0.95);
+            border: 1px solid #2a2a2a;
+            backdrop-filter: blur(10px);
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .neon-button {
+            background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+        }
+
+        .neon-button:hover {
+            background: linear-gradient(45deg, #2a2a2a, #3a3a3a);
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.3),
+                inset 0 0 20px rgba(0, 255, 65, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .terminal-text { color: #ffffff; }
+        .terminal-accent { color: #00ff41; }
+        .terminal-secondary { color: #00d4ff; }
+        .terminal-danger { color: #ff4757; }
+        .terminal-warning { color: #ffa502; }
+        .terminal-muted { color: #888888; }
+
+        .glow-text {
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        .command-line::before {
+            content: '$ ';
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .rank-gold { color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+        .rank-silver { color: #c0c0c0; text-shadow: 0 0 10px rgba(192, 192, 192, 0.5); }
+        .rank-bronze { color: #cd7f32; text-shadow: 0 0 10px rgba(205, 127, 50, 0.5); }
+
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.05;
+            pointer-events: none;
+        }
+
+        .loading-dots::after {
+            content: '';
+            animation: dots 2s linear infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-terminal-text">
+    <!-- Matrix Background Effect -->
+    <canvas id="matrix-bg" class="matrix-bg"></canvas>
+
+    <!-- Header -->
+    <header class="bg-terminal-bg/95 border-b-2 border-terminal-accent backdrop-filter backdrop-blur-lg sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="./nerd-universe.html" class="neon-button px-4 py-2 rounded-md text-sm">
+                        ← Back to Command Center
+                    </a>
+                    <h1 class="text-3xl font-bold terminal-accent glow-text command-line">Season Leaderboard 2025</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="user-display" class="text-sm terminal-secondary">Loading...</span>
+                    <div id="auth-status" class="text-sm terminal-muted">Authenticating...</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="terminal-window p-8 text-center">
+            <div class="text-2xl terminal-accent mb-4">🏆</div>
+            <h2 class="text-xl font-bold mb-4 terminal-text">Initializing Leaderboard System<span class="loading-dots"></span></h2>
+            <div class="terminal-muted">Calculating season statistics...</div>
+        </div>
+
+        <!-- Leaderboard Content (hidden initially) -->
+        <div id="leaderboard-content" class="hidden space-y-6">
+            <!-- Season Stats Header -->
+            <div class="terminal-window p-6">
+                <div class="text-center mb-6">
+                    <h2 class="text-3xl font-bold terminal-accent glow-text mb-2">🏆 Season Leaders</h2>
+                    <div id="season-stats" class="text-terminal-secondary">
+                        <span id="total-weeks-played">0</span> weeks completed •
+                        <span id="total-participants">0</span> participants •
+                        <span id="last-updated">Last updated: calculating...</span>
+                    </div>
+                </div>
+
+                <!-- Top 3 Podium -->
+                <div id="podium" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Full Leaderboard Table -->
+            <div class="terminal-window p-6">
+                <h3 class="text-xl font-bold terminal-secondary mb-4 command-line">Complete Rankings</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-terminal-border">
+                                <th class="text-left py-3 px-2 terminal-accent">Rank</th>
+                                <th class="text-left py-3 px-4 terminal-accent">Player</th>
+                                <th class="text-center py-3 px-2 terminal-accent">Total Points</th>
+                                <th class="text-center py-3 px-2 terminal-accent">Avg/Week</th>
+                                <th class="text-center py-3 px-2 terminal-accent">Correct Picks</th>
+                                <th class="text-center py-3 px-2 terminal-accent">Pick Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-table">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Week-by-Week Breakdown (Collapsible) -->
+            <div class="terminal-window p-6">
+                <button id="toggle-breakdown" class="neon-button px-4 py-2 rounded-md mb-4">
+                    📊 Show Weekly Breakdown
+                </button>
+                <div id="weekly-breakdown" class="hidden">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-screen" class="hidden terminal-window p-8 text-center border-terminal-danger">
+            <div class="text-3xl terminal-danger mb-4">⚠️</div>
+            <h2 class="text-xl font-bold mb-4 terminal-danger">System Error</h2>
+            <div id="error-message" class="terminal-muted mb-4">An error occurred loading the leaderboard.</div>
+            <button id="retry-btn" class="neon-button px-6 py-2 rounded-md">Retry</button>
+        </div>
+    </main>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+
+        // Auth state handler
+        onAuthStateChanged(auth, async (user) => {
+            const userDisplay = document.getElementById('user-display');
+            const authStatus = document.getElementById('auth-status');
+
+            if (user) {
+                currentUser = user;
+                userDisplay.textContent = user.email;
+                userDisplay.classList.add('terminal-accent');
+                authStatus.textContent = 'Authenticated';
+                authStatus.classList.add('terminal-accent');
+
+                // Load leaderboard data
+                await loadSeasonLeaderboard();
+            } else {
+                userDisplay.textContent = 'Not signed in';
+                userDisplay.classList.add('terminal-danger');
+                authStatus.textContent = 'Access denied - please sign in';
+                authStatus.classList.add('terminal-danger');
+
+                // Redirect after delay
+                setTimeout(() => {
+                    window.location.href = './index.html';
+                }, 2000);
+            }
+        });
+
+        async function loadSeasonLeaderboard() {
+            try {
+                showLoading();
+                console.log('⚡ Loading cached season leaderboard...');
+                const startTime = Date.now();
+
+                // Call Cloud Run Function for cached leaderboard data (sub-500ms performance)
+                const response = await fetch('https://getseasonleaderboard-np7uealtnq-uc.a.run.app', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    // If cache function fails, fallback to generation endpoint
+                    console.log('⚠️ Cache not available - generating fresh data...');
+                    const generateResponse = await fetch('https://generateseasonleaderboardcache-np7uealtnq-uc.a.run.app', {
+                        method: 'GET'
+                    });
+
+                    if (!generateResponse.ok) {
+                        throw new Error(`Failed to generate leaderboard: ${generateResponse.status}`);
+                    }
+
+                    const generateResult = await generateResponse.json();
+                    if (!generateResult.success) {
+                        throw new Error(generateResult.error || 'Failed to generate leaderboard data');
+                    }
+
+                    processLeaderboardData(generateResult.data);
+                } else {
+                    const result = await response.json();
+
+                    if (!result.success) {
+                        throw new Error(result.error || 'Failed to load leaderboard data');
+                    }
+
+                    console.log(`✅ Leaderboard loaded in ${Date.now() - startTime}ms (cached: ${result.cached})`);
+
+                    // Show cache status in UI
+                    if (result.cached && result.cacheAge) {
+                        document.getElementById('last-updated').textContent =
+                            `Last updated: ${result.cacheAge}s ago (cached)`;
+                    }
+
+                    processLeaderboardData(result.data);
+                }
+
+                showContent();
+
+            } catch (error) {
+                console.error('❌ Error loading leaderboard:', error);
+                showError(error.message);
+            }
+        }
+
+        function processLeaderboardData(leaderboardData) {
+            // Convert Firebase Function format to frontend format
+            const seasonData = leaderboardData.standings.map(standing => ({
+                id: standing.userId,
+                name: standing.name,
+                email: standing.email,
+                totalPoints: standing.totalPoints || 0,
+                totalCorrectPicks: standing.totalCorrectPicks || 0,
+                totalValidPicks: standing.totalPicks || 0,
+                averagePoints: ((standing.totalPoints || 0) / (standing.weeksPlayed || 1)).toFixed(1),
+                pickRate: (standing.avgAccuracy || 0).toFixed(1),
+                weeklyData: standing.weeklyBreakdown || {},
+                rank: standing.rank || 0,
+                pointsFromLeader: standing.pointsFromLeader || 0
+            }));
+
+            // Update season stats from metadata
+            updateSeasonStats(
+                leaderboardData.metadata.totalWeeks,
+                leaderboardData.metadata.totalUsers
+            );
+
+            // Render leaderboard
+            renderLeaderboard(seasonData);
+        }
+
+        // Note: analyzeWeekPicks and checkPickResult functions removed
+        // as we now use precomputed cached data from Firebase Functions
+
+        function updateSeasonStats(weeksCompleted, totalParticipants) {
+            document.getElementById('total-weeks-played').textContent = weeksCompleted;
+            document.getElementById('total-participants').textContent = totalParticipants;
+            document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleString()}`;
+        }
+
+        function renderLeaderboard(seasonData) {
+            // Render top 3 podium
+            renderPodium(seasonData.slice(0, 3));
+
+            // Render full table
+            renderLeaderboardTable(seasonData);
+        }
+
+        function renderPodium(topThree) {
+            const podium = document.getElementById('podium');
+            podium.innerHTML = '';
+
+            topThree.forEach((player, index) => {
+                const position = index + 1;
+                let rankClass = '';
+                let icon = '';
+
+                switch (position) {
+                    case 1:
+                        rankClass = 'rank-gold';
+                        icon = '🥇';
+                        break;
+                    case 2:
+                        rankClass = 'rank-silver';
+                        icon = '🥈';
+                        break;
+                    case 3:
+                        rankClass = 'rank-bronze';
+                        icon = '🥉';
+                        break;
+                }
+
+                podium.innerHTML += `
+                    <div class="terminal-window p-6 text-center border-2 ${position === 1 ? 'border-yellow-500' : position === 2 ? 'border-gray-400' : 'border-yellow-600'} hover:scale-105 transition-transform duration-300">
+                        <div class="text-4xl mb-2">${icon}</div>
+                        <div class="text-2xl ${rankClass} font-bold mb-2">#${position}</div>
+                        <div class="text-lg terminal-text font-semibold mb-2">${player.name}</div>
+                        <div class="text-xl terminal-accent font-bold">${player.totalPoints} pts</div>
+                        <div class="text-sm terminal-muted">${player.totalCorrectPicks}/${player.totalValidPicks} picks</div>
+                        <div class="text-sm terminal-secondary">${player.pickRate}% accuracy</div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderLeaderboardTable(seasonData) {
+            const tableBody = document.getElementById('leaderboard-table');
+            tableBody.innerHTML = '';
+
+            seasonData.forEach((player, index) => {
+                const rank = index + 1;
+                let rankClass = '';
+
+                if (rank <= 3) {
+                    rankClass = rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : 'rank-bronze';
+                }
+
+                tableBody.innerHTML += `
+                    <tr class="border-b border-terminal-border hover:bg-terminal-surface/30 transition-colors duration-200">
+                        <td class="py-3 px-2 font-bold ${rankClass}">#${rank}</td>
+                        <td class="py-3 px-4">
+                            <div class="terminal-text font-semibold">${player.name}</div>
+                            <div class="text-xs terminal-muted">${player.email}</div>
+                        </td>
+                        <td class="py-3 px-2 text-center">
+                            <div class="text-lg font-bold terminal-accent">${player.totalPoints}</div>
+                        </td>
+                        <td class="py-3 px-2 text-center terminal-secondary">${player.averagePoints}</td>
+                        <td class="py-3 px-2 text-center">
+                            <div class="terminal-text">${player.totalCorrectPicks}/${player.totalValidPicks}</div>
+                        </td>
+                        <td class="py-3 px-2 text-center">
+                            <div class="terminal-warning font-semibold">${player.pickRate}%</div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function showLoading() {
+            document.getElementById('loading-screen').classList.remove('hidden');
+            document.getElementById('leaderboard-content').classList.add('hidden');
+            document.getElementById('error-screen').classList.add('hidden');
+        }
+
+        function showContent() {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('leaderboard-content').classList.remove('hidden');
+            document.getElementById('error-screen').classList.add('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('leaderboard-content').classList.add('hidden');
+            document.getElementById('error-screen').classList.remove('hidden');
+            document.getElementById('error-message').textContent = message;
+        }
+
+        // Retry button
+        document.getElementById('retry-btn').addEventListener('click', () => {
+            if (currentUser) {
+                loadSeasonLeaderboard();
+            }
+        });
+
+        // Weekly breakdown toggle
+        document.getElementById('toggle-breakdown').addEventListener('click', () => {
+            const breakdown = document.getElementById('weekly-breakdown');
+            const button = document.getElementById('toggle-breakdown');
+
+            if (breakdown.classList.contains('hidden')) {
+                breakdown.classList.remove('hidden');
+                button.textContent = '📊 Hide Weekly Breakdown';
+            } else {
+                breakdown.classList.add('hidden');
+                button.textContent = '📊 Show Weekly Breakdown';
+            }
+        });
+    </script>
+
+    <!-- Matrix Background JavaScript -->
+    <script>
+        // Matrix background effect
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        setCanvasSize();
+        window.addEventListener('resize', setCanvasSize);
+
+        const matrixChars = '01010101LEADERBOARD2025';
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        const drops = [];
+
+        for (let i = 0; i < columns; i++) {
+            drops[i] = 1;
+        }
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.8)';
+            ctx.font = fontSize + 'px JetBrains Mono';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        setInterval(drawMatrix, 50);
+    </script>
+</body>
+</html>

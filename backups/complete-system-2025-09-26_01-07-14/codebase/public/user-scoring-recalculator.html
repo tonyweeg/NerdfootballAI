@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>👥 USER SCORING RECALCULATOR</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>👥 USER SCORING RECALCULATOR</h1>
+    <div style="background: #eeffff; padding: 20px; border: 2px solid blue; margin: 20px 0;">
+        <h3>🔄 STEP 5: RECALCULATE ALL USER SCORING</h3>
+        <p><strong>NOW THAT FIRESTORE HAS ALL GAME WINNERS:</strong> Recalculate every user's scoring to give credit for ALL winning picks</p>
+        <p><strong>Logic:</strong> if (userPick === gameWinner) then points = confidence else 0</p>
+        <p><strong>Target:</strong> All users in <code>/artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/</code></p>
+    </div>
+
+    <button onclick="recalculateWeek(1)" style="background: red; color: white; padding: 15px; margin: 5px;">👥 RECALCULATE WEEK 1</button>
+    <button onclick="recalculateWeek(2)" style="background: orange; color: white; padding: 15px; margin: 5px;">👥 RECALCULATE WEEK 2</button>
+    <button onclick="recalculateWeek(3)" style="background: green; color: white; padding: 15px; margin: 5px;">👥 RECALCULATE WEEK 3</button>
+    <br><br>
+    <button onclick="recalculateAllWeeks()" style="background: purple; color: white; padding: 20px; font-size: 18px;">🚀 RECALCULATE ALL WEEKS 1-3</button>
+    <br><br>
+    <button onclick="recalculateTonyOnly()" style="background: teal; color: white; padding: 15px; margin: 5px;">🎯 RECALCULATE TONY ONLY (TEST)</button>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        // Tony's UID for testing
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function getGameResults(weekNumber) {
+            try {
+                const resultsPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${weekNumber}`;
+                const resultsDoc = await firebase.firestore().doc(resultsPath).get();
+
+                if (!resultsDoc.exists) {
+                    throw new Error(`No results document found for Week ${weekNumber}`);
+                }
+
+                const resultsData = resultsDoc.data();
+
+                // Filter out metadata to get game results
+                const gameResults = {};
+                for (const [gameId, gameData] of Object.entries(resultsData)) {
+                    if (gameId !== 'lastUpdated' && gameId !== 'timestamp' && gameId !== 'firestoreUpdateApplied' &&
+                        gameId !== 'sourceData' && gameId !== 'totalGames' && gameId !== 'gamesWithWinners' &&
+                        gameId !== 'gamesWithoutWinners' && gameId !== 'mnfTotalPoints') {
+                        gameResults[gameId] = gameData;
+                    }
+                }
+
+                console.log(`✅ GAME RESULTS Week ${weekNumber}:`, gameResults);
+                return gameResults;
+
+            } catch (error) {
+                console.error(`❌ ERROR loading game results for week ${weekNumber}:`, error);
+                throw error;
+            }
+        }
+
+        async function getUserPicks(userId, weekNumber) {
+            try {
+                // Use the exact same path pattern as The Grid (working system)
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/${userId}`;
+                const picksDoc = await firebase.firestore().doc(picksPath).get();
+
+                if (!picksDoc.exists) {
+                    console.log(`📭 No picks found for user ${userId} week ${weekNumber}`);
+                    return {};
+                }
+
+                const picksData = picksDoc.data();
+
+                // Filter out metadata to get picks
+                const userPicks = {};
+                for (const [gameId, pickData] of Object.entries(picksData)) {
+                    if (gameId !== 'timestamp' && gameId !== 'lastUpdated' && gameId !== 'mnfTotalPoints') {
+                        userPicks[gameId] = pickData;
+                    }
+                }
+
+                console.log(`✅ USER PICKS ${userId} Week ${weekNumber}:`, userPicks);
+                return userPicks;
+
+            } catch (error) {
+                console.error(`❌ ERROR loading picks for user ${userId} week ${weekNumber}:`, error);
+                return {};
+            }
+        }
+
+        async function calculateWeeklyScore(userId, weekNumber, gameResults, userPicks) {
+            let totalPoints = 0;
+            let gamesWon = 0;
+            let gamesPlayed = 0;
+            const gameDetails = {};
+
+            console.log(`🧮 CALCULATING Week ${weekNumber} for user ${userId}`);
+
+            for (const [gameId, gameResult] of Object.entries(gameResults)) {
+                const userPick = userPicks[gameId];
+
+                if (!userPick) {
+                    console.log(`📭 No pick for game ${gameId}`);
+                    continue;
+                }
+
+                gamesPlayed++;
+
+                // Get user's team pick (handle both 'team' and 'winner' field names)
+                const pickedTeam = userPick.team || userPick.winner;
+                const confidence = userPick.confidence || userPick.confidencePoints || 0;
+                const actualWinner = gameResult.winner;
+
+                let gamePoints = 0;
+                let won = false;
+
+                // Award points if user picked the winning team
+                if (pickedTeam && actualWinner && pickedTeam === actualWinner) {
+                    gamePoints = confidence;
+                    totalPoints += gamePoints;
+                    gamesWon++;
+                    won = true;
+                }
+
+                gameDetails[gameId] = {
+                    pickedTeam: pickedTeam,
+                    actualWinner: actualWinner,
+                    confidence: confidence,
+                    points: gamePoints,
+                    won: won
+                };
+
+                console.log(`🎯 Game ${gameId}: Picked ${pickedTeam}, Winner ${actualWinner}, Confidence ${confidence}, Points ${gamePoints}`);
+            }
+
+            return {
+                totalPoints: totalPoints,
+                gamesWon: gamesWon,
+                gamesPlayed: gamesPlayed,
+                gameDetails: gameDetails
+            };
+        }
+
+        async function recalculateUserWeek(userId, weekNumber) {
+            const output = document.getElementById('output');
+
+            try {
+                // Get game results and user picks
+                const gameResults = await getGameResults(weekNumber);
+                const userPicks = await getUserPicks(userId, weekNumber);
+
+                // Calculate weekly score
+                const weeklyScore = await calculateWeeklyScore(userId, weekNumber, gameResults, userPicks);
+
+                output.innerHTML += `<p>👤 <strong>User ${userId.slice(-6)}:</strong> Week ${weekNumber} = ${weeklyScore.totalPoints} points (${weeklyScore.gamesWon}/${weeklyScore.gamesPlayed} games won)</p>`;
+
+                // Update user's scoring document
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+                const scoringDoc = await firebase.firestore().doc(scoringPath).get();
+
+                let scoringData = {};
+                if (scoringDoc.exists) {
+                    scoringData = scoringDoc.data();
+                }
+
+                // Update weekly data
+                if (!scoringData.weeklyPoints) {
+                    scoringData.weeklyPoints = {};
+                }
+
+                scoringData.weeklyPoints[weekNumber] = {
+                    totalPoints: weeklyScore.totalPoints,
+                    gamesWon: weeklyScore.gamesWon,
+                    gamesPlayed: weeklyScore.gamesPlayed,
+                    lastUpdated: new Date().toISOString(),
+                    recalculationApplied: true
+                    // Note: Not including gameDetails to keep docs clean
+                };
+
+                // Recalculate season totals
+                let seasonTotalPoints = 0;
+                let seasonGamesWon = 0;
+                let seasonGamesPlayed = 0;
+                let weeksPlayed = 0;
+
+                for (const [week, weekData] of Object.entries(scoringData.weeklyPoints)) {
+                    if (weekData && typeof weekData.totalPoints === 'number') {
+                        seasonTotalPoints += weekData.totalPoints;
+                        seasonGamesWon += weekData.gamesWon || 0;
+                        seasonGamesPlayed += weekData.gamesPlayed || 0;
+                        weeksPlayed++;
+                    }
+                }
+
+                // Update season stats
+                scoringData.totalPoints = seasonTotalPoints;
+                scoringData.seasonStats = {
+                    gamesWon: seasonGamesWon,
+                    totalGames: seasonGamesPlayed,
+                    weeksPlayed: weeksPlayed,
+                    lastUpdated: new Date().toISOString()
+                };
+
+                // Add recalculation metadata
+                scoringData.lastRecalculation = new Date().toISOString();
+                scoringData.recalculationSource = 'complete-pipeline-fix';
+
+                // Save updated scoring document
+                await firebase.firestore().doc(scoringPath).set(scoringData);
+
+                output.innerHTML += `<p style="color: green;">✅ User ${userId.slice(-6)} Week ${weekNumber} recalculated: ${weeklyScore.totalPoints} points, Season Total: ${seasonTotalPoints}</p>`;
+
+                return weeklyScore;
+
+            } catch (error) {
+                console.error(`❌ ERROR recalculating user ${userId} week ${weekNumber}:`, error);
+                output.innerHTML += `<p style="color: red;">❌ Error recalculating user ${userId.slice(-6)} week ${weekNumber}: ${error.message}</p>`;
+                return null;
+            }
+        }
+
+        async function getAllUsers() {
+            try {
+                // Get all users from scoring collection
+                const scoringCollectionPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users';
+                const usersSnapshot = await firebase.firestore().collection(scoringCollectionPath).get();
+
+                const userIds = [];
+                usersSnapshot.forEach(doc => {
+                    userIds.push(doc.id);
+                });
+
+                console.log(`👥 Found ${userIds.length} users in scoring collection`);
+                return userIds;
+
+            } catch (error) {
+                console.error('❌ ERROR getting all users:', error);
+                return [TONY_UID]; // Fallback to Tony only
+            }
+        }
+
+        async function recalculateWeek(weekNumber) {
+            const output = document.getElementById('output');
+            output.innerHTML = `<h2>👥 RECALCULATING ALL USERS FOR WEEK ${weekNumber}</h2>`;
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                // Get all users
+                const userIds = await getAllUsers();
+                output.innerHTML += `<p>👥 Found ${userIds.length} users to recalculate</p>`;
+
+                let successCount = 0;
+                let errorCount = 0;
+
+                // Recalculate each user for this week
+                for (const userId of userIds) {
+                    const result = await recalculateUserWeek(userId, weekNumber);
+                    if (result) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                    }
+                }
+
+                output.innerHTML += `<h3 style="color: green;">✅ WEEK ${weekNumber} RECALCULATION COMPLETE</h3>`;
+                output.innerHTML += `<p><strong>Success:</strong> ${successCount} users | <strong>Errors:</strong> ${errorCount} users</p>`;
+
+            } catch (error) {
+                console.error('❌ WEEK RECALCULATION ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ WEEK ${weekNumber} RECALCULATION FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function recalculateAllWeeks() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🚀 RECALCULATING ALL USERS FOR ALL WEEKS 1-3</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                for (let week = 1; week <= 3; week++) {
+                    output.innerHTML += `<h3>🔄 Processing Week ${week}...</h3>`;
+
+                    const userIds = await getAllUsers();
+                    let weekSuccessCount = 0;
+                    let weekErrorCount = 0;
+
+                    for (const userId of userIds) {
+                        const result = await recalculateUserWeek(userId, week);
+                        if (result) {
+                            weekSuccessCount++;
+                        } else {
+                            weekErrorCount++;
+                        }
+                    }
+
+                    output.innerHTML += `<p>Week ${week}: ${weekSuccessCount} success, ${weekErrorCount} errors</p>`;
+                }
+
+                output.innerHTML += `
+                    <hr>
+                    <h2 style="color: green;">🚀 ALL WEEKS USER RECALCULATION COMPLETE!</h2>
+                    <div style="background: #eeffff; padding: 20px; border: 2px solid blue;">
+                        <h3>✅ STEP 5 COMPLETE: ALL USER SCORING RECALCULATED</h3>
+                        <p><strong>EVERY USER NOW GETS CREDIT FOR ALL THEIR WINNING PICKS!</strong></p>
+
+                        <h4>🎯 WHAT WAS ACCOMPLISHED:</h4>
+                        <ul>
+                            <li><strong>Before:</strong> Users got credit for only 1 game per week (games 101, 201, 301)</li>
+                            <li><strong>After:</strong> Users get credit for ALL winning picks across all 16 games per week</li>
+                            <li><strong>Logic Applied:</strong> if (userPick === gameWinner) then points = confidence else 0</li>
+                            <li><strong>Season Totals:</strong> Automatically recalculated from weekly data</li>
+                        </ul>
+
+                        <h4>🔄 NEXT STEPS:</h4>
+                        <ol>
+                            <li>✅ <strong>ESPN Analysis:</strong> Analyzed scoreboard structure and data patterns</li>
+                            <li>✅ <strong>ESPN Fetcher:</strong> Created tool to fetch game results from ESPN</li>
+                            <li>✅ <strong>JSON Bible Updated:</strong> Updated JSON files with ESPN winners</li>
+                            <li>✅ <strong>Firestore Results Fixed:</strong> ALL game winners now in Firestore</li>
+                            <li>✅ <strong>User Scoring Recalculated:</strong> ALL users get credit for ALL wins</li>
+                            <li>🔄 <strong>Automated Pipeline:</strong> Make the entire process automatic</li>
+                        </ol>
+
+                        <p><strong>Ready for Step 6:</strong> <a href="automated-pipeline.html">Create Automated Pipeline</a></p>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('❌ ALL WEEKS RECALCULATION ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ ALL WEEKS RECALCULATION FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function recalculateTonyOnly() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🎯 RECALCULATING TONY ONLY (TEST)</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+                output.innerHTML += `<p>🎯 Testing with Tony's UID: ${TONY_UID}</p>`;
+
+                for (let week = 1; week <= 3; week++) {
+                    output.innerHTML += `<h3>Week ${week} - Tony's Recalculation:</h3>`;
+                    const result = await recalculateUserWeek(TONY_UID, week);
+
+                    if (result) {
+                        output.innerHTML += `<p style="color: green;">✅ Tony Week ${week}: ${result.totalPoints} points (${result.gamesWon}/${result.gamesPlayed} games)</p>`;
+                    }
+                }
+
+                output.innerHTML += '<h3 style="color: green;">🎯 TONY TEST COMPLETE</h3>';
+
+            } catch (error) {
+                console.error('❌ TONY TEST ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ TONY TEST FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

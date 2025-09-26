@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Run Week 4 Scoring</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #333; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .warning { color: #ff0; }
+        .info { color: #4af; }
+        button { padding: 10px 20px; margin: 10px; }
+        pre { background: #111; padding: 10px; white-space: pre-wrap; }
+        #results { max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🏆 Run Week 4 Scoring Fix</h1>
+
+    <div class="section">
+        <div id="authStatus">Loading...</div>
+        <button onclick="runWeek4Scoring()">🚀 Run Week 4 Scoring for All Users</button>
+        <button onclick="checkTonyScore()">👤 Check Tony's Week 4 Score</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const functions = getFunctions(app);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+
+        // Auto-auth
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+        async function checkAdminAccess() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const adminUID = urlParams.get('admin');
+            if (adminUID && ADMIN_UIDS.includes(adminUID)) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            }
+            return new Promise((resolve) => {
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    unsubscribe();
+                    resolve(user && ADMIN_UIDS.includes(user.uid));
+                });
+            });
+        }
+
+        (async () => {
+            const isAdmin = await checkAdminAccess();
+            document.getElementById('authStatus').innerHTML = isAdmin ?
+                '<span class="success">✅ Admin authenticated</span>' :
+                '<span class="error">❌ Admin access required</span>';
+        })();
+
+        window.runWeek4Scoring = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="info">🚀 Running Week 4 scoring for all users...</div>';
+
+            try {
+                const processWeeklyScoring = httpsCallable(functions, 'processWeeklyScoring');
+                const result = await processWeeklyScoring();
+
+                let html = '<div class="section"><h2>🏆 Week 4 Scoring Results</h2>';
+
+                if (result.data.success) {
+                    html += `<div class="success">✅ Success!</div>`;
+                    html += `<div class="info">Week: ${result.data.weekNumber || 4}</div>`;
+                    html += `<div class="info">Users Processed: ${result.data.usersProcessed}</div>`;
+                    html += `<div class="info">Errors: ${result.data.errors || 0}</div>`;
+                    html += `<div class="success">${result.data.message}</div>`;
+                } else {
+                    html += `<div class="error">❌ Error: ${result.data.error}</div>`;
+                }
+
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Function call failed: ${error.message}</div>`;
+            }
+        };
+
+        window.checkTonyScore = async function() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="info">👤 Checking Tony\'s Week 4 score...</div>';
+
+            try {
+                const scoringRef = doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`);
+                const scoringSnap = await getDoc(scoringRef);
+
+                let html = '<div class="section"><h2>👤 Tony\'s Scoring Status</h2>';
+
+                if (scoringSnap.exists()) {
+                    const scoring = scoringSnap.data();
+                    const weeklyPoints = scoring.weeklyPoints || {};
+
+                    html += '<div class="info">📊 Weekly Points:</div>';
+                    for (let week = 1; week <= 4; week++) {
+                        const weekData = weeklyPoints[week.toString()] || weeklyPoints[week];
+                        if (weekData) {
+                            html += `<div class="success">Week ${week}: ${weekData.totalPoints} points (${weekData.correctPicks}/${weekData.totalPicks} correct, ${weekData.accuracy}% accuracy)</div>`;
+                        } else {
+                            html += `<div class="${week === 4 ? 'error' : 'warning'}">Week ${week}: ${week === 4 ? '❌ NO DATA' : '⏳ No data'}</div>`;
+                        }
+                    }
+
+                    // Show the expected Week 4 result
+                    const week4Expected = weeklyPoints['4'] || weeklyPoints[4];
+                    if (week4Expected) {
+                        html += `<div class="success">🎯 Week 4 Fixed: ${week4Expected.totalPoints} points!</div>`;
+                    } else {
+                        html += `<div class="error">🚨 Week 4 still missing - run scoring fix!</div>`;
+                    }
+
+                } else {
+                    html += '<div class="error">❌ No scoring document found for Tony</div>';
+                }
+
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error checking score: ${error.message}</div>`;
+            }
+        };
+    </script>
+</body>
+</html>
