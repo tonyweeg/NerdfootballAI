@@ -613,6 +613,93 @@
             }
         }
 
+        function getAvailableConfidenceValues(currentGameId, totalGames) {
+            // Get all confidence values from 1 to totalGames
+            const allValues = Array.from({length: totalGames}, (_, i) => i + 1);
+
+            // Find confidence values already used by locked games
+            const usedByLockedGames = new Set();
+
+            console.log(`🔍 DEBUG: Checking available confidence for ${currentGameId}, total games: ${totalGames}`);
+            console.log(`🔍 DEBUG: Current userPicks:`, userPicks);
+
+            // Check all locked rows for used confidence values
+            document.querySelectorAll('.locked-row').forEach(row => {
+                const gameElement = row.querySelector('[data-game-id]');
+                if (gameElement) {
+                    const gameId = gameElement.getAttribute('data-game-id');
+                    const pick = userPicks[gameId];
+
+                    console.log(`🔒 DEBUG: Found locked row for game ${gameId}, pick:`, pick);
+
+                    if (pick && pick.confidence) {
+                        usedByLockedGames.add(parseInt(pick.confidence));
+                        console.log(`🔒 CONFIDENCE_FILTER: Game ${gameId} is locked with confidence ${pick.confidence}`);
+                    }
+                }
+            });
+
+            // Also check for games with locked time status
+            Object.keys(userPicks).forEach(gameId => {
+                // Skip the current game we're populating
+                if (gameId === currentGameId) return;
+
+                // Skip non-game data (userId, userName, etc.)
+                if (!gameId.includes('game_')) return;
+
+                const pick = userPicks[gameId];
+                if (pick && pick.confidence) {
+                    // Check if this game's time has passed (making it locked)
+                    const gameData = window.weekGames?.find(g => g.id === gameId);
+                    if (gameData) {
+                        const gameTime = new Date(gameData.date);
+                        const now = new Date();
+                        const isTimeLocked = now >= gameTime;
+
+                        if (isTimeLocked) {
+                            usedByLockedGames.add(parseInt(pick.confidence));
+                            console.log(`⏰ CONFIDENCE_FILTER: Game ${gameId} is time-locked with confidence ${pick.confidence}`);
+                        }
+                    }
+                }
+            });
+
+            // Filter out confidence values used by locked games
+            const availableValues = allValues.filter(value => !usedByLockedGames.has(value));
+
+            console.log(`🎯 CONFIDENCE_FILTER: Available values for ${currentGameId}: [${availableValues.join(', ')}] (excluded locked: [${Array.from(usedByLockedGames).join(', ')}])`);
+
+            return availableValues;
+        }
+
+        function refreshConfidenceDropdowns() {
+            // Refresh all confidence dropdowns to reflect current locked game restrictions
+            document.querySelectorAll('.confidence-select:not([disabled])').forEach(select => {
+                const gameId = select.getAttribute('data-game-id');
+                const currentValue = select.value;
+                const totalGames = document.querySelectorAll('.game-row').length;
+
+                // Get available values for this game
+                const availableValues = getAvailableConfidenceValues(gameId, totalGames);
+
+                // Clear existing options except "Select..."
+                select.innerHTML = '<option value="">Select...</option>';
+
+                // Add available options
+                availableValues.forEach(confValue => {
+                    const option = document.createElement('option');
+                    option.value = confValue;
+                    option.textContent = confValue;
+                    if (confValue == currentValue) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+
+                console.log(`🔄 CONFIDENCE_REFRESH: Updated dropdown for ${gameId} with ${availableValues.length} available values`);
+            });
+        }
+
         function updateWeekInfo() {
             const weekInfo = document.getElementById('weekInfo');
             const currentNFLWeek = getCurrentWeek();
@@ -752,7 +839,7 @@
                                 <select class="confidence-select px-3 py-2 border border-gray-300 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         data-game-id="${gameId}" data-field="confidence" ${isLocked ? 'disabled' : ''}>
                                     <option value="">Select...</option>
-                                    ${Array.from({length: gameIds.length}, (_, i) => i + 1).map(confValue => `
+                                    ${getAvailableConfidenceValues(gameId, gameIds.length).map(confValue => `
                                         <option value="${confValue}" ${pick.confidence == confValue ? 'selected' : ''}>${confValue}</option>
                                     `).join('')}
                                 </select>
@@ -772,6 +859,12 @@
             }
 
             updateStatus(`Week ${currentWeek} loaded - ${canEdit ? 'Editable' : 'View Only'}`, 'success');
+
+            // Refresh confidence dropdowns after page load to apply locked game filtering
+            setTimeout(() => {
+                refreshConfidenceDropdowns();
+                console.log('🔄 INITIAL_LOAD: Refreshed confidence dropdowns after page load');
+            }, 100);
         }
 
         function populateMNFPoints() {
@@ -863,6 +956,9 @@
 
             await savePicksData();
             validatePicks();
+
+            // Refresh all confidence dropdowns to update available options
+            refreshConfidenceDropdowns();
         }
 
         async function savePicksData() {
