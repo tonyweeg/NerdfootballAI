@@ -61,8 +61,15 @@ class PredictionTracker {
             predictions.predictions.push(prediction);
         });
 
-        // Save to Firebase
+        // Save to Firebase (only if admin authenticated)
         try {
+            if (!window.isAdmin || !window.currentUser) {
+                if (this.debugMode) {
+                    console.log(`🎯 PREDICTION_TRACKER: Skipping save - no admin authentication (read-only mode)`);
+                }
+                return { success: false, error: 'No admin authentication - predictions not saved', predictions };
+            }
+
             const docPath = `artifacts/nerdfootball/ai-predictions/week-${weeklyAnalysis.week}-${new Date().getFullYear()}`;
             await window.db.doc(docPath).set(predictions);
 
@@ -73,8 +80,15 @@ class PredictionTracker {
             return { success: true, path: docPath, predictions };
 
         } catch (error) {
-            console.error(`🎯 PREDICTION_TRACKER: ❌ Failed to save predictions:`, error);
-            return { success: false, error: error.message };
+            if (error.message.includes('Missing or insufficient permissions')) {
+                if (this.debugMode) {
+                    console.log(`🎯 PREDICTION_TRACKER: Skipping save - insufficient permissions (read-only mode)`);
+                }
+                return { success: false, error: 'Insufficient permissions - predictions not saved', predictions };
+            } else {
+                console.error(`🎯 PREDICTION_TRACKER: ❌ Failed to save predictions:`, error);
+                return { success: false, error: error.message };
+            }
         }
     }
 
@@ -131,6 +145,7 @@ class PredictionTracker {
             console.log(`🎯 PREDICTION_TRACKER: Generating accuracy report${week ? ` for Week ${week}` : ' for all weeks'}`);
         }
 
+
         try {
             let predictions = [];
 
@@ -142,12 +157,25 @@ class PredictionTracker {
                     predictions = doc.data().predictions;
                 }
             } else {
-                // Get all weeks
+                // Get all weeks - with enhanced error handling
+                if (this.debugMode) {
+                    console.log(`🎯 PREDICTION_TRACKER: Attempting to read collection: artifacts/nerdfootball/ai-predictions`);
+                    console.log(`🎯 PREDICTION_TRACKER: Auth state - isAdmin: ${window.isAdmin}, currentUser: ${window.currentUser ? window.currentUser.uid : 'null'}`);
+                }
+
                 const collection = await window.db.collection('artifacts/nerdfootball/ai-predictions').get();
+
+                if (this.debugMode) {
+                    console.log(`🎯 PREDICTION_TRACKER: Collection read successful, found ${collection.size} documents`);
+                }
+
                 collection.forEach(doc => {
                     // Only include documents from current season (doc ID format: week-X-YYYY)
                     if (doc.id.includes(`-${new Date().getFullYear()}`) && doc.data().predictions) {
                         predictions = predictions.concat(doc.data().predictions);
+                        if (this.debugMode) {
+                            console.log(`🎯 PREDICTION_TRACKER: Added ${doc.data().predictions.length} predictions from ${doc.id}`);
+                        }
                     }
                 });
             }
@@ -187,7 +215,29 @@ class PredictionTracker {
             return { success: true, report };
 
         } catch (error) {
-            console.error(`🎯 PREDICTION_TRACKER: ❌ Failed to generate report:`, error);
+            if (this.debugMode) {
+                console.error(`🎯 PREDICTION_TRACKER: ❌ Failed to generate report:`, error);
+            }
+
+            // If it's a permission error and no predictions exist yet, return empty report
+            if (error.message.includes('Missing or insufficient permissions')) {
+                return {
+                    success: true,
+                    report: {
+                        totalPredictions: 0,
+                        completedGames: 0,
+                        correctPredictions: 0,
+                        accuracy: 0,
+                        highConfidenceGames: [],
+                        lowConfidenceGames: [],
+                        easyPicks: [],
+                        hardPicks: [],
+                        predictions: [],
+                        message: 'No prediction data available yet. Generate some predictions first!'
+                    }
+                };
+            }
+
             return { success: false, error: error.message };
         }
     }
@@ -200,6 +250,19 @@ class PredictionTracker {
         }
 
         const data = report.report;
+
+        // Handle no data case
+        if (data.totalPredictions === 0 && data.message) {
+            return `
+                <div class="bg-yellow-50 p-4 rounded-lg mb-4">
+                    <h3 class="font-semibold text-yellow-800 mb-3">📊 AI Prediction Accuracy Report</h3>
+                    <div class="text-yellow-700">
+                        <p class="mb-2">${data.message}</p>
+                        <p class="text-sm">Use the "Generate Analysis" button to create your first predictions, then come back to view accuracy metrics.</p>
+                    </div>
+                </div>
+            `;
+        }
 
         return `
             <div class="bg-blue-50 p-4 rounded-lg mb-4">

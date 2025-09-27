@@ -1310,3 +1310,14 @@ const {
 } = require('./justRunWeek4');
 
 exports.processWeeklyScoring = processWeeklyScoring;
+
+// ============================================
+// ADMIN AUTHENTICATION SYSTEM
+// ============================================
+
+// Import admin auth functions
+const { generateAdminToken, generateAdminTokenHTTP } = require('./adminAuth');
+
+// Export admin authentication functions
+exports.generateAdminToken = generateAdminToken;
+exports.generateAdminTokenHTTP = generateAdminTokenHTTP;
