@@ -1023,35 +1023,69 @@ class RichNerdAITool {
         return validPlayers;
     }
 
+    // Parse roster data from Firebase Function response
+    parseFirebaseRosterData(rosterData) {
+        const validPlayers = [];
+
+        if (!rosterData.players || !Array.isArray(rosterData.players)) {
+            return validPlayers;
+        }
+
+        for (const player of rosterData.players) {
+            if (player.name && player.position) {
+                // Convert Firebase roster format to expected format
+                const processedPlayer = {
+                    id: player.number || null,
+                    displayName: player.name,
+                    position: {
+                        abbreviation: player.position
+                    },
+                    weight: player.weight ? parseInt(player.weight) : null,
+                    height: player.height ? parseInt(player.height) : null,
+                    jersey: player.number || null
+                };
+
+                // Filter for linemen positions
+                if (this.isLineman(processedPlayer.position.abbreviation)) {
+                    validPlayers.push(processedPlayer);
+                }
+            }
+        }
+
+        return validPlayers;
+    }
+
     async scrapeTeamRosterData(teamAbbr) {
-        // Try ESPN roster page scraping as suggested
+        // Use Firebase Function to fetch roster data (bypasses CORS)
         try {
             const teamName = this.getESPNTeamName(teamAbbr);
             if (!teamName) return null;
 
-            const rosterUrl = `https://www.espn.com/nfl/team/roster/_/name/${teamAbbr.toLowerCase()}/${teamName}`;
-
             if (this.debugMode) {
-                console.log(`🏈 LINEMEN_ANALYSIS: Attempting to fetch roster from: ${rosterUrl}`);
+                console.log(`🏈 LINEMEN_ANALYSIS: Fetching roster via Firebase Function for ${teamAbbr}`);
             }
 
-            // Try to fetch the roster page
-            const response = await fetch(rosterUrl, {
-                mode: 'cors',
-                headers: {
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-                }
+            // Call Firebase Function instead of direct ESPN request
+            const fetchTeamRoster = window.firebase.functions().httpsCallable('fetchTeamRoster');
+            const result = await fetchTeamRoster({
+                teamAbbr: teamAbbr,
+                teamName: teamName
             });
 
-            if (response.ok) {
-                const html = await response.text();
-                return this.parseESPNRosterHTML(html, teamAbbr);
+            if (result.data.success && result.data.data.players) {
+                if (this.debugMode) {
+                    console.log(`🏈 LINEMEN_ANALYSIS: ✅ Got roster from Firebase Function: ${result.data.data.players.length} players`);
+                }
+                return this.parseFirebaseRosterData(result.data.data);
+            } else {
+                if (this.debugMode) {
+                    console.log(`🏈 LINEMEN_ANALYSIS: Firebase Function returned error: ${result.data.error}`);
+                }
             }
 
         } catch (error) {
             if (this.debugMode) {
-                console.log(`🏈 LINEMEN_ANALYSIS: Roster page scraping failed: ${error.message}`);
+                console.log(`🏈 LINEMEN_ANALYSIS: Firebase roster fetch failed: ${error.message}`);
             }
         }
 

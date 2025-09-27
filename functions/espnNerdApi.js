@@ -739,6 +739,134 @@ exports.espnApiStatus = functions.https.onCall(async (data, context) => {
     };
 });
 
+// Fetch team roster data (bypasses CORS for client-side requests)
+exports.fetchTeamRoster = functions.https.onCall(async (data, context) => {
+    try {
+        const { teamAbbr, teamName } = data;
+
+        if (!teamAbbr || !teamName) {
+            throw new Error('Team abbreviation and team name are required');
+        }
+
+        // Rate limiting check
+        if (!espnApi.canMakeRequest()) {
+            throw new Error('Rate limit exceeded. Please try again later.');
+        }
+
+        espnApi.RATE_LIMIT.requests++;
+
+        // Construct ESPN roster URL
+        const rosterUrl = `https://www.espn.com/nfl/team/roster/_/name/${teamAbbr.toLowerCase()}/${teamName.toLowerCase().replace(/\s+/g, '-')}`;
+
+        console.log(`🏈 ROSTER: Fetching roster data for ${teamAbbr} from: ${rosterUrl}`);
+
+        // Fetch roster page (server-side bypasses CORS)
+        const response = await fetch(rosterUrl, {
+            headers: {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'User-Agent': 'Mozilla/5.0 (compatible; NerdFootball/1.0; +https://nerdfootball.web.app)'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`ESPN roster fetch failed: ${response.status} ${response.statusText}`);
+        }
+
+        const html = await response.text();
+
+        // Basic HTML parsing to extract roster data
+        // Look for common roster table patterns
+        const rosterData = {
+            teamAbbr: teamAbbr.toUpperCase(),
+            teamName: teamName,
+            url: rosterUrl,
+            lastUpdated: new Date().toISOString(),
+            players: extractPlayersFromHtml(html)
+        };
+
+        console.log(`🏈 ROSTER: Successfully fetched ${rosterData.players.length} players for ${teamAbbr}`);
+
+        return {
+            success: true,
+            data: rosterData,
+            cached: false,
+            lastUpdated: new Date().toISOString()
+        };
+
+    } catch (error) {
+        console.error('🏈 ROSTER: Error fetching team roster:', error);
+        return {
+            success: false,
+            error: error.message,
+            lastUpdated: new Date().toISOString()
+        };
+    }
+});
+
+// Helper function to extract player data from ESPN HTML
+function extractPlayersFromHtml(html) {
+    const players = [];
+
+    try {
+        // Look for common ESPN roster table patterns
+        // This is a basic implementation - can be enhanced based on actual ESPN HTML structure
+        const tableMatch = html.match(/<table[^>]*class="[^"]*roster[^"]*"[^>]*>[\s\S]*?<\/table>/i);
+
+        if (tableMatch) {
+            const tableHtml = tableMatch[0];
+            const rowMatches = tableHtml.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi);
+
+            if (rowMatches) {
+                rowMatches.forEach((row, index) => {
+                    // Skip header rows
+                    if (index === 0 || row.includes('<th')) return;
+
+                    const cellMatches = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
+                    if (cellMatches && cellMatches.length >= 3) {
+                        // Extract basic player info (adjust based on ESPN's actual structure)
+                        const player = {
+                            number: extractTextFromCell(cellMatches[0]),
+                            name: extractTextFromCell(cellMatches[1]),
+                            position: extractTextFromCell(cellMatches[2]),
+                            // Add more fields as needed based on ESPN structure
+                        };
+
+                        if (player.name && player.name.trim()) {
+                            players.push(player);
+                        }
+                    }
+                });
+            }
+        }
+
+        // Fallback: Look for JSON data in script tags (ESPN often embeds data this way)
+        const scriptMatches = html.match(/<script[^>]*>[\s\S]*?window\.__espnfitt__\s*=[\s\S]*?<\/script>/gi);
+        if (scriptMatches) {
+            // Try to extract player data from embedded JSON
+            // This would need to be implemented based on ESPN's actual data structure
+        }
+
+    } catch (parseError) {
+        console.warn('🏈 ROSTER: HTML parsing failed, returning empty roster:', parseError.message);
+    }
+
+    return players;
+}
+
+// Helper function to extract clean text from HTML cell
+function extractTextFromCell(cellHtml) {
+    if (!cellHtml) return '';
+
+    // Remove HTML tags and decode entities
+    return cellHtml
+        .replace(/<[^>]*>/g, '')  // Remove HTML tags
+        .replace(/&nbsp;/g, ' ')  // Replace &nbsp; with space
+        .replace(/&amp;/g, '&')   // Replace &amp; with &
+        .replace(/&lt;/g, '<')    // Replace &lt; with <
+        .replace(/&gt;/g, '>')    // Replace &gt; with >
+        .trim();
+}
+
 // Scheduled function to update live games (runs every 30 seconds during game days)
 // TODO: Re-enable when scheduler API is available
 /*exports.scheduledGameUpdates = functions.pubsub.schedule('every 30 minutes').onRun(async (context) => {
