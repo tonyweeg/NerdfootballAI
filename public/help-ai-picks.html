@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -59,7 +60,7 @@
                 </button>
 
                 <!-- Admin-only features -->
-                <div class="admin-only mt-6 p-4 bg-gray-800 border-2 border-yellow-600 rounded-lg" style="display: none;">
+                <div class="admin-only mt-6 p-4 bg-gray-800 border-2 border-yellow-600 rounded-lg">
                     <h3 class="text-xl font-bold text-yellow-400 mb-4 text-center">⚔️ WU-TANG ADMIN ARSENAL ⚔️</h3>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-center">
                         <button onclick="showAccuracyReport()" class="bg-yellow-600 text-black px-4 py-2 rounded-lg hover:bg-yellow-500 transition font-bold border-2 border-yellow-400">
@@ -79,9 +80,6 @@
                         </button>
                         <button onclick="addAZvsSEALearning()" class="bg-yellow-600 text-black px-4 py-2 rounded-lg hover:bg-yellow-500 transition font-bold border-2 border-yellow-400">
                             🧠 TEACH AI
-                        </button>
-                        <button onclick="showCacheStatus()" class="bg-cyan-700 text-white px-4 py-2 rounded-lg hover:bg-cyan-600 transition font-bold border-2 border-cyan-400">
-                            🔥 CACHE STATUS
                         </button>
                     </div>
                 </div>
@@ -230,7 +228,13 @@
                 }
             }
 
-            console.log('🎯 NERDAI_DEBUG: Admin UI features activated');
+            // Show all admin-only sections including Wu-Tang Admin Arsenal
+            const adminOnlySections = document.querySelectorAll('.admin-only');
+            adminOnlySections.forEach(section => {
+                section.style.display = 'block';
+            });
+
+            console.log('🎯 NERDAI_DEBUG: Admin UI features activated - Wu-Tang Admin Arsenal now visible');
         }
 
         function showAdminLoginOptions() {
@@ -346,109 +350,35 @@
 
         // Note: Removed auth timeout - now shows friendly login interface instead
 
-        // Firebase JSON cache configuration
-        const FIREBASE_CACHE_CONFIG = {
-            cachePath: 'artifacts/nerdfootball/pools/nerduniverse-2025/latest-ai-intel-sheet',
-            cacheTimeMinutes: 15,
-            isValid: function(createdDate) {
-                if (!createdDate) return false;
-                const cacheTime = new Date(createdDate).getTime();
-                const now = Date.now();
-                const maxAge = this.cacheTimeMinutes * 60 * 1000;
-                return (now - cacheTime) < maxAge;
-            }
-        };
-
-        // Legacy cache for fallback
+        // 15-minute cache for predictions
         let predictionCache = {
             data: null,
             timestamp: null,
             isValid: function() {
                 if (!this.data || !this.timestamp) return false;
-                const fifteenMinutes = 15 * 60 * 1000;
+                const fifteenMinutes = 15 * 60 * 1000; // 15 minutes in milliseconds
                 return (Date.now() - this.timestamp) < fifteenMinutes;
             }
         };
-
-        async function loadFirebaseCachedAnalysis() {
-            try {
-                console.log('🔥 FIREBASE_CACHE: Checking for cached analysis...');
-                const cacheDoc = await window.db.doc(FIREBASE_CACHE_CONFIG.cachePath).get();
-
-                if (!cacheDoc.exists) {
-                    console.log('🔥 FIREBASE_CACHE: No cached document found');
-                    return null;
-                }
-
-                const cacheData = cacheDoc.data();
-
-                if (!FIREBASE_CACHE_CONFIG.isValid(cacheData.createdDate)) {
-                    console.log('🔥 FIREBASE_CACHE: Cache expired, needs refresh');
-                    return null;
-                }
-
-                console.log('🔥 FIREBASE_CACHE: ✅ Using fresh cached analysis');
-                return cacheData.analysisData;
-
-            } catch (error) {
-                console.error('🔥 FIREBASE_CACHE: Error loading cache:', error);
-                return null;
-            }
-        }
-
-        async function saveFirebaseCachedAnalysis(analysisData) {
-            try {
-                console.log('🔥 FIREBASE_CACHE: Saving fresh analysis to Firebase...');
-
-                const cacheDocument = {
-                    createdDate: new Date().toISOString(),
-                    week: analysisData.week || 4,
-                    analysisData: analysisData,
-                    metadata: {
-                        totalGames: analysisData.summary?.totalGames || 0,
-                        dataSource: analysisData.summary?.dataQuality?.dataSource || 'unknown',
-                        realESPNData: analysisData.summary?.dataQuality?.realESPNData || false
-                    }
-                };
-
-                await window.db.doc(FIREBASE_CACHE_CONFIG.cachePath).set(cacheDocument);
-                console.log('🔥 FIREBASE_CACHE: ✅ Analysis cached to Firebase successfully');
-
-            } catch (error) {
-                console.error('🔥 FIREBASE_CACHE: Error saving cache:', error);
-            }
-        }
 
         async function getRichAIAnalysis(forceFresh = false) {
             const loading = document.getElementById('loading');
             const results = document.getElementById('aiResults');
             const content = document.getElementById('aiContent');
 
-            // STEP 1: Try Firebase cache first (unless force fresh requested)
-            if (!forceFresh) {
-                const cachedAnalysis = await loadFirebaseCachedAnalysis();
-                if (cachedAnalysis) {
-                    console.log('🎯 PERFORMANCE: Using Firebase cached analysis (instant load)');
-                    displayRichAIResults(cachedAnalysis);
-                    results.classList.remove('hidden');
-                    return;
-                }
-
-                // Fallback to legacy cache
-                if (predictionCache.isValid()) {
-                    console.log('🎯 PERFORMANCE: Using legacy cache as fallback');
-                    displayRichAIResults(predictionCache.data);
-                    results.classList.remove('hidden');
-                    return;
-                }
+            // Check cache first (unless force fresh requested)
+            if (!forceFresh && predictionCache.isValid()) {
+                console.log('🎯 CACHE: Using cached predictions (less than 15 minutes old)');
+                displayRichAIResults(predictionCache.data);
+                results.classList.remove('hidden');
+                return;
             }
 
-            // STEP 2: Generate fresh analysis (cache miss or forced refresh)
             loading.classList.remove('hidden');
             results.classList.add('hidden');
 
             try {
-                console.log('🎯 PERFORMANCE: Generating fresh analysis (cache miss or forced)');
+                console.log('🎯 CACHE: Generating fresh predictions (cache expired or forced refresh)');
                 const richAI = window.RichNerdAITool;
                 richAI.setDebugMode(true);
 
@@ -457,14 +387,11 @@
                 if (comprehensiveAnalysis.error) {
                     content.innerHTML = `<div class="text-red-600">Error: ${comprehensiveAnalysis.error}</div>`;
                 } else {
-                    // STEP 3: Save to both Firebase cache and legacy cache
-                    await saveFirebaseCachedAnalysis(comprehensiveAnalysis);
-
-                    // Legacy cache for immediate fallback
+                    // Cache the fresh results
                     predictionCache.data = comprehensiveAnalysis;
                     predictionCache.timestamp = Date.now();
+                    console.log('🎯 CACHE: Fresh predictions cached for 15 minutes');
 
-                    console.log('🎯 PERFORMANCE: Fresh analysis cached to Firebase + legacy');
                     displayRichAIResults(comprehensiveAnalysis);
                 }
 
@@ -1557,135 +1484,6 @@ ${JSON.stringify(data, null, 2)}
             } catch (error) {
                 console.error('🧠 LEARNING: ❌ Failed to add learning experience:', error);
                 alert('❌ Failed to add learning experience: ' + error.message);
-            }
-        }
-
-        async function showCacheStatus() {
-            const content = document.getElementById('aiContent');
-            const results = document.getElementById('aiResults');
-
-            try {
-                console.log('🔥 CACHE_STATUS: Checking Firebase cache status...');
-
-                const cacheDoc = await window.db.doc(FIREBASE_CACHE_CONFIG.cachePath).get();
-
-                let html = `
-                    <div class="bg-cyan-900 border-2 border-cyan-400 p-6 rounded-lg mb-6">
-                        <h2 class="text-2xl font-bold text-cyan-400 mb-4 text-center">🔥 FIREBASE CACHE STATUS</h2>
-                `;
-
-                if (!cacheDoc.exists) {
-                    html += `
-                        <div class="bg-red-900 border-2 border-red-400 p-4 rounded text-center">
-                            <div class="text-2xl font-bold text-red-400">❌ NO CACHE FOUND</div>
-                            <div class="text-red-300 mt-2">First visitor will generate fresh analysis</div>
-                        </div>
-                    `;
-                } else {
-                    const cacheData = cacheDoc.data();
-                    const createdDate = new Date(cacheData.createdDate);
-                    const now = new Date();
-                    const ageMinutes = Math.floor((now - createdDate) / (1000 * 60));
-                    const isValid = FIREBASE_CACHE_CONFIG.isValid(cacheData.createdDate);
-
-                    html += `
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div class="bg-gray-800 border-2 ${isValid ? 'border-green-400' : 'border-red-400'} p-4 rounded text-center">
-                                <div class="text-2xl font-bold ${isValid ? 'text-green-400' : 'text-red-400'}">
-                                    ${isValid ? '✅ VALID' : '❌ EXPIRED'}
-                                </div>
-                                <div class="text-sm text-gray-300">Cache Status</div>
-                            </div>
-                            <div class="bg-gray-800 border-2 border-cyan-400 p-4 rounded text-center">
-                                <div class="text-2xl font-bold text-cyan-400">${ageMinutes}m</div>
-                                <div class="text-sm text-gray-300">Age (${FIREBASE_CACHE_CONFIG.cacheTimeMinutes}m max)</div>
-                            </div>
-                            <div class="bg-gray-800 border-2 border-yellow-400 p-4 rounded text-center">
-                                <div class="text-2xl font-bold text-yellow-400">${cacheData.metadata?.totalGames || 0}</div>
-                                <div class="text-sm text-gray-300">Games Cached</div>
-                            </div>
-                        </div>
-
-                        <div class="bg-gray-800 border-2 border-cyan-500 p-4 rounded mb-4">
-                            <h3 class="font-bold text-cyan-400 mb-3">📊 Cache Details</h3>
-                            <div class="grid grid-cols-2 gap-4 text-sm text-white">
-                                <div><strong class="text-cyan-300">Created:</strong> ${createdDate.toLocaleString()}</div>
-                                <div><strong class="text-cyan-300">Week:</strong> ${cacheData.week || 'N/A'}</div>
-                                <div><strong class="text-cyan-300">Data Source:</strong> ${cacheData.metadata?.dataSource || 'Unknown'}</div>
-                                <div><strong class="text-cyan-300">Real ESPN:</strong> ${cacheData.metadata?.realESPNData ? '✅ Yes' : '❌ No'}</div>
-                            </div>
-                        </div>
-
-                        <div class="bg-gray-900 border border-cyan-600 p-4 rounded">
-                            <h4 class="font-bold text-cyan-300 mb-2">🚀 Performance Impact</h4>
-                            <div class="text-sm text-cyan-200">
-                                <div>• <strong>Cache Hit:</strong> ~200-500ms load time (99% faster)</div>
-                                <div>• <strong>Cache Miss:</strong> ~5-10 seconds for fresh analysis</div>
-                                <div>• <strong>Firebase Path:</strong> <code class="bg-gray-800 px-1 rounded">${FIREBASE_CACHE_CONFIG.cachePath}</code></div>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                html += `
-                        <div class="text-center mt-4">
-                            <button onclick="clearFirebaseCache()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-500 transition font-bold border-2 border-red-400 mr-2">
-                                🗑️ CLEAR CACHE
-                            </button>
-                            <button onclick="testCachePerformance()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-500 transition font-bold border-2 border-green-400">
-                                ⚡ TEST PERFORMANCE
-                            </button>
-                        </div>
-                    </div>
-                `;
-
-                content.innerHTML = html;
-                results.classList.remove('hidden');
-
-            } catch (error) {
-                content.innerHTML = `<div class="text-red-600">Error checking cache status: ${error.message}</div>`;
-                results.classList.remove('hidden');
-            }
-        }
-
-        async function clearFirebaseCache() {
-            if (!window.isAdmin) {
-                alert('Admin access required');
-                return;
-            }
-
-            if (confirm('Clear the Firebase cache? Next visitor will generate fresh analysis.')) {
-                try {
-                    await window.db.doc(FIREBASE_CACHE_CONFIG.cachePath).delete();
-                    alert('✅ Firebase cache cleared successfully');
-                    showCacheStatus(); // Refresh the display
-                } catch (error) {
-                    alert(`❌ Error clearing cache: ${error.message}`);
-                }
-            }
-        }
-
-        async function testCachePerformance() {
-            const startTime = performance.now();
-            console.log('⚡ PERFORMANCE_TEST: Starting cache performance test...');
-
-            try {
-                // Test Firebase cache load
-                const cachedAnalysis = await loadFirebaseCachedAnalysis();
-                const endTime = performance.now();
-                const loadTime = Math.round(endTime - startTime);
-
-                if (cachedAnalysis) {
-                    console.log(`⚡ PERFORMANCE_TEST: ✅ Cache hit - ${loadTime}ms`);
-                    alert(`🚀 Cache Performance: ${loadTime}ms (Expected: <500ms)`);
-                } else {
-                    console.log(`⚡ PERFORMANCE_TEST: ❌ Cache miss - ${loadTime}ms`);
-                    alert(`⚠️ No cache found - would need fresh generation (~5-10 seconds)`);
-                }
-
-            } catch (error) {
-                console.error('⚡ PERFORMANCE_TEST: Error:', error);
-                alert(`❌ Performance test failed: ${error.message}`);
             }
         }
     </script>
