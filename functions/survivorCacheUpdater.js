@@ -74,11 +74,20 @@ async function invalidateRelevantCaches(gameId, gameData) {
         if (invalidatedCount > 0) {
             await batch.commit();
             console.log(`✅ Invalidated ${invalidatedCount} survivor caches for game ${gameId}`);
-            
+
             // Trigger cache warming for active pools
             await warmCachesForActivePools();
         } else {
             console.log(`ℹ️  No caches found tracking game ${gameId}`);
+        }
+
+        // SUPER-SURVIVOR: Also clear the HTML display cache when games finish
+        try {
+            const superSurvivorCachePath = 'artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-survivor-display';
+            await db.doc(superSurvivorCachePath).delete();
+            console.log(`🔥 SUPER-SURVIVOR: Cleared HTML cache for game ${gameId} completion`);
+        } catch (error) {
+            console.log(`ℹ️  SUPER-SURVIVOR: No HTML cache to clear (${error.message})`);
         }
         
     } catch (error) {
