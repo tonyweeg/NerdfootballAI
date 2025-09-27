@@ -23,16 +23,27 @@
 
 **Usage**: Call upon these agents using the Task tool when their expertise matches your development needs.
 
-## 🥇 NERD-UNIVERSE GOLD STANDARD - v1.0
-**CURRENT GOLD STANDARD - THE PERFECT REFERENCE POINT**
+## 🥷 WU-TANG AI CHAMBER GOLD STANDARD - v2.0
+**CURRENT GOLD STANDARD - WU-TANG AI SUPREMACY**
 
 ### 📌 Gold Standard Details:
 - **Branch**: `main` (current working branch)
-- **Tag**: `nerd-universe-gold-v1.0` (permanent reference point)
-- **Main Hub**: `nerd-universe.html` (terminal-themed perfection)
+- **Tag**: `wu-tang-ai-gold-v2.0` (permanent reference point)
+- **Main Chamber**: `ai-picks-helper.html` (Wu-Tang AI prediction chamber)
+- **Main Hub**: `nerd-universe.html` (terminal-themed perfection with Wu-Tang AI integration)
 - **Auth Gateway**: `index.html` (redirects to nerd-universe.html)
 - **Picks Gateway**: `picks-landing.html` (choice between pools)
-- **Commit**: `8f9b049` (Nerd-Universe Gold Standard)
+- **Commit**: `88c63ff` (Wu-Tang AI Gold Standard v2.0)
+
+### 🥷 NEW Wu-Tang AI Features (MUST ALL WORK):
+- **Wu-Tang AI Chamber**: Complete moneyline intelligence system at `ai-picks-helper.html`
+- **5-Dimensional Analysis**: Line Battle, Betting Intel, Experience, Weather, Cognitive Intelligence
+- **Admin Authentication**: Multi-method auth (Google OAuth + Email/Password) for Wu-Tang AI access
+- **Moneyline Intelligence**: Straight-up winner predictions with confidence percentages and rollup summary
+- **Real Data Integration**: ESPN API integration with zero sample/fake data
+- **Wonderlic Cognitive Analysis**: Team intelligence scoring based on Wonderlic test averages
+- **Admin Menu Integration**: Wu-Tang AI Chamber accessible via nerd-universe.html admin tools
+- **Complete Documentation**: WU-TANG-AI-GOLD-STANDARD.md with full system specs
 
 ### ✅ Gold Standard Features (MUST ALL WORK):
 - **nerd-universe.html**: Terminal-themed main application hub
@@ -62,13 +73,19 @@
 
 ### 🛡️ Gold Standard Recovery Commands:
 ```bash
-# If anything breaks, restore gold standard:
+# If Wu-Tang AI breaks, restore to gold standard:
+git checkout wu-tang-ai-gold-v2.0
+firebase deploy --only hosting
+firebase deploy --only functions
+
+# If complete system failure, fallback to previous standard:
 git checkout nerd-universe-gold-v1.0
 firebase deploy --only hosting
 
-# Or restore to main branch at gold commit:
-git reset --hard 8f9b049
+# Or restore to main branch at Wu-Tang AI gold commit:
+git reset --hard 88c63ff
 firebase deploy --only hosting
+firebase deploy --only functions
 ```
 
 ## 🤖 MEGATRON DASHBOARD SYSTEM - v1.0
