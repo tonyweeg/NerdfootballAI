@@ -152,26 +152,6 @@
                     </div>
                 </div>
 
-                <!-- Admin Cache Management (hidden by default) -->
-                <div id="admin-cache-controls" class="admin-only" style="display: none;">
-                    <div class="bg-terminal-surface border border-terminal-border rounded-lg p-4 mb-6">
-                        <h3 class="text-lg font-bold text-terminal-warning mb-3">🔧 Admin Cache Management</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <button id="clear-cache-btn"
-                                    class="neon-button text-sm px-4 py-2 rounded hover:bg-terminal-danger transition-colors">
-                                🗑️ Clear Cache
-                            </button>
-                            <button id="regenerate-cache-btn"
-                                    class="neon-button text-sm px-4 py-2 rounded hover:bg-terminal-accent transition-colors">
-                                🔄 Regenerate Cache
-                            </button>
-                        </div>
-                        <div id="cache-admin-status" class="text-xs text-terminal-muted mt-2">
-                            Cache management tools for admins
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Top 3 Podium -->
                 <div id="podium" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                     <!-- Will be populated by JavaScript -->
@@ -220,46 +200,6 @@
         </div>
     </main>
 
-    <!-- Player Performance Modal -->
-    <div id="player-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="terminal-window max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="p-6">
-                <!-- Modal Header -->
-                <div class="flex justify-between items-center mb-6">
-                    <h3 id="modal-title" class="text-2xl font-bold terminal-accent">Player Performance</h3>
-                    <button id="close-modal" class="neon-button px-3 py-2 rounded-md text-sm">✕ Close</button>
-                </div>
-
-                <!-- Player Comparison -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <!-- Selected Player -->
-                    <div class="terminal-window p-4 border-2 border-terminal-accent">
-                        <h4 class="text-lg font-bold terminal-accent mb-3">🎯 Selected Player</h4>
-                        <div id="selected-player-stats" class="space-y-2">
-                            <!-- Player stats will be inserted here -->
-                        </div>
-                    </div>
-
-                    <!-- Current User -->
-                    <div class="terminal-window p-4 border-2 border-terminal-secondary">
-                        <h4 class="text-lg font-bold terminal-secondary mb-3">👤 Your Performance</h4>
-                        <div id="current-user-stats" class="space-y-2">
-                            <!-- Current user stats will be inserted here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Weekly Performance Chart -->
-                <div class="terminal-window p-4">
-                    <h4 class="text-lg font-bold terminal-text mb-4">📈 Weekly Performance Comparison</h4>
-                    <div id="weekly-chart" class="space-y-3">
-                        <!-- Weekly comparison chart will be inserted here -->
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -281,14 +221,6 @@
         const db = getFirestore(app);
 
         let currentUser = null;
-        let allPlayersData = []; // Store all player data for modal access
-
-        // Admin UIDs for cache management access
-        const ADMIN_UIDS = [
-            'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
-            'ebBc70wNgMgIvIfG44jJupsMW0T2', // jimweeg@comcast.net
-            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'  // erweeg@gmail.com
-        ];
 
         // Auth state handler
         onAuthStateChanged(auth, async (user) => {
@@ -301,14 +233,6 @@
                 userDisplay.classList.add('terminal-accent');
                 authStatus.textContent = 'Authenticated';
                 authStatus.classList.add('terminal-accent');
-
-                // Check for admin access and show cache controls
-                if (ADMIN_UIDS.includes(user.uid)) {
-                    const adminControls = document.getElementById('admin-cache-controls');
-                    if (adminControls) {
-                        adminControls.style.display = 'block';
-                    }
-                }
 
                 // Load leaderboard data
                 await loadSeasonLeaderboard();
@@ -404,8 +328,7 @@
                 leaderboardData.metadata.totalUsers
             );
 
-            // Store data globally and render leaderboard
-            allPlayersData = seasonData;
+            // Render leaderboard
             renderLeaderboard(seasonData);
         }
 
@@ -476,12 +399,11 @@
                 }
 
                 tableBody.innerHTML += `
-                    <tr class="border-b border-terminal-border hover:bg-terminal-surface/30 transition-colors duration-200 cursor-pointer" onclick="showPlayerModal('${player.id}', '${player.name}', ${rank})">
+                    <tr class="border-b border-terminal-border hover:bg-terminal-surface/30 transition-colors duration-200">
                         <td class="py-3 px-2 font-bold ${rankClass}">#${rank}</td>
                         <td class="py-3 px-4">
-                            <div class="terminal-text font-semibold hover:terminal-accent transition-colors">${player.name}</div>
+                            <div class="terminal-text font-semibold">${player.name}</div>
                             <div class="text-xs terminal-muted">${player.email}</div>
-                            <div class="text-xs terminal-secondary">Click for details</div>
                         </td>
                         <td class="py-3 px-2 text-center">
                             <div class="text-lg font-bold terminal-accent">${player.totalPoints}</div>
@@ -524,73 +446,6 @@
             }
         });
 
-        // Admin cache management buttons
-        document.getElementById('clear-cache-btn').addEventListener('click', async () => {
-            const statusDiv = document.getElementById('cache-admin-status');
-            const button = document.getElementById('clear-cache-btn');
-
-            try {
-                button.disabled = true;
-                button.textContent = '🗑️ Clearing...';
-                statusDiv.textContent = 'Clearing leaderboard cache...';
-                statusDiv.className = 'text-xs text-terminal-warning mt-2';
-
-                // Clear cache by calling our Node.js script endpoint
-                const response = await fetch('/clear-leaderboard-cache', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                if (response.ok) {
-                    statusDiv.textContent = '✅ Cache cleared successfully! Reload page for fresh data.';
-                    statusDiv.className = 'text-xs text-terminal-accent mt-2';
-                } else {
-                    throw new Error('Failed to clear cache');
-                }
-            } catch (error) {
-                console.error('Cache clear error:', error);
-                statusDiv.textContent = '❌ Failed to clear cache. Try regenerate instead.';
-                statusDiv.className = 'text-xs text-terminal-danger mt-2';
-            } finally {
-                button.disabled = false;
-                button.textContent = '🗑️ Clear Cache';
-            }
-        });
-
-        document.getElementById('regenerate-cache-btn').addEventListener('click', async () => {
-            const statusDiv = document.getElementById('cache-admin-status');
-            const button = document.getElementById('regenerate-cache-btn');
-
-            try {
-                button.disabled = true;
-                button.textContent = '🔄 Generating...';
-                statusDiv.textContent = 'Regenerating fresh leaderboard cache...';
-                statusDiv.className = 'text-xs text-terminal-warning mt-2';
-
-                const response = await fetch('https://generateseasonleaderboardcache-np7uealtnq-uc.a.run.app');
-                const result = await response.json();
-
-                if (result.success) {
-                    statusDiv.textContent = '✅ Cache regenerated! Reloading page with fresh data...';
-                    statusDiv.className = 'text-xs text-terminal-accent mt-2';
-
-                    // Reload page after 2 seconds to show fresh data
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
-                } else {
-                    throw new Error(result.error || 'Generation failed');
-                }
-            } catch (error) {
-                console.error('Cache regeneration error:', error);
-                statusDiv.textContent = '❌ Failed to regenerate cache. Try again.';
-                statusDiv.className = 'text-xs text-terminal-danger mt-2';
-            } finally {
-                button.disabled = false;
-                button.textContent = '🔄 Regenerate Cache';
-            }
-        });
-
         // Weekly breakdown toggle
         document.getElementById('toggle-breakdown').addEventListener('click', () => {
             const breakdown = document.getElementById('weekly-breakdown');
@@ -602,126 +457,6 @@
             } else {
                 breakdown.classList.add('hidden');
                 button.textContent = '📊 Show Weekly Breakdown';
-            }
-        });
-
-        // Modal functionality
-        window.showPlayerModal = function(playerId, playerName, playerRank) {
-            const selectedPlayer = allPlayersData.find(p => p.id === playerId);
-            const currentUserData = allPlayersData.find(p => p.email === currentUser?.email);
-
-            if (!selectedPlayer) return;
-
-            // Update modal title
-            document.getElementById('modal-title').textContent = `${playerName} Performance Analysis`;
-
-            // Populate selected player stats
-            populatePlayerStats('selected-player-stats', selectedPlayer, playerRank);
-
-            // Populate current user stats (if found)
-            if (currentUserData) {
-                const currentUserRank = allPlayersData.findIndex(p => p.email === currentUser.email) + 1;
-                populatePlayerStats('current-user-stats', currentUserData, currentUserRank);
-            } else {
-                document.getElementById('current-user-stats').innerHTML = '<div class="terminal-muted">Your data not found in leaderboard</div>';
-            }
-
-            // Generate weekly comparison chart
-            generateWeeklyChart(selectedPlayer, currentUserData);
-
-            // Show modal
-            document.getElementById('player-modal').classList.remove('hidden');
-        };
-
-        function populatePlayerStats(containerId, playerData, rank) {
-            const container = document.getElementById(containerId);
-            const rankClass = rank <= 3 ? (rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : 'rank-bronze') : 'terminal-text';
-
-            container.innerHTML = `
-                <div class="flex justify-between"><span class="terminal-muted">Rank:</span><span class="${rankClass} font-bold">#${rank}</span></div>
-                <div class="flex justify-between"><span class="terminal-muted">Total Points:</span><span class="terminal-accent font-bold">${playerData.totalPoints}</span></div>
-                <div class="flex justify-between"><span class="terminal-muted">Avg/Week:</span><span class="terminal-secondary">${playerData.averagePoints}</span></div>
-                <div class="flex justify-between"><span class="terminal-muted">Correct Picks:</span><span class="terminal-text">${playerData.totalCorrectPicks}/${playerData.totalValidPicks}</span></div>
-                <div class="flex justify-between"><span class="terminal-muted">Pick Rate:</span><span class="terminal-warning">${playerData.pickRate}%</span></div>
-                <div class="flex justify-between"><span class="terminal-muted">Points Behind Leader:</span><span class="terminal-danger">${playerData.pointsFromLeader}</span></div>
-            `;
-        }
-
-        function generateWeeklyChart(selectedPlayer, currentUserData) {
-            const chartContainer = document.getElementById('weekly-chart');
-
-            const weeks = [1, 2, 3, 4]; // Current weeks
-
-            let chartHTML = '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-terminal-border">';
-            chartHTML += '<th class="text-left py-2 px-2 terminal-accent">Week</th>';
-            chartHTML += '<th class="text-center py-2 px-2 terminal-accent">' + selectedPlayer.name.split(' ')[0] + '</th>';
-            if (currentUserData) {
-                chartHTML += '<th class="text-center py-2 px-2 terminal-secondary">Your Score</th>';
-                chartHTML += '<th class="text-center py-2 px-2 terminal-warning">Difference</th>';
-            }
-            chartHTML += '</tr></thead><tbody>';
-
-            // Use REAL weekly data from player objects
-            weeks.forEach(week => {
-                const selectedWeekData = selectedPlayer.weeklyData && selectedPlayer.weeklyData[`week${week}`];
-                const userWeekData = currentUserData && currentUserData.weeklyData && currentUserData.weeklyData[`week${week}`];
-
-                const selectedWeekPoints = selectedWeekData ? selectedWeekData.points : 0;
-                const userWeekPoints = userWeekData ? userWeekData.points : 0;
-                const difference = currentUserData ? selectedWeekPoints - userWeekPoints : 0;
-                const diffClass = difference > 0 ? 'terminal-accent' : difference < 0 ? 'terminal-danger' : 'terminal-muted';
-                const diffSign = difference > 0 ? '+' : '';
-
-                chartHTML += '<tr class="border-b border-terminal-border/30">';
-                chartHTML += `<td class="py-2 px-2 terminal-text">Week ${week}</td>`;
-
-                if (selectedWeekData) {
-                    chartHTML += `<td class="py-2 px-2 text-center terminal-accent">${selectedWeekPoints}</td>`;
-                } else {
-                    chartHTML += `<td class="py-2 px-2 text-center terminal-muted">-</td>`;
-                }
-
-                if (currentUserData) {
-                    if (userWeekData) {
-                        chartHTML += `<td class="py-2 px-2 text-center terminal-secondary">${userWeekPoints}</td>`;
-                        if (selectedWeekData) {
-                            chartHTML += `<td class="py-2 px-2 text-center ${diffClass}">${diffSign}${difference}</td>`;
-                        } else {
-                            chartHTML += `<td class="py-2 px-2 text-center terminal-muted">-</td>`;
-                        }
-                    } else {
-                        chartHTML += `<td class="py-2 px-2 text-center terminal-muted">-</td>`;
-                        chartHTML += `<td class="py-2 px-2 text-center terminal-muted">-</td>`;
-                    }
-                }
-                chartHTML += '</tr>';
-            });
-
-            chartHTML += '</tbody></table></div>';
-
-            if (!currentUserData) {
-                chartHTML += '<div class="mt-4 terminal-muted text-center">Log in to see comparison with your performance</div>';
-            }
-
-            chartContainer.innerHTML = chartHTML;
-        }
-
-        // Close modal functionality
-        document.getElementById('close-modal').addEventListener('click', () => {
-            document.getElementById('player-modal').classList.add('hidden');
-        });
-
-        // Close modal when clicking outside
-        document.getElementById('player-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'player-modal') {
-                document.getElementById('player-modal').classList.add('hidden');
-            }
-        });
-
-        // Close modal with Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                document.getElementById('player-modal').classList.add('hidden');
             }
         });
     </script>
