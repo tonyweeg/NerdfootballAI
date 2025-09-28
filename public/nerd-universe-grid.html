@@ -295,11 +295,12 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 90vw;
+            width: 50vw;
             max-width: 600px;
-            max-height: 80vh;
-            background: #111111;
+            max-height: 50vh;
+            background: rgba(17, 17, 17, 0.95);
             border: 2px solid #00ff41;
+            backdrop-filter: blur(10px);
             z-index: 50;
             overflow-y: auto;
             color: #00ff41;
@@ -313,6 +314,7 @@
             width: 100vw;
             height: 100vh;
             background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
             z-index: 40;
         }
 
@@ -1106,13 +1108,18 @@
             return teamShorts[teamName] || teamName?.substring(0, 3) || 'TBD';
         }
 
+        function getTeamHelmetUrl(teamName) {
+            const teamShort = getTeamShort(teamName);
+            return `https://a.espncdn.com/i/teamlogos/nfl/500/${teamShort.toLowerCase()}.png`;
+        }
+
         // Update strategic insights
         function updateStats() {
             const memberIds = Object.keys(poolMembers);
-            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+            const currentUserId = window.auth?.currentUser?.uid;
 
             const userRankings = calculateUserRankings(memberIds);
-            const yourRanking = userRankings.find(r => r.userId === tonyUID);
+            const yourRanking = userRankings.find(r => r.userId === currentUserId);
             const leaderInfo = getLeaderInfo(userRankings);
 
             const consensus = calculateConsensus(memberIds);
@@ -1270,7 +1277,7 @@
             const userPicks = allPicks[memberId];
 
             document.getElementById('modal-user-name').textContent =
-                `${member.name || 'UNKNOWN'} - WEEK ${currentWeek}`;
+                `${member.displayName || member.name || 'UNKNOWN'} - WEEK ${currentWeek}`;
 
             if (!userPicks) {
                 document.getElementById('modal-user-content').innerHTML = `
@@ -1289,7 +1296,7 @@
                 <div class="border border-nerd-green p-4">
                     <div class="grid grid-cols-2 gap-4 mb-4 text-xs">
                         <div>
-                            <div class="text-nerd-gold">USER: ${member.name || 'Unknown'}</div>
+                            <div class="text-nerd-gold">USER: ${member.displayName || member.name || 'Unknown'}</div>
                             <div class="text-nerd-cyan text-xs">${member.email || 'No email'}</div>
                             <div class="text-nerd-grey text-xs font-mono">${memberId}</div>
                         </div>
@@ -1391,13 +1398,20 @@
                 const bgColor = isGameComplete ? (isCorrect ? 'bg-green-900 border-green-600' : 'bg-red-900 border-red-600') : 'bg-nerd-darker border-nerd-grey';
                 const textColor = isGameComplete ? (isCorrect ? 'text-green-400' : 'text-red-400') : 'text-nerd-grey';
 
+                const teamShort = getTeamShort(pick.winner);
+                const helmetUrl = getTeamHelmetUrl(pick.winner);
+
                 return `<div class="p-1 ${bgColor} border text-center">
                     <div class="font-bold ${textColor} text-xs">${gameId}</div>
                     <div class="text-xs ${textColor}">C${pick.confidence}</div>
-                    <div class="text-xs ${textColor}" title="${pick.winner}">
-                        ${getTeamShort(pick.winner)}
+                    <div class="flex items-center justify-center mt-1">
+                        <img src="${helmetUrl}" alt="${teamShort}" class="w-4 h-4 mr-1" onerror="this.style.display='none'">
+                        <span class="text-xs ${textColor}" title="${pick.winner}">${teamShort}</span>
                     </div>
-                    ${!isCorrect && isGameComplete ? `<div class="text-xs ${textColor} opacity-75">→${getTeamShort(game.winner)}</div>` : ''}
+                    ${!isCorrect && isGameComplete ? `<div class="text-xs ${textColor} opacity-75 flex items-center justify-center">
+                        <img src="${getTeamHelmetUrl(game.winner)}" alt="${getTeamShort(game.winner)}" class="w-3 h-3 mr-1" onerror="this.style.display='none'">
+                        →${getTeamShort(game.winner)}
+                    </div>` : ''}
                 </div>`;
             }).join('');
         }
