@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add User to Rollups</title>
+</head>
+<body>
+    <h1>Add User THoYhTIT46RdGeNuL9CyfPCJtZ73 to Rollups</h1>
+    <button onclick="processUserRollups()">Process User for Weeks 1 & 2</button>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.processUserRollups = async function() {
+            const userId = 'THoYhTIT46RdGeNuL9CyfPCJtZ73';
+            const resultsDiv = document.getElementById('results');
+
+            try {
+                resultsDiv.innerHTML = '<p>Processing user rollups...</p>';
+
+                if (!auth.currentUser) {
+                    resultsDiv.innerHTML = '<p style="color: red;">Please sign in first!</p>';
+                    return;
+                }
+
+                // Check if user exists in pool members
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const poolDoc = await getDoc(doc(db, poolMembersPath));
+
+                if (!poolDoc.exists()) {
+                    resultsDiv.innerHTML = '<p style="color: red;">Pool members not found!</p>';
+                    return;
+                }
+
+                const poolData = poolDoc.data();
+                const userInPool = Object.values(poolData).find(member => member.uid === userId);
+
+                if (!userInPool) {
+                    resultsDiv.innerHTML = '<p style="color: red;">User not found in pool members!</p>';
+                    return;
+                }
+
+                console.log('Found user in pool:', userInPool);
+
+                // Process weeks 1 and 2
+                const results = { week1: null, week2: null };
+
+                for (const weekNumber of [1, 2]) {
+                    console.log(`Processing Week ${weekNumber} for user ${userId}...`);
+
+                    // Check if user has picks for this week
+                    const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions`;
+                    const userPicksDoc = await getDoc(doc(db, picksPath, userId));
+
+                    if (userPicksDoc.exists()) {
+                        const picks = userPicksDoc.data();
+                        console.log(`Week ${weekNumber} picks found:`, picks);
+
+                        // Calculate score for this week
+                        const score = await calculateWeekScore(userId, weekNumber, picks);
+
+                        if (score) {
+                            // Save user's weekly score
+                            const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+                            const scoreDoc = await getDoc(doc(db, scorePath));
+
+                            let scoreData = scoreDoc.exists() ? scoreDoc.data() : { weeklyPoints: {} };
+                            scoreData.weeklyPoints[weekNumber] = score;
+
+                            await setDoc(doc(db, scorePath), scoreData);
+
+                            results[`week${weekNumber}`] = score;
+                            console.log(`✅ Week ${weekNumber} score saved:`, score);
+                        }
+                    } else {
+                        console.log(`❌ No picks found for Week ${weekNumber}`);
+                    }
+                }
+
+                // Update season leaderboard
+                console.log('Updating season leaderboard...');
+                // Trigger season leaderboard regeneration would go here
+
+                resultsDiv.innerHTML = `
+                    <h3>✅ User Processing Complete</h3>
+                    <p><strong>User:</strong> ${userInPool.email || userId}</p>
+                    <p><strong>Week 1:</strong> ${results.week1 ? `${results.week1.totalPoints} points` : 'No picks found'}</p>
+                    <p><strong>Week 2:</strong> ${results.week2 ? `${results.week2.totalPoints} points` : 'No picks found'}</p>
+                    <p>User has been added to scoring system and rollups.</p>
+                `;
+
+            } catch (error) {
+                console.error('Error processing user rollups:', error);
+                resultsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        };
+
+        async function calculateWeekScore(userId, weekNumber, picks) {
+            try {
+                // Get game results for the week
+                const gameResultsPath = `artifacts/nerdfootball/public/data/gameResults/${weekNumber}`;
+                const gameResultsDoc = await getDoc(doc(db, gameResultsPath));
+
+                if (!gameResultsDoc.exists()) {
+                    console.log(`No game results found for Week ${weekNumber}`);
+                    return null;
+                }
+
+                const gameResults = gameResultsDoc.data();
+                console.log(`Week ${weekNumber} game results:`, gameResults);
+
+                // Calculate score based on picks vs results
+                let totalPoints = 0;
+                let correctPicks = 0;
+                const pickDetails = [];
+
+                Object.entries(picks).forEach(([gameId, pick]) => {
+                    if (gameId === 'submittedAt' || gameId === 'uid') return;
+
+                    const gameResult = gameResults[gameId];
+                    if (gameResult && gameResult.winner) {
+                        const isCorrect = pick.team === gameResult.winner;
+                        if (isCorrect) {
+                            totalPoints += parseInt(pick.confidence) || 0;
+                            correctPicks++;
+                        }
+
+                        pickDetails.push({
+                            gameId,
+                            pickedTeam: pick.team,
+                            confidence: pick.confidence,
+                            winner: gameResult.winner,
+                            correct: isCorrect,
+                            points: isCorrect ? (parseInt(pick.confidence) || 0) : 0
+                        });
+                    }
+                });
+
+                return {
+                    totalPoints,
+                    correctPicks,
+                    totalGames: pickDetails.length,
+                    accuracy: pickDetails.length > 0 ? (correctPicks / pickDetails.length * 100).toFixed(1) : 0,
+                    pickDetails,
+                    weekNumber,
+                    calculatedAt: new Date().toISOString()
+                };
+
+            } catch (error) {
+                console.error(`Error calculating Week ${weekNumber} score:`, error);
+                return null;
+            }
+        }
+    </script>
+</body>
+</html>

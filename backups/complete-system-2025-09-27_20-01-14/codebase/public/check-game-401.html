@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Game 401 Status</title>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(26, 26, 26, 0.95);
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 2rem;
+        }
+        .game-card {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .status-in-progress {
+            background: #ff6600;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .status-final {
+            background: #00ff41;
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .status-scheduled {
+            background: #666;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏈 Game 401 Status Check</h1>
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <button id="signInBtn" onclick="signIn()">🔐 Sign In with Google</button>
+            <button id="signOutBtn" onclick="signOutUser()" style="display: none;">🚪 Sign Out</button>
+        </div>
+        <div id="authStatus" style="margin-bottom: 1rem; text-align: center; color: #ffff44;"></div>
+        <div id="gameStatus">Please sign in to check game status...</div>
+        <button id="refreshBtn" onclick="checkGameStatus()" style="display: none;">🔄 Refresh Status</button>
+        <div id="lastUpdate"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+
+        let currentUser = null;
+
+        // Authentication state listener
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const signInBtn = document.getElementById('signInBtn');
+            const signOutBtn = document.getElementById('signOutBtn');
+            const authStatus = document.getElementById('authStatus');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const gameStatus = document.getElementById('gameStatus');
+
+            if (user) {
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                refreshBtn.style.display = 'inline-block';
+                authStatus.innerHTML = `✅ Signed in as: ${user.email}`;
+                gameStatus.innerHTML = 'Loading game status...';
+                checkGameStatus(); // Auto-load on sign in
+            } else {
+                signInBtn.style.display = 'inline-block';
+                signOutBtn.style.display = 'none';
+                refreshBtn.style.display = 'none';
+                authStatus.innerHTML = '🔐 Please sign in to view game data';
+                gameStatus.innerHTML = 'Please sign in to check game status...';
+            }
+        });
+
+        // Sign in function
+        window.signIn = async function() {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error('Sign in error:', error);
+                document.getElementById('authStatus').innerHTML = `❌ Sign in failed: ${error.message}`;
+            }
+        };
+
+        // Sign out function
+        window.signOutUser = async function() {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error('Sign out error:', error);
+                document.getElementById('authStatus').innerHTML = `❌ Sign out failed: ${error.message}`;
+            }
+        };
+
+        window.checkGameStatus = async function() {
+            try {
+                document.getElementById('gameStatus').innerHTML = 'Loading...';
+
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/4`;
+                const gamesRef = doc(db, gamesPath);
+                const gamesSnap = await getDoc(gamesRef);
+
+                if (!gamesSnap.exists()) {
+                    document.getElementById('gameStatus').innerHTML = '<div class="game-card">No Week 4 games found</div>';
+                    return;
+                }
+
+                const gamesData = gamesSnap.data();
+                const game401 = gamesData['401'];
+
+                if (!game401) {
+                    document.getElementById('gameStatus').innerHTML = '<div class="game-card">Game 401 not found</div>';
+                    return;
+                }
+
+                const statusClass = game401.status?.includes('FINAL') ? 'status-final' :
+                                  game401.status === 'IN_PROGRESS' ? 'status-in-progress' :
+                                  'status-scheduled';
+
+                const score = (game401.awayScore !== null && game401.homeScore !== null) ?
+                              `${game401.awayScore} - ${game401.homeScore}` :
+                              'vs';
+
+                const html = `
+                    <div class="game-card">
+                        <h3>Game 401 Status</h3>
+                        <div style="margin: 10px 0;">
+                            <strong>${game401.a || game401.awayTeam} ${score} ${game401.h || game401.homeTeam}</strong>
+                        </div>
+                        <div style="margin: 10px 0;">
+                            Status: <span class="${statusClass}">${game401.status || 'scheduled'}</span>
+                        </div>
+                        ${game401.winner ? `<div style="color: #00ff41; margin-top: 5px;">🏆 Winner: ${game401.winner}</div>` : ''}
+                        ${game401.status === 'IN_PROGRESS' ? `
+                            <div style="background: #ff6600; color: #fff; padding: 10px; border-radius: 6px; margin-top: 10px;">
+                                <div><strong>🔥 LIVE GAME DETAILS:</strong></div>
+                                ${game401.gameDetail ? `<div>📊 Status: ${game401.gameDetail}</div>` : ''}
+                                ${game401.period ? `<div>🏈 Quarter: ${game401.period}</div>` : ''}
+                                ${game401.clock ? `<div>⏱️ Clock: ${game401.clock}</div>` : ''}
+                                ${game401.lastPlay ? `<div>🎯 Last Play: ${game401.lastPlay}</div>` : ''}
+                            </div>
+                        ` : ''}
+                        <div style="font-size: 0.9em; color: #888; margin-top: 10px;">
+                            📍 ${game401.stadium || 'Stadium TBD'}<br>
+                            ⏰ Game Time: ${new Date(game401.dt).toLocaleString()}<br>
+                            🔄 Last Updated: ${game401.lastUpdated || 'Never'}
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('gameStatus').innerHTML = html;
+                document.getElementById('lastUpdate').textContent = `Last checked: ${new Date().toLocaleTimeString()}`;
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('gameStatus').innerHTML = `<div class="game-card" style="color: #ff4444;">Error: ${error.message}</div>`;
+            }
+        };
+
+        // Auto-load on page load
+        checkGameStatus();
+    </script>
+</body>
+</html>

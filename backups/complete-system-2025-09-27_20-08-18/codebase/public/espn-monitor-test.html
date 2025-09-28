@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESPN Score Monitor - Live Test</title>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(26, 26, 26, 0.95);
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .status {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #00cc34;
+        }
+        .button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+        .game-card {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .game-status {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        .status-scheduled { background: #666; color: #fff; }
+        .status-in-progress { background: #ff6600; color: #fff; }
+        .status-final { background: #00ff41; color: #000; }
+        .error { color: #ff4444; }
+        .success { color: #44ff44; }
+        .warning { color: #ffff44; }
+        .auto-refresh {
+            text-align: center;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #1a1a1a;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏈 ESPN Score Monitor - Live Test</h1>
+            <p>Real-time NFL score updates and game status monitoring</p>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <button id="signInBtn" class="button">🔐 Sign In</button>
+            <button id="signOutBtn" class="button" style="display: none;">🚪 Sign Out</button>
+            <button id="updateNowBtn" class="button" disabled>🔥 Update Scores Now</button>
+            <button id="viewCurrentBtn" class="button" disabled>👀 View Current Week</button>
+            <button id="clearBtn" class="button">🧹 Clear Log</button>
+        </div>
+
+        <div class="auto-refresh">
+            <label>
+                <input type="checkbox" id="autoRefresh"> Auto-refresh every 30 seconds
+            </label>
+            <div id="lastUpdate" style="margin-top: 10px; color: #888;"></div>
+        </div>
+
+        <div id="currentGames" style="margin-bottom: 2rem;">
+            <!-- Current week games will be displayed here -->
+        </div>
+
+        <div id="statusLog" class="status">
+            <div class="success">🏈 ESPN Score Monitor ready for testing...</div>
+            <div class="warning">⚠️ Sign in as admin to test score updates</div>
+            <div style="color: #888;">📡 Manual: Click "Update Scores Now" to fetch from ESPN</div>
+            <div style="color: #888;">⏰ Auto: Enable auto-refresh for real-time monitoring</div>
+            <div style="color: #888;">🎯 Target: Game 401 (currently IN_PROGRESS)</div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const functions = getFunctions(app);
+
+        let currentUser = null;
+        let autoRefreshInterval = null;
+
+        // UI Elements
+        const signInBtn = document.getElementById('signInBtn');
+        const signOutBtn = document.getElementById('signOutBtn');
+        const updateNowBtn = document.getElementById('updateNowBtn');
+        const viewCurrentBtn = document.getElementById('viewCurrentBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusLog = document.getElementById('statusLog');
+        const currentGames = document.getElementById('currentGames');
+        const autoRefreshCheckbox = document.getElementById('autoRefresh');
+        const lastUpdate = document.getElementById('lastUpdate');
+
+        // Admin check
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user && ADMIN_UIDS.includes(user.uid)) {
+                log(`✅ Admin authenticated: ${user.email}`, 'success');
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                updateNowBtn.disabled = false;
+                viewCurrentBtn.disabled = false;
+            } else if (user) {
+                log(`❌ Access denied: ${user.email} is not an admin`, 'error');
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                updateNowBtn.disabled = true;
+                viewCurrentBtn.disabled = true;
+            } else {
+                log(`🔐 Please sign in as admin to continue`, 'warning');
+                signInBtn.style.display = 'inline-block';
+                signOutBtn.style.display = 'none';
+                updateNowBtn.disabled = true;
+                viewCurrentBtn.disabled = true;
+            }
+        });
+
+        async function signIn() {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+                log('🔐 Sign in initiated...', 'success');
+            } catch (error) {
+                log(`❌ Sign in failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                log('🚪 Signed out successfully', 'success');
+            } catch (error) {
+                log(`❌ Sign out failed: ${error.message}`, 'error');
+            }
+        }
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : '';
+            statusLog.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            statusLog.scrollTop = statusLog.scrollHeight;
+        }
+
+        function getCurrentWeek() {
+            const seasonStart = new Date('2025-09-04');
+            const now = new Date();
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        async function updateScoresNow() {
+            try {
+                log('🔥 Triggering ESPN score update...', 'success');
+                updateNowBtn.disabled = true;
+                updateNowBtn.textContent = '🔄 Updating...';
+
+                // Call the Firebase function
+                const updateScores = httpsCallable(functions, 'updateScoresCallable');
+                const result = await updateScores();
+
+                if (result.data.success) {
+                    const data = result.data.result;
+                    log(`✅ Scores updated! Week ${data.week}: ${data.gamesUpdated} games updated, ${data.gamesCompleted} completed`, 'success');
+
+                    if (data.completedGameIds.length > 0) {
+                        log(`🏆 Completed games: ${data.completedGameIds.join(', ')}`, 'success');
+                    }
+
+                    // Refresh the current week view
+                    await viewCurrentWeek();
+                } else {
+                    log(`❌ Score update failed: ${result.data.error}`, 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Update error: ${error.message}`, 'error');
+            } finally {
+                updateNowBtn.disabled = false;
+                updateNowBtn.textContent = '🔥 Update Scores Now';
+                lastUpdate.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            }
+        }
+
+        async function viewCurrentWeek() {
+            try {
+                const currentWeek = getCurrentWeek();
+                log(`👀 Loading Week ${currentWeek} games...`);
+
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesRef = doc(db, gamesPath);
+                const gamesSnap = await getDoc(gamesRef);
+
+                if (!gamesSnap.exists()) {
+                    currentGames.innerHTML = '<div class="game-card">No games found for current week</div>';
+                    return;
+                }
+
+                const gamesData = gamesSnap.data();
+                let html = `<h3>🏈 Week ${currentWeek} Games</h3>`;
+
+                for (const [gameId, game] of Object.entries(gamesData)) {
+                    if (gameId.startsWith('_')) continue;
+
+                    const statusClass = game.status?.includes('FINAL') ? 'status-final' :
+                                      game.status === 'IN_PROGRESS' ? 'status-in-progress' :
+                                      'status-scheduled';
+
+                    const score = (game.awayScore !== null && game.homeScore !== null) ?
+                                  `${game.awayScore} - ${game.homeScore}` :
+                                  'vs';
+
+                    html += `
+                        <div class="game-card">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>Game ${gameId}</strong>: ${game.a} ${score} ${game.h}
+                                    ${game.winner ? `<div style="color: #00ff41; margin-top: 5px;">🏆 Winner: ${game.winner}</div>` : ''}
+                                </div>
+                                <div>
+                                    <span class="game-status ${statusClass}">${game.status || 'scheduled'}</span>
+                                </div>
+                            </div>
+                            <div style="font-size: 0.9em; color: #888; margin-top: 5px;">
+                                📍 ${game.stadium || 'Stadium TBD'} | ⏰ ${new Date(game.dt).toLocaleString()}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                currentGames.innerHTML = html;
+                log(`✅ Loaded ${Object.keys(gamesData).filter(k => !k.startsWith('_')).length} games for Week ${currentWeek}`);
+
+            } catch (error) {
+                log(`❌ Error loading games: ${error.message}`, 'error');
+            }
+        }
+
+        function clearStatus() {
+            statusLog.innerHTML = '<div class="success">📡 Status cleared - ready for monitoring...</div>';
+        }
+
+        function toggleAutoRefresh() {
+            if (autoRefreshCheckbox.checked) {
+                autoRefreshInterval = setInterval(async () => {
+                    if (currentUser && ADMIN_UIDS.includes(currentUser.uid)) {
+                        await updateScoresNow();
+                    }
+                }, 30000);
+                log('⏰ Auto-refresh enabled (30 seconds)', 'success');
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+                log('⏹️ Auto-refresh disabled', 'warning');
+            }
+        }
+
+        // Event listeners
+        signInBtn.addEventListener('click', signIn);
+        signOutBtn.addEventListener('click', signOutUser);
+        updateNowBtn.addEventListener('click', updateScoresNow);
+        viewCurrentBtn.addEventListener('click', viewCurrentWeek);
+        clearBtn.addEventListener('click', clearStatus);
+        autoRefreshCheckbox.addEventListener('change', toggleAutoRefresh);
+
+        // Initial load
+        log('🏈 ESPN Score Monitor Test loaded', 'success');
+        log('🎯 Testing Game 401 (Seattle @ Arizona) - currently IN_PROGRESS', 'warning');
+    </script>
+</body>
+</html>

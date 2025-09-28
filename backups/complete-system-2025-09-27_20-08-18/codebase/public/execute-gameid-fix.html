@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Execute GameID Fix - JSON Version</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Execute GameID Fix - All Weeks</h1>
+    <div>
+        Week to fix:
+        <select id="weekSelect">
+            <option value="1">Week 1 Only</option>
+            <option value="2">Week 2 Only</option>
+            <option value="3">Week 3 Only</option>
+            <option value="4">Week 4 Only</option>
+            <option value="5">Week 5 Only</option>
+            <option value="6">Week 6 Only</option>
+            <option value="7">Week 7 Only</option>
+            <option value="8">Week 8 Only</option>
+            <option value="9">Week 9 Only</option>
+            <option value="10">Week 10 Only</option>
+            <option value="11">Week 11 Only</option>
+            <option value="12">Week 12 Only</option>
+            <option value="13">Week 13 Only</option>
+            <option value="14">Week 14 Only</option>
+            <option value="15">Week 15 Only</option>
+            <option value="16">Week 16 Only</option>
+            <option value="17">Week 17 Only</option>
+            <option value="18">Week 18 Only</option>
+            <option value="all" selected>All Weeks (1-18)</option>
+        </select>
+        <button onclick="executeFix()" style="background: red; color: white; padding: 10px; margin-left: 10px;">⚠️ EXECUTE FIX (IRREVERSIBLE)</button>
+    </div>
+    <div id="output"></div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        // Auto-login with Google
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        // Get bible data from JSON files hosted on the site
+        async function getBibleData(weekNumber) {
+            try {
+                const jsonUrl = `/game-data/nfl_2025_week_${weekNumber}.json`;
+                console.log(`📖 FETCHING BIBLE DATA FROM: ${jsonUrl}`);
+
+                const response = await fetch(jsonUrl);
+
+                if (response.ok) {
+                    const bibleData = await response.json();
+                    console.log(`📖 BIBLE DATA WEEK ${weekNumber}:`, bibleData);
+                    return bibleData;
+                } else {
+                    console.error(`❌ HTTP ${response.status}: No bible data found for week ${weekNumber} at ${jsonUrl}`);
+                    return null;
+                }
+            } catch (error) {
+                console.error(`❌ Error getting bible data for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        // Create comprehensive team to gameId mapping based on bible data
+        function createTeamToGameIdMap(bibleData) {
+            const teamMap = {};
+            Object.keys(bibleData).forEach(gameId => {
+                if (gameId !== '_metadata' && bibleData[gameId] && bibleData[gameId].a && bibleData[gameId].h) {
+                    const awayTeam = bibleData[gameId].a;
+                    const homeTeam = bibleData[gameId].h;
+
+                    // Add both teams with all variations
+                    [awayTeam, homeTeam].forEach(team => {
+                        teamMap[team] = gameId;
+                        teamMap[team.toLowerCase()] = gameId;
+
+                        // Add common variations
+                        const variations = getTeamVariations(team);
+                        variations.forEach(variation => {
+                            teamMap[variation] = gameId;
+                            teamMap[variation.toLowerCase()] = gameId;
+                        });
+                    });
+                }
+            });
+            return teamMap;
+        }
+
+        function getTeamVariations(teamName) {
+            const variations = [];
+
+            switch (teamName) {
+                case "Jacksonville Jaguars":
+                    variations.push("Jacksonville", "JAX", "Jaguars");
+                    break;
+                case "Washington Commanders":
+                    variations.push("Washington", "WAS", "Commanders");
+                    break;
+                case "Las Vegas Raiders":
+                    variations.push("Las Vegas", "LV", "Raiders");
+                    break;
+                case "New England Patriots":
+                    variations.push("New England", "NE", "Patriots");
+                    break;
+                case "Kansas City Chiefs":
+                    variations.push("Kansas City", "KC", "Chiefs");
+                    break;
+                case "Los Angeles Chargers":
+                    variations.push("Los Angeles", "LA", "Chargers", "L.A. Chargers");
+                    break;
+                case "Los Angeles Rams":
+                    variations.push("Los Angeles", "LAR", "Rams", "L.A. Rams");
+                    break;
+                case "Tampa Bay Buccaneers":
+                    variations.push("Tampa Bay", "TB", "Buccaneers", "Bucs");
+                    break;
+                case "Green Bay Packers":
+                    variations.push("Green Bay", "GB", "Packers");
+                    break;
+                // Add more as needed
+            }
+
+            return variations;
+        }
+
+        async function executeFix() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔐 Authenticating and preparing fix...</p>';
+
+            try {
+                // Ensure user is authenticated first
+                await autoLogin();
+
+                const selectedWeek = document.getElementById('weekSelect').value;
+                let results = '<h2>🔧 Executing GameID Fix...</h2>';
+                console.log('🔧 GAMEID-FIX-STARTING');
+
+                const weeksToFix = selectedWeek === 'all' ? ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18'] : [selectedWeek];
+                let totalCorrectionsAllWeeks = 0;
+
+                for (const weekNumber of weeksToFix) {
+                    results += `<h3>Processing Week ${weekNumber}</h3>`;
+
+                    // Get bible data for this week
+                    const bibleData = await getBibleData(weekNumber);
+                    if (!bibleData) {
+                        results += `<p style="color: red;">❌ No bible data found for Week ${weekNumber}, skipping...</p>`;
+                        continue;
+                    }
+
+                    const teamMap = createTeamToGameIdMap(bibleData);
+                    console.log(`🗺️ Week ${weekNumber} team mapping:`, teamMap);
+
+                    // Get all pick submissions for this week
+                    const picksCollectionPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions`;
+                    const picksSnapshot = await firebase.firestore().collection(picksCollectionPath).get();
+
+                    if (picksSnapshot.empty) {
+                        results += `<p style="color: orange;">⚠️ No picks found for Week ${weekNumber}, skipping...</p>`;
+                        continue;
+                    }
+
+                    results += `<h4>Processing ${picksSnapshot.size} users for Week ${weekNumber}...</h4>`;
+
+                    let weekCorrections = 0;
+                    const batch = firebase.firestore().batch();
+
+                    picksSnapshot.forEach(doc => {
+                        const userId = doc.id;
+                        const originalPicks = doc.data();
+                        let correctedPicks = {};
+                        let userCorrections = 0;
+
+                        results += `<h5>User: ${userId}</h5><ul>`;
+
+                        // Process each game pick
+                        Object.keys(originalPicks).forEach(gameId => {
+                            const pick = originalPicks[gameId];
+
+                            if (gameId === 'mnfTotalPoints') {
+                                // Keep MNF points as-is
+                                correctedPicks[gameId] = pick;
+                            } else if (pick && pick.winner) {
+                                const pickedTeam = pick.winner;
+                                const correctGameId = teamMap[pickedTeam] || teamMap[pickedTeam.toLowerCase()];
+
+                                if (correctGameId && correctGameId !== gameId) {
+                                    // GameID needs correction
+                                    correctedPicks[correctGameId] = pick;
+                                    results += `<li style="color: red;">FIXED: ${pickedTeam} moved from Game ${gameId} → Game ${correctGameId}</li>`;
+                                    userCorrections++;
+                                    weekCorrections++;
+                                } else {
+                                    // GameID is correct, keep as-is
+                                    correctedPicks[gameId] = pick;
+                                    results += `<li style="color: green;">OK: ${pickedTeam} stays in Game ${gameId}</li>`;
+                                }
+                            }
+                        });
+
+                        results += `</ul><p><strong>Corrections for this user: ${userCorrections}</strong></p>`;
+
+                        // Update the document if corrections were made
+                        if (userCorrections > 0) {
+                            const docRef = firebase.firestore().doc(`${picksCollectionPath}/${userId}`);
+                            batch.set(docRef, correctedPicks);
+                        }
+                    });
+
+                    // Execute all updates for this week
+                    if (weekCorrections > 0) {
+                        results += `<h4>💾 Applying ${weekCorrections} corrections for Week ${weekNumber}...</h4>`;
+                        await batch.commit();
+                        results += `<h4 style="color: green;">✅ Week ${weekNumber} Fix Complete! Applied ${weekCorrections} corrections.</h4>`;
+                    } else {
+                        results += `<h4 style="color: green;">✅ Week ${weekNumber}: No corrections needed - all gameIDs were already correct!</h4>`;
+                    }
+
+                    totalCorrectionsAllWeeks += weekCorrections;
+                    results += `<hr>`;
+                }
+
+                // Final summary
+                results += `<h3 style="color: green;">🎉 OVERALL FIX COMPLETE!</h3>`;
+                results += `<p><strong>Total corrections applied across all weeks: ${totalCorrectionsAllWeeks}</strong></p>`;
+                results += `<p><strong>The grid should now display correctly aligned columns and data for all processed weeks.</strong></p>`;
+
+                output.innerHTML = results;
+                console.log('🔧 GAMEID-FIX-COMPLETE');
+
+            } catch (error) {
+                console.error('❌ GAMEID-FIX-ERROR:', error);
+                const errorResults = `<h2>❌ Fix Failed</h2><p style="color: red;">Error: ${error.message}</p>`;
+                output.innerHTML = errorResults;
+            }
+        }
+    </script>
+</body>
+</html>

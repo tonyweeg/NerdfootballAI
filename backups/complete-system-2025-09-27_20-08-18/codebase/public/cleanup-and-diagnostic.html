@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🧹 CLEANUP & DIAGNOSTIC TOOL</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>🧹 CLEANUP & DIAGNOSTIC TOOL</h1>
+    <div style="background: #ffeeee; padding: 20px; border: 2px solid red; margin: 20px 0;">
+        <h3>🚨 ISSUES TO FIX</h3>
+        <p><strong>1. Missing Game Results:</strong> Only 1 game per week has results, should be 16 games</p>
+        <p><strong>2. Useless gameDetails:</strong> Remove massive text strings from all scoring documents</p>
+        <p><strong>3. Incomplete Scoring:</strong> Users only getting credit for 1 game per week instead of all games</p>
+    </div>
+
+    <button onclick="checkResultsData()" style="background: blue; color: white; padding: 15px; margin: 5px;">🔍 CHECK RESULTS DATA</button>
+    <button onclick="removeGameDetails()" style="background: orange; color: white; padding: 15px; margin: 5px;">🧹 REMOVE gameDetails FROM ALL DOCS</button>
+    <button onclick="diagnosticAllWeeks()" style="background: purple; color: white; padding: 15px; margin: 5px;">📊 DIAGNOSTIC ALL WEEKS</button>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function checkResultsData() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🔍 CHECKING RESULTS DATA...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                output.innerHTML += '<h3>📊 RESULTS DATA ANALYSIS</h3>';
+                output.innerHTML += '<table border="1" style="border-collapse: collapse;"><tr><th>Week</th><th>Document Exists</th><th>Games Found</th><th>Game IDs</th><th>Winners Found</th></tr>';
+
+                for (let week = 1; week <= 3; week++) {
+                    const resultsPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`;
+                    const resultsDoc = await firebase.firestore().doc(resultsPath).get();
+
+                    if (!resultsDoc.exists) {
+                        output.innerHTML += `<tr><td>Week ${week}</td><td style="color: red;">❌ NO</td><td>0</td><td>-</td><td>0</td></tr>`;
+                        continue;
+                    }
+
+                    const resultsData = resultsDoc.data();
+                    const gameIds = Object.keys(resultsData).filter(key =>
+                        key !== 'timestamp' && key !== 'lastUpdated' && key !== 'mnfTotalPoints'
+                    );
+
+                    const gamesWithWinners = gameIds.filter(gameId =>
+                        resultsData[gameId] && resultsData[gameId].winner
+                    );
+
+                    const gameIdsList = gameIds.slice(0, 5).join(', ') + (gameIds.length > 5 ? '...' : '');
+
+                    output.innerHTML += `
+                        <tr>
+                            <td>Week ${week}</td>
+                            <td style="color: green;">✅ YES</td>
+                            <td>${gameIds.length}</td>
+                            <td>${gameIdsList}</td>
+                            <td>${gamesWithWinners.length}</td>
+                        </tr>
+                    `;
+
+                    // Show detailed game data for first week
+                    if (week === 1) {
+                        output.innerHTML += `
+                            <tr><td colspan="5">
+                                <h4>Week 1 Detailed Data:</h4>
+                                <pre style="font-size: 10px; max-height: 200px; overflow: auto;">${JSON.stringify(resultsData, null, 2)}</pre>
+                            </td></tr>
+                        `;
+                    }
+                }
+
+                output.innerHTML += '</table>';
+
+                output.innerHTML += `
+                    <div style="background: #ffffee; padding: 15px; margin: 20px 0; border: 2px solid orange;">
+                        <h3>📋 DIAGNOSIS</h3>
+                        <p><strong>Expected:</strong> Each week should have 16 games with winners</p>
+                        <p><strong>If games missing:</strong> Need to populate results documents with all game outcomes</p>
+                        <p><strong>If winners missing:</strong> Need to update results with actual game winners</p>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('❌ ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ ERROR</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function removeGameDetails() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🧹 REMOVING gameDetails FROM ALL SCORING DOCUMENTS...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                // Get all scoring documents
+                const scoringCollectionPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users';
+                const scoringSnapshot = await firebase.firestore().collection(scoringCollectionPath).get();
+
+                if (scoringSnapshot.empty) {
+                    output.innerHTML += '<p>❌ NO SCORING DOCUMENTS FOUND!</p>';
+                    return;
+                }
+
+                output.innerHTML += `<p>🧹 Found ${scoringSnapshot.size} scoring documents to clean</p>`;
+
+                let cleanedCount = 0;
+                let errorCount = 0;
+
+                for (const userDoc of scoringSnapshot.docs) {
+                    const userId = userDoc.id;
+                    const userData = userDoc.data();
+                    const displayName = userData.displayName || `User ${userId.slice(-6)}`;
+
+                    try {
+                        let needsUpdate = false;
+                        const cleanedData = { ...userData };
+
+                        // Remove gameDetails from all weekly data
+                        if (cleanedData.weeklyPoints) {
+                            for (const [week, weekData] of Object.entries(cleanedData.weeklyPoints)) {
+                                if (weekData.gameDetails) {
+                                    delete weekData.gameDetails;
+                                    needsUpdate = true;
+                                }
+                            }
+                        }
+
+                        // Update document if needed
+                        if (needsUpdate) {
+                            cleanedData.cleanupApplied = true;
+                            cleanedData.cleanupTimestamp = new Date().toISOString();
+                            cleanedData.gameDetailsRemoved = true;
+
+                            await firebase.firestore().doc(`${scoringCollectionPath}/${userId}`).set(cleanedData);
+                            cleanedCount++;
+
+                            output.innerHTML += `<p style="color: green;">✅ Cleaned ${displayName}</p>`;
+                        } else {
+                            output.innerHTML += `<p style="color: blue;">ℹ️ ${displayName} already clean</p>`;
+                        }
+
+                    } catch (error) {
+                        console.error(`❌ ERROR cleaning ${displayName}:`, error);
+                        output.innerHTML += `<p style="color: red;">❌ Error cleaning ${displayName}: ${error.message}</p>`;
+                        errorCount++;
+                    }
+                }
+
+                output.innerHTML += `
+                    <hr>
+                    <h3>🧹 CLEANUP COMPLETE</h3>
+                    <p><strong>Documents Cleaned:</strong> ${cleanedCount}</p>
+                    <p><strong>Errors:</strong> ${errorCount}</p>
+                    <p><strong>All gameDetails fields have been removed from scoring documents!</strong></p>
+                `;
+
+            } catch (error) {
+                console.error('❌ CLEANUP ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ CLEANUP FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function diagnosticAllWeeks() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>📊 DIAGNOSTIC ALL WEEKS...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                output.innerHTML += '<h3>📊 COMPREHENSIVE DIAGNOSTIC</h3>';
+
+                // Check Tony's specific data
+                const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+                const scoringDoc = await firebase.firestore().doc(scoringPath).get();
+
+                if (scoringDoc.exists) {
+                    const scoringData = scoringDoc.data();
+
+                    output.innerHTML += `
+                        <div style="background: #eeffee; padding: 15px; margin: 20px 0; border: 2px solid green;">
+                            <h4>🎯 TONY'S CURRENT SCORING SUMMARY</h4>
+                            <p><strong>Total Points:</strong> ${scoringData.totalPoints}</p>
+                            <p><strong>Games Won:</strong> ${scoringData.seasonStats?.gamesWon}</p>
+                            <p><strong>Games Played:</strong> ${scoringData.seasonStats?.totalGames}</p>
+                            <p><strong>Weeks Played:</strong> ${scoringData.seasonStats?.weeksPlayed}</p>
+                        </div>
+                    `;
+
+                    output.innerHTML += '<h4>📅 WEEKLY BREAKDOWN</h4>';
+                    output.innerHTML += '<table border="1" style="border-collapse: collapse;"><tr><th>Week</th><th>Points</th><th>Games Won</th><th>Games Played</th><th>Issues</th></tr>';
+
+                    for (let week = 1; week <= 3; week++) {
+                        const weekData = scoringData.weeklyPoints?.[week];
+                        const issues = [];
+
+                        if (!weekData) {
+                            issues.push('No data');
+                        } else {
+                            if (weekData.gamesPlayed < 16) {
+                                issues.push(`Only ${weekData.gamesPlayed}/16 games played`);
+                            }
+                            if (weekData.totalPoints && weekData.gamesWon === 1) {
+                                issues.push('Only 1 game won - likely missing results');
+                            }
+                        }
+
+                        const issueText = issues.length > 0 ? issues.join('; ') : '✅ OK';
+                        const issueColor = issues.length > 0 ? 'red' : 'green';
+
+                        output.innerHTML += `
+                            <tr>
+                                <td>Week ${week}</td>
+                                <td>${weekData?.totalPoints || 0}</td>
+                                <td>${weekData?.gamesWon || 0}</td>
+                                <td>${weekData?.gamesPlayed || 0}</td>
+                                <td style="color: ${issueColor};">${issueText}</td>
+                            </tr>
+                        `;
+                    }
+
+                    output.innerHTML += '</table>';
+                }
+
+                // Check a few picks documents to see what's available
+                output.innerHTML += '<h4>📋 SAMPLE PICKS DATA</h4>';
+                for (let week = 1; week <= 3; week++) {
+                    const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions/${TONY_UID}`;
+                    const picksDoc = await firebase.firestore().doc(picksPath).get();
+
+                    if (picksDoc.exists) {
+                        const picksData = picksDoc.data();
+                        const pickCount = Object.keys(picksData).filter(key =>
+                            key !== 'timestamp' && key !== 'lastUpdated' && key !== 'mnfTotalPoints'
+                        ).length;
+
+                        output.innerHTML += `<p>Week ${week}: ${pickCount} picks found ✅</p>`;
+                    } else {
+                        output.innerHTML += `<p>Week ${week}: No picks found ❌</p>`;
+                    }
+                }
+
+                output.innerHTML += `
+                    <div style="background: #ffeeee; padding: 15px; margin: 20px 0; border: 2px solid red;">
+                        <h3>🚨 NEXT STEPS NEEDED</h3>
+                        <ol>
+                            <li><strong>Fix Results Data:</strong> Populate all 16 games per week with winners</li>
+                            <li><strong>Re-run Scoring:</strong> Recalculate all users with complete results</li>
+                            <li><strong>Remove gameDetails:</strong> Clean up unnecessary data from documents</li>
+                            <li><strong>Verify Accuracy:</strong> Ensure all picks get proper credit</li>
+                        </ol>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('❌ DIAGNOSTIC ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ DIAGNOSTIC FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

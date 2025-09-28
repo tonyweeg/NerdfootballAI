@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌀 NERD SCORING AUDIT TOOL - Progressive Analysis</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
+
+        :root {
+            --nerd-black: #0a0a0a;
+            --nerd-dark-red: #2d1b1e;
+            --nerd-red: #cc4125;
+            --nerd-bright-red: #ff5722;
+            --nerd-gold: #ffb000;
+            --nerd-silver: #c0c0c0;
+            --nerd-white: #f5f5f5;
+            --nerd-purple: #6a1b9a;
+            --nerd-cyan: #00bcd4;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, var(--nerd-black) 0%, var(--nerd-dark-red) 100%);
+            color: var(--nerd-white);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .spiral-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 20% 80%, var(--nerd-purple) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, var(--nerd-red) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, var(--nerd-cyan) 0%, transparent 50%);
+            opacity: 0.1;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(45deg, var(--nerd-gold), var(--nerd-bright-red), var(--nerd-purple));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px var(--nerd-red);
+            letter-spacing: 3px;
+            margin-bottom: 1rem;
+        }
+
+        .header .subtitle {
+            font-size: 1rem;
+            color: var(--nerd-silver);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .auth-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--nerd-red);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow:
+                0 0 30px rgba(204, 65, 37, 0.3),
+                inset 0 0 20px rgba(255, 87, 34, 0.1);
+        }
+
+        .auth-section h2 {
+            color: var(--nerd-gold);
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .tool-button {
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            border: 1px solid #444;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-transform: none;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tool-button:hover {
+            background: linear-gradient(135deg, #2d2d2d, #404040);
+            border-color: #666;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .tool-button:disabled {
+            background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
+            border-color: #222;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .tool-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .tool-button:hover::before {
+            left: 100%;
+        }
+
+        .controls-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--nerd-purple);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow:
+                0 0 30px rgba(106, 27, 154, 0.3),
+                inset 0 0 20px rgba(156, 39, 176, 0.1);
+        }
+
+        .controls-section h2 {
+            color: var(--nerd-cyan);
+            margin-bottom: 1.5rem;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            align-items: center;
+        }
+
+        select {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--nerd-silver);
+            color: var(--nerd-white);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--nerd-gold);
+            box-shadow: 0 0 10px rgba(255, 176, 0, 0.5);
+        }
+
+        .status-display {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--nerd-gold);
+            font-size: 0.9rem;
+            color: var(--nerd-silver);
+            letter-spacing: 1px;
+        }
+
+        .results-container {
+            margin-top: 2rem;
+        }
+
+        .result-card {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--nerd-gold);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow:
+                0 0 30px rgba(255, 176, 0, 0.2),
+                inset 0 0 20px rgba(255, 193, 7, 0.05);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--nerd-red);
+        }
+
+        .result-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--nerd-gold);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .error-stats {
+            text-align: right;
+        }
+
+        .error-count {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--nerd-bright-red);
+        }
+
+        .error-rate {
+            font-size: 0.8rem;
+            color: var(--nerd-silver);
+            text-transform: uppercase;
+        }
+
+        .perfect-week {
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(139, 195, 74, 0.2));
+            border-color: #4caf50;
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .perfect-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .perfect-title {
+            font-size: 1.5rem;
+            color: #4caf50;
+            margin-bottom: 0.5rem;
+        }
+
+        .discrepancy-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .discrepancy-item {
+            background: rgba(204, 65, 37, 0.1);
+            border: 1px solid var(--nerd-red);
+            border-radius: 10px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .discrepancy-item:hover {
+            background: rgba(204, 65, 37, 0.2);
+            transform: translateX(5px);
+        }
+
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .user-name {
+            font-weight: 700;
+            color: var(--nerd-bright-red);
+            font-size: 1.1rem;
+        }
+
+        .user-id {
+            font-size: 0.8rem;
+            color: var(--nerd-silver);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .error-amount {
+            font-weight: 700;
+            color: var(--nerd-gold);
+            font-size: 0.9rem;
+        }
+
+        .scoring-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .should-be, .stored-as {
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+        }
+
+        .should-be {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 3px solid #4caf50;
+        }
+
+        .stored-as {
+            background: rgba(244, 67, 54, 0.2);
+            border-left: 3px solid #f44336;
+        }
+
+        .winning-picks {
+            background: rgba(0, 188, 212, 0.1);
+            border: 1px solid var(--nerd-cyan);
+            border-radius: 5px;
+            padding: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        .winning-picks .label {
+            color: var(--nerd-cyan);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.3rem;
+        }
+
+        .picks-list {
+            color: var(--nerd-white);
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .processing {
+            animation: pulse 2s infinite;
+        }
+
+        .fibonacci-pattern {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 50px;
+            height: 50px;
+            background: conic-gradient(from 0deg, var(--nerd-gold), var(--nerd-red), var(--nerd-purple), var(--nerd-cyan), var(--nerd-gold));
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: spin 13s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="spiral-background"></div>
+
+    <div class="container">
+        <div class="fibonacci-pattern"></div>
+
+        <div class="header">
+            <h1>🌀 NERD SCORING AUDIT TOOL</h1>
+            <div class="subtitle">Progressive Analysis • Systematic Integrity • Tool-Assisted Verification</div>
+        </div>
+
+        <!-- Auth Section -->
+        <div class="auth-section">
+            <h2>🔐 Administrative Access Portal</h2>
+            <div class="controls-grid">
+                <button id="signInBtn" class="tool-button">
+                    🔐 Sign In
+                </button>
+                <div id="userInfo" class="status-display hidden"></div>
+            </div>
+        </div>
+
+        <!-- Controls Section -->
+        <div class="controls-section">
+            <h2>🎯 Audit Control Interface</h2>
+            <div class="controls-grid">
+                <select id="weekSelector" disabled>
+                    <option value="">Select Week...</option>
+                </select>
+                <button id="auditWeekBtn" class="tool-button" disabled>
+                    🔍 Audit Week
+                </button>
+                <button id="fixWeekBtn" class="tool-button" disabled>
+                    🔧 Fix Errors
+                </button>
+                <button id="auditAllBtn" class="tool-button" disabled>
+                    🌀 Audit All Weeks
+                </button>
+            </div>
+            <div id="auditStatus" class="status-display">
+                Awaiting authentication...
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div id="resultsContainer" class="results-container"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, getDoc, writeBatch, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+        let currentWeek = null;
+        let currentDiscrepancies = [];
+
+        // Admin UIDs (same as other pages)
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2',
+            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2',
+            'bEVzcZtSExT8cIjamWnGbWZ3J5s1'
+        ];
+
+        // Initialize
+        initializeWeekSelector();
+
+        // Auth state listener
+        onAuthStateChanged(auth, (user) => {
+            if (user && ADMIN_UIDS.includes(user.uid)) {
+                currentUser = user;
+                document.getElementById('userInfo').innerHTML = `
+                    <div style="color: var(--nerd-gold);">✅ NERD ADMIN: ${user.email}</div>
+                    <div style="color: var(--nerd-silver); font-size: 0.8rem;">UID: ${user.uid.slice(-8)}</div>
+                `;
+                document.getElementById('userInfo').classList.remove('hidden');
+                document.getElementById('signInBtn').textContent = '✅ Signed In';
+                document.getElementById('signInBtn').disabled = true;
+                enableControls();
+            } else {
+                currentUser = null;
+                document.getElementById('userInfo').classList.add('hidden');
+                document.getElementById('signInBtn').textContent = '🔐 Sign In';
+                document.getElementById('signInBtn').disabled = false;
+                disableControls();
+                if (user && !ADMIN_UIDS.includes(user.uid)) {
+                    updateStatus('🚨 Access Denied: NERD Admin privileges required');
+                }
+            }
+        });
+
+        document.getElementById('signInBtn').addEventListener('click', async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                updateStatus(`🚨 Authentication Error: ${error.message}`);
+            }
+        });
+
+        function initializeWeekSelector() {
+            const selector = document.getElementById('weekSelector');
+            for (let i = 1; i <= 18; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Week ${i}`;
+                selector.appendChild(option);
+            }
+        }
+
+        function enableControls() {
+            document.getElementById('weekSelector').disabled = false;
+            document.getElementById('auditWeekBtn').disabled = false;
+            document.getElementById('auditAllBtn').disabled = false;
+            updateStatus('🎯 TOOL interface active - Select week for analysis');
+        }
+
+        function disableControls() {
+            document.getElementById('weekSelector').disabled = true;
+            document.getElementById('auditWeekBtn').disabled = true;
+            document.getElementById('fixWeekBtn').disabled = true;
+            document.getElementById('auditAllBtn').disabled = true;
+        }
+
+        function updateStatus(message) {
+            document.getElementById('auditStatus').textContent = message;
+        }
+
+        document.getElementById('weekSelector').addEventListener('change', (e) => {
+            currentWeek = parseInt(e.target.value) || null;
+            document.getElementById('fixWeekBtn').disabled = !currentWeek;
+        });
+
+        document.getElementById('auditWeekBtn').addEventListener('click', () => {
+            if (currentWeek) {
+                auditSingleWeek(currentWeek);
+            }
+        });
+
+        document.getElementById('fixWeekBtn').addEventListener('click', () => {
+            if (currentWeek && currentDiscrepancies.length > 0) {
+                const userList = currentDiscrepancies.map(d => `• ${d.userName} (${d.uid.slice(-6)})`).join('\\n');
+                if (confirm(`🔧 REPAIR Week ${currentWeek} scoring for ${currentDiscrepancies.length} users?\\n\\n${userList}\\n\\nThis will ONLY update users with scoring discrepancies.`)) {
+                    fixWeekScoring(currentWeek, currentDiscrepancies);
+                }
+            } else if (currentWeek && currentDiscrepancies.length === 0) {
+                alert('✅ Perfect week - No discrepancies to repair!');
+            }
+        });
+
+        document.getElementById('auditAllBtn').addEventListener('click', () => {
+            if (confirm('🌀 SPIRAL ANALYSIS - Audit all weeks? This progressive scan may take time...')) {
+                auditAllWeeks();
+            }
+        });
+
+        async function loadBibleData(week) {
+            const gamesRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`);
+            const gamesSnap = await getDoc(gamesRef);
+
+            if (!gamesSnap.exists()) {
+                throw new Error(`No games found for Week ${week} in Firestore`);
+            }
+
+            return gamesSnap.data();
+        }
+
+        async function loadPoolMembers() {
+            const membersSnap = await getDoc(doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+            return membersSnap.exists() ? membersSnap.data() : {};
+        }
+
+        async function calculateCorrectScoring(picks, bibleData, isWeekComplete = true) {
+            const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata');
+            const numGames = gameIds.length;
+
+            // Calculate expected confidence sum: 1+2+3+...+n
+            const expectedConfidenceSum = (numGames * (numGames + 1)) / 2;
+
+            let correctPicks = 0;
+            let totalPointsEarned = 0;
+            let actualConfidenceSum = 0;
+            const winningPicks = [];
+            const losingPicks = [];
+            const confidenceValues = [];
+            const allPicks = [];
+
+            gameIds.forEach(gameId => {
+                const pick = picks[gameId];
+                const game = bibleData[gameId];
+
+                if (pick && typeof pick === 'object' && pick.winner && game) {
+                    const actualWinner = game.winner;
+                    const userPick = pick.winner;
+                    const confidence = pick.confidence;
+
+                    // Track all confidence values for validation
+                    if (typeof confidence === 'number') {
+                        confidenceValues.push(confidence);
+                        actualConfidenceSum += confidence;
+                    }
+
+                    allPicks.push({ gameId, pick: userPick, confidence, actualWinner });
+
+                    if (actualWinner) {
+                        const isCorrect = actualWinner === userPick;
+
+                        if (isCorrect) {
+                            correctPicks++;
+                            if (typeof confidence === 'number' && confidence >= 1 && confidence <= numGames) {
+                                totalPointsEarned += confidence;
+                                winningPicks.push({ gameId, team: userPick, points: confidence });
+                            }
+                        } else {
+                            losingPicks.push({ gameId, team: userPick, points: confidence, actualWinner });
+                        }
+                    }
+                }
+            });
+
+            // Validate confidence system integrity
+            const confidenceErrors = [];
+            const picksCount = confidenceValues.length;
+            const hasAllPicks = picksCount === numGames;
+
+            // For incomplete weeks, only validate users who have all picks entered
+            if (isWeekComplete || hasAllPicks) {
+                // Check if confidence sum matches expected (1+2+...+n)
+                if (actualConfidenceSum !== expectedConfidenceSum) {
+                    confidenceErrors.push(`Confidence sum is ${actualConfidenceSum}, should be ${expectedConfidenceSum}`);
+                }
+
+                // Check for duplicate confidence values
+                const uniqueValues = [...new Set(confidenceValues)];
+                if (uniqueValues.length !== confidenceValues.length) {
+                    confidenceErrors.push(`Duplicate confidence values detected`);
+                }
+            }
+
+            // Always check for invalid confidence ranges
+            const invalidValues = confidenceValues.filter(v => v < 1 || v > numGames);
+            if (invalidValues.length > 0) {
+                confidenceErrors.push(`Invalid confidence values: ${invalidValues.join(', ')}`);
+            }
+
+            return {
+                correctPicks,
+                totalPointsEarned,
+                winningPicks,
+                losingPicks,
+                totalGames: numGames,
+                finishedGames: gameIds.filter(id => bibleData[id]?.winner).length,
+                confidenceSum: actualConfidenceSum,
+                expectedConfidenceSum,
+                confidenceValid: confidenceErrors.length === 0,
+                confidenceErrors,
+                allPicks,
+                picksCount,
+                hasAllPicks,
+                isIncompleteWeek: !isWeekComplete && !hasAllPicks
+            };
+        }
+
+        async function checkLeaderboardDataConsistency(week, poolMembers) {
+            try {
+                updateStatus(`🔄 Checking leaderboard API consistency for Week ${week}...`);
+
+                // Fetch leaderboard data from Cloud Function
+                const response = await fetch(`https://getweeklyleaderboard-np7uealtnq-uc.a.run.app?week=${week}`);
+                if (!response.ok) {
+                    return { error: `Leaderboard API error: ${response.statusText}` };
+                }
+
+                const apiData = await response.json();
+                if (!apiData.success) {
+                    return { error: 'Leaderboard API returned error' };
+                }
+
+                const leaderboardDiscrepancies = [];
+
+                // Compare leaderboard data vs Firestore data
+                for (const standing of apiData.data.standings) {
+                    const uid = standing.userId;
+                    if (!poolMembers[uid]) continue; // Skip non-pool members
+
+                    // Get Firestore scoring data
+                    const scoringSnap = await getDoc(doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${uid}`));
+                    if (scoringSnap.exists()) {
+                        const weeklyPoints = scoringSnap.data().weeklyPoints || {};
+                        const firestoreData = weeklyPoints[week.toString()] || { gamesWon: 0, totalPoints: 0 };
+
+                        // Check for discrepancies
+                        const pointsMismatch = standing.totalPoints !== (firestoreData.totalPoints || 0);
+                        const correctMismatch = standing.correctPicks !== (firestoreData.gamesWon || 0);
+
+                        if (pointsMismatch || correctMismatch) {
+                            leaderboardDiscrepancies.push({
+                                uid,
+                                name: standing.name,
+                                leaderboard: {
+                                    points: standing.totalPoints,
+                                    correct: standing.correctPicks,
+                                    accuracy: standing.pickAccuracy
+                                },
+                                firestore: {
+                                    points: firestoreData.totalPoints || 0,
+                                    correct: firestoreData.gamesWon || 0
+                                }
+                            });
+                        }
+                    }
+                }
+
+                return {
+                    discrepancies: leaderboardDiscrepancies,
+                    cacheAge: apiData.cacheAge,
+                    isStale: apiData.isStale,
+                    lastGenerated: apiData.lastGenerated
+                };
+
+            } catch (error) {
+                console.error('Error checking leaderboard consistency:', error);
+                return { error: error.message };
+            }
+        }
+
+        async function auditSingleWeek(week) {
+            updateStatus(`🌀 Progressive analysis of Week ${week}...`);
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = '';
+
+            // Add processing visual
+            container.innerHTML = '<div class="processing" style="text-align: center; padding: 3rem; color: var(--nerd-gold); font-size: 1.2rem;">🌀 ANALYZING PATTERNS...</div>';
+
+            try {
+                // Load bible data and pool members
+                const [bibleData, poolMembers] = await Promise.all([
+                    loadBibleData(week),
+                    loadPoolMembers()
+                ]);
+
+                // Determine if week is complete by checking if all games have winners
+                const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata');
+                const gamesWithWinners = gameIds.filter(id => bibleData[id]?.winner).length;
+                const isWeekComplete = gamesWithWinners === gameIds.length;
+
+                if (!isWeekComplete) {
+                    updateStatus(`📅 Week ${week} is IN PROGRESS (${gamesWithWinners}/${gameIds.length} games complete) - Only validating complete pick sets`);
+                } else {
+                    updateStatus(`🔍 Examining Week ${week} picks and scoring integrity...`);
+                }
+
+                // Load picks and scoring data
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`;
+                const picksSnap = await getDocs(collection(db, picksPath));
+
+                const discrepancies = [];
+                let totalUsers = 0;
+                let errorCount = 0;
+
+                for (const pickDoc of picksSnap.docs) {
+                    const uid = pickDoc.id;
+                    const picks = pickDoc.data();
+                    const member = poolMembers[uid];
+
+                    if (!member) continue; // Skip non-pool members
+
+                    totalUsers++;
+
+                    // Calculate correct scoring
+                    const correct = await calculateCorrectScoring(picks, bibleData, isWeekComplete);
+
+                    // Get stored scoring
+                    const scoringSnap = await getDoc(doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${uid}`));
+                    let stored = { gamesWon: 0, totalPoints: 0 };
+
+                    if (scoringSnap.exists()) {
+                        const weeklyPoints = scoringSnap.data().weeklyPoints || {};
+                        stored = weeklyPoints[week.toString()] || { gamesWon: 0, totalPoints: 0 };
+                    }
+
+                    // Check for discrepancies
+                    const correctPicksMatch = correct.correctPicks === (stored.gamesWon || 0);
+                    const pointsMatch = correct.totalPointsEarned === (stored.totalPoints || 0);
+                    const confidenceValid = correct.confidenceValid;
+
+                    // Skip users with incomplete picks during in-progress weeks
+                    const shouldValidate = isWeekComplete || correct.hasAllPicks;
+
+                    if (shouldValidate && (!correctPicksMatch || !pointsMatch || !confidenceValid)) {
+                        errorCount++;
+
+                        let errorType = [];
+                        if (!correctPicksMatch) errorType.push('picks mismatch');
+                        if (!pointsMatch) errorType.push('points mismatch');
+                        if (!confidenceValid) errorType.push('confidence errors');
+
+                        discrepancies.push({
+                            uid,
+                            userName: member.displayName || 'Unknown',
+                            correct: correct.correctPicks,
+                            correctPoints: correct.totalPointsEarned,
+                            stored: stored.gamesWon || 0,
+                            storedPoints: stored.totalPoints || 0,
+                            winningPicks: correct.winningPicks,
+                            confidenceSum: correct.confidenceSum,
+                            expectedConfidenceSum: correct.expectedConfidenceSum,
+                            confidenceErrors: correct.confidenceErrors,
+                            errorType: errorType.join(', ')
+                        });
+                    }
+                }
+
+                // Store discrepancies for targeted fixing
+                currentDiscrepancies = discrepancies;
+
+                // Check leaderboard data consistency
+                const leaderboardDiscrepancies = await checkLeaderboardDataConsistency(week, poolMembers);
+
+                // Display results
+                displayToolResults(week, totalUsers, errorCount, discrepancies, isWeekComplete, gamesWithWinners, gameIds.length, leaderboardDiscrepancies);
+
+                if (isWeekComplete) {
+                    updateStatus(`✅ Week ${week} analysis complete: ${errorCount}/${totalUsers} anomalies detected`);
+                } else {
+                    updateStatus(`✅ Week ${week} IN-PROGRESS analysis complete: ${errorCount}/${totalUsers} anomalies detected (incomplete picks ignored)`);
+                }
+
+            } catch (error) {
+                updateStatus(`❌ Analysis error for Week ${week}: ${error.message}`);
+                console.error('Audit error:', error);
+            }
+        }
+
+        function displayToolResults(week, totalUsers, errorCount, discrepancies, isWeekComplete = true, gamesComplete = 0, totalGames = 0, leaderboardCheck = null) {
+            const container = document.getElementById('resultsContainer');
+
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result-card';
+
+            const errorRate = Math.round((errorCount / totalUsers) * 100);
+            const statusIcon = errorCount === 0 ? '✅' : errorCount > totalUsers * 0.1 ? '🚨' : '⚠️';
+
+            const weekStatus = isWeekComplete ? 'COMPLETED' : `IN PROGRESS (${gamesComplete}/${totalGames} games finished)`;
+
+            if (errorCount === 0) {
+                resultDiv.innerHTML = `
+                    <div class="perfect-week">
+                        <div class="perfect-icon">🌟</div>
+                        <div class="perfect-title">PERFECT SPIRAL</div>
+                        <div style="color: var(--nerd-silver); margin-bottom: 1rem;">Week ${week} Integrity Analysis - ${weekStatus}</div>
+                        <div style="color: #4caf50; font-size: 1.1rem;">All ${totalUsers} users have mathematically correct scoring data.</div>
+                        <div style="color: var(--nerd-silver); font-size: 0.9rem; margin-top: 1rem;">No discrepancies detected • System operating within expected parameters</div>
+                        ${!isWeekComplete ? '<div style="color: var(--nerd-gold); font-size: 0.8rem; margin-top: 0.5rem;">📅 Week in progress - Incomplete picks are normal</div>' : ''}
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="result-header">
+                        <div class="result-title">Week ${week} Analysis - ${weekStatus}</div>
+                        <div class="error-stats">
+                            <div class="error-count">${statusIcon} ${errorCount}/${totalUsers} Anomalies</div>
+                            <div class="error-rate">${errorRate}% Discrepancy Rate</div>
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(204, 65, 37, 0.1); border: 1px solid var(--nerd-red); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
+                        <h4 style="color: var(--nerd-bright-red); font-size: 1.1rem; margin-bottom: 0.5rem;">${statusIcon} Scoring Integrity Compromised</h4>
+                        <p style="color: var(--nerd-silver); font-size: 0.9rem;">${errorCount} out of ${totalUsers} users have incorrect scoring data requiring systematic correction.</p>
+                        ${!isWeekComplete ? '<p style="color: var(--nerd-gold); font-size: 0.8rem; margin-top: 0.5rem;">📅 Week in progress - Only users with complete pick sets are validated</p>' : ''}
+                    </div>
+
+                    <div class="discrepancy-grid">
+                        ${discrepancies.slice(0, 10).map(d =>
+                            '<div class="discrepancy-item">' +
+                                '<div class="user-info">' +
+                                    '<div>' +
+                                        '<div class="user-name">' + d.userName + '</div>' +
+                                        '<div class="user-id">ID: ' + d.uid.slice(-6) + '</div>' +
+                                    '</div>' +
+                                    '<div class="error-amount">' +
+                                        'Error: ' + Math.abs(d.correctPoints - d.storedPoints) + ' pts' +
+                                    '</div>' +
+                                '</div>' +
+                                '<div class="scoring-details">' +
+                                    '<div class="should-be">' +
+                                        '<strong>Should be:</strong> ' + d.correct + ' correct, ' + d.correctPoints + ' points' +
+                                    '</div>' +
+                                    '<div class="stored-as">' +
+                                        '<strong>Stored as:</strong> ' + d.stored + ' correct, ' + d.storedPoints + ' points' +
+                                    '</div>' +
+                                    (d.confidenceErrors && d.confidenceErrors.length > 0 ?
+                                        '<div class="confidence-errors" style="color: #ff4757; font-size: 0.8rem; margin-top: 0.5rem;">' +
+                                            '<strong>⚠️ Confidence Issues:</strong><br>' +
+                                            d.confidenceErrors.join('<br>') +
+                                            '<br><strong>Sum:</strong> ' + d.confidenceSum + ' (should be ' + d.expectedConfidenceSum + ')' +
+                                        '</div>'
+                                        : '') +
+                                '</div>' +
+                                (d.winningPicks.length > 0 ?
+                                    '<div class="winning-picks">' +
+                                        '<div class="label">✅ Validated Winning Selections</div>' +
+                                        '<div class="picks-list">' + d.winningPicks.map(p => p.team + '(' + p.points + ')').join(', ') + '</div>' +
+                                    '</div>'
+                                    : '') +
+                            '</div>'
+                        ).join('')}
+
+                        ${discrepancies.length > 10 ?
+                            '<div style="text-align: center; padding: 1rem; background: rgba(0, 0, 0, 0.5); border-radius: 8px; color: var(--nerd-silver);">' +
+                                'Displaying first 10 of ' + discrepancies.length + ' anomalies • Use REPAIR function for systematic correction' +
+                            '</div>'
+                            : ''}
+                    </div>
+                `;
+            }
+
+            container.innerHTML = '';
+            container.appendChild(resultDiv);
+
+            // Add leaderboard consistency check results
+            if (leaderboardCheck) {
+                const leaderboardDiv = document.createElement('div');
+                leaderboardDiv.className = 'result-card';
+                leaderboardDiv.style.marginTop = '1rem';
+
+                if (leaderboardCheck.error) {
+                    leaderboardDiv.innerHTML = `
+                        <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid var(--nerd-gold); border-radius: 8px; padding: 1rem;">
+                            <h4 style="color: var(--nerd-gold); margin-bottom: 0.5rem;">⚠️ Leaderboard Check Failed</h4>
+                            <p style="color: var(--nerd-silver); font-size: 0.9rem;">Could not verify leaderboard consistency: ${leaderboardCheck.error}</p>
+                        </div>
+                    `;
+                } else if (leaderboardCheck.discrepancies && leaderboardCheck.discrepancies.length > 0) {
+                    const badDiscrepancies = leaderboardCheck.discrepancies.length;
+                    leaderboardDiv.innerHTML = `
+                        <div style="background: rgba(204, 65, 37, 0.1); border: 1px solid var(--nerd-red); border-radius: 8px; padding: 1rem;">
+                            <h4 style="color: var(--nerd-bright-red); margin-bottom: 0.5rem;">🚨 LEADERBOARD DATA CORRUPTION DETECTED</h4>
+                            <p style="color: var(--nerd-silver); font-size: 0.9rem; margin-bottom: 1rem;">
+                                The leaderboard API shows corrupted data for ${badDiscrepancies} users!
+                                Firestore data is correct, but the Cloud Function cache is stale.
+                            </p>
+
+                            <div style="background: rgba(0, 0, 0, 0.3); padding: 0.8rem; border-radius: 4px; margin-bottom: 1rem;">
+                                <div style="color: var(--nerd-gold); font-size: 0.8rem; margin-bottom: 0.5rem;">EXAMPLES OF CORRUPTED LEADERBOARD DATA:</div>
+                                ${leaderboardCheck.discrepancies.slice(0, 3).map(d => `
+                                    <div style="color: var(--nerd-white); font-size: 0.8rem; margin-bottom: 0.3rem;">
+                                        <strong>${d.name.split('@')[0]}</strong>:
+                                        Leaderboard shows ${d.leaderboard.points} pts (${d.leaderboard.correct}/${totalGames})
+                                        but Firestore has ${d.firestore.points} pts (${d.firestore.correct}/${totalGames})
+                                    </div>
+                                `).join('')}
+                                ${leaderboardCheck.discrepancies.length > 3 ? `<div style="color: var(--nerd-silver); font-size: 0.7rem;">...and ${leaderboardCheck.discrepancies.length - 3} more</div>` : ''}
+                            </div>
+
+                            <div style="color: var(--nerd-gold); font-size: 0.8rem;">
+                                ⚡ <strong>SOLUTION:</strong> The Cloud Function cache needs to be refreshed or regenerated.
+                                ${leaderboardCheck.isStale ? '<br/>📅 Cache is marked as STALE' : ''}
+                                ${leaderboardCheck.cacheAge ? '<br/>🕐 Cache age: ' + Math.round(leaderboardCheck.cacheAge / 1000 / 60) + ' minutes' : ''}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    leaderboardDiv.innerHTML = `
+                        <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4caf50; border-radius: 8px; padding: 1rem;">
+                            <h4 style="color: #4caf50; margin-bottom: 0.5rem;">✅ Leaderboard Data Consistent</h4>
+                            <p style="color: var(--nerd-silver); font-size: 0.9rem;">
+                                Cloud Function cache matches Firestore data perfectly.
+                                ${leaderboardCheck.isStale ? '<br/>📅 Note: Cache is marked as stale but data is still accurate' : ''}
+                                ${leaderboardCheck.cacheAge ? '<br/>🕐 Cache age: ' + Math.round(leaderboardCheck.cacheAge / 1000 / 60) + ' minutes' : ''}
+                            </p>
+                        </div>
+                    `;
+                }
+
+                container.appendChild(leaderboardDiv);
+            }
+        }
+
+        async function fixWeekScoring(week, discrepancies) {
+            updateStatus(`🔧 Initiating systematic repair for Week ${week} - ${discrepancies.length} users...`);
+
+            const confidenceCorrections = [];
+
+            try {
+                const bibleData = await loadBibleData(week);
+                const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata');
+                const numGames = gameIds.length;
+                const expectedSum = (numGames * (numGames + 1)) / 2;
+
+                const batch = writeBatch(db);
+                let fixedCount = 0;
+
+                for (const discrepancy of discrepancies) {
+                    const uid = discrepancy.uid;
+
+                    // Load this user's picks
+                    const picksRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions/${uid}`);
+                    const picksSnap = await getDoc(picksRef);
+
+                    if (!picksSnap.exists()) {
+                        console.warn(`No picks found for user ${uid} in Week ${week}`);
+                        continue;
+                    }
+
+                    let picks = picksSnap.data();
+                    let confidenceFixed = false;
+                    const originalPicks = JSON.parse(JSON.stringify(picks));
+
+                    // Fix confidence values if needed
+                    if (discrepancy.confidenceErrors && discrepancy.confidenceErrors.length > 0) {
+                        const usedConfidences = [];
+                        const gamePickMap = {};
+                        const gameChanges = [];
+
+                        // Collect currently used confidence values
+                        gameIds.forEach(gameId => {
+                            const pick = picks[gameId];
+                            if (pick && typeof pick.confidence === 'number') {
+                                usedConfidences.push(pick.confidence);
+                                gamePickMap[gameId] = pick;
+                            }
+                        });
+
+                        // Find available confidence values (1 to numGames)
+                        const allConfidences = Array.from({length: numGames}, (_, i) => i + 1);
+                        const availableConfidences = allConfidences.filter(c => !usedConfidences.includes(c));
+
+                        // Fix missing picks by assigning available confidence values
+                        gameIds.forEach(gameId => {
+                            const game = bibleData[gameId];
+                            const gameDesc = game ? `${game.a} @ ${game.h}` : `Game ${gameId}`;
+
+                            if (!picks[gameId] || typeof picks[gameId].confidence !== 'number') {
+                                if (availableConfidences.length > 0) {
+                                    const newConfidence = availableConfidences.shift();
+                                    const oldConfidence = picks[gameId]?.confidence || 'missing';
+
+                                    if (!picks[gameId]) picks[gameId] = {};
+                                    picks[gameId].confidence = newConfidence;
+                                    picks[gameId].winner = picks[gameId].winner || game?.h || 'Unknown';
+
+                                    gameChanges.push({
+                                        gameId: gameId,
+                                        game: gameDesc,
+                                        change: 'Added missing confidence',
+                                        before: oldConfidence,
+                                        after: newConfidence,
+                                        pick: picks[gameId].winner
+                                    });
+
+                                    confidenceFixed = true;
+                                }
+                            }
+                        });
+
+                        // Fix duplicate confidence values
+                        const seenConfidences = new Set();
+                        gameIds.forEach(gameId => {
+                            const pick = picks[gameId];
+                            const game = bibleData[gameId];
+                            const gameDesc = game ? `${game.a} @ ${game.h}` : `Game ${gameId}`;
+
+                            if (pick && typeof pick.confidence === 'number') {
+                                if (seenConfidences.has(pick.confidence)) {
+                                    // This is a duplicate, assign next available
+                                    if (availableConfidences.length > 0) {
+                                        const oldConfidence = pick.confidence;
+                                        const newConfidence = availableConfidences.shift();
+                                        pick.confidence = newConfidence;
+
+                                        gameChanges.push({
+                                            gameId: gameId,
+                                            game: gameDesc,
+                                            change: 'Fixed duplicate confidence',
+                                            before: oldConfidence,
+                                            after: newConfidence,
+                                            pick: pick.winner
+                                        });
+
+                                        confidenceFixed = true;
+                                    }
+                                } else {
+                                    seenConfidences.add(pick.confidence);
+                                }
+                            }
+                        });
+
+                        if (confidenceFixed) {
+                            // Log the correction with detailed game changes
+                            confidenceCorrections.push({
+                                userName: discrepancy.userName,
+                                uid: uid,
+                                week: week,
+                                originalSum: discrepancy.confidenceSum,
+                                expectedSum: expectedSum,
+                                issues: discrepancy.confidenceErrors,
+                                correction: 'Auto-assigned missing/duplicate confidence values',
+                                gameChanges: gameChanges,
+                                totalChanges: gameChanges.length,
+                                timestamp: new Date().toISOString()
+                            });
+
+                            // Update picks document
+                            batch.set(picksRef, picks);
+                        }
+                    }
+
+                    // Recalculate scoring with corrected picks
+                    const correct = await calculateCorrectScoring(picks, bibleData);
+
+                    // Update scoring document
+                    const scoringRef = doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${uid}`);
+                    const scoringSnap = await getDoc(scoringRef);
+
+                    if (scoringSnap.exists()) {
+                        const data = scoringSnap.data();
+                        const weeklyPoints = data.weeklyPoints || {};
+
+                        weeklyPoints[week.toString()] = {
+                            gamesWon: correct.correctPicks,
+                            totalPoints: correct.totalPointsEarned,
+                            gamesPlayed: correct.totalGames,
+                            lastUpdated: new Date().toISOString(),
+                            recalculationApplied: true,
+                            toolRepaired: true,
+                            confidenceCorrected: confidenceFixed
+                        };
+
+                        batch.update(scoringRef, { weeklyPoints });
+                        fixedCount++;
+                        console.log(`✅ Queued repair for ${discrepancy.userName}: ${correct.correctPicks} correct, ${correct.totalPointsEarned} points`);
+                    }
+                }
+
+                await batch.commit();
+
+                // Generate and download confidence corrections report
+                if (confidenceCorrections.length > 0) {
+                    generateConfidenceReport(confidenceCorrections, week);
+                    updateStatus(`✅ Systematic repair complete: ${fixedCount} users corrected for Week ${week}. Confidence corrections: ${confidenceCorrections.length}`);
+                } else {
+                    updateStatus(`✅ Systematic repair complete: ${fixedCount} users corrected for Week ${week}`);
+                }
+
+                // Clear discrepancies and re-audit
+                currentDiscrepancies = [];
+                setTimeout(() => auditSingleWeek(week), 1000);
+
+            } catch (error) {
+                updateStatus(`❌ Repair error for Week ${week}: ${error.message}`);
+                console.error('Fix error:', error);
+            }
+        }
+
+        function generateConfidenceReport(corrections, week) {
+            const reportData = {
+                week: week,
+                timestamp: new Date().toISOString(),
+                corrections: corrections,
+                summary: {
+                    totalUsers: corrections.length,
+                    tool: 'NERD SCORING AUDIT TOOL',
+                    version: '3.0'
+                }
+            };
+
+            // Create detailed text report
+            let reportText = `NERD FOOTBALL CONFIDENCE CORRECTIONS REPORT\n`;
+            reportText += `Week ${week} - Generated: ${new Date().toLocaleString()}\n`;
+            reportText += `========================================\n\n`;
+            reportText += `SUMMARY: ${corrections.length} users had confidence values automatically corrected\n\n`;
+
+            corrections.forEach((correction, index) => {
+                reportText += `${index + 1}. ${correction.userName} (ID: ${correction.uid.slice(-6)})\n`;
+                reportText += `   Original confidence sum: ${correction.originalSum} (should be ${correction.expectedSum})\n`;
+                reportText += `   Issues detected: ${correction.issues.join(', ')}\n`;
+                reportText += `   Correction applied: ${correction.correction}\n`;
+                reportText += `   Total games altered: ${correction.totalChanges || 0}\n`;
+
+                if (correction.gameChanges && correction.gameChanges.length > 0) {
+                    reportText += `   \n   SPECIFIC GAME CHANGES:\n`;
+                    correction.gameChanges.forEach((change, gameIndex) => {
+                        reportText += `   ${gameIndex + 1}) ${change.game}\n`;
+                        reportText += `      Change: ${change.change}\n`;
+                        reportText += `      Confidence: ${change.before} → ${change.after}\n`;
+                        reportText += `      User's pick: ${change.pick}\n`;
+                        reportText += `      Game ID: ${change.gameId}\n\n`;
+                    });
+                }
+
+                reportText += `   Timestamp: ${correction.timestamp}\n`;
+                reportText += `   ----------------------------------------\n\n`;
+            });
+
+            reportText += `VERIFICATION NEEDED:\n`;
+            reportText += `Please verify these automatic corrections with affected users.\n`;
+            reportText += `Missing confidence values were assigned using available numbers 1-16.\n`;
+            reportText += `Duplicate values were replaced with next available confidence.\n\n`;
+
+            reportText += `JSON DATA:\n`;
+            reportText += JSON.stringify(reportData, null, 2);
+
+            // Download the report
+            const blob = new Blob([reportText], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `NERD_Confidence_Corrections_Week${week}_${new Date().getTime()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            console.log('📥 Confidence corrections report downloaded:', reportData);
+        }
+
+        async function auditAllWeeks() {
+            updateStatus('🌀 Initiating SPIRAL ANALYSIS - Progressive audit of all weeks...');
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = '';
+
+            for (let week = 1; week <= 4; week++) {
+                try {
+                    await auditSingleWeek(week);
+                    await new Promise(resolve => setTimeout(resolve, 800)); // Progressive delay
+                } catch (error) {
+                    console.error(`Error auditing week ${week}:`, error);
+                }
+            }
+
+            updateStatus('✅ SPIRAL ANALYSIS complete - All weeks systematically examined');
+        }
+    </script>
+</body>
+</html>

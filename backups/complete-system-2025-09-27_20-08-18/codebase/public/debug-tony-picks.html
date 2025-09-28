@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Tony's Picks</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Debug Tony's Pick Data</h1>
+    <div id="output"></div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+
+        async function debugTonyPicks() {
+            const output = document.getElementById('output');
+
+            try {
+                console.log('🔍 DEBUG: Loading Tony\'s pick data...');
+
+                // Tony's UID
+                const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+                // Use the exact path structure from the grid
+                const picksCollectionPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/1/submissions`;
+                const picksDocRef = firebase.firestore().doc(picksCollectionPath, tonyUID);
+
+                console.log('🔍 DEBUG: Fetching from path:', `${picksCollectionPath}/${tonyUID}`);
+
+                const picksSnap = await picksDocRef.get();
+
+                if (picksSnap.exists) {
+                    const tonyPicks = picksSnap.data();
+                    console.log('🎯 TONY FULL PICKS DATA:', tonyPicks);
+
+                    // Focus on games 106 and 110
+                    const game106 = tonyPicks['106'];
+                    const game110 = tonyPicks['110'];
+
+                    console.log('🔍 GAME 106 DETAILS:', game106);
+                    console.log('🔍 GAME 110 DETAILS:', game110);
+
+                    output.innerHTML = `
+                        <h2>Tony's Pick Data Analysis</h2>
+                        <h3>Game 106:</h3>
+                        <pre>${JSON.stringify(game106, null, 2)}</pre>
+                        <h3>Game 110:</h3>
+                        <pre>${JSON.stringify(game110, null, 2)}</pre>
+                        <h3>Full Pick Data:</h3>
+                        <pre>${JSON.stringify(tonyPicks, null, 2)}</pre>
+                    `;
+                } else {
+                    console.log('❌ No pick data found for Tony');
+                    output.innerHTML = '<p>No pick data found for Tony</p>';
+                }
+
+            } catch (error) {
+                console.error('❌ Error loading pick data:', error);
+                output.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+
+        // Run debug on page load
+        debugTonyPicks();
+    </script>
+</body>
+</html>
