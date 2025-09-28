@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Week 1 Elimination Checker</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 5px; }
+        .error { background: #fee; color: #c00; }
+        .success { background: #efe; color: #060; }
+        .info { background: #eef; color: #006; }
+    </style>
+</head>
+<body>
+    <h1>Week 1 Elimination Checker</h1>
+    <button onclick="runCheck()" id="checkBtn">Check Week 1 Eliminations</button>
+    <div id="results"></div>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            document.getElementById('results').appendChild(div);
+            console.log(message);
+        }
+
+        async function runCheck() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('checkBtn').disabled = true;
+
+            addResult('🔍 Starting Week 1 elimination check...', 'info');
+
+            try {
+                // Check elimination status - use correct path with 6 segments
+                const statusDoc = await db.doc('artifacts/nerdfootball/public/data/nerdSurvivor_status/status').get();
+
+                if (!statusDoc.exists) {
+                    addResult('📋 No survivor status document found', 'info');
+                    return;
+                }
+
+                const allStatuses = statusDoc.data();
+                addResult(`📊 Total users in status document: ${Object.keys(allStatuses).length}`, 'info');
+
+                // Filter Week 1 eliminations
+                const week1Eliminations = [];
+                let totalEliminated = 0;
+
+                for (const [userId, status] of Object.entries(allStatuses)) {
+                    if (status.eliminated && status.eliminatedWeek === 1) {
+                        week1Eliminations.push({
+                            userId,
+                            eliminatedWeek: status.eliminatedWeek,
+                            eliminationReason: status.eliminationReason,
+                            eliminatedDate: status.eliminatedDate
+                        });
+                    }
+
+                    if (status.eliminated) {
+                        totalEliminated++;
+                    }
+                }
+
+                addResult(`📊 <strong>WEEK 1 ELIMINATION SUMMARY:</strong>`, 'success');
+                addResult(`   • Total eliminated in Week 1: <strong>${week1Eliminations.length}</strong>`, 'success');
+                addResult(`   • Total eliminated overall: <strong>${totalEliminated}</strong>`, 'success');
+
+                if (week1Eliminations.length > 0) {
+                    addResult('📋 <strong>Week 1 eliminated users:</strong>', 'info');
+                    week1Eliminations.forEach(user => {
+                        addResult(`   🚫 ${user.userId}: ${user.eliminationReason}`, 'info');
+                    });
+
+                    // Extract teams
+                    const teamCounts = {};
+                    week1Eliminations.forEach(user => {
+                        const reason = user.eliminationReason || '';
+                        const teamMatch = reason.match(/Picked (.+?)$/);
+                        if (teamMatch) {
+                            const team = teamMatch[1];
+                            teamCounts[team] = (teamCounts[team] || 0) + 1;
+                        }
+                    });
+
+                    addResult('📊 <strong>Teams that caused Week 1 eliminations:</strong>', 'success');
+                    Object.entries(teamCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .forEach(([team, count]) => {
+                            addResult(`   💀 <strong>${team}</strong>: ${count} elimination${count > 1 ? 's' : ''}`, 'success');
+                        });
+                }
+
+                // Check Miami user specifically
+                const miamiUserId = 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2';
+                const miamiUserStatus = allStatuses[miamiUserId];
+
+                addResult(`🐬 <strong>Miami user (${miamiUserId}) status:</strong>`, 'info');
+                if (miamiUserStatus) {
+                    addResult(`   Status: ${JSON.stringify(miamiUserStatus)}`, 'info');
+                } else {
+                    addResult(`   No status found for Miami user`, 'error');
+                }
+
+                // Now check user picks
+                addResult('🔍 Checking user picks for Week 1...', 'info');
+
+                const poolMembersDoc = await db.doc('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members').get();
+
+                if (!poolMembersDoc.exists) {
+                    addResult('❌ Pool members not found', 'error');
+                    return;
+                }
+
+                const memberIds = Object.keys(poolMembersDoc.data());
+                addResult(`👥 Checking picks for ${memberIds.length} pool members`, 'info');
+
+                const week1Picks = [];
+                for (const userId of memberIds) {
+                    try {
+                        const userPicksDoc = await db.doc(`artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`).get();
+
+                        if (userPicksDoc.exists) {
+                            const userPicksData = userPicksDoc.data();
+                            const userPicks = userPicksData.picks || {};
+                            const week1Pick = userPicks[1];
+
+                            if (week1Pick) {
+                                week1Picks.push({
+                                    userId,
+                                    team: week1Pick.team,
+                                    gameId: week1Pick.gameId
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.log(`Error checking user ${userId}:`, error);
+                    }
+                }
+
+                addResult(`📊 <strong>Week 1 picks summary (${week1Picks.length} users made picks):</strong>`, 'success');
+
+                // Group by team
+                const teamPicks = {};
+                week1Picks.forEach(pick => {
+                    teamPicks[pick.team] = (teamPicks[pick.team] || 0) + 1;
+                });
+
+                Object.entries(teamPicks)
+                    .sort((a, b) => b[1] - a[1])
+                    .forEach(([team, count]) => {
+                        addResult(`   🏈 <strong>${team}</strong>: ${count} pick${count > 1 ? 's' : ''}`, 'info');
+                    });
+
+                // Check Miami picks specifically
+                const miamiPickers = week1Picks.filter(pick => pick.team === 'Miami Dolphins');
+                if (miamiPickers.length > 0) {
+                    addResult(`🐬 <strong>Users who picked Miami Dolphins:</strong>`, 'info');
+                    miamiPickers.forEach(picker => {
+                        addResult(`   • ${picker.userId}`, 'info');
+                    });
+                }
+
+                addResult('✅ <strong>Week 1 elimination check complete!</strong>', 'success');
+
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+
+            document.getElementById('checkBtn').disabled = false;
+        }
+
+        // Auto-run on page load
+        window.addEventListener('load', () => {
+            setTimeout(runCheck, 1000);
+        });
+    </script>
+</body>
+</html>

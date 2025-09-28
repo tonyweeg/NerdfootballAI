@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head><title>Nuclear Fix</title></head>
+<body>
+    <h1>NUCLEAR OPTION - Bypass Firestore</h1>
+    <p>Since Firestore is completely broken, let's use Realtime Database to create the pool member data</p>
+    <button id="nuclear" style="padding: 20px; font-size: 18px; background: red; color: white;">NUCLEAR FIX - USE REALTIME DB</button>
+    <div id="status"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+        import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js';
+
+        const app = initializeApp({
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        });
+
+        // Initialize App Check - THIS WAS THE MISSING PIECE!
+        const appCheck = initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider('6Lds9dMrAAAAAGIL03MqQbJuN99t_ICepTLH4Hww'),
+            isTokenAutoRefreshEnabled: true
+        });
+
+        const auth = getAuth(app);
+        const database = getDatabase(app);
+
+        document.getElementById('nuclear').onclick = async () => {
+            const status = document.getElementById('status');
+
+            if (!auth.currentUser) {
+                status.innerHTML = '❌ Not authenticated';
+                return;
+            }
+
+            try {
+                status.innerHTML = '⏳ Using Realtime Database to bypass Firestore...';
+
+                // Create pool members in Realtime DB as backup
+                const poolMembersRef = ref(database, 'pools/nerduniverse-2025/metadata/members');
+
+                const memberData = {
+                    'WxSPmEildJdqs6T5hIpBUZrscwt2': {
+                        displayName: 'Tony Weeg',
+                        email: 'tonyweeg@gmail.com',
+                        role: 'admin',
+                        joinedAt: new Date().toISOString(),
+                        participation: {
+                            confidence: true,
+                            survivor: true
+                        }
+                    }
+                };
+
+                await set(poolMembersRef, memberData);
+
+                status.innerHTML = '✅ SUCCESS! Created backup in Realtime DB.<br><br>';
+                status.innerHTML += 'Now let me try ONE MORE TIME with Firestore using a completely different approach...';
+
+                // Try creating a document in a completely different path
+                const { getFirestore, doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+                const db = getFirestore(app);
+
+                // Try a simple path first
+                const testRef = doc(db, 'test/simple');
+                await setDoc(testRef, { test: 'data', timestamp: Date.now() });
+
+                status.innerHTML += '<br>✅ Basic Firestore write works!';
+
+                // Now try the pool path
+                const poolRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                await setDoc(poolRef, memberData);
+
+                status.innerHTML += '<br>✅ MIRACLE! Pool members created in Firestore!';
+                status.innerHTML += '<br><a href="/nerd-universe-grid.html" style="font-size: 18px; color: green;">TRY THE GRID NOW!</a>';
+
+            } catch (error) {
+                status.innerHTML += `<br>❌ Failed: ${error.message}`;
+                console.error('Error:', error);
+                status.innerHTML += '<br><br>Firestore is completely broken. We need to check the Firebase Console manually.';
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameId Mapping Test Harness - NerdFootball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0c1445 0%, #1e3a8a 100%);
+            color: #e2e8f0;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+        .terminal-border {
+            border: 2px solid #22d3ee;
+            box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+        }
+        .data-mismatch {
+            background-color: rgba(239, 68, 68, 0.2);
+            border-left: 4px solid #ef4444;
+        }
+        .data-match {
+            background-color: rgba(34, 197, 94, 0.2);
+            border-left: 4px solid #22c55e;
+        }
+        .console-output {
+            background: #1e293b;
+            border: 1px solid #475569;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4">
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        window.auth = getAuth(app);
+        window.db = getFirestore(app);
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.GoogleAuthProvider = GoogleAuthProvider;
+        window.signInWithPopup = signInWithPopup;
+
+        console.log('🔥 FIREBASE INITIALIZED');
+    </script>
+
+    <div class="container mx-auto max-w-7xl">
+        <!-- Header -->
+        <div class="terminal-border rounded-lg p-6 mb-6 bg-slate-800/50">
+            <h1 class="text-3xl font-bold text-cyan-400 mb-4">🔍 GameId Mapping Test Harness</h1>
+            <p class="text-slate-300 mb-4">Analyzing pick data vs bible data inconsistencies across all users</p>
+
+            <!-- Authentication Status -->
+            <div id="auth-status" class="mb-4 p-3 rounded bg-slate-700/50">
+                <span class="text-yellow-400">🔐 Authentication: </span>
+                <span id="auth-text">Checking...</span>
+                <button id="signin-btn" class="ml-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white hidden">
+                    Sign In with Google
+                </button>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex gap-4 mb-4">
+                <button id="analyze-btn" class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-white font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>
+                    🔬 Analyze GameId Mappings
+                </button>
+                <button id="clear-btn" class="px-6 py-2 bg-red-600 hover:bg-red-700 rounded text-white font-semibold">
+                    🧹 Clear Results
+                </button>
+                <select id="week-select" class="px-4 py-2 bg-slate-700 text-white rounded">
+                    <option value="1">Week 1</option>
+                    <option value="2">Week 2</option>
+                    <option value="3">Week 3</option>
+                    <option value="4">Week 4</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Status Panel -->
+        <div id="status-panel" class="terminal-border rounded-lg p-6 mb-6 bg-slate-800/50 hidden">
+            <h2 class="text-xl font-bold text-cyan-400 mb-4">📊 Analysis Status</h2>
+            <div id="status-text" class="text-slate-300"></div>
+            <div id="progress-bar" class="w-full bg-slate-700 rounded-full h-2 mt-4 hidden">
+                <div id="progress-fill" class="bg-cyan-500 h-2 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Results Panel -->
+        <div id="results-panel" class="terminal-border rounded-lg p-6 mb-6 bg-slate-800/50 hidden">
+            <h2 class="text-xl font-bold text-cyan-400 mb-4">📈 Analysis Results</h2>
+            <div id="summary-stats" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
+            <div id="detailed-results" class="space-y-4"></div>
+        </div>
+
+        <!-- Console Output -->
+        <div id="console-panel" class="terminal-border rounded-lg p-6 bg-slate-800/50">
+            <h2 class="text-xl font-bold text-cyan-400 mb-4">🖥️ Console Output</h2>
+            <div id="console-output" class="console-output p-4 rounded max-h-96 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let isAnalyzing = false;
+
+        // Console logging capture
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const output = document.getElementById('console-output');
+            if (output) {
+                const timestamp = new Date().toISOString().slice(11, 23);
+                const message = args.map(arg =>
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                ).join(' ');
+                output.innerHTML += `<div class="text-green-400">[${timestamp}] ${message}</div>`;
+                output.scrollTop = output.scrollHeight;
+            }
+        };
+
+        // Authentication setup
+        window.auth.onAuthStateChanged((user) => {
+            currentUser = user;
+            const authText = document.getElementById('auth-text');
+            const signinBtn = document.getElementById('signin-btn');
+            const analyzeBtn = document.getElementById('analyze-btn');
+
+            if (user) {
+                authText.textContent = `✅ Signed in as ${user.email}`;
+                signinBtn.classList.add('hidden');
+                analyzeBtn.disabled = false;
+                console.log(`🔐 AUTHENTICATED: ${user.email} (${user.uid})`);
+            } else {
+                authText.textContent = '❌ Not signed in';
+                signinBtn.classList.remove('hidden');
+                analyzeBtn.disabled = true;
+            }
+        });
+
+        // Sign-in handler
+        document.getElementById('signin-btn').addEventListener('click', async () => {
+            try {
+                const provider = new window.GoogleAuthProvider();
+                await window.signInWithPopup(window.auth, provider);
+            } catch (error) {
+                console.error('❌ SIGNIN ERROR:', error);
+            }
+        });
+
+        // Clear results
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            document.getElementById('status-panel').classList.add('hidden');
+            document.getElementById('results-panel').classList.add('hidden');
+            document.getElementById('console-output').innerHTML = '';
+        });
+
+        // Main analysis function
+        document.getElementById('analyze-btn').addEventListener('click', async () => {
+            if (isAnalyzing || !currentUser) return;
+
+            isAnalyzing = true;
+            const analyzeBtn = document.getElementById('analyze-btn');
+            const statusPanel = document.getElementById('status-panel');
+            const statusText = document.getElementById('status-text');
+
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '⏳ Analyzing...';
+            statusPanel.classList.remove('hidden');
+
+            try {
+                const selectedWeek = document.getElementById('week-select').value;
+                console.log(`🔬 STARTING ANALYSIS FOR WEEK ${selectedWeek}`);
+
+                await analyzeGameIdMappings(selectedWeek);
+
+            } catch (error) {
+                console.error('❌ ANALYSIS ERROR:', error);
+                statusText.innerHTML = `<span class="text-red-400">❌ Analysis failed: ${error.message}</span>`;
+            } finally {
+                isAnalyzing = false;
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '🔬 Analyze GameId Mappings';
+            }
+        });
+
+        async function analyzeGameIdMappings(weekNumber) {
+            const statusText = document.getElementById('status-text');
+            const resultsPanel = document.getElementById('results-panel');
+            const summaryStats = document.getElementById('summary-stats');
+            const detailedResults = document.getElementById('detailed-results');
+
+            // Step 1: Load bible data
+            statusText.innerHTML = '📖 Loading bible data...';
+            console.log('📖 LOADING BIBLE DATA...');
+
+            const bibleDocPath = `artifacts/nerdfootball/public/data/nerdfootball_bible/2025`;
+            const bibleDoc = await window.getDoc(window.doc(window.db, bibleDocPath));
+            const bibleData = bibleDoc.data();
+
+            if (!bibleData || !bibleData.weeks || !bibleData.weeks[weekNumber]) {
+                throw new Error(`No bible data found for week ${weekNumber}`);
+            }
+
+            const bibleWeek = bibleData.weeks[weekNumber];
+            const bibleGames = bibleWeek.games || {};
+            console.log(`📖 BIBLE DATA LOADED: ${Object.keys(bibleGames).length} games`);
+
+            // Step 2: Load all user picks
+            statusText.innerHTML = '👥 Loading all user picks...';
+            console.log('👥 LOADING ALL USER PICKS...');
+
+            const picksCollectionPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions`;
+            const picksSnapshot = await window.getDocs(window.collection(window.db, picksCollectionPath));
+
+            const allUserPicks = {};
+            picksSnapshot.forEach(doc => {
+                allUserPicks[doc.id] = doc.data();
+            });
+
+            console.log(`👥 LOADED PICKS FOR ${Object.keys(allUserPicks).length} USERS`);
+
+            // Step 3: Load pool members for user names
+            statusText.innerHTML = '📋 Loading pool members...';
+            const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+            const poolMembersDoc = await window.getDoc(window.doc(window.db, poolMembersPath));
+            const poolMembers = poolMembersDoc.data() || {};
+
+            // Step 4: Analyze mismatches
+            statusText.innerHTML = '🔍 Analyzing gameId mismatches...';
+            console.log('🔍 ANALYZING GAMEID MISMATCHES...');
+
+            const analysisResults = [];
+            let totalUsers = 0;
+            let usersWithMismatches = 0;
+            let totalMismatches = 0;
+
+            for (const [userId, userPicks] of Object.entries(allUserPicks)) {
+                if (!userPicks || typeof userPicks !== 'object') continue;
+
+                totalUsers++;
+                const member = poolMembers[userId] || {};
+                const userName = member.name || member.email || userId;
+
+                const userMismatches = [];
+
+                // Check each pick against bible data
+                for (const [gameId, pickData] of Object.entries(userPicks)) {
+                    if (gameId === 'mnfTotalPoints' || !pickData || !pickData.winner) continue;
+
+                    const bibleGame = bibleGames[gameId];
+                    if (!bibleGame) {
+                        userMismatches.push({
+                            gameId,
+                            issue: 'MISSING_FROM_BIBLE',
+                            pickData: pickData,
+                            bibleGame: null
+                        });
+                        continue;
+                    }
+
+                    // Check if picked team is in the bible game
+                    const pickedTeam = pickData.winner;
+                    const homeTeam = bibleGame.homeTeam;
+                    const awayTeam = bibleGame.awayTeam;
+
+                    if (pickedTeam !== homeTeam && pickedTeam !== awayTeam) {
+                        userMismatches.push({
+                            gameId,
+                            issue: 'TEAM_NOT_IN_GAME',
+                            pickData: pickData,
+                            bibleGame: bibleGame,
+                            expectedTeams: [homeTeam, awayTeam]
+                        });
+                    }
+                }
+
+                if (userMismatches.length > 0) {
+                    usersWithMismatches++;
+                    totalMismatches += userMismatches.length;
+                    analysisResults.push({
+                        userId,
+                        userName,
+                        mismatches: userMismatches
+                    });
+                }
+
+                console.log(`✅ ANALYZED ${userName}: ${userMismatches.length} mismatches`);
+            }
+
+            // Step 5: Display results
+            statusText.innerHTML = '📊 Generating report...';
+
+            // Summary statistics
+            summaryStats.innerHTML = `
+                <div class="bg-slate-700/50 p-4 rounded">
+                    <div class="text-cyan-400 text-lg font-bold">Total Users</div>
+                    <div class="text-2xl font-mono">${totalUsers}</div>
+                </div>
+                <div class="bg-slate-700/50 p-4 rounded">
+                    <div class="text-red-400 text-lg font-bold">Users with Mismatches</div>
+                    <div class="text-2xl font-mono">${usersWithMismatches}</div>
+                </div>
+                <div class="bg-slate-700/50 p-4 rounded">
+                    <div class="text-yellow-400 text-lg font-bold">Total Mismatches</div>
+                    <div class="text-2xl font-mono">${totalMismatches}</div>
+                </div>
+            `;
+
+            // Detailed results
+            if (analysisResults.length === 0) {
+                detailedResults.innerHTML = `
+                    <div class="data-match p-4 rounded">
+                        <h3 class="text-green-400 font-bold text-lg mb-2">✅ Perfect Alignment!</h3>
+                        <p class="text-slate-300">All user picks perfectly match the bible data. No gameId mapping issues detected.</p>
+                    </div>
+                `;
+            } else {
+                detailedResults.innerHTML = analysisResults.map(result => `
+                    <div class="data-mismatch p-4 rounded">
+                        <h3 class="text-red-400 font-bold text-lg mb-2">❌ ${result.userName}</h3>
+                        <div class="text-slate-400 text-sm mb-2">User ID: ${result.userId}</div>
+                        <div class="space-y-2">
+                            ${result.mismatches.map(mismatch => `
+                                <div class="bg-slate-800/50 p-3 rounded text-sm">
+                                    <div class="text-yellow-400 font-bold">Game ${mismatch.gameId}</div>
+                                    <div class="text-slate-300">Issue: ${mismatch.issue}</div>
+                                    <div class="text-slate-300">Picked: ${mismatch.pickData.winner} (confidence: ${mismatch.pickData.confidence})</div>
+                                    ${mismatch.bibleGame ?
+                                        `<div class="text-slate-300">Bible Game: ${mismatch.bibleGame.awayTeam} @ ${mismatch.bibleGame.homeTeam}</div>` :
+                                        `<div class="text-red-300">Bible Game: NOT FOUND</div>`
+                                    }
+                                    ${mismatch.expectedTeams ?
+                                        `<div class="text-cyan-300">Expected Teams: ${mismatch.expectedTeams.join(' or ')}</div>` : ''
+                                    }
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            resultsPanel.classList.remove('hidden');
+            statusText.innerHTML = `✅ Analysis complete! Found ${totalMismatches} mismatches across ${usersWithMismatches} users.`;
+
+            console.log(`🏁 ANALYSIS COMPLETE: ${totalMismatches} mismatches found`);
+            console.log('NERD-TEST-HARNESS-COMPLETE'); // Special marker for you to search for
+        }
+    </script>
+</body>
+</html>

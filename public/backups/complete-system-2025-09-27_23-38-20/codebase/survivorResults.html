@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏆 Survivor Pool Results - NerdFootball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .survivor-active {
+            background-color: #dcfce7; /* Light green */
+        }
+        .survivor-eliminated {
+            background-color: #fce7e7; /* Light rose */
+            position: relative;
+        }
+        .survivor-eliminated::after {
+            content: '💀';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 24px;
+            opacity: 0.5;
+        }
+        .survivor-eliminated td {
+            opacity: 0.7;
+        }
+        .survivor-eliminated .text-gray-900 {
+            text-decoration: line-through;
+            color: #991b1b;
+        }
+        .survivor-won {
+            background-color: #dcfce7; /* Light green - weekly winner */
+        }
+        .survivor-lost {
+            background-color: #fce7e7; /* Light red - weekly loser */
+        }
+        .survivor-pending {
+            background-color: #fef3c7; /* Light yellow - pending game */
+        }
+        .survivor-grid {
+            min-height: 600px;
+        }
+        .loading-spinner {
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="mb-6">
+        <div class="flex justify-between items-center flex-wrap gap-4">
+            <!-- Logo and title - left aligned -->
+            <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
+                <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 md:h-10 w-auto">
+                <div class="flex items-center gap-2">
+                    <h1 class="text-3xl md:text-4xl font-bold text-slate-800">NerdfootballAI</h1>
+                    <i class="fas fa-skull-crossbones text-xl text-red-600"></i>
+                </div>
+            </a>
+            <!-- Right side elements -->
+            <div class="flex items-center space-x-4">
+                <span class="text-sm font-medium text-slate-600">v3.0</span>
+                <div class="flex items-center space-x-2 relative">
+                    <span id="user-display" class="text-sm font-medium text-slate-700"></span>
+                    <!-- Pool Switcher -->
+                    <div class="relative" id="pool-switcher-container">
+                        <button id="pool-switcher-btn" class="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200 transition-colors">
+                            <span id="current-pool-name">Loading...</span>
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </button>
+                        <div id="pool-switcher-dropdown" class="hidden absolute top-full right-0 mt-1 w-64 bg-white rounded-md shadow-lg z-30 ring-1 ring-black ring-opacity-5">
+                            <div class="py-1">
+                                <div id="user-pools-list" class="max-h-64 overflow-y-auto">
+                                    <!-- Pools will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hamburger Menu -->
+                    <div class="relative">
+                        <button id="menu-btn" class="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
+                            <span class="sr-only">Open menu</span>
+                            <i class="fas fa-bars h-6 w-6"></i>
+                        </button>
+                        <div id="menu-panel" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 ring-1 ring-black ring-opacity-5">
+                            <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                <!-- Admin Only Section (Top for Admins) -->
+                                <div id="menu-admin-controls" class="hidden">
+                                    <button id="menu-admin-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🔧 Admin</button>
+                                    <div class="border-t border-gray-200 my-1"></div>
+                                </div>
+                                
+                                <!-- Main Menu Items -->
+                                <a href="./index.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">📝 My Picks</a>
+                                <a href="./index.html?view=leaderboard" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🏆 Leaderboard</a>
+                                <a href="./index.html?view=grid" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">📊 The Grid</a>
+                                <a href="./index.html?view=survivor" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">⚔️ Survivor Picks</a>
+                                <a href="./survivorResults.html" class="block px-4 py-2 text-sm text-orange-700 bg-orange-50 font-medium" role="menuitem">💀 Survivors List</a>
+                                <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">📋 Rules</a>
+                                
+                                <!-- Account Section -->
+                                <div class="border-t border-gray-200 my-1"></div>
+                                <button id="settings-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">⚙️ Settings</button>
+                                <button id="logout-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">🚪 Logout</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <!-- Loading State -->
+        <div id="loading-container" class="text-center py-12">
+            <div class="loading-spinner w-12 h-12 mx-auto border-4 border-gray-200 rounded-full"></div>
+            <p class="mt-4 text-gray-600">Loading survivor results...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-container" class="hidden text-center py-12">
+            <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">Error Loading Results</h2>
+            <p id="error-message" class="text-gray-600"></p>
+            <button id="retry-btn" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                Try Again
+            </button>
+        </div>
+
+        <!-- Results Grid -->
+        <div id="results-container" class="hidden">
+            <!-- Stats Summary -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">🏆 Survivor Pool Battle Stats</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-gray-900" id="total-players">0</div>
+                        <div class="text-sm text-gray-600">Total Warriors</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600" id="active-players">0</div>
+                        <div class="text-sm text-gray-600">🛡️ Still Fighting</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600" id="eliminated-players">0</div>
+                        <div class="text-sm text-gray-600">💀 Fallen Heroes</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600" id="current-week">1</div>
+                        <div class="text-sm text-gray-600">Week of Battle</div>
+                    </div>
+                </div>
+                <div id="elimination-breakdown" class="hidden mt-4 pt-4 border-t border-gray-200">
+                    <div class="text-sm text-gray-600">
+                        <span class="font-medium">Elimination Causes:</span>
+                        <span id="lost-picks-count" class="ml-4">0 picked losing teams</span>
+                        <span id="no-picks-count" class="ml-4">0 didn't make picks</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-gray-900">Survivor Pool Status</h2>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center text-sm">
+                                <div class="w-4 h-4 bg-green-200 rounded mr-2"></div>
+                                <span class="text-gray-600">Won</span>
+                            </div>
+                            <div class="flex items-center text-sm">
+                                <div class="w-4 h-4 bg-yellow-200 rounded mr-2"></div>
+                                <span class="text-gray-600">Pending</span>
+                            </div>
+                            <div class="flex items-center text-sm">
+                                <div class="w-4 h-4 bg-rose-200 rounded mr-2"></div>
+                                <span class="text-gray-600">Lost/Eliminated</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto survivor-grid">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Player
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Current Week Pick
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Pick Week
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Eliminated Week
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Weeks Survived
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-tbody" class="bg-white divide-y divide-gray-200">
+                            <!-- Results will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- No Results State -->
+            <div id="no-results" class="hidden text-center py-12">
+                <i class="fas fa-users-slash text-4xl text-gray-400 mb-4"></i>
+                <h2 class="text-xl font-semibold text-gray-900 mb-2">No Survivor Pool Data</h2>
+                <p class="text-gray-600 mb-4">No players have joined the survivor pool yet.</p>
+                <a href="./index.html?view=survivor" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                    <i class="fas fa-plus mr-2"></i>
+                    Join Survivor Pool
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase and App JavaScript -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        
+        // --- FCM INTEGRATION ---
+        // Include FCM integration module
+        const fcmScript = document.createElement('script');
+        fcmScript.src = '/fcm-integration.js';
+        fcmScript.defer = true;
+        document.head.appendChild(fcmScript);
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+            measurementId: "G-8RVRHE3HRC"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        window.firebaseApp = app; // Make Firebase app globally available for FCM
+        const db = getFirestore(app);
+        window.db = db; // Make Firestore globally available for FCM
+        const auth = getAuth(app);
+        window.auth = auth; // Make Auth globally available for FCM
+
+        const ADMIN_UIDS = ["WxSPmEildJdqs6T5hIpBUZrscwt2", "BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2"];
+        let currentUser = null;
+        let currentPool = 'nerduniverse-2025'; // Default pool
+
+        // Helper functions
+        const appId = () => 'nerdfootball';
+        
+        const survivorPicksPath = (uid) => `artifacts/${appId()}/public/data/nerdSurvivor_picks/${uid}`;
+        const survivorStatusPath = () => `artifacts/${appId()}/public/data/nerdSurvivor_status/status`;
+        const poolMembersPath = (poolId) => `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+
+        // UI Elements
+        const elements = {
+            loadingContainer: document.getElementById('loading-container'),
+            errorContainer: document.getElementById('error-container'),
+            resultsContainer: document.getElementById('results-container'),
+            noResults: document.getElementById('no-results'),
+            resultsTbody: document.getElementById('results-tbody'),
+            totalPlayers: document.getElementById('total-players'),
+            activePlayers: document.getElementById('active-players'),
+            eliminatedPlayers: document.getElementById('eliminated-players'),
+            currentWeek: document.getElementById('current-week'),
+            userDisplay: document.getElementById('user-display'),
+            logoutBtn: document.getElementById('logout-btn'),
+            menuBtn: document.getElementById('menu-btn'),
+            menuPanel: document.getElementById('menu-panel'),
+            menuAdminControls: document.getElementById('menu-admin-controls'),
+            retryBtn: document.getElementById('retry-btn'),
+            errorMessage: document.getElementById('error-message'),
+            poolSwitcherBtn: document.getElementById('pool-switcher-btn'),
+            poolSwitcherDropdown: document.getElementById('pool-switcher-dropdown'),
+            currentPoolName: document.getElementById('current-pool-name')
+        };
+
+        // Show/hide functions
+        function showLoading() {
+            elements.loadingContainer.classList.remove('hidden');
+            elements.errorContainer.classList.add('hidden');
+            elements.resultsContainer.classList.add('hidden');
+            elements.noResults.classList.add('hidden');
+        }
+
+        function showError(message) {
+            elements.errorMessage.textContent = message;
+            elements.loadingContainer.classList.add('hidden');
+            elements.errorContainer.classList.remove('hidden');
+            elements.resultsContainer.classList.add('hidden');
+            elements.noResults.classList.add('hidden');
+        }
+
+        function showResults() {
+            elements.loadingContainer.classList.add('hidden');
+            elements.errorContainer.classList.add('hidden');
+            elements.resultsContainer.classList.remove('hidden');
+            elements.noResults.classList.add('hidden');
+        }
+
+        function showNoResults() {
+            elements.loadingContainer.classList.add('hidden');
+            elements.errorContainer.classList.add('hidden');
+            elements.resultsContainer.classList.add('hidden');
+            elements.noResults.classList.remove('hidden');
+        }
+
+        // Get current NFL week
+        function getCurrentWeek() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-05'); // NFL Season start
+            const weeksDiff = Math.floor((now - seasonStart) / (7 * 24 * 60 * 60 * 1000));
+            return Math.max(1, Math.min(18, weeksDiff + 1));
+        }
+
+        // 💎 DIAMOND FIX: Optimized weeks survived calculation with batch loading
+        let cachedWeekResults = null;
+        
+        async function loadAllWeekResults(currentWeek) {
+            if (cachedWeekResults) return cachedWeekResults;
+            
+            console.log('🚀 Batch loading results for weeks 1-' + currentWeek);
+            const startTime = performance.now();
+            
+            try {
+                // 🔧 DIAMOND FIX: Load all week results in parallel, handle missing data gracefully
+                const resultPromises = [];
+                for (let week = 1; week <= currentWeek; week++) {
+                    resultPromises.push(
+                        getDoc(doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`))
+                            .then(doc => ({ week, data: doc.exists() ? doc.data() : null }))
+                            .catch(error => {
+                                console.log(`ℹ️ Week ${week} results not available (expected for future weeks)`);
+                                return { week, data: null };
+                            })
+                    );
+                }
+                
+                const allResults = await Promise.all(resultPromises);
+                cachedWeekResults = {};
+                allResults.forEach(({ week, data }) => {
+                    cachedWeekResults[week] = data;
+                    
+                    // 🔍 DETAILED DEBUGGING: Log actual game results structure
+                    console.log(`📋 Week ${week} results structure:`);
+                    if (data) {
+                        console.log(`   - Games found: ${Object.keys(data).length}`);
+                        Object.entries(data).forEach(([gameId, gameResult]) => {
+                            if (gameResult) {
+                                console.log(`   - ${gameId}: homeScore=${gameResult.homeScore}, awayScore=${gameResult.awayScore} → Winner: ${gameResult.winner}`);
+                            }
+                        });
+                    } else {
+                        console.log('   - No data available');
+                    }
+                });
+                
+                console.log(`📊 Loaded ${allResults.length} week results in ${(performance.now() - startTime).toFixed(0)}ms`);
+                return cachedWeekResults;
+            } catch (error) {
+                console.error('Error batch loading week results:', error);
+                return {};
+            }
+        }
+        
+        function calculateWeeksSurvived(userPicks, currentWeek, allWeekResults) {
+            try {
+                let weeksSurvived = 0;
+                
+                // Check each week from 1 to current week
+                for (let week = 1; week <= currentWeek; week++) {
+                    const weekPick = userPicks[week];
+                    if (!weekPick || !weekPick.team) {
+                        // No pick for this week - stop counting
+                        break;
+                    }
+                    
+                    const weekResults = allWeekResults[week];
+                    if (weekResults) {
+                        // Find if user's team won any game this week
+                        let teamWon = false;
+                        Object.values(weekResults).forEach(gameResult => {
+                            if (gameResult && gameResult.winner === weekPick.team) {
+                                teamWon = true;
+                            }
+                        });
+                        
+                        if (teamWon) {
+                            weeksSurvived = week; // User survived this week
+                        } else {
+                            // Team lost or no result yet
+                            if (week < currentWeek) {
+                                // Past week with no win = eliminated
+                                break;
+                            } else {
+                                // Current week - no result yet, don't count it
+                                break;
+                            }
+                        }
+                    } else if (week < currentWeek) {
+                        // Past week with no results = assume eliminated
+                        break;
+                    }
+                    // Current week with no results yet = don't count it
+                }
+                
+                return weeksSurvived;
+            } catch (error) {
+                console.error('Error calculating weeks survived for user:', error);
+                // Fallback to old logic
+                return Math.max(0, currentWeek - 1);
+            }
+        }
+
+        // Get player row status based on current week pick result
+        function getPlayerRowStatus(user, currentWeek, allWeekResults) {
+            console.log(`🎯 getPlayerRowStatus for ${user.displayName} (${user.uid.slice(-8)})`);
+            console.log(`   - Eliminated: ${user.isEliminated}`);
+            console.log(`   - Current Week Pick: ${user.currentWeekPick}`);
+            console.log(`   - Current Week: ${currentWeek}`);
+            
+            if (user.isEliminated) {
+                console.log(`   → ELIMINATED (red)`);
+                return 'survivor-eliminated'; // Red for eliminated users
+            }
+            
+            // Check current week pick result
+            if (user.currentWeekPick) {
+                const weekResults = allWeekResults[currentWeek];
+                console.log(`   - Week ${currentWeek} results available: ${weekResults ? 'Yes' : 'No'}`);
+                
+                if (weekResults) {
+                    console.log(`   - Checking ${Object.keys(weekResults).length} games for team: ${user.currentWeekPick}`);
+                    
+                    // Check if user's team won any game this week
+                    let teamWon = false;
+                    let teamLost = false;
+                    let gameFinished = false;
+                    let gamesWithUserTeam = [];
+                    
+                    Object.entries(weekResults).forEach(([gameId, gameResult]) => {
+                        if (gameResult) {
+                            console.log(`     ${gameId}: homeScore=${gameResult.homeScore}, awayScore=${gameResult.awayScore}, winner: ${gameResult.winner}`);
+                            
+                            // 🔧 FIXED: Direct winner comparison - game results only have winner field, not homeTeam/awayTeam
+                            const userTeam = user.currentWeekPick;
+                            const winnerMatch = gameResult.winner === userTeam;
+                            
+                            console.log(`       🔍 Winner comparison for "${userTeam}":`);
+                            console.log(`         - Winner: "${gameResult.winner}" === "${userTeam}" ? ${winnerMatch}`);
+                            
+                            // If this game has a winner, check if it matches user's pick
+                            if (gameResult.winner) {
+                                gameFinished = true;
+                                gamesWithUserTeam.push({gameId, gameResult});
+                                
+                                if (winnerMatch) {
+                                    console.log(`       🎉 User's team WON!`);
+                                    teamWon = true;
+                                } else {
+                                    console.log(`       😞 User's team did not win (game winner: ${gameResult.winner})`);
+                                    teamLost = true;
+                                }
+                            }
+                        }
+                    });
+                    
+                    console.log(`   - Games with user's team: ${gamesWithUserTeam.length}`);
+                    console.log(`   - Team won: ${teamWon}, Team lost: ${teamLost}, Game finished: ${gameFinished}`);
+                    
+                    if (teamWon) {
+                        console.log(`   → WON (green)`);
+                        return 'survivor-won'; // Green for weekly winners
+                    } else if (teamLost) {
+                        console.log(`   → LOST (red)`);
+                        return 'survivor-lost'; // Red for weekly losers
+                    } else if (gameFinished) {
+                        console.log(`   → GAME FINISHED BUT NO WIN (red)`);
+                        return 'survivor-lost'; // Red if game finished but team didn't win
+                    } else {
+                        console.log(`   → PENDING GAMES (yellow)`);
+                        return 'survivor-pending'; // Yellow for pending games
+                    }
+                } else {
+                    console.log(`   → NO RESULTS YET (yellow)`);
+                    return 'survivor-pending'; // Yellow if no results yet
+                }
+            }
+            
+            // Default to active if no current week pick but not eliminated
+            console.log(`   → DEFAULT ACTIVE (green)`);
+            return 'survivor-active';
+        }
+
+        // Load survivor results
+        async function loadSurvivorResults() {
+            showLoading();
+            
+            // Reset cache for fresh data
+            cachedWeekResults = null;
+            
+            try {
+                console.log('🔍 Loading survivor results for pool:', currentPool);
+                
+                // Get pool members
+                const poolMembersDoc = await getDoc(doc(db, poolMembersPath(currentPool)));
+                if (!poolMembersDoc.exists()) {
+                    console.log('No pool members found');
+                    showNoResults();
+                    return;
+                }
+
+                const poolMembers = poolMembersDoc.data();
+                const memberIds = Object.keys(poolMembers);
+                
+                console.log(`👥 Pool members (${memberIds.length} total):`);
+                memberIds.forEach(uid => {
+                    const member = poolMembers[uid];
+                    console.log(`   - ${uid.slice(-8)}: ${member.displayName} (${member.email})`);
+                });
+                
+                if (memberIds.length === 0) {
+                    showNoResults();
+                    return;
+                }
+
+                // Hybrid approach: Get essential data for winner/loser status (optimized: 22 reads → 4-6 reads)
+                console.log('Fetching survivor data with winner/loser status...');
+                const startTime = performance.now();
+                
+                const currentWeek = getCurrentWeek();
+                
+                // Get status document (contains elimination status and current picks)
+                // 🔧 DIAMOND FIX: Handle missing status document gracefully
+                let statusDoc, allStatuses = {};
+                try {
+                    statusDoc = await getDoc(doc(db, survivorStatusPath()));
+                    allStatuses = statusDoc.exists() ? statusDoc.data() : {};
+                } catch (error) {
+                    console.log('⚠️ Status document not found, treating all users as active');
+                    statusDoc = { exists: () => false };
+                    allStatuses = {};
+                }
+                
+                console.log(`📊 Survivor status document:`);
+                console.log(`   - Document exists: ${statusDoc.exists()}`);
+                console.log(`   - Status data:`, allStatuses);
+                
+                memberIds.forEach(uid => {
+                    const status = allStatuses[uid] || {};
+                    console.log(`   - ${uid.slice(-8)}: eliminated=${status.eliminated || false}, week=${status.eliminatedWeek || 'N/A'}, currentPick=${status.currentWeekPick || 'N/A'}`);
+                });
+                
+                // We need historical picks to show latest pick and results, but only for active users
+                // 🔧 DIAMOND FIX: When no status document exists, treat all users as active
+                const userResults = [];
+                const activeUsers = memberIds.filter(uid => !allStatuses[uid]?.eliminated);
+                const eliminatedUsers = memberIds.filter(uid => allStatuses[uid]?.eliminated);
+                
+                console.log(`🎮 User categorization:`);
+                console.log(`   - Active users (${activeUsers.length}): ${activeUsers.map(u => u.slice(-8)).join(', ')}`);
+                console.log(`   - Eliminated users (${eliminatedUsers.length}): ${eliminatedUsers.map(u => u.slice(-8)).join(', ')}`);
+                
+                // For active users, get their individual picks to show latest status
+                console.log(`Fetching detailed picks for ${activeUsers.length} active users (eliminated users use status data only)`);
+                
+                const activeUserPromises = activeUsers.map(async uid => {
+                    try {
+                        const userPicksDoc = await getDoc(doc(db, survivorPicksPath(uid)));
+                        const userPicksData = userPicksDoc.exists() ? userPicksDoc.data() : {};
+                        const userPicks = userPicksData.picks || {};
+                        
+                        // 🔍 DETAILED DEBUGGING: Log user pick data structure
+                        console.log(`👤 User ${uid.slice(-8)} pick data structure:`);
+                        console.log(`   - Document exists: ${userPicksDoc.exists()}`);
+                        console.log(`   - Raw data:`, userPicksData);
+                        console.log(`   - Processed picks:`, userPicks);
+                        console.log(`   - Weeks with picks: ${Object.keys(userPicks).join(', ')}`);
+                        
+                        // Find current week pick first, then latest pick
+                        const currentWeekPickObj = userPicks[currentWeek];
+                        const currentWeekPick = currentWeekPickObj ? currentWeekPickObj.team : null;
+                        
+                        console.log(`   - Week ${currentWeek} pick object:`, currentWeekPickObj);
+                        console.log(`   - Week ${currentWeek} team: ${currentWeekPick}`);
+                        
+                        // Find latest pick as fallback
+                        const pickWeeks = Object.keys(userPicks).map(w => parseInt(w)).sort((a, b) => b - a);
+                        const latestWeek = pickWeeks.length > 0 ? pickWeeks[0] : null;
+                        const latestPickObj = latestWeek ? userPicks[latestWeek] : null;
+                        const latestPick = latestPickObj ? latestPickObj.team : null;
+                        
+                        console.log(`   - Latest week: ${latestWeek}`);
+                        console.log(`   - Latest pick object:`, latestPickObj);
+                        console.log(`   - Latest team: ${latestPick}`);
+                        
+                        // Show current week pick if available, otherwise latest pick
+                        const displayPick = currentWeekPick || latestPick;
+                        const displayWeek = currentWeekPick ? currentWeek : latestWeek;
+                        
+                        console.log(`   - Display pick: ${displayPick} (Week ${displayWeek})`);
+                        
+                        return {
+                            uid,
+                            userPicks,
+                            displayPick,
+                            displayWeek,
+                            currentWeekPick,
+                            totalPicks: Object.keys(userPicks).length
+                        };
+                    } catch (error) {
+                        console.error(`Error loading picks for user ${uid}:`, error);
+                        return { uid, userPicks: {}, displayPick: null, displayWeek: null, currentWeekPick: null, totalPicks: 0 };
+                    }
+                });
+                
+                const activeUsersData = await Promise.all(activeUserPromises);
+                
+                // 💎 DIAMOND OPTIMIZATION: Batch load all week results once
+                const allWeekResults = await loadAllWeekResults(currentWeek);
+                
+                // Process active users with full pick data - Real-time weeks calculation
+                for (const userData of activeUsersData) {
+                    const { uid, userPicks, displayPick, displayWeek, currentWeekPick, totalPicks } = userData;
+                    const userStatus = allStatuses[uid] || { eliminated: false };
+                    
+                    // Calculate weeks survived with pre-loaded results (no more Firebase calls!)
+                    const weeksSurvived = calculateWeeksSurvived(userPicks, currentWeek, allWeekResults);
+                    
+                    userResults.push({
+                        uid,
+                        displayName: poolMembers[uid].displayName || poolMembers[uid].email || 'Unknown User',
+                        email: poolMembers[uid].email || '',
+                        isEliminated: false,
+                        eliminatedWeek: null,
+                        latestPick: displayPick || 'No picks yet',
+                        latestPickWeek: displayWeek,
+                        currentWeekPick: currentWeekPick,
+                        weeksSurvived: weeksSurvived,
+                        totalPicks: totalPicks
+                    });
+                }
+                
+                // Process eliminated users using status data only (no additional reads needed)
+                // 🔧 DIAMOND FIX: Handle case where no eliminated users exist (no status document)
+                for (const uid of eliminatedUsers) {
+                    const userStatus = allStatuses[uid] || { eliminated: true };
+                    
+                    // Check if user was eliminated for not making a pick
+                    const eliminationReason = userStatus.eliminationReason || '';
+                    const noPick = eliminationReason.includes('No pick made');
+                    
+                    userResults.push({
+                        uid,
+                        displayName: poolMembers[uid].displayName || poolMembers[uid].email || 'Unknown User',
+                        email: poolMembers[uid].email || '',
+                        isEliminated: true,
+                        eliminatedWeek: userStatus.eliminatedWeek || 'Unknown',
+                        latestPick: noPick ? 'NO PICK' : (userStatus.currentWeekPick || 'Eliminated'),
+                        latestPickWeek: userStatus.eliminatedWeek ? userStatus.eliminatedWeek - 1 : null,
+                        currentWeekPick: null,
+                        weeksSurvived: userStatus.eliminatedWeek ? (userStatus.eliminatedWeek - 1) : 0,
+                        totalPicks: 1, // Approximate for eliminated users
+                        eliminationReason: userStatus.eliminationReason
+                    });
+                }
+                
+                console.log(`Hybrid data fetch completed in ${(performance.now() - startTime).toFixed(0)}ms`);
+                console.log(`Firebase reads: ${memberIds.length + 2} → ${activeUsers.length + 2} reads (${Math.round((1 - (activeUsers.length + 2)/(memberIds.length + 2)) * 100)}% reduction)`);
+
+                // Sort results: Active users first (by weeks survived DESC), then eliminated users (by elimination week DESC)
+                userResults.sort((a, b) => {
+                    if (a.isEliminated !== b.isEliminated) {
+                        return a.isEliminated ? 1 : -1; // Active first
+                    }
+                    if (a.isEliminated) {
+                        return (b.eliminatedWeek || 0) - (a.eliminatedWeek || 0); // Later elimination first
+                    }
+                    return b.weeksSurvived - a.weeksSurvived; // More weeks survived first
+                });
+
+                renderResults(userResults);
+                
+            } catch (error) {
+                console.error('Error loading survivor results:', error);
+                showError('Failed to load survivor results. Please try again.');
+            }
+        }
+
+        // Render results table
+        function renderResults(userResults) {
+            if (userResults.length === 0) {
+                showNoResults();
+                return;
+            }
+
+            const currentWeek = getCurrentWeek();
+            const activeCount = userResults.filter(u => !u.isEliminated).length;
+            const eliminatedCount = userResults.filter(u => u.isEliminated).length;
+            
+            // Count elimination types
+            const lostPicksCount = userResults.filter(u => 
+                u.isEliminated && u.eliminationReason && u.eliminationReason.includes('Lost in Week')
+            ).length;
+            const noPicksCount = userResults.filter(u => 
+                u.isEliminated && u.eliminationReason && u.eliminationReason.includes('No pick made')
+            ).length;
+
+            // Update summary stats
+            elements.totalPlayers.textContent = userResults.length;
+            elements.activePlayers.textContent = activeCount;
+            elements.eliminatedPlayers.textContent = eliminatedCount;
+            elements.currentWeek.textContent = currentWeek;
+            
+            // Update elimination breakdown if there are eliminations
+            if (eliminatedCount > 0) {
+                const breakdownDiv = document.getElementById('elimination-breakdown');
+                const lostPicksSpan = document.getElementById('lost-picks-count');
+                const noPicksSpan = document.getElementById('no-picks-count');
+                
+                if (breakdownDiv && lostPicksSpan && noPicksSpan) {
+                    breakdownDiv.classList.remove('hidden');
+                    lostPicksSpan.textContent = `${lostPicksCount} picked losing teams`;
+                    noPicksSpan.textContent = `${noPicksCount} didn't make picks`;
+                }
+            }
+
+            // Render table rows
+            elements.resultsTbody.innerHTML = userResults.map((user, index) => {
+                const rowClass = getPlayerRowStatus(user, currentWeek, cachedWeekResults || {});
+                
+                // Check if eliminated for no pick
+                const isNoPick = user.eliminationReason && user.eliminationReason.includes('No pick made');
+                
+                const statusBadge = user.isEliminated 
+                    ? isNoPick 
+                        ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                             <i class="fas fa-ban mr-1"></i> No Pick
+                           </span>`
+                        : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                             <i class="fas fa-skull mr-1"></i> Eliminated
+                           </span>`
+                    : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                         <i class="fas fa-heart mr-1"></i> Active
+                       </span>`;
+
+                // Prioritize showing current week pick
+                const currentWeekNum = getCurrentWeek();
+                const hasCurrentWeekPick = user.currentWeekPick;
+                
+                // For eliminated users, show what caused their elimination
+                let pickDisplay;
+                if (user.isEliminated && user.eliminationReason) {
+                    if (user.eliminationReason.includes('No pick made')) {
+                        pickDisplay = '<span class="text-orange-600 font-medium">❌ NO PICK</span>';
+                    } else if (user.eliminationReason.includes('Lost in Week')) {
+                        // Extract the team they picked from elimination reason
+                        const match = user.eliminationReason.match(/Picked (\w+),/);
+                        const lostTeam = match ? match[1] : user.latestPick;
+                        pickDisplay = `<span class="text-red-600 font-medium">💀 ${lostTeam} (LOST)</span>`;
+                    } else {
+                        pickDisplay = `<span class="text-red-600">${user.latestPick}</span>`;
+                    }
+                } else {
+                    pickDisplay = hasCurrentWeekPick 
+                        ? `${user.currentWeekPick} (Current)` 
+                        : user.latestPick 
+                            ? `${user.latestPick} (Week ${user.latestPickWeek})` 
+                            : 'No picks yet';
+                }
+                        
+                const pickWeekDisplay = hasCurrentWeekPick 
+                    ? `Week ${currentWeekNum}` 
+                    : user.latestPickWeek 
+                        ? `Week ${user.latestPickWeek}` 
+                        : '-';
+                const eliminatedWeek = user.eliminatedWeek ? `Week ${user.eliminatedWeek}` : '-';
+                const weeksSurvived = user.weeksSurvived >= 0 ? user.weeksSurvived : 0;
+
+                return `
+                    <tr class="${rowClass}" ${user.isEliminated && user.eliminationReason ? `title="${user.eliminationReason}"` : ''}>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-8 w-8">
+                                    <div class="h-8 w-8 rounded-full ${user.isEliminated ? 'bg-red-200' : 'bg-gray-200'} flex items-center justify-center">
+                                        <span class="text-sm font-medium ${user.isEliminated ? 'text-red-800' : 'text-gray-600'}">${user.isEliminated ? '💀' : user.displayName.charAt(0).toUpperCase()}</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">${user.displayName}</div>
+                                    <div class="text-sm text-gray-500">${user.email}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            ${statusBadge}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${pickDisplay}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${pickWeekDisplay}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${eliminatedWeek}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm font-medium text-gray-900">${weeksSurvived}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            showResults();
+        }
+
+        // Event listeners
+        elements.retryBtn.addEventListener('click', loadSurvivorResults);
+        
+        elements.menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            elements.menuPanel.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!elements.menuPanel.contains(e.target) && !elements.menuBtn.contains(e.target)) {
+                elements.menuPanel.classList.add('hidden');
+            }
+        });
+
+        elements.logoutBtn.addEventListener('click', () => {
+            auth.signOut();
+        });
+
+        // Auth state listener
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                elements.userDisplay.textContent = user.displayName || user.email;
+                
+                // Show admin controls if user is admin
+                if (ADMIN_UIDS.includes(user.uid)) {
+                    elements.menuAdminControls.classList.remove('hidden');
+                }
+                
+                // Load results
+                loadSurvivorResults();
+            } else {
+                // Redirect to main page if not authenticated
+                window.location.href = './index.html';
+            }
+        });
+
+        // Initialize page
+        elements.currentPoolName.textContent = currentPool;
+        console.log('Survivor Results page initialized');
+    </script>
+</body>
+</html>

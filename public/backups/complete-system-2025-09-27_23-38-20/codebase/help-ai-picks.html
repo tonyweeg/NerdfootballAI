@@ -1,0 +1,1491 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Picks Helper - NerdFootball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Suppress Tailwind production warning completely
+        console.warn = function() {};
+
+        tailwind.config = {
+            corePlugins: { preflight: true },
+            theme: {
+                extend: {
+                    colors: {
+                        'nerd-green': '#10B981',
+                        'nerd-blue': '#3B82F6',
+                        'nerd-purple': '#8B5CF6'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-black min-h-screen text-yellow-400 font-mono">
+
+    <!-- Simple Admin Status -->
+    <div id="admin-status" class="hidden flex justify-between items-center py-2 px-4 bg-green-800 text-green-200 text-sm">
+        <a href="/nerd-universe.html" class="text-green-200 hover:text-white underline">← Back to Nerd Universe</a>
+        <div>🔐 <span id="admin-name" onclick="signOutAdmin()" class="cursor-pointer hover:text-white underline" title="Click to sign out">Admin</span> - AUTHENTICATED</div>
+        <div></div> <!-- Empty div for spacing -->
+    </div>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="bg-gray-900 border-2 border-yellow-400 rounded-lg shadow-2xl p-6">
+            <h1 class="text-4xl font-bold text-yellow-400 mb-2 text-center">
+                <span class="text-yellow-500">🏈</span> WU-TANG AI PICKS CHAMBER <span class="text-yellow-500">🏈</span>
+            </h1>
+            <div class="text-center text-yellow-300 mb-6 text-lg">
+                >> ENTER THE 36 CHAMBERS OF NFL PREDICTION <<
+            </div>
+            <p class="text-yellow-500 mb-6 text-center border border-yellow-600 p-2 rounded">
+                [ADMIN ONLY] Comprehensive AI analysis with real game data, betting lines, and injury reports
+            </p>
+
+            <div class="mb-6 text-center">
+                <button onclick="getRichAIAnalysis()" class="bg-yellow-600 text-black px-6 py-3 rounded-lg hover:bg-yellow-500 transition font-bold mr-2 mb-2 border-2 border-yellow-400">
+                    🎯 GENERATE PREDICTIONS (15min cache)
+                </button>
+                <button onclick="getRichAIAnalysis(true)" class="bg-orange-600 text-black px-6 py-3 rounded-lg hover:bg-orange-500 transition font-bold mr-2 mb-2 border-2 border-orange-400">
+                    🔥 FORCE FRESH (Live ESPN)
+                </button>
+                <button onclick="testRichAI()" class="bg-gray-700 text-yellow-400 px-6 py-3 rounded-lg hover:bg-gray-600 transition font-bold mr-2 mb-2 border-2 border-yellow-400">
+                    🧪 TEST CHAMBER
+                </button>
+                <button onclick="getBettingLines()" class="bg-gray-700 text-yellow-400 px-6 py-3 rounded-lg hover:bg-gray-600 transition font-bold mr-2 mb-2 border-2 border-yellow-400">
+                    💰 BETTING INTEL
+                </button>
+
+                <!-- Admin-only features -->
+                <div class="admin-only mt-6 p-4 bg-gray-800 border-2 border-yellow-600 rounded-lg">
+                    <h3 class="text-xl font-bold text-yellow-400 mb-4 text-center">⚔️ WU-TANG ADMIN ARSENAL ⚔️</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-center">
+                        <button onclick="showAccuracyReport()" class="bg-yellow-600 text-black px-4 py-2 rounded-lg hover:bg-yellow-500 transition font-bold border-2 border-yellow-400">
+                            📊 ACCURACY INTEL
+                        </button>
+                        <button onclick="updatePredictionsWithResults()" class="bg-gray-700 text-yellow-400 px-4 py-2 rounded-lg hover:bg-gray-600 transition font-bold border-2 border-yellow-400">
+                            🔄 UPDATE CHAMBER
+                        </button>
+                        <button onclick="showLearningInsights()" class="bg-gray-700 text-yellow-400 px-4 py-2 rounded-lg hover:bg-gray-600 transition font-bold border-2 border-yellow-400">
+                            🧠 LEARNING MATRIX
+                        </button>
+                        <button onclick="managePredictionData()" class="bg-gray-700 text-yellow-400 px-4 py-2 rounded-lg hover:bg-gray-600 transition font-bold border-2 border-yellow-400">
+                            🗄️ DATA VAULT
+                        </button>
+                        <button onclick="exportAnalysis()" class="bg-gray-700 text-yellow-400 px-4 py-2 rounded-lg hover:bg-gray-600 transition font-bold border-2 border-yellow-400">
+                            📤 EXPORT WISDOM
+                        </button>
+                        <button onclick="addAZvsSEALearning()" class="bg-yellow-600 text-black px-4 py-2 rounded-lg hover:bg-yellow-500 transition font-bold border-2 border-yellow-400">
+                            🧠 TEACH AI
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="aiResults" class="hidden">
+                <h2 class="text-2xl font-bold mb-4 text-yellow-400 text-center border-b-2 border-yellow-600 pb-2">⚔️ AI PREDICTIONS CHAMBER ⚔️</h2>
+                <div id="aiContent" class="space-y-4"></div>
+            </div>
+
+            <div id="loading" class="hidden text-center py-8">
+                <div class="text-lg text-yellow-400 font-bold">🤖 AI ANALYZING GAMES...</div>
+                <div class="text-yellow-500 mt-2">>> ENTERING THE 36 CHAMBERS <<</div>
+            </div>
+
+            <div id="testResults" class="hidden mt-6">
+                <h3 class="text-xl font-bold mb-2 text-yellow-400">🧪 TEST CHAMBER RESULTS</h3>
+                <pre id="testOutput" class="bg-gray-800 border-2 border-yellow-600 p-4 rounded-lg text-sm overflow-auto text-yellow-300"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+    <!-- NFL Stadium Data for Weather Integration -->
+    <script src="nfl-stadium-data.js"></script>
+    <!-- Betting Intelligence System -->
+    <script src="betting-intelligence.js"></script>
+    <!-- Rich AI Tool -->
+    <script src="rich-nerdai-tool.js?v=1758345045"></script>
+    <!-- Prediction Tracker -->
+    <script src="prediction-tracker.js"></script>
+    <!-- Results Tracker -->
+    <script src="results-tracker.js"></script>
+
+    <script>
+        // Firebase initialization
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        // Admin UIDs for full access (matching Firestore rules exactly)
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        // Global admin status
+        window.isAdmin = false;
+        window.currentUser = null;
+
+        // Initialize Firebase auth on page load
+        window.addEventListener('load', async () => {
+            try {
+                // Check URL parameters for admin authentication
+                const urlParams = new URLSearchParams(window.location.search);
+                const adminUID = urlParams.get('admin');
+
+                if (adminUID && ADMIN_UIDS.includes(adminUID)) {
+                    // Clear URL for security
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    console.log('🎯 NERDAI_DEBUG: Admin access granted via URL parameter');
+
+                    try {
+                        // Generate custom token for proper Firebase authentication
+                        console.log('🎯 NERDAI_DEBUG: Requesting custom token for admin UID:', adminUID);
+
+                        const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/generateAdminTokenHTTP', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ requestedUID: adminUID })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Token request failed: ${response.status}`);
+                        }
+
+                        const tokenData = await response.json();
+                        console.log('🎯 NERDAI_DEBUG: Custom token received');
+
+                        // Sign in with the custom token
+                        const userCredential = await window.auth.signInWithCustomToken(tokenData.customToken);
+                        console.log('🎯 NERDAI_DEBUG: Authenticated with custom token, UID:', userCredential.user.uid);
+
+                        // Verify the UID matches what we requested
+                        if (userCredential.user.uid !== adminUID) {
+                            throw new Error('UID mismatch in custom token');
+                        }
+
+                        window.currentUser = userCredential.user;
+                        window.isAdmin = true;
+
+                        console.log('🎯 NERDAI_DEBUG: Admin authentication successful with proper Firebase Auth');
+                        updateUIForAdmin();
+                        return;
+                    } catch (error) {
+                        console.error('🎯 NERDAI_DEBUG: Admin authentication failed:', error);
+                        blockNonAdminAccess('Failed to establish proper Firebase authentication: ' + error.message);
+                        return;
+                    }
+                }
+
+                // Check if already signed in
+                window.auth.onAuthStateChanged((user) => {
+                    window.currentUser = user;
+                    if (user) {
+                        console.log('🎯 NERDAI_DEBUG: Firebase authenticated for data access');
+                        if (ADMIN_UIDS.includes(user.uid)) {
+                            window.isAdmin = true;
+                            updateUIForAdmin();
+                            console.log('🎯 NERDAI_DEBUG: Admin privileges activated');
+                        } else {
+                            // User is authenticated but not admin
+                            blockNonAdminAccess('Authenticated user does not have admin privileges');
+                        }
+                    } else {
+                        // No authenticated user - show login options for admins
+                        showAdminLoginOptions();
+                    }
+                });
+            } catch (error) {
+                console.log('🎯 NERDAI_DEBUG: Firebase auth setup failed:', error.message);
+            }
+        });
+
+        function updateUIForAdmin() {
+            // Show simple admin status
+            const adminStatus = document.getElementById('admin-status');
+            if (adminStatus && window.currentUser) {
+                adminStatus.classList.remove('hidden');
+                const adminName = document.getElementById('admin-name');
+                if (adminName) {
+                    adminName.textContent = window.currentUser.email || window.currentUser.displayName || 'Admin';
+                }
+            }
+
+            // Show all admin-only sections including Wu-Tang Admin Arsenal
+            const adminOnlySections = document.querySelectorAll('.admin-only');
+            adminOnlySections.forEach(section => {
+                section.style.display = 'block';
+            });
+
+            console.log('🎯 NERDAI_DEBUG: Admin UI features activated - Wu-Tang Admin Arsenal now visible');
+        }
+
+        function showAdminLoginOptions() {
+            console.log('🎯 NERDAI_DEBUG: Showing admin login options');
+
+            // Show admin login interface
+            document.body.innerHTML = `
+                <div class="min-h-screen bg-black text-yellow-400 font-mono flex items-center justify-center">
+                    <div class="bg-gray-900 border-2 border-yellow-400 p-8 rounded-lg shadow-2xl max-w-lg text-center">
+                        <div class="text-6xl mb-4">🐉</div>
+                        <h1 class="text-3xl font-bold text-yellow-400 mb-4">WU-TANG AI CHAMBER</h1>
+                        <p class="text-yellow-300 mb-6">Welcome to the Wu-Tang AI Picks Chamber. Please sign in with your admin credentials to access the 36 chambers of NFL prediction wisdom.</p>
+
+                        <div class="mb-6">
+                            <button onclick="loginWithGoogle()" class="bg-yellow-600 text-black font-bold px-8 py-3 rounded-lg hover:bg-yellow-500 transition border-2 border-yellow-400 mb-3 w-full">
+                                🔑 Sign In with Google
+                            </button>
+                            <button onclick="loginWithEmail()" class="bg-gray-700 text-yellow-400 font-bold px-8 py-3 rounded-lg hover:bg-gray-600 transition border-2 border-yellow-400 w-full">
+                                📧 Sign In with Email
+                            </button>
+                        </div>
+
+                        <p class="text-sm text-yellow-500 mb-4">Authorized Admin UIDs:</p>
+                        <div class="text-xs text-yellow-600 bg-gray-800 p-2 rounded font-mono">
+                            ${ADMIN_UIDS.map(uid => uid.substring(0, 8) + '...').join('<br>')}
+                        </div>
+
+                        <div class="mt-6">
+                            <button onclick="window.location.href='/'" class="bg-gray-600 text-yellow-400 font-bold px-6 py-2 rounded hover:bg-gray-500 transition border border-yellow-400">
+                                Return to Nerd Universe
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loginWithGoogle() {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await window.auth.signInWithPopup(provider);
+                console.log('🎯 NERDAI_DEBUG: Google sign-in successful, UID:', result.user.uid);
+
+                if (ADMIN_UIDS.includes(result.user.uid)) {
+                    window.currentUser = result.user;
+                    window.isAdmin = true;
+                    location.reload(); // Reload to show admin interface
+                } else {
+                    await window.auth.signOut();
+                    alert('Access denied: This account does not have admin privileges for the Wu-Tang AI Chamber.');
+                }
+            } catch (error) {
+                console.error('🎯 NERDAI_DEBUG: Google sign-in failed:', error);
+                alert('Sign-in failed: ' + error.message);
+            }
+        }
+
+        async function loginWithEmail() {
+            const email = prompt('Enter your admin email:');
+            if (!email) return;
+
+            const password = prompt('Enter your password:');
+            if (!password) return;
+
+            try {
+                const result = await window.auth.signInWithEmailAndPassword(email, password);
+                console.log('🎯 NERDAI_DEBUG: Email sign-in successful, UID:', result.user.uid);
+
+                if (ADMIN_UIDS.includes(result.user.uid)) {
+                    window.currentUser = result.user;
+                    window.isAdmin = true;
+                    location.reload(); // Reload to show admin interface
+                } else {
+                    await window.auth.signOut();
+                    alert('Access denied: This account does not have admin privileges for the Wu-Tang AI Chamber.');
+                }
+            } catch (error) {
+                console.error('🎯 NERDAI_DEBUG: Email sign-in failed:', error);
+                alert('Sign-in failed: ' + error.message);
+            }
+        }
+
+        function blockNonAdminAccess(reason) {
+            console.log('🚫 ACCESS_DENIED:', reason);
+
+            // Hide the main content
+            document.body.innerHTML = `
+                <div class="min-h-screen bg-black text-yellow-400 font-mono flex items-center justify-center">
+                    <div class="bg-gray-900 border-2 border-yellow-600 p-8 rounded-lg shadow-2xl max-w-md text-center">
+                        <div class="text-6xl mb-4">🔒</div>
+                        <h1 class="text-2xl font-bold text-yellow-400 mb-4">WU-TANG CHAMBER SEALED</h1>
+                        <p class="text-yellow-300 mb-6">This Wu-Tang AI Picks Chamber is restricted to authorized administrators only.</p>
+                        <p class="text-sm text-yellow-500 mb-6">Please access this tool through the admin menu with proper authentication.</p>
+                        <button onclick="window.location.href='/'" class="bg-yellow-600 text-black font-bold px-6 py-2 rounded hover:bg-yellow-500 transition border-2 border-yellow-400">
+                            Return to Nerd Universe
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function signOutAdmin() {
+            try {
+                await window.auth.signOut();
+                window.currentUser = null;
+                window.isAdmin = false;
+                location.reload();
+            } catch (error) {
+                console.error('🎯 NERDAI_DEBUG: Sign out failed:', error);
+                alert('Sign out failed: ' + error.message);
+            }
+        }
+
+        // Note: Removed auth timeout - now shows friendly login interface instead
+
+        // 15-minute cache for predictions
+        let predictionCache = {
+            data: null,
+            timestamp: null,
+            isValid: function() {
+                if (!this.data || !this.timestamp) return false;
+                const fifteenMinutes = 15 * 60 * 1000; // 15 minutes in milliseconds
+                return (Date.now() - this.timestamp) < fifteenMinutes;
+            }
+        };
+
+        async function getRichAIAnalysis(forceFresh = false) {
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('aiResults');
+            const content = document.getElementById('aiContent');
+
+            // Check cache first (unless force fresh requested)
+            if (!forceFresh && predictionCache.isValid()) {
+                console.log('🎯 CACHE: Using cached predictions (less than 15 minutes old)');
+                displayRichAIResults(predictionCache.data);
+                results.classList.remove('hidden');
+                return;
+            }
+
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+
+            try {
+                console.log('🎯 CACHE: Generating fresh predictions (cache expired or forced refresh)');
+                const richAI = window.RichNerdAITool;
+                richAI.setDebugMode(true);
+
+                const comprehensiveAnalysis = await richAI.getComprehensiveAnalysis(4);
+
+                if (comprehensiveAnalysis.error) {
+                    content.innerHTML = `<div class="text-red-600">Error: ${comprehensiveAnalysis.error}</div>`;
+                } else {
+                    // Cache the fresh results
+                    predictionCache.data = comprehensiveAnalysis;
+                    predictionCache.timestamp = Date.now();
+                    console.log('🎯 CACHE: Fresh predictions cached for 15 minutes');
+
+                    displayRichAIResults(comprehensiveAnalysis);
+                }
+
+                loading.classList.add('hidden');
+                results.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Rich AI Error:', error);
+                content.innerHTML = `<div class="text-red-600">Error: ${error.message}</div>`;
+                loading.classList.add('hidden');
+                results.classList.remove('hidden');
+            }
+        }
+
+        function displayAIResults(analysis) {
+            const content = document.getElementById('aiContent');
+            const suggestions = analysis.suggestions;
+
+            let html = `
+                <div class="bg-gray-800 border-2 border-yellow-600 p-4 rounded-lg mb-4">
+                    <h3 class="font-bold text-yellow-400 text-lg">Week ${analysis.week} Wu-Tang Summary</h3>
+                    <p class="text-yellow-300">Analyzed ${analysis.games.length} games</p>
+                </div>
+            `;
+
+            // Easy Picks
+            if (suggestions.easyPicks.length > 0) {
+                html += `
+                    <div class="bg-green-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold text-green-800 mb-2">🎯 Easy Picks (High Confidence)</h3>
+                `;
+                suggestions.easyPicks.forEach(game => {
+                    html += `
+                        <div class="flex justify-between items-center py-2 border-b border-green-200 last:border-b-0">
+                            <span class="font-medium">${game.matchup}</span>
+                            <span class="text-green-600">Pick: ${game.suggestion} (${game.confidence}%)</span>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            // Hard Picks
+            if (suggestions.hardPicks.length > 0) {
+                html += `
+                    <div class="bg-red-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold text-red-800 mb-2">⚠️ Tough Calls (Low Confidence)</h3>
+                `;
+                suggestions.hardPicks.forEach(game => {
+                    html += `
+                        <div class="flex justify-between items-center py-2 border-b border-red-200 last:border-b-0">
+                            <span class="font-medium">${game.matchup}</span>
+                            <span class="text-red-600">Pick: ${game.suggestion} (${game.confidence}%)</span>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            // Confidence Rankings
+            const rankings = window.SimpleNerdAI.generateConfidenceOrder(analysis.games);
+            html += `
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-semibold text-gray-800 mb-2">📊 Confidence Rankings</h3>
+                    <div class="space-y-2">
+            `;
+            rankings.slice(0, 8).forEach(rank => {
+                const bgColor = rank.difficulty === 'easy' ? 'bg-green-100' :
+                               rank.difficulty === 'very hard' ? 'bg-red-100' : 'bg-yellow-100';
+                html += `
+                    <div class="flex justify-between items-center p-2 ${bgColor} rounded">
+                        <span class="font-medium">${rank.rank}. ${rank.pick}</span>
+                        <span class="text-sm">${rank.confidence}% confident</span>
+                    </div>
+                `;
+            });
+            html += `</div></div>`;
+
+            content.innerHTML = html;
+        }
+
+        function displayRichAIResults(analysis) {
+            const content = document.getElementById('aiContent');
+
+            let html = `
+                <div class="bg-gray-800 border-2 border-yellow-600 p-4 rounded-lg mb-4">
+                    <h3 class="font-bold text-yellow-400 text-lg">🎯 Week ${analysis.week} Wu-Tang Analysis</h3>
+                    <p class="text-yellow-300">
+                        ${analysis.summary.totalGames} games analyzed |
+                        ESPN Live: ${analysis.summary.dataQuality.realESPNData ? '✅ REAL' : '❌ FAILED'} |
+                        Live News: ${analysis.summary.dataQuality.liveNews ? '✅ REAL' : '❌ FAILED'} |
+                        Live Teams: ${analysis.summary.dataQuality.liveTeams ? '✅ REAL' : '❌ FAILED'} |
+                        Source: ${analysis.summary.dataQuality.dataSource.toUpperCase()}
+                    </p>
+                </div>
+            `;
+
+            // MONEYLINE INTELLIGENCE SECTION
+            if (analysis.moneylineIntelligence) {
+                const rollup = analysis.moneylineIntelligence.rollupSummary;
+                html += `
+                    <div class="bg-gray-900 border-2 border-yellow-400 p-6 rounded-lg mb-6">
+                        <h2 class="text-3xl font-bold text-yellow-400 mb-4 text-center">💰 WU-TANG MONEYLINE INTELLIGENCE 💰</h2>
+                        <div class="text-center text-yellow-300 mb-6 text-lg">
+                            >> ENTER THE 36 CHAMBERS OF BETTING WISDOM <<
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div class="bg-green-900 border-2 border-green-400 p-4 rounded text-center">
+                                <div class="text-3xl font-bold text-green-400">${rollup.strongBets}</div>
+                                <div class="text-sm text-green-300 font-bold">STRONG BETS</div>
+                                <div class="text-xs text-green-200">🔥 FIRE PICKS</div>
+                            </div>
+                            <div class="bg-blue-900 border-2 border-blue-400 p-4 rounded text-center">
+                                <div class="text-3xl font-bold text-blue-400">${rollup.goodBets}</div>
+                                <div class="text-sm text-blue-300 font-bold">GOOD BETS</div>
+                                <div class="text-xs text-blue-200">💎 SOLID PICKS</div>
+                            </div>
+                            <div class="bg-yellow-900 border-2 border-yellow-400 p-4 rounded text-center">
+                                <div class="text-3xl font-bold text-yellow-400">${rollup.leans}</div>
+                                <div class="text-sm text-yellow-300 font-bold">LEANS</div>
+                                <div class="text-xs text-yellow-200">⚖️ SLIGHT EDGE</div>
+                            </div>
+                            <div class="bg-red-900 border-2 border-red-400 p-4 rounded text-center">
+                                <div class="text-3xl font-bold text-red-400">${rollup.avoids}</div>
+                                <div class="text-sm text-red-300 font-bold">AVOID</div>
+                                <div class="text-xs text-red-200">⚠️ STAY AWAY</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-800 border-2 border-yellow-600 p-4 rounded mb-4">
+                            <h3 class="font-bold text-yellow-400 mb-3 text-xl">📊 WU-TANG WEEKLY ROLLUP</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-yellow-300">
+                                <div><strong class="text-yellow-400">Total Games:</strong> ${rollup.totalGames}</div>
+                                <div><strong class="text-yellow-400">Avg Confidence:</strong> ${rollup.averageConfidence}%</div>
+                                <div><strong class="text-yellow-400">Low Risk:</strong> ${rollup.riskDistribution.low} games</div>
+                                <div><strong class="text-yellow-400">Medium Risk:</strong> ${rollup.riskDistribution.medium} games</div>
+                                <div><strong class="text-yellow-400">High Risk:</strong> ${rollup.riskDistribution.high} games</div>
+                                <div><strong class="text-yellow-400">Very High Risk:</strong> ${rollup.riskDistribution.veryHigh} games</div>
+                            </div>
+                        </div>
+
+                        ${rollup.topPicks.length > 0 ? `
+                        <div class="bg-gray-800 border-2 border-green-400 p-4 rounded">
+                            <h3 class="font-bold text-green-400 mb-3 text-xl">🏆 WU-TANG ELITE MONEYLINE CHAMBERS</h3>
+                            <div class="space-y-2">
+                                ${rollup.topPicks.map(pick => `
+                                    <div class="flex justify-between items-center bg-gray-900 border border-green-500 p-3 rounded">
+                                        <span class="font-bold text-yellow-400">${pick.matchup}</span>
+                                        <div class="text-right">
+                                            <div class="font-bold text-green-400 text-lg">BET: ${pick.moneylinePick}</div>
+                                            <div class="text-sm text-green-300">${pick.moneylineConfidence} (${pick.confidence}%)</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                // WEEKLY SCHEDULE - ALL GAMES MONEYLINE
+                html += `
+                    <div class="bg-gray-800 border-2 border-yellow-400 p-6 rounded-lg mb-6">
+                        <h2 class="text-2xl font-bold text-yellow-400 mb-4 text-center">🗓️ WEEKLY MONEYLINE SCHEDULE</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                `;
+
+                analysis.moneylineIntelligence.weeklySchedule.forEach(game => {
+                    const confidenceColor = game.moneylineConfidence === 'STRONG BET' ? 'border-green-400 bg-green-900' :
+                                          game.moneylineConfidence === 'GOOD BET' ? 'border-blue-400 bg-blue-900' :
+                                          game.moneylineConfidence === 'LEAN' ? 'border-yellow-400 bg-yellow-900' :
+                                          game.moneylineConfidence === 'SLIGHT LEAN' ? 'border-orange-400 bg-orange-900' :
+                                          'border-red-400 bg-red-900';
+
+                    const textColor = game.moneylineConfidence === 'STRONG BET' ? 'text-green-300' :
+                                    game.moneylineConfidence === 'GOOD BET' ? 'text-blue-300' :
+                                    game.moneylineConfidence === 'LEAN' ? 'text-yellow-300' :
+                                    game.moneylineConfidence === 'SLIGHT LEAN' ? 'text-orange-300' :
+                                    'text-red-300';
+
+                    html += `
+                        <div class="border-2 ${confidenceColor} p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-white text-lg">${game.matchup}</span>
+                                <span class="font-bold ${textColor}">${game.moneylineConfidence}</span>
+                            </div>
+                            <div class="mb-2">
+                                <div class="text-2xl font-bold text-yellow-400">MONEYLINE BET: ${game.moneylinePick}</div>
+                                <div class="text-lg ${textColor}">Confidence: ${game.confidence}% | Risk: ${game.riskLevel}</div>
+                            </div>
+                            <div class="text-sm text-gray-300">
+                                <strong>Reasoning:</strong>
+                                <ul class="mt-1 ml-4">
+                                    ${game.reasoning.map(reason => `<li>• ${reason}</li>`).join('')}
+                                </ul>
+                            </div>
+                            ${game.gameTime ? `<div class="text-xs text-gray-400 mt-2">Game Time: ${new Date(game.gameTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>` : ''}
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Best Bets
+            if (analysis.recommendations.bestBets.length > 0) {
+                html += `
+                    <div class="bg-gray-800 border-2 border-green-500 p-4 rounded-lg mb-4">
+                        <h3 class="font-bold text-green-400 mb-2 text-lg">🎯 Wu-Tang Best Picks (High Confidence)</h3>
+                `;
+                analysis.recommendations.bestBets.forEach(game => {
+                    html += `
+                        <div class="border-b border-yellow-600 pb-3 mb-3 last:border-b-0 last:mb-0">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-yellow-400">${game.matchup}</span>
+                                <span class="text-green-400 font-bold">Pick: ${game.aiPick} (${game.confidence}%)</span>
+                            </div>
+                            <div class="text-sm text-yellow-300 mb-1">
+                                <strong>Betting Line:</strong> ${game.analysis.bettingLines.spread || 'N/A'} |
+                                <strong>Total:</strong> ${game.analysis.bettingLines.total || 'N/A'}
+                            </div>
+                            <div class="text-sm text-yellow-200">
+                                <strong>Key Factors:</strong> ${game.reasoning.join(', ')}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            // Upset Alerts
+            if (analysis.recommendations.upsetAlerts.length > 0) {
+                html += `
+                    <div class="bg-gray-800 border-2 border-red-500 p-4 rounded-lg mb-4">
+                        <h3 class="font-bold text-red-400 mb-2 text-lg">⚠️ Wu-Tang Upset Alerts</h3>
+                `;
+                analysis.recommendations.upsetAlerts.forEach(game => {
+                    html += `
+                        <div class="flex justify-between items-center py-2 border-b border-yellow-600 last:border-b-0">
+                            <span class="font-bold text-yellow-400">${game.matchup}</span>
+                            <span class="text-red-400 font-bold">Pick: ${game.aiPick} (${game.confidence}%)</span>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            // Injury Watch
+            if (analysis.recommendations.injuryWatch.length > 0) {
+                html += `
+                    <div class="bg-gray-800 border-2 border-orange-500 p-4 rounded-lg mb-4">
+                        <h3 class="font-bold text-orange-400 mb-2 text-lg">🏥 Wu-Tang Injury Impact Games</h3>
+                `;
+                analysis.recommendations.injuryWatch.forEach(game => {
+                    html += `
+                        <div class="py-2 border-b border-yellow-600 last:border-b-0">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="font-bold text-yellow-400">${game.matchup}</span>
+                                <span class="text-orange-400 font-bold">Pick: ${game.aiPick}</span>
+                            </div>
+                            <div class="text-sm text-yellow-300">
+                                Home Injuries: ${game.analysis.injuries.home.length} |
+                                Away Injuries: ${game.analysis.injuries.away.length}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            // Quick Summary of All Picks
+            html += `
+                <div class="bg-yellow-900 border-2 border-yellow-400 p-4 rounded-lg mb-6">
+                    <h3 class="font-bold text-yellow-400 mb-4 text-xl text-center">🎯 WU-TANG QUICK PICKS SUMMARY</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            `;
+            analysis.confidenceRankings.slice(0, 12).forEach(rank => {
+                const confidenceColor = rank.confidence >= 70 ? 'text-green-400' :
+                                       rank.confidence >= 60 ? 'text-yellow-400' : 'text-red-400';
+                const bgColor = rank.confidence >= 70 ? 'bg-green-900' :
+                               rank.confidence >= 60 ? 'bg-yellow-900' : 'bg-red-900';
+
+                html += `
+                    <div class="${bgColor} border border-yellow-600 p-3 rounded text-center">
+                        <div class="text-lg font-bold text-white">${rank.matchup}</div>
+                        <div class="text-xl font-bold text-yellow-400 my-1">PICK: ${rank.aiPick}</div>
+                        <div class="text-sm ${confidenceColor} font-bold">${rank.confidence}% CONFIDENCE</div>
+                    </div>
+                `;
+            });
+            html += `
+                    </div>
+                </div>
+            `;
+
+            // Detailed Game Analysis with WHY
+            html += `
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-semibold text-gray-800 mb-4 text-xl">📊 DETAILED ANALYSIS & REASONING</h3>
+                    <div class="space-y-4">
+            `;
+            analysis.confidenceRankings.forEach(rank => {
+                const borderColor = rank.difficulty === 'easy' ? 'border-green-500' :
+                                   rank.difficulty === 'very hard' ? 'border-red-500' : 'border-yellow-500';
+
+                html += `
+                    <div class="p-4 bg-gray-900 ${borderColor} border-2 rounded-lg">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <span class="text-xl font-bold text-yellow-400">${rank.rank}. ${rank.aiPick}</span>
+                                <span class="text-lg text-yellow-300 ml-2">(${rank.matchup})</span>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-bold text-yellow-400">${rank.confidence}%</div>
+                                <div class="text-sm text-yellow-500">${rank.difficulty.toUpperCase()}</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-900 border-2 border-yellow-400 p-4 rounded-lg mb-3">
+                            <h4 class="font-bold text-yellow-400 mb-2 text-lg">🎯 WU-TANG PREDICTION</h4>
+                            <div class="text-xl font-bold text-white text-center mb-2">
+                                PICK: <span class="text-yellow-400">${rank.aiPick}</span> at <span class="text-yellow-400">${rank.confidence}% CONFIDENCE</span>
+                            </div>
+                            <div class="text-center text-yellow-300 mb-2">
+                                ${rank.difficulty === 'easy' ? '🟢 HIGH CONFIDENCE PICK' :
+                                  rank.difficulty === 'very hard' ? '🔴 DIFFICULT CALL' : '🟡 MODERATE CONFIDENCE'}
+                            </div>
+
+                            ${rank.nerdaiLogicUsed ? `
+                            <div class="border-t border-yellow-600 pt-2">
+                                <div class="text-center text-xs text-yellow-300 mb-2 font-bold">🧠 NERDAI ADVANCED LOGIC APPLIED</div>
+                                <div class="flex flex-wrap justify-center gap-1">
+                                    ${rank.nerdaiLogicUsed.weatherImpact ? '<span class="px-2 py-1 bg-cyan-700 text-cyan-200 text-xs rounded">🌦️ WEATHER</span>' : ''}
+                                    ${rank.nerdaiLogicUsed.lineAnalysis ? '<span class="px-2 py-1 bg-purple-700 text-purple-200 text-xs rounded">⚔️ LINE BATTLE</span>' : ''}
+                                    ${rank.nerdaiLogicUsed.injuryAdjustment ? '<span class="px-2 py-1 bg-red-700 text-red-200 text-xs rounded">🏥 INJURIES</span>' : ''}
+                                    ${rank.nerdaiLogicUsed.learningExperience ? '<span class="px-2 py-1 bg-orange-700 text-orange-200 text-xs rounded">🧠 LEARNING</span>' : ''}
+                                    ${rank.nerdaiLogicUsed.recentFormAnalysis ? '<span class="px-2 py-1 bg-green-700 text-green-200 text-xs rounded">📈 FORM</span>' : ''}
+                                    ${rank.nerdaiLogicUsed.bettingIntelligence ? '<span class="px-2 py-1 bg-yellow-700 text-yellow-200 text-xs rounded">💰 BETTING EDGE</span>' : ''}
+                                    ${rank.nerdaiLogicUsed.experienceAnalysis ? '<span class="px-2 py-1 bg-purple-700 text-purple-200 text-xs rounded">👴 EXPERIENCE</span>' : ''}
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                            <div class="bg-gray-800 border border-yellow-600 p-3 rounded">
+                                <h4 class="font-bold text-yellow-400 mb-1">🏈 Game Info</h4>
+                                <div class="text-sm text-white">
+                                    <div><strong class="text-yellow-300">Status:</strong> ${rank.gameStatus || 'Scheduled'}</div>
+                                    <div><strong class="text-yellow-300">Time:</strong> ${rank.gameTime ? new Date(rank.gameTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'TBD'}</div>
+                                    <div><strong class="text-yellow-300">Venue:</strong> ${rank.analysis?.espnData?.venue || 'TBD'}</div>
+                                    <div><strong class="text-yellow-300">Records:</strong> ${rank.analysis?.records?.home || 'N/A'} vs ${rank.analysis?.records?.away || 'N/A'}</div>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-800 border border-yellow-600 p-3 rounded">
+                                <h4 class="font-bold text-yellow-400 mb-1">💰 Betting Info</h4>
+                                <div class="text-sm text-white">
+                                    <div><strong class="text-yellow-300">Spread:</strong> ${rank.analysis?.bettingLines?.spread || 'Pick'}</div>
+                                    <div><strong class="text-yellow-300">O/U:</strong> ${rank.analysis?.bettingLines?.overUnder || 'N/A'}</div>
+                                    <div><strong class="text-yellow-300">Strength:</strong> ${rank.analysis?.teamStrength?.home || 'N/A'} vs ${rank.analysis?.teamStrength?.away || 'N/A'}</div>
+                                </div>
+                            </div>
+
+                            ${rank.weatherInfo && rank.weatherInfo.hasImpact ? `
+                            <div class="bg-gray-800 border border-cyan-400 p-3 rounded">
+                                <h4 class="font-bold text-cyan-400 mb-1">🌦️ Weather Conditions</h4>
+                                <div class="text-sm text-white">
+                                    <div><strong class="text-cyan-300">Impact:</strong> ${rank.weatherInfo.description}</div>
+                                    <div><strong class="text-cyan-300">Effect:</strong> ${rank.weatherInfo.totalImpact > 0 ? '+' : ''}${rank.weatherInfo.totalImpact} confidence points</div>
+                                    ${rank.weatherInfo.rawData ? `<div class="text-xs text-cyan-200 mt-1">Temp: ${Math.round((rank.weatherInfo.rawData.tempMax + rank.weatherInfo.rawData.tempMin) / 2)}°F | Wind: ${Math.round(rank.weatherInfo.rawData.windSpeed)} mph</div>` : ''}
+                                </div>
+                            </div>
+                            ` : `
+                            <div class="bg-gray-800 border border-gray-600 p-3 rounded">
+                                <h4 class="font-bold text-gray-400 mb-1">🏟️ Venue Conditions</h4>
+                                <div class="text-sm text-white">
+                                    <div class="text-gray-300">Indoor/Controlled Environment</div>
+                                    <div class="text-xs text-gray-400 mt-1">No weather impact expected</div>
+                                </div>
+                            </div>
+                            `}
+                        </div>
+
+                        ${rank.bettingIntelligence && rank.bettingIntelligence.hasEdge ? `
+                        <div class="bg-yellow-900 border-2 border-yellow-400 p-4 rounded-lg mb-3">
+                            <h4 class="font-bold text-yellow-400 mb-2 text-lg">💰 BETTING INTELLIGENCE</h4>
+                            <div class="space-y-2">
+                                <div class="bg-gray-800 p-3 rounded border-l-4 border-yellow-400">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-bold text-yellow-400">${rank.bettingIntelligence.edgeType.toUpperCase().replace('_', ' ')} EDGE</span>
+                                        <span class="text-yellow-300">${rank.bettingIntelligence.confidenceAdjustment > 0 ? '+' : ''}${rank.bettingIntelligence.confidenceAdjustment} confidence</span>
+                                    </div>
+                                    <div class="text-white text-sm">${rank.bettingIntelligence.description}</div>
+                                </div>
+                                ${rank.bettingIntelligence.publicData ? `
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div class="bg-gray-800 p-3 rounded">
+                                        <h5 class="font-bold text-yellow-300 mb-1">🏟️ Public Betting</h5>
+                                        <div class="text-sm text-white">
+                                            <div><strong>Favorite:</strong> ${rank.bettingIntelligence.publicData.favorite}</div>
+                                            <div><strong>Public %:</strong> ${rank.bettingIntelligence.publicData.percentage}%</div>
+                                            <div><strong>Contrarian:</strong> ${rank.bettingIntelligence.publicData.contrarian_side}</div>
+                                        </div>
+                                    </div>
+                                    ${rank.bettingIntelligence.sharpMoney && rank.bettingIntelligence.sharpMoney.detected ? `
+                                    <div class="bg-gray-800 p-3 rounded">
+                                        <h5 class="font-bold text-green-300 mb-1">🎯 Sharp Money</h5>
+                                        <div class="text-sm text-white">
+                                            <div><strong>Side:</strong> ${rank.bettingIntelligence.sharpMoney.side}</div>
+                                            <div><strong>Movement:</strong> ${rank.bettingIntelligence.sharpMoney.movement > 0 ? '+' : ''}${rank.bettingIntelligence.sharpMoney.movement}</div>
+                                            <div><strong>Status:</strong> ${rank.bettingIntelligence.sharpMoney.against_public ? 'Against Public' : 'With Volume'}</div>
+                                        </div>
+                                    </div>
+                                    ` : `
+                                    <div class="bg-gray-800 p-3 rounded">
+                                        <h5 class="font-bold text-gray-300 mb-1">📊 Line Movement</h5>
+                                        <div class="text-sm text-white">
+                                            <div class="text-gray-300">No significant sharp money detected</div>
+                                        </div>
+                                    </div>
+                                    `}
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                        </div>
+
+                        <div class="bg-cyan-900 border-2 border-cyan-400 p-4 rounded-lg mb-3">
+                            <h4 class="font-bold text-cyan-400 mb-3 text-lg">🧠 WU-TANG REASONING - WHY ${rank.aiPick}?</h4>
+                            <div class="space-y-2">
+                                ${rank.reasoning?.map(reason => `
+                                    <div class="flex items-start bg-gray-800 p-3 rounded border-l-4 border-cyan-400">
+                                        <span class="text-cyan-400 mr-3 text-lg font-bold">→</span>
+                                        <span class="text-white text-base">${reason}</span>
+                                    </div>
+                                `).join('') || '<div class="text-white bg-gray-800 p-3 rounded">Analysis in progress...</div>'}
+                            </div>
+                        </div>
+
+                        ${rank.lineMatchupInfo && rank.lineMatchupInfo.hasAnalysis ? `
+                        <div class="bg-purple-900 border-2 border-purple-400 p-4 rounded-lg mb-3">
+                            <h4 class="font-bold text-purple-400 mb-3 text-lg">🏈 LINE BATTLE BREAKDOWN</h4>
+
+                            <div class="mb-4 text-center">
+                                <div class="text-xl font-bold ${Math.abs(rank.lineMatchupInfo.confidenceImpact) >= 6 ? 'text-red-400 animate-pulse' : Math.abs(rank.lineMatchupInfo.confidenceImpact) >= 4 ? 'text-orange-400' : 'text-yellow-400'}">
+                                    ${Math.abs(rank.lineMatchupInfo.confidenceImpact) >= 6 ? '🚨 ' : Math.abs(rank.lineMatchupInfo.confidenceImpact) >= 4 ? '⚠️ ' : '📊 '}
+                                    ${rank.lineMatchupInfo.description}
+                                </div>
+                                <div class="text-sm text-purple-300 mt-1">
+                                    Confidence Impact: ${rank.lineMatchupInfo.confidenceImpact > 0 ? '+' : ''}${rank.lineMatchupInfo.confidenceImpact} points
+                                    ${Math.abs(rank.lineMatchupInfo.confidenceImpact) >= 6 ? ' 🔥 MAJOR FACTOR' : Math.abs(rank.lineMatchupInfo.confidenceImpact) >= 4 ? ' ⚡ SIGNIFICANT' : ''}
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Home O-Line vs Away D-Line -->
+                                <div class="bg-gray-800 border border-purple-500 p-3 rounded">
+                                    <h5 class="font-bold text-purple-300 mb-2">${rank.homeTeam} O-Line vs ${rank.awayTeam} D-Line</h5>
+                                    <div class="space-y-1 text-sm text-white">
+                                        <div><strong class="text-purple-400">${rank.homeTeam} O-Line:</strong> ${rank.lineMatchupInfo.details?.keyMatchups?.homeOLineVsAwayDLine?.homeOLine || 'N/A'}</div>
+                                        <div><strong class="text-red-400">${rank.awayTeam} D-Line:</strong> ${rank.lineMatchupInfo.details?.keyMatchups?.homeOLineVsAwayDLine?.awayDLine || 'N/A'}</div>
+                                        <div class="font-bold ${rank.lineMatchupInfo.details?.homeRunGameAdvantage > 0 ? 'text-green-400' : 'text-red-400'}">
+                                            Power Advantage: ${rank.lineMatchupInfo.details?.homeRunGameAdvantage > 0 ? '+' : ''}${rank.lineMatchupInfo.details?.homeRunGameAdvantage?.toFixed(1) || '0'}
+                                            (${rank.lineMatchupInfo.details?.homeRunGameAdvantage > 0 ? rank.homeTeam : rank.awayTeam})
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Away O-Line vs Home D-Line -->
+                                <div class="bg-gray-800 border border-purple-500 p-3 rounded">
+                                    <h5 class="font-bold text-purple-300 mb-2">${rank.awayTeam} O-Line vs ${rank.homeTeam} D-Line</h5>
+                                    <div class="space-y-1 text-sm text-white">
+                                        <div><strong class="text-purple-400">${rank.awayTeam} O-Line:</strong> ${rank.lineMatchupInfo.details?.keyMatchups?.awayOLineVsHomeDLine?.awayOLine || 'N/A'}</div>
+                                        <div><strong class="text-red-400">${rank.homeTeam} D-Line:</strong> ${rank.lineMatchupInfo.details?.keyMatchups?.awayOLineVsHomeDLine?.homeDLine || 'N/A'}</div>
+                                        <div class="font-bold ${rank.lineMatchupInfo.details?.awayRunGameAdvantage > 0 ? 'text-green-400' : 'text-red-400'}">
+                                            Power Advantage: ${rank.lineMatchupInfo.details?.awayRunGameAdvantage > 0 ? '+' : ''}${rank.lineMatchupInfo.details?.awayRunGameAdvantage?.toFixed(1) || '0'}
+                                            (${rank.lineMatchupInfo.details?.awayRunGameAdvantage > 0 ? rank.awayTeam : rank.homeTeam})
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 p-3 bg-gray-900 border border-purple-600 rounded text-center">
+                                <div class="text-sm text-purple-300 mb-1">NET ADVANTAGE</div>
+                                <div class="text-lg font-bold ${Math.abs(rank.lineMatchupInfo.details?.netAdvantage || 0) >= 20 ? 'text-red-400' : 'text-yellow-400'}">
+                                    ${rank.lineMatchupInfo.details?.netAdvantage > 0 ? rank.homeTeam : rank.awayTeam}
+                                    +${Math.abs(rank.lineMatchupInfo.details?.netAdvantage || 0).toFixed(1)} Overall Power Edge
+                                </div>
+                                <div class="text-xs text-purple-400 mt-1">
+                                    Formula: (Weight × Height) ÷ 100 = Power Index
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        ${rank.cognitiveAnalysis?.hasAnalysis ? `
+                        <div class="bg-indigo-900 border border-indigo-400 p-4 rounded mb-4">
+                            <h4 class="font-bold text-indigo-400 mb-3 text-lg">🧠 COGNITIVE INTELLIGENCE BREAKDOWN</h4>
+
+                            <div class="mb-4 text-center">
+                                <div class="text-xl font-bold ${Math.abs(rank.cognitiveAnalysis.confidenceImpact) >= 4 ? 'text-red-400 animate-pulse' : Math.abs(rank.cognitiveAnalysis.confidenceImpact) >= 2 ? 'text-orange-400' : 'text-yellow-400'}">
+                                    ${Math.abs(rank.cognitiveAnalysis.confidenceImpact) >= 4 ? '🧠 ' : Math.abs(rank.cognitiveAnalysis.confidenceImpact) >= 2 ? '🤔 ' : '⚖️ '}
+                                    ${rank.cognitiveAnalysis.description}
+                                </div>
+                                <div class="text-sm text-indigo-300 mt-2">
+                                    Confidence Impact: <span class="${rank.cognitiveAnalysis.confidenceImpact > 0 ? 'text-green-400' : rank.cognitiveAnalysis.confidenceImpact < 0 ? 'text-red-400' : 'text-yellow-400'}">${rank.cognitiveAnalysis.confidenceImpact > 0 ? '+' : ''}${rank.cognitiveAnalysis.confidenceImpact} points</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <!-- Home Team Cognitive Index -->
+                                <div class="bg-gray-800 border border-indigo-500 p-3 rounded">
+                                    <h5 class="font-bold text-indigo-300 mb-2">${rank.homeTeam} Cognitive Index</h5>
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-indigo-400">${rank.cognitiveAnalysis.homeIndex?.toFixed(1) || 'N/A'}</div>
+                                        <div class="text-xs text-indigo-300">Wonderlic Average</div>
+                                    </div>
+                                </div>
+
+                                <!-- Away Team Cognitive Index -->
+                                <div class="bg-gray-800 border border-indigo-500 p-3 rounded">
+                                    <h5 class="font-bold text-indigo-300 mb-2">${rank.awayTeam} Cognitive Index</h5>
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-indigo-400">${rank.cognitiveAnalysis.awayIndex?.toFixed(1) || 'N/A'}</div>
+                                        <div class="text-xs text-indigo-300">Wonderlic Average</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 p-3 bg-gray-900 border border-indigo-600 rounded text-center">
+                                <div class="text-sm text-indigo-300 mb-1">INTELLIGENCE ADVANTAGE</div>
+                                <div class="text-lg font-bold ${Math.abs(rank.cognitiveAnalysis.advantage || 0) >= 2 ? 'text-red-400' : 'text-yellow-400'}">
+                                    ${rank.cognitiveAnalysis.advantage > 0 ? rank.homeTeam : rank.awayTeam}
+                                    +${Math.abs(rank.cognitiveAnalysis.advantage || 0).toFixed(1)} Wonderlic Points
+                                </div>
+                                <div class="text-xs text-indigo-400 mt-1">
+                                    Key Positions: QB (28), C/OL (26), S (24), LB (23)
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        ${rank.analysis?.injuries && (rank.analysis.injuries.home?.length > 0 || rank.analysis.injuries.away?.length > 0) ? `
+                        <div class="bg-blue-900 border border-blue-400 p-3 rounded">
+                            <h4 class="font-semibold text-sm text-blue-300 mb-2">🏥 Injury Impact Analysis</h4>
+                            <div class="text-sm text-white space-y-1">
+                                ${rank.analysis.injuries.home?.length > 0 ? `
+                                <div class="border-l-2 border-blue-400 pl-2">
+                                    <strong class="text-blue-200">${rank.homeTeam}:</strong> ${rank.analysis.injuries.home.length} injury concerns
+                                    ${rank.analysis.injuries.home.slice(0, 2).map(injury => `
+                                        <div class="text-xs text-blue-100 ml-2">• ${injury.position || 'Unknown'} (${injury.severity || 'questionable'}): ${injury.headline.split(' ').slice(0, 8).join(' ')}...</div>
+                                    `).join('')}
+                                    ${rank.analysis.injuries.home.length > 2 ? `<div class="text-xs text-blue-200 ml-2">+ ${rank.analysis.injuries.home.length - 2} more injuries</div>` : ''}
+                                </div>
+                                ` : ''}
+                                ${rank.analysis.injuries.away?.length > 0 ? `
+                                <div class="border-l-2 border-blue-400 pl-2">
+                                    <strong class="text-blue-200">${rank.awayTeam}:</strong> ${rank.analysis.injuries.away.length} injury concerns
+                                    ${rank.analysis.injuries.away.slice(0, 2).map(injury => `
+                                        <div class="text-xs text-blue-100 ml-2">• ${injury.position || 'Unknown'} (${injury.severity || 'questionable'}): ${injury.headline.split(' ').slice(0, 8).join(' ')}...</div>
+                                    `).join('')}
+                                    ${rank.analysis.injuries.away.length > 2 ? `<div class="text-xs text-blue-200 ml-2">+ ${rank.analysis.injuries.away.length - 2} more injuries</div>` : ''}
+                                </div>
+                                ` : ''}
+                                <div class="text-xs text-blue-300 mt-2 pt-1 border-t border-blue-700">
+                                    <strong>Impact Level:</strong> ${rank.analysis.injuries.impact?.toUpperCase() || 'LOW'}
+                                    ${rank.analysis.injuries.home?.length > 0 || rank.analysis.injuries.away?.length > 0 ? `| Weighted Impact: ${((rank.analysis.injuries.home || []).reduce((sum, inj) => sum + (inj.positionWeight || 2) * (inj.severityMultiplier || 0.4), 0) + (rank.analysis.injuries.away || []).reduce((sum, inj) => sum + (inj.positionWeight || 2) * (inj.severityMultiplier || 0.4), 0)).toFixed(1)} points` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            ${rank.tags?.map(tag => `<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">${tag}</span>`).join('') || ''}
+                            ${rank.learningExperience ? '<span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded font-semibold">🧠 Learning Experience</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div></div>`;
+
+            content.innerHTML = html;
+        }
+
+        async function getBettingLines() {
+            const content = document.getElementById('aiContent');
+            const results = document.getElementById('aiResults');
+            const loading = document.getElementById('loading');
+
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+
+            try {
+                console.log('🎯 NERDAI_DEBUG: Fetching comprehensive betting lines...');
+
+                const richAI = window.RichNerdAITool;
+                const espnData = await richAI.getESPNScoreboard();
+
+                if (!espnData.success) {
+                    throw new Error('Failed to fetch ESPN game data');
+                }
+
+                let html = `
+                    <div class="bg-purple-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold text-purple-800 mb-3">💰 Betting Lines Analysis</h3>
+                        <p class="text-purple-600">Live Game Data: ${espnData.data.length} games</p>
+                    </div>
+                `;
+
+                html += `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                `;
+
+                for (const game of espnData.data) {
+                    const competition = game.competitions?.[0];
+                    if (!competition) continue;
+
+                    const homeTeam = competition.competitors?.find(c => c.homeAway === 'home');
+                    const awayTeam = competition.competitors?.find(c => c.homeAway === 'away');
+
+                    if (!homeTeam || !awayTeam) continue;
+
+                    const matchup = `${awayTeam.team.abbreviation} @ ${homeTeam.team.abbreviation}`;
+
+                    // Extract betting information if available
+                    const odds = competition.odds?.[0];
+                    const spread = odds?.details || 'Pick';
+                    const overUnder = odds?.overUnder || 'N/A';
+
+                    // Get team records
+                    const homeRecord = homeTeam.record?.[0]?.displayValue || 'N/A';
+                    const awayRecord = awayTeam.record?.[0]?.displayValue || 'N/A';
+
+                    // Calculate simple strength metric
+                    const homeWins = parseInt(homeRecord.split('-')[0]) || 0;
+                    const homeLosses = parseInt(homeRecord.split('-')[1]) || 0;
+                    const awayWins = parseInt(awayRecord.split('-')[0]) || 0;
+                    const awayLosses = parseInt(awayRecord.split('-')[1]) || 0;
+
+                    const homeWinPct = homeWins / (homeWins + homeLosses || 1);
+                    const awayWinPct = awayWins / (awayWins + awayLosses || 1);
+
+                    const favorite = homeWinPct > awayWinPct ? homeTeam.team.abbreviation : awayTeam.team.abbreviation;
+                    const confidence = Math.abs(homeWinPct - awayWinPct) * 100 + 50;
+
+                    html += `
+                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="font-semibold text-lg">${matchup}</h4>
+                                <span class="text-sm text-gray-600">${game.status?.type?.detail || 'Scheduled'}</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 mb-3">
+                                <div class="text-center">
+                                    <div class="font-medium">${awayTeam.team.abbreviation}</div>
+                                    <div class="text-sm text-gray-600">${awayRecord}</div>
+                                    <div class="text-xs">${(awayWinPct * 100).toFixed(1)}% Win Rate</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="font-medium">${homeTeam.team.abbreviation}</div>
+                                    <div class="text-sm text-gray-600">${homeRecord}</div>
+                                    <div class="text-xs">${(homeWinPct * 100).toFixed(1)}% Win Rate</div>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-50 p-3 rounded mb-3">
+                                <div class="grid grid-cols-2 gap-2 text-sm">
+                                    <div><strong>Spread:</strong> ${spread}</div>
+                                    <div><strong>O/U:</strong> ${overUnder}</div>
+                                    <div><strong>AI Pick:</strong> ${favorite}</div>
+                                    <div><strong>Confidence:</strong> ${Math.round(confidence)}%</div>
+                                </div>
+                            </div>
+
+                            <div class="text-xs text-gray-600">
+                                <strong>Analysis:</strong> Based on records, ${favorite} favored
+                                ${homeWinPct === awayWinPct ? '(even match)' :
+                                  Math.abs(homeWinPct - awayWinPct) > 0.3 ? '(strong edge)' : '(slight edge)'}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `</div>`;
+
+                // Add summary
+                html += `
+                    <div class="bg-blue-50 p-4 rounded-lg mt-4">
+                        <h4 class="font-semibold text-blue-800 mb-2">📊 Betting Summary</h4>
+                        <p class="text-blue-600 text-sm">
+                            Analysis based on team records and ESPN live data.
+                            For official betting lines, consult licensed sportsbooks.
+                        </p>
+                    </div>
+                `;
+
+                content.innerHTML = html;
+                loading.classList.add('hidden');
+                results.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Betting lines error:', error);
+                content.innerHTML = `<div class="text-red-600">Error loading betting lines: ${error.message}</div>`;
+                loading.classList.add('hidden');
+                results.classList.remove('hidden');
+            }
+        }
+
+        async function showAccuracyReport() {
+            const content = document.getElementById('aiContent');
+            const results = document.getElementById('aiResults');
+
+            try {
+                console.log('🎯 NERDAI_DEBUG: Generating accuracy report...');
+
+                // Check authentication status
+                if (!window.auth.currentUser) {
+                    console.log('🎯 NERDAI_DEBUG: No authenticated user - proceeding with limited access');
+                }
+
+                const dashboardHTML = await window.PredictionTracker.displayAccuracyDashboard();
+
+                content.innerHTML = dashboardHTML;
+                results.classList.remove('hidden');
+
+            } catch (error) {
+                content.innerHTML = `<div class="text-red-600">Error loading accuracy report: ${error.message}</div>`;
+                results.classList.remove('hidden');
+            }
+        }
+
+        async function testRichAI() {
+            const testResults = document.getElementById('testResults');
+            const testOutput = document.getElementById('testOutput');
+
+            try {
+                console.log('🎯 NERDAI_DEBUG: Testing Rich AI Tool...');
+                const result = await window.testRichAI();
+
+                testOutput.textContent = JSON.stringify(result, null, 2);
+                testResults.classList.remove('hidden');
+
+            } catch (error) {
+                testOutput.textContent = `Error: ${error.message}`;
+                testResults.classList.remove('hidden');
+            }
+        }
+
+        async function updatePredictionsWithResults() {
+            const content = document.getElementById('aiContent');
+            const results = document.getElementById('aiResults');
+
+            try {
+                console.log('🔄 RESULTS_TRACKER: Updating predictions with actual results...');
+
+                // Check authentication status
+                if (!window.auth.currentUser) {
+                    console.log('🔄 RESULTS_TRACKER: No authenticated user - proceeding with limited access');
+                }
+
+                const currentWeek = 4; // Dynamic: getCurrentNFLWeek()
+                const updateResult = await window.ResultsTracker.updatePredictionsWithResults(currentWeek);
+
+                if (updateResult.success) {
+                    content.innerHTML = `
+                        <div class="bg-green-50 p-4 rounded-lg mb-4">
+                            <h3 class="font-semibold text-green-800 mb-3">✅ Results Updated Successfully!</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="bg-white p-3 rounded text-center">
+                                    <div class="text-2xl font-bold text-blue-600">${updateResult.week}</div>
+                                    <div class="text-sm text-gray-600">Week Updated</div>
+                                </div>
+                                <div class="bg-white p-3 rounded text-center">
+                                    <div class="text-2xl font-bold text-green-600">${updateResult.updatedCount}</div>
+                                    <div class="text-sm text-gray-600">Games Updated</div>
+                                </div>
+                                <div class="bg-white p-3 rounded text-center">
+                                    <div class="text-2xl font-bold text-purple-600">${updateResult.correctPredictions}</div>
+                                    <div class="text-sm text-gray-600">Correct Picks</div>
+                                </div>
+                                <div class="bg-white p-3 rounded text-center">
+                                    <div class="text-2xl font-bold text-orange-600">${updateResult.accuracy}%</div>
+                                    <div class="text-sm text-gray-600">Accuracy</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-blue-800 mb-2">🎯 Tagged as Learning Experience</h4>
+                            <p class="text-blue-700">AI predictions updated with actual results. Future predictions will include learning from these outcomes.</p>
+                        </div>
+                    `;
+                } else {
+                    content.innerHTML = `<div class="text-red-600">Error updating results: ${updateResult.error}</div>`;
+                }
+
+                results.classList.remove('hidden');
+
+            } catch (error) {
+                content.innerHTML = `<div class="text-red-600">Error: ${error.message}</div>`;
+                results.classList.remove('hidden');
+            }
+        }
+
+        async function showLearningInsights() {
+            const content = document.getElementById('aiContent');
+            const results = document.getElementById('aiResults');
+
+            try {
+                console.log('🧠 RESULTS_TRACKER: Analyzing learning insights...');
+
+                // Check authentication status
+                if (!window.auth.currentUser) {
+                    console.log('🧠 RESULTS_TRACKER: No authenticated user - proceeding with limited access');
+                }
+
+                const analysisResult = await window.ResultsTracker.analyzeAccuracyTrends();
+
+                if (analysisResult.success) {
+                    const analysis = analysisResult.analysis;
+                    const insights = window.ResultsTracker.generateLearningInsights(analysis);
+
+                    let html = `
+                        <div class="bg-purple-50 p-4 rounded-lg mb-4">
+                            <h3 class="font-semibold text-purple-800 mb-3">🧠 AI Learning Insights</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                <div class="bg-white p-3 rounded text-center">
+                                    <div class="text-2xl font-bold text-green-600">${analysis.overallAccuracy}%</div>
+                                    <div class="text-sm text-gray-600">Overall Accuracy</div>
+                                </div>
+                                <div class="bg-white p-3 rounded text-center">
+                                    <div class="text-2xl font-bold text-blue-600">${analysis.totalGames}</div>
+                                    <div class="text-sm text-gray-600">Games Analyzed</div>
+                                </div>
+                                <div class="bg-white p-3 rounded text-center">
+                                    <div class="text-2xl font-bold text-purple-600">${analysis.confidenceBreakdown.high.accuracy}%</div>
+                                    <div class="text-sm text-gray-600">High Confidence</div>
+                                </div>
+                                <div class="bg-white p-3 rounded text-center">
+                                    <div class="text-2xl font-bold text-red-600">${analysis.surprises.length}</div>
+                                    <div class="text-sm text-gray-600">Surprises</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    if (insights.length > 0) {
+                        html += `
+                            <div class="bg-yellow-50 p-4 rounded-lg mb-4">
+                                <h4 class="font-semibold text-yellow-800 mb-3">💡 Learning Insights</h4>
+                                <div class="space-y-3">
+                        `;
+                        insights.forEach(insight => {
+                            const bgColor = insight.type === 'improvement' ? 'bg-green-100' :
+                                           insight.type === 'decline' ? 'bg-red-100' : 'bg-blue-100';
+                            html += `
+                                <div class="${bgColor} p-3 rounded border-l-4 border-current">
+                                    <div class="font-medium">${insight.message}</div>
+                                    <div class="text-sm text-gray-600 mt-1"><strong>Action:</strong> ${insight.action}</div>
+                                </div>
+                            `;
+                        });
+                        html += `</div></div>`;
+                    }
+
+                    if (analysis.surprises.length > 0) {
+                        html += `
+                            <div class="bg-red-50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-red-800 mb-3">😱 Biggest Surprises (Learning Experiences)</h4>
+                                <div class="space-y-2">
+                        `;
+                        analysis.surprises.slice(0, 5).forEach(surprise => {
+                            html += `
+                                <div class="bg-white p-3 rounded border border-red-200">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-medium">${surprise.matchup}</span>
+                                        <span class="text-red-600">Week ${surprise.week}</span>
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">
+                                        <span class="text-red-600">Predicted: ${surprise.aiPick} (${surprise.confidence}%)</span>
+                                        <span class="mx-2">→</span>
+                                        <span class="text-green-600">Actual: ${surprise.actualWinner}</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1 italic">🏷️ Tagged as Learning Experience</div>
+                                </div>
+                            `;
+                        });
+                        html += `</div></div>`;
+                    }
+
+                    content.innerHTML = html;
+                } else {
+                    content.innerHTML = `<div class="text-red-600">Error analyzing insights: ${analysisResult.error}</div>`;
+                }
+
+                results.classList.remove('hidden');
+
+            } catch (error) {
+                content.innerHTML = `<div class="text-red-600">Error: ${error.message}</div>`;
+                results.classList.remove('hidden');
+            }
+        }
+
+        // Admin-only functions
+        async function managePredictionData() {
+            if (!window.isAdmin) {
+                alert('Admin access required');
+                return;
+            }
+
+            const content = document.getElementById('aiContent');
+            const results = document.getElementById('aiResults');
+
+            try {
+                console.log('🗄️ DATA_MANAGER: Loading prediction data management interface...');
+
+                // Get all stored predictions
+                const predictionsCollection = await window.db.collection('artifacts/nerdfootball/ai-predictions').get();
+
+                let html = `
+                    <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold text-blue-800 mb-3">🗄️ Prediction Data Management</h3>
+                        <p class="text-blue-600">Stored Predictions: ${predictionsCollection.size} documents</p>
+                    </div>
+                `;
+
+                if (predictionsCollection.size > 0) {
+                    html += `
+                        <div class="bg-white p-4 rounded-lg border">
+                            <h4 class="font-semibold text-gray-800 mb-3">Stored Prediction Documents</h4>
+                            <div class="space-y-2">
+                    `;
+
+                    predictionsCollection.forEach(doc => {
+                        const data = doc.data();
+                        html += `
+                            <div class="flex justify-between items-center p-3 bg-gray-50 rounded border">
+                                <div>
+                                    <span class="font-medium">${doc.id}</span>
+                                    <span class="text-sm text-gray-600 ml-2">(${data.totalGames || 0} games)</span>
+                                </div>
+                                <div class="space-x-2">
+                                    <button onclick="viewPredictionDetails('${doc.id}')" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                                        View
+                                    </button>
+                                    <button onclick="deletePrediction('${doc.id}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `</div></div>`;
+                }
+
+                content.innerHTML = html;
+                results.classList.remove('hidden');
+
+            } catch (error) {
+                content.innerHTML = `<div class="text-red-600">Error loading prediction data: ${error.message}</div>`;
+                results.classList.remove('hidden');
+            }
+        }
+
+        async function exportAnalysis() {
+            if (!window.isAdmin) {
+                alert('Admin access required');
+                return;
+            }
+
+            try {
+                console.log('📤 EXPORT: Generating comprehensive analysis export...');
+
+                // Get current analysis
+                const richAI = window.RichNerdAITool;
+                const analysis = await richAI.getComprehensiveAnalysis(4);
+
+                // Format for export
+                const exportData = {
+                    timestamp: new Date().toISOString(),
+                    week: analysis.week,
+                    summary: analysis.summary,
+                    predictions: analysis.confidenceRankings?.map(rank => ({
+                        rank: rank.rank,
+                        matchup: rank.matchup,
+                        pick: rank.aiPick,
+                        confidence: rank.confidence,
+                        reasoning: rank.reasoning
+                    })) || []
+                };
+
+                // Create and download JSON file
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `nerdai-analysis-week-${analysis.week}-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                alert('Analysis exported successfully!');
+
+            } catch (error) {
+                alert(`Export failed: ${error.message}`);
+            }
+        }
+
+        async function viewPredictionDetails(docId) {
+            if (!window.isAdmin) return;
+
+            try {
+                const doc = await window.db.doc(`artifacts/nerdfootball/ai-predictions/${docId}`).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    console.log(`📊 Prediction Details for ${docId}:`, data);
+
+                    // Display in a modal or new section
+                    const detailsWindow = window.open('', '_blank', 'width=800,height=600');
+                    detailsWindow.document.write(`
+                        <html>
+                            <head><title>Prediction Details: ${docId}</title></head>
+                            <body style="font-family: Arial, sans-serif; padding: 20px;">
+                                <h2>Prediction Details: ${docId}</h2>
+                                <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto;">
+${JSON.stringify(data, null, 2)}
+                                </pre>
+                            </body>
+                        </html>
+                    `);
+                }
+            } catch (error) {
+                alert(`Error viewing details: ${error.message}`);
+            }
+        }
+
+        async function deletePrediction(docId) {
+            if (!window.isAdmin) return;
+
+            if (confirm(`Are you sure you want to delete prediction document "${docId}"? This cannot be undone.`)) {
+                try {
+                    await window.db.doc(`artifacts/nerdfootball/ai-predictions/${docId}`).delete();
+                    alert('Prediction deleted successfully');
+                    managePredictionData(); // Refresh the list
+                } catch (error) {
+                    alert(`Error deleting prediction: ${error.message}`);
+                }
+            }
+        }
+
+        async function addAZvsSEALearning() {
+            if (!window.isAdmin) {
+                alert('Admin access required');
+                return;
+            }
+
+            try {
+                console.log('🧠 LEARNING: Adding AZ vs SEA learning experience...');
+
+                // Create the learning experience document
+                const learningExperience = {
+                    gameId: 'manual-az-vs-sea-learning',
+                    homeTeam: 'ARI',
+                    awayTeam: 'SEA',
+                    aiPick: 'ARI',
+                    actualWinner: 'SEA',
+                    predictionCorrect: false,
+                    confidence: 65, // Typical confidence for home team pick
+                    week: 4, // Assuming this was week 4
+                    season: 2025,
+                    timestamp: new Date().toISOString(),
+                    reasoning: 'AI consistently picks Arizona, but Seattle won Thursday game',
+                    source: 'manual_correction'
+                };
+
+                // Save to Firebase learning collection
+                const learningPath = 'artifacts/nerdfootball/ai-learning';
+                const docRef = await window.db.collection(learningPath).add(learningExperience);
+
+                console.log('🧠 LEARNING: ✅ Learning experience added successfully:', docRef.id);
+                alert('✅ AZ vs SEA learning experience added! Future predictions involving Arizona will have reduced confidence.');
+
+            } catch (error) {
+                console.error('🧠 LEARNING: ❌ Failed to add learning experience:', error);
+                alert('❌ Failed to add learning experience: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Week 1 Picks Viewer - All Users</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">🔍 Week 1 Picks - All Users</h1>
+
+        <div class="mb-4">
+            <button id="loadPicks" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                Load All Week 1 Picks
+            </button>
+            <span id="status" class="ml-4 text-gray-600"></span>
+        </div>
+
+        <div id="picksContainer" class="space-y-6"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, collection, getDocs, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.doc = doc;
+        window.getDoc = getDoc;
+
+        document.getElementById('loadPicks').addEventListener('click', loadWeek1Picks);
+
+        async function loadWeek1Picks() {
+            const status = document.getElementById('status');
+            const container = document.getElementById('picksContainer');
+
+            status.textContent = 'Loading picks...';
+            container.innerHTML = '';
+
+            try {
+                // Load Week 1 picks
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/1/submissions';
+                const picksCollection = collection(db, picksPath);
+                const picksSnap = await getDocs(picksCollection);
+
+                status.textContent = `Found ${picksSnap.size} users with Week 1 picks`;
+
+                // Load pool members for validation
+                let poolMembers = {};
+                try {
+                    const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                    const membersSnap = await getDoc(doc(db, membersPath));
+                    if (membersSnap.exists()) {
+                        poolMembers = membersSnap.data();
+                    }
+                } catch (e) {
+                    console.warn('Could not load pool members:', e);
+                }
+
+                const allPicks = [];
+                picksSnap.forEach(userDoc => {
+                    const userId = userDoc.id;
+                    const picks = userDoc.data();
+                    const isPoolMember = !!poolMembers[userId];
+
+                    allPicks.push({
+                        userId,
+                        userName: picks.userName || 'Unknown',
+                        picks,
+                        isPoolMember
+                    });
+                });
+
+                // Sort by username
+                allPicks.sort((a, b) => a.userName.localeCompare(b.userName));
+
+                // Display all picks
+                displayAllPicks(allPicks);
+
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+                console.error('Error loading picks:', error);
+            }
+        }
+
+        function displayAllPicks(allPicks) {
+            const container = document.getElementById('picksContainer');
+
+            allPicks.forEach(user => {
+                const userDiv = document.createElement('div');
+                userDiv.className = `bg-white rounded-lg shadow p-6 ${user.isPoolMember ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'}`;
+
+                // Analyze picks for anomalies
+                const analysis = analyzePicks(user.picks);
+
+                userDiv.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold">${user.userName}</h3>
+                            <p class="text-sm text-gray-600">User ID: ${user.userId}</p>
+                            <p class="text-sm ${user.isPoolMember ? 'text-green-600' : 'text-red-600'}">
+                                ${user.isPoolMember ? '✅ Pool Member' : '❌ Not Pool Member'}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-600">Games: ${analysis.totalGames}</p>
+                            <p class="text-sm ${analysis.issues.length > 0 ? 'text-red-600' : 'text-green-600'}">
+                                ${analysis.issues.length > 0 ? `⚠️ ${analysis.issues.length} Issues` : '✅ Clean'}
+                            </p>
+                        </div>
+                    </div>
+
+                    ${analysis.issues.length > 0 ? `
+                        <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+                            <h4 class="font-semibold text-red-800 mb-2">🚨 Issues Found:</h4>
+                            <ul class="text-sm text-red-700 list-disc list-inside space-y-1">
+                                ${analysis.issues.map(issue => `<li>${issue}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-4 md:grid-cols-8 gap-2 text-xs">
+                        ${generatePicksGrid(user.picks, analysis)}
+                    </div>
+
+                    <details class="mt-4">
+                        <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-800">View Raw Data</summary>
+                        <pre class="mt-2 p-3 bg-gray-100 rounded text-xs overflow-x-auto">${JSON.stringify(user.picks, null, 2)}</pre>
+                    </details>
+                `;
+
+                container.appendChild(userDiv);
+            });
+        }
+
+        function analyzePicks(picks) {
+            const issues = [];
+            const gameIds = Object.keys(picks).filter(key => !['userName', 'submittedAt', 'weekNumber', 'timestamp'].includes(key));
+            const expectedGameIds = Array.from({length: 16}, (_, i) => (101 + i).toString());
+
+            // Check for expected game IDs
+            const missingGames = expectedGameIds.filter(id => !gameIds.includes(id));
+            const extraGames = gameIds.filter(id => !expectedGameIds.includes(id));
+
+            if (missingGames.length > 0) {
+                issues.push(`Missing games: ${missingGames.join(', ')}`);
+            }
+            if (extraGames.length > 0) {
+                issues.push(`Extra games: ${extraGames.join(', ')}`);
+            }
+
+            // Check confidence values
+            const confidenceValues = [];
+            gameIds.forEach(gameId => {
+                const pick = picks[gameId];
+                if (pick && typeof pick === 'object') {
+                    if (pick.winner === '[object Object]' || typeof pick.winner === 'object') {
+                        issues.push(`Game ${gameId}: Winner corrupted`);
+                    }
+                    if (pick.confidence !== undefined) {
+                        if (typeof pick.confidence !== 'number' || pick.confidence < 1 || pick.confidence > 16) {
+                            issues.push(`Game ${gameId}: Invalid confidence ${pick.confidence}`);
+                        } else {
+                            confidenceValues.push(pick.confidence);
+                        }
+                    } else {
+                        issues.push(`Game ${gameId}: Missing confidence`);
+                    }
+                }
+            });
+
+            // Check for duplicate confidence values
+            const uniqueConfidence = [...new Set(confidenceValues)];
+            if (confidenceValues.length !== uniqueConfidence.length) {
+                const duplicates = confidenceValues.filter((val, idx) => confidenceValues.indexOf(val) !== idx);
+                issues.push(`Duplicate confidence: ${[...new Set(duplicates)].join(', ')}`);
+            }
+
+            return {
+                totalGames: gameIds.length,
+                issues,
+                confidenceValues: confidenceValues.sort((a, b) => a - b),
+                gameIds
+            };
+        }
+
+        function generatePicksGrid(picks, analysis) {
+            const expectedGameIds = Array.from({length: 16}, (_, i) => (101 + i).toString());
+
+            return expectedGameIds.map(gameId => {
+                const pick = picks[gameId];
+                if (!pick) {
+                    return `<div class="p-2 bg-red-100 border border-red-300 rounded">
+                        <div class="font-semibold text-red-800">${gameId}</div>
+                        <div class="text-red-600">MISSING</div>
+                    </div>`;
+                }
+
+                const isCorrupted = pick.winner === '[object Object]' || typeof pick.winner === 'object';
+                const isInvalidConfidence = typeof pick.confidence !== 'number' || pick.confidence < 1 || pick.confidence > 16;
+
+                const bgColor = isCorrupted || isInvalidConfidence ? 'bg-red-100 border-red-300' : 'bg-green-100 border-green-300';
+                const textColor = isCorrupted || isInvalidConfidence ? 'text-red-800' : 'text-green-800';
+
+                return `<div class="p-2 ${bgColor} border rounded">
+                    <div class="font-semibold ${textColor}">${gameId}</div>
+                    <div class="text-xs ${textColor}">C: ${pick.confidence || 'N/A'}</div>
+                    <div class="text-xs ${textColor} truncate" title="${pick.winner || 'N/A'}">
+                        ${isCorrupted ? '[CORRUPT]' : (pick.winner || 'N/A').substring(0, 8)}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    </script>
+</body>
+</html>

@@ -172,8 +172,6 @@
                     </div>
                     <span class="text-sm font-medium terminal-secondary glow-text">v3.0</span>
                     <div class="flex items-center space-x-2 relative">
-                        <span id="user-display" class="text-sm font-medium terminal-text command-line">Welcome, User</span>
-
                         <!-- Logout Button -->
                         <button id="main-logout-btn" onclick="handleLogout()" class="neon-button px-3 py-1 text-xs rounded-md hover:bg-terminal-danger/20 transition-all duration-200 flex items-center space-x-1">
                             <span>🚪</span>
@@ -364,19 +362,18 @@
             if (user) {
                 console.log('🔐 User authenticated:', user.email);
                 const isAdmin = ADMIN_UIDS.includes(user.uid);
-                userDisplay.textContent = `${user.email}`;
-                userDisplay.classList.add('terminal-accent');
 
                 // Store current user globally for admin checks
                 window.currentUser = user;
 
                 // Show admin tools if user is admin
+                if (isAdmin) {
+                    showAdminTools();
+                }
 
                 loadSurvivorData();
             } else {
                 console.log('🚫 User not authenticated - redirecting to login');
-                userDisplay.textContent = 'Not signed in';
-                userDisplay.classList.add('terminal-danger');
                 // Redirect to main page for authentication
                 window.location.href = '/';
             }
@@ -979,6 +976,72 @@
             }
         }
 
+
+        // Show admin tools for cache management
+        function showAdminTools() {
+            const adminToolsHTML = `
+                <div id="admin-tools" class="fixed top-20 right-4 bg-red-900 border-2 border-red-400 p-4 rounded-lg z-50">
+                    <h3 class="text-red-400 font-bold mb-2">🔧 ADMIN CACHE TOOLS</h3>
+                    <div class="space-y-2">
+                        <button onclick="clearSurvivorCache()" class="w-full bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-500">
+                            🗑️ Clear Cache
+                        </button>
+                        <button onclick="refreshSurvivorData()" class="w-full bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-500">
+                            🔄 Force Refresh
+                        </button>
+                        <button onclick="hideAdminTools()" class="w-full bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-500">
+                            ❌ Hide
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', adminToolsHTML);
+        }
+
+        // Clear cache and force refresh
+        window.clearSurvivorCache = async function() {
+            try {
+                const cacheRef = window.doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-survivor-display');
+                await window.deleteDoc(cacheRef);
+                console.log('🗑️ Cache cleared - forcing fresh data load...');
+                location.reload(); // Reload page to get fresh data
+            } catch (error) {
+                console.error('❌ Error clearing cache:', error);
+                alert('Error clearing cache: ' + error.message);
+            }
+        };
+
+        // Force refresh without cache
+        window.refreshSurvivorData = async function() {
+            try {
+                // Skip cache and force fresh load
+                console.log('🔄 Forcing fresh survivor data load...');
+                document.getElementById('loading').classList.remove('hidden');
+                document.getElementById('stats').classList.add('hidden');
+                document.getElementById('survivor-table').classList.add('hidden');
+
+                const response = await fetch('https://getsurvivorpooldata-np7uealtnq-uc.a.run.app');
+                const result = await response.json();
+
+                if (result.success) {
+                    await processSurvivorData(result);
+                    // Update cache with new data
+                    await saveCachedSurvivorHTML(document.body.innerHTML);
+                    console.log('✅ Fresh data loaded and cached');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('❌ Error refreshing data:', error);
+                showError(error.message);
+            }
+        };
+
+        // Hide admin tools
+        window.hideAdminTools = function() {
+            const adminTools = document.getElementById('admin-tools');
+            if (adminTools) adminTools.remove();
+        };
 
         // Make loadSurvivorData globally accessible
         window.loadSurvivorData = loadSurvivorData;

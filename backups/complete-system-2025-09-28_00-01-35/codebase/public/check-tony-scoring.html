@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tony Scoring Check - WORKING VERSION</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Tony Scoring Check - Direct Access</h1>
+    <button onclick="checkTonyScoring()" style="background: red; color: white; padding: 15px;">🏆 CHECK TONY'S SCORING DATA</button>
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function checkTonyScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔐 Authenticating and checking Tony scoring...</p>';
+
+            try {
+                await autoLogin();
+
+                let results = '<h2>🏆 Tony Scoring Data Check</h2>';
+                console.log('🏆 TONY-SCORING-CHECK-STARTING');
+
+                const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${tonyUID}`;
+
+                console.log('🔍 CHECKING PATH:', scoringPath);
+
+                // Use EXACT pattern from find-bible-data.html (COPY PASTE)
+                const possiblePaths = [
+                    `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${tonyUID}`,
+                    `artifacts/nerdfootball/scoring-users/${tonyUID}`,
+                    `scoring-users/${tonyUID}`,
+                    `pools/nerduniverse-2025/scoring-users/${tonyUID}`
+                ];
+
+                for (const path of possiblePaths) {
+                    try {
+                        results += `<h3>🔍 Trying path: ${path}</h3>`;
+                        const doc = await firebase.firestore().doc(path).get();
+                        if (doc.exists()) {
+                            const data = doc.data();
+                            results += `<h3 style="color: green;">✅ FOUND TONY'S DATA AT: ${path}</h3>`;
+                            results += `<pre style="background: #f0f0f0; padding: 10px;">${JSON.stringify(data, null, 2)}</pre>`;
+                            console.log(`✅ TONY'S SCORING DATA FOUND AT: ${path}`, data);
+
+                            // Analyze the data structure
+                            if (data.weeklyPoints) {
+                                const weeks = Object.keys(data.weeklyPoints);
+                                results += `<h4>📋 Weeks with data: ${weeks.join(', ')}</h4>`;
+                                let totalPoints = 0;
+                                weeks.forEach(week => {
+                                    const weekData = data.weeklyPoints[week];
+                                    totalPoints += weekData.totalPoints || 0;
+                                    results += `<p><strong>Week ${week}:</strong> ${weekData.totalPoints} points, ${weekData.correctPicks} correct picks</p>`;
+                                });
+                                results += `<h4>🎯 TOTAL SEASON POINTS: ${totalPoints}</h4>`;
+                            }
+
+                            break; // Found it, stop searching
+                        } else {
+                            results += `<p style="color: red;">❌ NOT FOUND: ${path}</p>`;
+                            console.log(`❌ NO TONY DATA AT: ${path}`);
+                        }
+                    } catch (error) {
+                        results += `<p style="color: orange;">⚠️ ERROR ACCESSING: ${path} - ${error.message}</p>`;
+                        console.log(`⚠️ ERROR AT: ${path}`, error);
+                    }
+                }
+
+                // Also check for JSON bible data while we're at it
+                results += '<h3>📖 Checking JSON Bible Data</h3>';
+                try {
+                    const jsonResponse = await fetch('/game-data/nfl_2025_week_1.json');
+                    if (jsonResponse.ok) {
+                        const jsonData = await jsonResponse.json();
+                        results += '<p style="color: green;">✅ JSON Bible Data accessible</p>';
+                        results += `<p>Week 1 games found: ${Object.keys(jsonData).filter(k => k !== '_metadata').length}</p>`;
+                    } else {
+                        results += '<p style="color: red;">❌ JSON Bible Data not accessible</p>';
+                    }
+                } catch (jsonError) {
+                    results += `<p style="color: red;">❌ JSON Error: ${jsonError.message}</p>`;
+                }
+
+                output.innerHTML = results;
+                console.log('🏆 TONY-SCORING-CHECK-COMPLETE');
+
+            } catch (error) {
+                console.error('❌ TONY-SCORING-ERROR:', error);
+                output.innerHTML = `<h2>❌ Check Failed</h2><p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

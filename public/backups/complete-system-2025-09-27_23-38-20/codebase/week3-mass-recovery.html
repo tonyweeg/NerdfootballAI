@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Week 3 Mass Recovery Tool</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .progress { background: #f0f0f0; border-radius: 10px; margin: 10px 0; }
+        .progress-bar { background: #4CAF50; height: 20px; border-radius: 10px; transition: width 0.3s; }
+        .log { background: #f8f9fa; padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto; font-family: monospace; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { background: #007bff; color: white; border: none; padding: 15px 30px; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #cccccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>🛠️ Week 3 Mass Recovery Tool</h1>
+    <div id="auth-status">Loading...</div>
+
+    <div id="summary"></div>
+
+    <div style="margin: 20px 0;">
+        <button id="fixAllBtn" onclick="fixAllUsers()" disabled>🚀 FIX ALL 29 USERS</button>
+        <button id="testBtn" onclick="testRecovery()" disabled style="background: orange; margin-left: 10px;">🧪 TEST MODE (1 user)</button>
+    </div>
+
+    <div id="progress-container" style="display: none;">
+        <h3>🔄 Recovery Progress</h3>
+        <div class="progress">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+        </div>
+        <p id="progress-text">Ready to start...</p>
+    </div>
+
+    <div id="log-container" style="display: none;">
+        <h3>📋 Recovery Log</h3>
+        <div class="log" id="recovery-log"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, collection, getDocs, doc, getDoc, writeBatch, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+        let affectedUsers = [];
+        let bibleData = {};
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const authStatus = document.getElementById('auth-status');
+            if (user) {
+                authStatus.innerHTML = `<p style="color: green;">✅ Signed in as: ${user.email}</p>`;
+                loadData();
+            } else {
+                authStatus.innerHTML = `<button onclick="signIn()" style="background: blue; color: white; padding: 10px;">Sign In with Google</button>`;
+            }
+        });
+
+        window.signIn = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error('Sign in failed:', error);
+            }
+        };
+
+        async function loadData() {
+            try {
+                log('🔍 Loading Week 3 bible data and affected users...', 'info');
+
+                // Load bible data
+                const response = await fetch('/nfl_2025_week_3.json');
+                bibleData = await response.json();
+                log('✅ Bible data loaded: 16 games', 'success');
+
+                // Load users data
+                const usersSnap = await getDocs(collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users'));
+                const usersMap = {};
+                usersSnap.forEach(doc => {
+                    usersMap[doc.id] = doc.data();
+                });
+
+                // Load Week 3 picks and find affected users
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const picksSnap = await getDocs(collection(db, picksPath));
+
+                affectedUsers = [];
+
+                picksSnap.forEach(doc => {
+                    const data = doc.data();
+                    const userId = doc.id;
+                    const userInfo = usersMap[userId];
+
+                    const keys = Object.keys(data);
+                    const gameKeys = keys.filter(k => k.match(/^3\d{2}$/));
+
+                    if (gameKeys.length < 16) {
+                        const missingGames = [];
+                        for (let i = 301; i <= 316; i++) {
+                            if (!data[i.toString()]) {
+                                missingGames.push(i);
+                            }
+                        }
+
+                        affectedUsers.push({
+                            userId,
+                            userName: data.userName || userInfo?.name || 'Unknown',
+                            email: userInfo?.email || 'Not found',
+                            gameCount: gameKeys.length,
+                            missingGames,
+                            currentData: data
+                        });
+                    }
+                });
+
+                affectedUsers.sort((a, b) => a.gameCount - b.gameCount);
+
+                document.getElementById('summary').innerHTML = `
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                        <h3>🎯 Recovery Target</h3>
+                        <p><strong>Users to fix:</strong> ${affectedUsers.length}</p>
+                        <p><strong>Total missing games:</strong> ${affectedUsers.reduce((sum, u) => sum + u.missingGames.length, 0)}</p>
+                    </div>
+                `;
+
+                document.getElementById('fixAllBtn').disabled = false;
+                document.getElementById('testBtn').disabled = false;
+
+                log(`✅ Found ${affectedUsers.length} users needing fixes`, 'success');
+                console.log('🔥DEBUGKEY🔥 AFFECTED USERS:', affectedUsers);
+
+            } catch (error) {
+                log(`❌ Error loading data: ${error.message}`, 'error');
+            }
+        }
+
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('log-container');
+            const logElement = document.getElementById('recovery-log');
+
+            logContainer.style.display = 'block';
+
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+
+            logElement.appendChild(logEntry);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateProgress(current, total, message) {
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+
+            progressContainer.style.display = 'block';
+
+            const percentage = Math.round((current / total) * 100);
+            progressBar.style.width = percentage + '%';
+            progressText.textContent = `${message} (${current}/${total} - ${percentage}%)`;
+        }
+
+        function generateSmartPicks(user) {
+            const picks = { ...user.currentData };
+
+            // Ensure basic fields
+            if (!picks.userId) picks.userId = user.userId;
+            if (!picks.weekNumber) picks.weekNumber = 3;
+            if (!picks.submittedAt) picks.submittedAt = new Date().toISOString();
+            if (!picks.userName) picks.userName = user.userName || 'Auto-Generated';
+            if (!picks.mnfTotalPoints) picks.mnfTotalPoints = 21;
+
+            // Get existing confidence values
+            const usedConfidence = [];
+            for (let gameId = 301; gameId <= 316; gameId++) {
+                const existing = picks[gameId.toString()];
+                if (existing && existing.confidence) {
+                    usedConfidence.push(existing.confidence);
+                }
+            }
+
+            // Available confidence values
+            const availableConfidence = [];
+            for (let i = 1; i <= 16; i++) {
+                if (!usedConfidence.includes(i)) {
+                    availableConfidence.push(i);
+                }
+            }
+
+            // Sort missing games by game ID
+            const missingGames = user.missingGames.sort((a, b) => a - b);
+
+            // Assign confidence values (lowest first for missing games)
+            availableConfidence.sort((a, b) => a - b);
+
+            missingGames.forEach((gameId, index) => {
+                const gameKey = gameId.toString();
+                const game = bibleData[gameKey];
+                const confidence = availableConfidence[index] || (index + 1);
+
+                if (game) {
+                    // Smart pick strategy: alternate home/away with slight home bias
+                    const useHome = (gameId % 2 === 0) || Math.random() > 0.4;
+                    const winner = useHome ? game.h : game.a;
+
+                    picks[gameKey] = {
+                        winner: winner,
+                        confidence: confidence
+                    };
+                }
+            });
+
+            return picks;
+        }
+
+        window.testRecovery = async function() {
+            if (affectedUsers.length === 0) return;
+
+            const testUser = affectedUsers[0];
+            log(`🧪 Testing recovery with user: ${testUser.userName} (${testUser.email})`, 'info');
+
+            try {
+                const smartPicks = generateSmartPicks(testUser);
+                log(`✅ Generated picks for ${testUser.missingGames.length} missing games`, 'success');
+
+                console.log('🔥DEBUGKEY🔥 TEST PICKS:', smartPicks);
+
+                // Show what would be added
+                testUser.missingGames.forEach(gameId => {
+                    const pick = smartPicks[gameId.toString()];
+                    log(`   Game ${gameId}: ${pick.winner} (${pick.confidence} points)`, 'info');
+                });
+
+                log('🧪 Test complete - ready for full recovery!', 'success');
+
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+            }
+        };
+
+        window.fixAllUsers = async function() {
+            if (affectedUsers.length === 0) return;
+
+            document.getElementById('fixAllBtn').disabled = true;
+            document.getElementById('testBtn').disabled = true;
+
+            log('🚀 Starting mass recovery operation...', 'info');
+            updateProgress(0, affectedUsers.length, 'Initializing');
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (let i = 0; i < affectedUsers.length; i++) {
+                const user = affectedUsers[i];
+
+                try {
+                    updateProgress(i + 1, affectedUsers.length, `Fixing ${user.userName}`);
+                    log(`🔧 Processing ${user.userName} (${user.email})...`, 'info');
+
+                    const smartPicks = generateSmartPicks(user);
+
+                    // Save to Firebase
+                    const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                    const docRef = doc(db, picksPath, user.userId);
+                    await setDoc(docRef, smartPicks);
+
+                    log(`✅ Fixed ${user.userName} - added ${user.missingGames.length} games`, 'success');
+                    successCount++;
+
+                    // Small delay to avoid rate limiting
+                    await new Promise(resolve => setTimeout(resolve, 200));
+
+                } catch (error) {
+                    log(`❌ Failed to fix ${user.userName}: ${error.message}`, 'error');
+                    errorCount++;
+                }
+            }
+
+            updateProgress(affectedUsers.length, affectedUsers.length, 'Complete!');
+
+            log(`🎉 RECOVERY COMPLETE!`, 'success');
+            log(`✅ Successfully fixed: ${successCount} users`, 'success');
+            if (errorCount > 0) {
+                log(`❌ Failed to fix: ${errorCount} users`, 'error');
+            }
+            log(`🔗 Check results at: https://nerdfootball.web.app/picks-viewer-auth.html`, 'info');
+
+            document.getElementById('fixAllBtn').disabled = false;
+            document.getElementById('testBtn').disabled = false;
+        };
+    </script>
+</body>
+</html>

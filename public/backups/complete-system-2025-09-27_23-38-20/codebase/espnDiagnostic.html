@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESPN API Diagnostic Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">ESPN API Diagnostic Dashboard</h1>
+                    <p class="text-gray-600 mt-1">Monitor and test ESPN API integration for NerdFootball</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button id="runDiagnostics" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                        Run Full Diagnostics
+                    </button>
+                    <button id="clearCache" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition">
+                        Clear Cache
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Week Selector -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <label class="text-sm font-medium text-gray-700">Select Week:</label>
+                    <select id="weekSelector" class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                    <button id="loadWeekData" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                        Load Week Data
+                    </button>
+                </div>
+                <div class="text-sm text-gray-600">
+                    <span>Viewing: </span>
+                    <span id="viewingWeek" class="font-semibold">Current Week</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div id="apiStatus" class="w-3 h-3 rounded-full bg-gray-400"></div>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-gray-500">API Status</p>
+                        <p id="apiStatusText" class="text-lg font-semibold text-gray-900">Checking...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <div class="flex items-center">
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-gray-500">Current Week</p>
+                        <p id="currentWeek" class="text-lg font-semibold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <div class="flex items-center">
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-gray-500">Rate Limit</p>
+                        <p id="rateLimit" class="text-lg font-semibold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                <div class="flex items-center">
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-gray-500">Cache Entries</p>
+                        <p id="cacheCount" class="text-lg font-semibold text-gray-900">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- API Tests -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">API Tests</h2>
+                    <span id="testsStatus" class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                        Ready
+                    </span>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="flex space-x-3 mb-4">
+                        <button id="testCurrentWeek" class="bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition">
+                            Test Current Week
+                        </button>
+                        <button id="testSpecificWeek" class="bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition">
+                            Test Week 
+                        </button>
+                        <input id="weekInput" type="number" min="1" max="18" value="1" class="w-16 px-2 py-1 border rounded text-sm">
+                        <button id="testTeams" class="bg-green-600 text-white px-3 py-2 text-sm rounded hover:bg-green-700 transition">
+                            Test Teams
+                        </button>
+                    </div>
+                    
+                    <div id="testResults" class="space-y-2">
+                        <div class="text-gray-500 text-sm">Run tests to see results...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cache Status -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">Cache Status</h2>
+                    <button id="refreshCache" class="text-blue-600 hover:text-blue-700 text-sm">
+                        Refresh
+                    </button>
+                </div>
+                
+                <div id="cacheDetails" class="space-y-2">
+                    <div class="text-gray-500 text-sm">Loading cache information...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Preview -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Data Preview</h2>
+            
+            <div class="mb-4">
+                <label for="dataType" class="block text-sm font-medium text-gray-700 mb-2">Data Type:</label>
+                <select id="dataType" class="border border-gray-300 rounded px-3 py-2">
+                    <option value="currentWeek">Current Week Games</option>
+                    <option value="specificWeek">Specific Week Games</option>
+                    <option value="teams">NFL Teams</option>
+                    <option value="schedule">Full Schedule (Admin)</option>
+                </select>
+            </div>
+            
+            <div class="mb-4">
+                <button id="loadData" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition">
+                    Load Data
+                </button>
+                <button id="downloadData" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition ml-2">
+                    Download JSON
+                </button>
+            </div>
+            
+            <div id="dataPreview" class="bg-gray-100 p-4 rounded max-h-96 overflow-auto">
+                <div class="text-gray-500">Select a data type and click "Load Data" to preview...</div>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-gray-900">Activity Logs</h2>
+                <button id="clearLogs" class="text-red-600 hover:text-red-700 text-sm">
+                    Clear Logs
+                </button>
+            </div>
+            
+            <div id="logs" class="bg-gray-100 p-4 rounded max-h-64 overflow-y-auto font-mono text-sm">
+                <div class="text-gray-500">Activity logs will appear here...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <div class="flex items-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-medium text-gray-900">Loading...</h3>
+                    <p id="loadingMessage" class="text-sm text-gray-500">Please wait</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Configuration -->
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCmTpVTRtCTqKx_Y8K7LEY4mBNqFz2cbYw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.firebasestorage.app",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+            measurementId: "G-8RVRHE3HRC"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        
+        // Enable emulator in development
+        if (window.location.hostname === 'localhost') {
+            firebase.functions().useEmulator("localhost", 5001);
+        }
+    </script>
+
+    <!-- ESPN API Client -->
+    <script src="espnNerdApi.js"></script>
+
+    <!-- Diagnostic Dashboard Script -->
+    <script>
+        class EspnDiagnosticDashboard {
+            constructor() {
+                this.logs = [];
+                this.currentData = null;
+                this.currentWeek = 1;
+                this.selectedWeek = null;
+                this.initializeWeekSelector();
+                this.initializeEventListeners();
+                this.loadInitialStatus();
+            }
+            
+            // Initialize week selector
+            initializeWeekSelector() {
+                // We're in Week 1 of the regular season
+                // For now, only show Week 1 since no future weeks should be shown
+                this.currentWeek = 1; // Week 1 of regular season
+                
+                // Populate week selector
+                const weekSelector = document.getElementById('weekSelector');
+                weekSelector.innerHTML = '';
+                
+                // Add weeks up to current week only (no future weeks)
+                for (let week = 1; week <= this.currentWeek; week++) {
+                    const option = document.createElement('option');
+                    option.value = week;
+                    option.textContent = `Week ${week}${week === this.currentWeek ? ' (Current)' : ''}`;
+                    weekSelector.appendChild(option);
+                }
+                
+                // Set to current week by default
+                weekSelector.value = this.currentWeek;
+                this.selectedWeek = this.currentWeek;
+                document.getElementById('viewingWeek').textContent = `Week ${this.currentWeek}`;
+            }
+
+            // Initialize event listeners
+            initializeEventListeners() {
+                document.getElementById('runDiagnostics').addEventListener('click', () => this.runFullDiagnostics());
+                document.getElementById('clearCache').addEventListener('click', () => this.clearCache());
+                document.getElementById('testCurrentWeek').addEventListener('click', () => this.testCurrentWeek());
+                document.getElementById('testSpecificWeek').addEventListener('click', () => this.testSpecificWeek());
+                document.getElementById('testTeams').addEventListener('click', () => this.testTeams());
+                document.getElementById('refreshCache').addEventListener('click', () => this.refreshCacheStatus());
+                document.getElementById('loadData').addEventListener('click', () => this.loadData());
+                document.getElementById('downloadData').addEventListener('click', () => this.downloadData());
+                document.getElementById('clearLogs').addEventListener('click', () => this.clearLogs());
+                
+                // Week selector events
+                document.getElementById('weekSelector').addEventListener('change', (e) => {
+                    this.selectedWeek = parseInt(e.target.value);
+                    document.getElementById('viewingWeek').textContent = `Week ${this.selectedWeek}`;
+                });
+                
+                document.getElementById('loadWeekData').addEventListener('click', () => {
+                    this.loadWeekData(this.selectedWeek);
+                });
+            }
+
+            // Load initial status
+            async loadInitialStatus() {
+                this.log('Dashboard initialized');
+                await this.updateStatus();
+                this.refreshCacheStatus();
+                // Load current week data by default
+                await this.loadWeekData(this.currentWeek);
+            }
+
+            // Add log entry
+            log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = { timestamp, message, type };
+                this.logs.push(logEntry);
+                
+                // Keep only last 100 logs
+                if (this.logs.length > 100) {
+                    this.logs = this.logs.slice(-100);
+                }
+                
+                this.updateLogsDisplay();
+            }
+
+            // Update logs display
+            updateLogsDisplay() {
+                const logsElement = document.getElementById('logs');
+                const logsHtml = this.logs.map(log => {
+                    const colorClass = log.type === 'error' ? 'text-red-600' : 
+                                     log.type === 'success' ? 'text-green-600' : 
+                                     'text-gray-800';
+                    return `<div class="${colorClass}">[${log.timestamp}] ${log.message}</div>`;
+                }).join('');
+                
+                logsElement.innerHTML = logsHtml || '<div class="text-gray-500">No logs yet...</div>';
+                logsElement.scrollTop = logsElement.scrollHeight;
+            }
+
+            // Clear logs
+            clearLogs() {
+                this.logs = [];
+                this.updateLogsDisplay();
+            }
+
+            // Show/hide loading modal
+            showLoading(message = 'Please wait...') {
+                document.getElementById('loadingMessage').textContent = message;
+                document.getElementById('loadingModal').classList.remove('hidden');
+                document.getElementById('loadingModal').classList.add('flex');
+            }
+
+            hideLoading() {
+                document.getElementById('loadingModal').classList.add('hidden');
+                document.getElementById('loadingModal').classList.remove('flex');
+            }
+
+            // Update status indicators
+            async updateStatus() {
+                try {
+                    const status = await window.espnApi.getApiStatus();
+                    
+                    // API Status
+                    const statusElement = document.getElementById('apiStatus');
+                    const statusTextElement = document.getElementById('apiStatusText');
+                    
+                    if (status.success && status.status === 'online') {
+                        statusElement.className = 'w-3 h-3 rounded-full bg-green-500';
+                        statusTextElement.textContent = 'Online';
+                    } else {
+                        statusElement.className = 'w-3 h-3 rounded-full bg-red-500';
+                        statusTextElement.textContent = 'Offline';
+                    }
+                    
+                    // Current Week
+                    document.getElementById('currentWeek').textContent = status.currentWeek || window.espnApi.getCurrentWeek();
+                    
+                    // Rate Limit
+                    const rateLimit = status.rateLimitRemaining;
+                    document.getElementById('rateLimit').textContent = rateLimit ? `${rateLimit} remaining` : 'Unknown';
+                    
+                } catch (error) {
+                    this.log('Failed to update status: ' + error.message, 'error');
+                    document.getElementById('apiStatus').className = 'w-3 h-3 rounded-full bg-red-500';
+                    document.getElementById('apiStatusText').textContent = 'Error';
+                }
+            }
+
+            // Refresh cache status
+            refreshCacheStatus() {
+                const cacheStats = window.espnApi.getCacheStats();
+                document.getElementById('cacheCount').textContent = cacheStats.totalEntries;
+                
+                const cacheDetailsElement = document.getElementById('cacheDetails');
+                if (cacheStats.totalEntries === 0) {
+                    cacheDetailsElement.innerHTML = '<div class="text-gray-500 text-sm">No cache entries</div>';
+                } else {
+                    const entriesHtml = Object.entries(cacheStats.entries).map(([key, info]) => {
+                        const statusClass = info.expired ? 'text-red-600' : 'text-green-600';
+                        const sizeKb = Math.round(info.size / 1024);
+                        return `
+                            <div class="flex justify-between items-center py-1 border-b border-gray-100">
+                                <span class="text-sm font-medium">${key}</span>
+                                <div class="text-xs">
+                                    <span class="${statusClass}">${info.expired ? 'Expired' : 'Valid'}</span>
+                                    <span class="text-gray-500 ml-2">${info.age}s old</span>
+                                    <span class="text-gray-500 ml-2">${sizeKb}KB</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    cacheDetailsElement.innerHTML = entriesHtml;
+                }
+            }
+
+            // Clear cache
+            clearCache() {
+                window.espnApi.invalidateCache();
+                this.refreshCacheStatus();
+                this.log('Cache cleared', 'success');
+            }
+
+            // Run full diagnostics
+            async runFullDiagnostics() {
+                this.showLoading('Running diagnostics...');
+                document.getElementById('testsStatus').textContent = 'Running...';
+                document.getElementById('testsStatus').className = 'px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800';
+                
+                try {
+                    this.log('Starting full diagnostics');
+                    const results = await window.espnApi.runDiagnostics();
+                    
+                    this.displayTestResults(results.tests);
+                    await this.updateStatus();
+                    this.refreshCacheStatus();
+                    
+                    const successCount = results.tests.filter(t => t.success).length;
+                    const totalCount = results.tests.length;
+                    
+                    if (successCount === totalCount) {
+                        document.getElementById('testsStatus').textContent = 'All Passed';
+                        document.getElementById('testsStatus').className = 'px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800';
+                        this.log(`All ${totalCount} diagnostics passed`, 'success');
+                    } else {
+                        document.getElementById('testsStatus').textContent = `${successCount}/${totalCount} Passed`;
+                        document.getElementById('testsStatus').className = 'px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800';
+                        this.log(`${successCount}/${totalCount} diagnostics passed`, 'error');
+                    }
+                    
+                } catch (error) {
+                    this.log('Diagnostics failed: ' + error.message, 'error');
+                    document.getElementById('testsStatus').textContent = 'Failed';
+                    document.getElementById('testsStatus').className = 'px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800';
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            // Display test results
+            displayTestResults(tests) {
+                const resultsElement = document.getElementById('testResults');
+                const resultsHtml = tests.map(test => {
+                    const statusClass = test.success ? 'text-green-600' : 'text-red-600';
+                    const statusIcon = test.success ? '✓' : '✗';
+                    
+                    return `
+                        <div class="flex items-center justify-between p-2 border border-gray-200 rounded">
+                            <div>
+                                <span class="${statusClass} font-medium">${statusIcon} ${test.name}</span>
+                                ${test.error ? `<div class="text-xs text-red-600 mt-1">${test.error}</div>` : ''}
+                                ${test.data && test.name === 'Current Week Games' ? 
+                                    `<div class="text-xs text-gray-500 mt-1">Week ${test.data.week}: ${test.data.gameCount} games</div>` : ''}
+                                ${test.data && test.name === 'NFL Teams' ? 
+                                    `<div class="text-xs text-gray-500 mt-1">${test.data.teamCount} teams loaded</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                resultsElement.innerHTML = resultsHtml;
+            }
+
+            // Test current week
+            async testCurrentWeek() {
+                this.showLoading('Testing current week games...');
+                try {
+                    const games = await window.espnApi.getCurrentWeekGames(true);
+                    this.log(`Current week test: ${games.length} games loaded`, 'success');
+                    
+                    this.displayTestResults([{
+                        name: 'Current Week Games',
+                        success: true,
+                        data: { week: window.espnApi.getCurrentWeek(), gameCount: games.length }
+                    }]);
+                } catch (error) {
+                    this.log('Current week test failed: ' + error.message, 'error');
+                    this.displayTestResults([{
+                        name: 'Current Week Games',
+                        success: false,
+                        error: error.message
+                    }]);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            // Test specific week
+            async testSpecificWeek() {
+                const week = parseInt(document.getElementById('weekInput').value);
+                this.showLoading(`Testing Week ${week} games...`);
+                
+                try {
+                    const games = await window.espnApi.getWeekGames(week, true);
+                    this.log(`Week ${week} test: ${games.length} games loaded`, 'success');
+                    
+                    this.displayTestResults([{
+                        name: `Week ${week} Games`,
+                        success: true,
+                        data: { week, gameCount: games.length }
+                    }]);
+                } catch (error) {
+                    this.log(`Week ${week} test failed: ` + error.message, 'error');
+                    this.displayTestResults([{
+                        name: `Week ${week} Games`,
+                        success: false,
+                        error: error.message
+                    }]);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            // Test teams
+            async testTeams() {
+                this.showLoading('Testing NFL teams...');
+                try {
+                    const teams = await window.espnApi.getNflTeams(true);
+                    this.log(`Teams test: ${teams.length} teams loaded`, 'success');
+                    
+                    this.displayTestResults([{
+                        name: 'NFL Teams',
+                        success: true,
+                        data: { teamCount: teams.length }
+                    }]);
+                } catch (error) {
+                    this.log('Teams test failed: ' + error.message, 'error');
+                    this.displayTestResults([{
+                        name: 'NFL Teams',
+                        success: false,
+                        error: error.message
+                    }]);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            // Load data for preview
+            // Load data for specific week
+            async loadWeekData(week) {
+                this.log(`Loading data for Week ${week}...`);
+                this.showLoading(`Loading Week ${week} data...`);
+                
+                try {
+                    const data = await window.espnApi.getWeekGames(week);
+                    this.currentData = data;
+                    this.displayData(data);
+                    this.log(`Successfully loaded Week ${week} data: ${data.length} games`, 'success');
+                    this.hideLoading();
+                    
+                    // Update viewing week display
+                    document.getElementById('viewingWeek').textContent = `Week ${week}`;
+                    
+                    // Update test results with game info
+                    const testResults = document.getElementById('testResults');
+                    testResults.innerHTML = `
+                        <div class="p-3 bg-green-50 border border-green-200 rounded">
+                            <p class="text-sm text-green-800">Week ${week}: ${data.length} games loaded</p>
+                            ${data.slice(0, 3).map(game => `
+                                <div class="text-xs text-gray-600 mt-1">
+                                    • ${game.awayTeam} @ ${game.homeTeam}
+                                </div>
+                            `).join('')}
+                            ${data.length > 3 ? `<div class="text-xs text-gray-500 mt-1">...and ${data.length - 3} more</div>` : ''}
+                        </div>
+                    `;
+                } catch (error) {
+                    this.log(`Error loading Week ${week} data: ${error.message}`, 'error');
+                    this.hideLoading();
+                }
+            }
+            
+            async loadData() {
+                const dataType = document.getElementById('dataType').value;
+                this.showLoading('Loading data...');
+                
+                try {
+                    let data;
+                    
+                    switch (dataType) {
+                        case 'currentWeek':
+                            data = await window.espnApi.getCurrentWeekGames();
+                            break;
+                        case 'specificWeek':
+                            const week = parseInt(document.getElementById('weekInput').value) || 1;
+                            data = await window.espnApi.getWeekGames(week);
+                            break;
+                        case 'teams':
+                            data = await window.espnApi.getNflTeams();
+                            break;
+                        case 'schedule':
+                            data = await window.espnApi.fetchSeasonSchedule();
+                            break;
+                        default:
+                            throw new Error('Unknown data type');
+                    }
+                    
+                    this.currentData = data;
+                    this.displayDataPreview(data);
+                    this.log(`Loaded ${dataType} data`, 'success');
+                    
+                } catch (error) {
+                    this.log('Failed to load data: ' + error.message, 'error');
+                    document.getElementById('dataPreview').innerHTML = `<div class="text-red-600">Error: ${error.message}</div>`;
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            // Display data preview
+            displayDataPreview(data) {
+                const previewElement = document.getElementById('dataPreview');
+                const jsonString = JSON.stringify(data, null, 2);
+                previewElement.innerHTML = `<pre class="text-xs overflow-auto">${this.escapeHtml(jsonString)}</pre>`;
+            }
+
+            // Download data as JSON
+            downloadData() {
+                if (!this.currentData) {
+                    this.log('No data to download', 'error');
+                    return;
+                }
+                
+                const dataStr = JSON.stringify(this.currentData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `espn_data_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                this.log('Data downloaded', 'success');
+            }
+
+            // Escape HTML for display
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        }
+
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new EspnDiagnosticDashboard();
+        });
+    </script>
+</body>
+</html>

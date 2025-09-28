@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏈 The Survival Chamber - 36 Degrees</title>
+    <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+    <script>
+        // Suppress Tailwind CDN production warning
+        if (typeof process === 'undefined') {
+            window.process = { env: { NODE_ENV: 'development' } };
+        }
+        if (typeof window !== 'undefined') {
+            window.process = { env: { NODE_ENV: 'production' } };
+        }
+        ['warn', 'error', 'log', 'info'].forEach(method => {
+            const original = console[method];
+            if (original) {
+                console[method] = function(...args) {
+                    const message = args.join(' ');
+                    if (message.includes('tailwindcss.com') ||
+                        message.includes('should not be used in production') ||
+                        message.includes('cdn.tailwindcss.com') ||
+                        message.includes('PostCSS plugin')) {
+                        return; // Block production warnings
+                    }
+                    original.apply(console, args);
+                };
+            }
+        });
+        tailwind.config = {
+            corePlugins: { preflight: true },
+            content: ['./*.html', './*.js']
+        }
+    </script>
+    <style>
+        .survival-glow {
+            box-shadow: 0 0 20px rgba(139, 69, 19, 0.5);
+        }
+        .eliminated {
+            opacity: 0.7;
+            background: linear-gradient(45deg, #1a0000, #330000);
+            border-left: 3px solid #ff0000;
+        }
+        .alive {
+            background: linear-gradient(45deg, #001a00, #003300);
+            border-left: 3px solid #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        }
+        body {
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+        }
+
+        /* Terminal Header Styles */
+        .header-terminal {
+            position: relative;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0, 255, 65, 0.1);
+            z-index: 1000;
+        }
+
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.05;
+            pointer-events: none;
+        }
+
+        .terminal-window {
+            background: rgba(26, 26, 26, 0.95);
+            border: 1px solid #2a2a2a;
+            backdrop-filter: blur(10px);
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .neon-button {
+            background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+        }
+
+        .neon-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .neon-button:hover::before {
+            left: 100%;
+        }
+
+        .neon-button:hover {
+            background: linear-gradient(45deg, #2a2a2a, #3a3a3a);
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.3),
+                inset 0 0 20px rgba(0, 255, 65, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .command-line::before {
+            content: '$ ';
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        /* Terminal color utility classes */
+        .terminal-text { color: #ffffff; }
+        .terminal-accent { color: #00ff41; }
+        .terminal-secondary { color: #00d4ff; }
+        .terminal-danger { color: #ff4757; }
+        .terminal-warning { color: #ffa502; }
+        .terminal-muted { color: #888888; }
+        .terminal-bg { background: #0a0a0a; }
+        .terminal-surface { background: #1a1a1a; }
+        .terminal-border { border-color: #2a2a2a; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Matrix Background Effect -->
+    <canvas id="matrix-bg" class="matrix-bg"></canvas>
+
+    <!-- Header - Linux Terminal Style -->
+    <header class="header-terminal">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <!-- Logo and title - left aligned -->
+                <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 md:h-10 w-auto">
+                    <h1 class="text-3xl md:text-4xl font-bold terminal-text glow-text">NerdfootballAI</h1>
+                </a>
+                <!-- Right side elements -->
+                <div class="flex items-center space-x-4">
+                    <!-- Status Indicators -->
+                    <div class="flex items-center space-x-2">
+                        <!-- Game Update Indicator -->
+                        <div id="game-update-indicator" class="hidden opacity-0 transition-opacity duration-500" title="Game Updated">
+                            <span class="text-lg terminal-text">🏈</span>
+                            <div class="live-game-data mt-1 space-y-0.5 text-xs terminal-muted"></div>
+                        </div>
+                        <!-- Cache Status Indicator -->
+                        <div id="cache-status-indicator" class="relative group" title="Cache Status">
+                            <div id="cache-status-glyph" class="w-3 h-3 rounded-full bg-terminal-accent animate-pulse cursor-pointer refreshing shadow-lg shadow-terminal-accent/30"></div>
+                            <div class="absolute right-0 mt-2 w-48 bg-terminal-surface text-terminal-text text-xs rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-terminal-border">
+                                <div id="cache-status-tooltip">Refreshing cache...</div>
+                            </div>
+                        </div>
+
+                        <!-- Theme Variant Toggle -->
+                        <button id="theme-variant-toggle" class="ml-2 p-1 rounded bg-opacity-20 hover:bg-opacity-30 transition-all duration-200 text-sm terminal-text" title="Toggle Light/Dark Variant" style="display: none;">
+                            🌙
+                        </button>
+                    </div>
+                    <span class="text-sm font-medium terminal-secondary glow-text">v3.0</span>
+                    <div class="flex items-center space-x-2 relative">
+                        <span id="user-display" class="text-sm font-medium terminal-text command-line">Welcome, User</span>
+
+                        <!-- Logout Button -->
+                        <button id="main-logout-btn" onclick="handleLogout()" class="neon-button px-3 py-1 text-xs rounded-md hover:bg-terminal-danger/20 transition-all duration-200 flex items-center space-x-1">
+                            <span>🚪</span>
+                            <span>Logout</span>
+                        </button>
+
+                        <!-- Hamburger Menu - Terminal Style -->
+                        <button id="menu-btn" class="neon-button p-2 rounded-md">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
+                        </button>
+                        <div id="menu-panel" class="absolute top-full right-0 mt-2 w-64 terminal-window rounded-md shadow-2xl hidden" style="z-index: 9999;">
+                            <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                <!-- Main Features Only -->
+                                <a href="./nerd-universe-grid.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200 bg-terminal-accent/20 border-l-4 border-terminal-accent" role="menuitem">
+                                    <span class="text-lg">📊</span>
+                                    <span class="font-semibold">Picks Grid</span>
+                                </a>
+                                <a href="./index.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🎯</span>
+                                    <span>Make Picks</span>
+                                </a>
+                                <a href="./nerdSurvivor.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🏈</span>
+                                    <span>Survivor Pool</span>
+                                </a>
+                                <a href="./the-survival-chamber-36-degrees.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200 bg-terminal-danger/20 border-l-4 border-yellow-400" role="menuitem">
+                                    <span class="text-lg">⚔️</span>
+                                    <span>The 36 Chambers</span>
+                                </a>
+                                <a href="./leaderboard.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🏆</span>
+                                    <span>Season Leaderboard</span>
+                                </a>
+                                <a href="./weekly-leaderboard.html" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🎮</span>
+                                    <span>Weekly Leaderboard</span>
+                                </a>
+
+                                <!-- Account Section -->
+                                <div class="border-t border-terminal-border my-1"></div>
+                                <button id="logout-btn" onclick="handleLogout()" class="w-full text-left block px-4 py-2 text-sm terminal-text hover:bg-terminal-surface/50 hover:bg-terminal-danger/20 flex items-center space-x-2 transition-all duration-200" role="menuitem">
+                                    <span class="text-lg">🚪</span>
+                                    <span>Logout</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-6xl font-bold mb-4 text-yellow-400 tracking-wider" style="text-shadow: 2px 2px 4px #000, 0 0 10px #ff6600;">
+                ⚔️ THE 36 CHAMBERS ⚔️
+            </h1>
+            <h2 class="text-3xl font-bold text-red-500 mb-2" style="text-shadow: 1px 1px 2px #000;">
+                🗡️ DEATH BEFORE DISHONOR 🗡️
+            </h2>
+            <p class="text-orange-300 text-xl font-medium">Enter the Wu... But Few Survive</p>
+            <p class="text-gray-400 mt-2">🐉 Protect Ya Neck - Week 3 Results 🐉</p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="text-center">
+            <div class="text-xl">❄️ Freezing survivor data...</div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="text-center text-red-500 hidden">
+            <div class="text-xl">🔥 Chamber malfunction detected!</div>
+            <div id="error-message" class="mt-2"></div>
+        </div>
+
+        <!-- Survivor Pool Stats -->
+        <div id="stats" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 hidden">
+            <div class="bg-black p-6 rounded-lg text-center" style="background: linear-gradient(45deg, #001100, #003300); box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);">
+                <div class="text-4xl font-bold text-green-400" id="alive-count">-</div>
+                <div class="text-sm text-green-300 font-semibold">🐉 SURVIVORS</div>
+            </div>
+            <div class="bg-black p-6 rounded-lg text-center" style="background: linear-gradient(45deg, #220000, #440000); box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);">
+                <div class="text-4xl font-bold text-red-400" id="eliminated-count">-</div>
+                <div class="text-sm text-red-300 font-semibold">☠️ FALLEN WARRIORS</div>
+            </div>
+            <div class="bg-black p-6 rounded-lg text-center" style="background: linear-gradient(45deg, #221100, #443300); box-shadow: 0 0 20px rgba(255, 165, 0, 0.3);">
+                <div class="text-4xl font-bold text-orange-400" id="total-count">-</div>
+                <div class="text-sm text-orange-300 font-semibold">⚔️ ENTERED THE WU</div>
+            </div>
+        </div>
+
+
+        <!-- Current Week Picks (shown when games have started) -->
+        <div id="current-week-picks" class="mb-8 hidden">
+            <div class="bg-black p-6 rounded-lg" style="background: linear-gradient(45deg, #1a1000, #2a2000); border: 2px solid #FFD700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);">
+                <h3 class="text-2xl font-bold text-yellow-400 mb-4" style="text-shadow: 1px 1px 2px #000;">
+                    ⚔️ Week <span id="current-week-number">4</span> Battle Picks
+                </h3>
+                <p class="text-yellow-300 mb-4">
+                    <span id="current-picks-count">0</span> Alive Survivors have entered the chamber...
+                </p>
+                <div id="current-picks-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Current week picks will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Survivor Table -->
+        <div id="survivor-table" class="hidden">
+            <div class="bg-gray-800 rounded-lg overflow-hidden survival-glow">
+                <div class="bg-black px-6 py-4" style="background: linear-gradient(45deg, #1a0000, #330000);">
+                    <h3 class="text-2xl font-bold text-yellow-400" style="text-shadow: 1px 1px 2px #000;">
+                        ⚔️ THE FALLEN & THE SURVIVORS ⚔️
+                    </h3>
+                    <p class="text-red-400 text-sm mt-1">Week 3 Battle Results - Only The Strong Survive</p>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-black" style="background: linear-gradient(45deg, #1a1a00, #2d2d00);">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-yellow-400 font-bold">🥷 WARRIOR</th>
+                                <th class="px-4 py-3 text-left text-yellow-400 font-bold">⚔️ WEAPON OF CHOICE</th>
+                                <th class="px-4 py-3 text-left text-yellow-400 font-bold">☯️ FATE</th>
+                                <th class="px-4 py-3 text-left text-yellow-400 font-bold">🌡️ LIFE FORCE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="survivor-body">
+                            <!-- Dynamic survivor data -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make Firebase functions available globally for use in other functions
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.deleteDoc = deleteDoc;
+
+        let survivorsData = [];
+        let currentUser = null;
+
+        // Make signOut available globally for logout functionality
+        window.signOut = signOut;
+
+        // Admin UIDs (same as other pages)
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
+            'CX0etIyJbGg33nmHCo4eezPWrsr2',
+            'sm17z8ovI8NAGmyQvogD86lIurr1',
+            'dN91P1yGG4YBttxeGWmpAM2xhl22'
+        ];
+
+        // Authentication check
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const userDisplay = document.getElementById('user-display');
+
+            if (user) {
+                console.log('🔐 User authenticated:', user.email);
+                const isAdmin = ADMIN_UIDS.includes(user.uid);
+                userDisplay.textContent = `${user.email}`;
+                userDisplay.classList.add('terminal-accent');
+
+                // Store current user globally for admin checks
+                window.currentUser = user;
+
+                // Show admin tools if user is admin
+
+                loadSurvivorData();
+            } else {
+                console.log('🚫 User not authenticated - redirecting to login');
+                userDisplay.textContent = 'Not signed in';
+                userDisplay.classList.add('terminal-danger');
+                // Redirect to main page for authentication
+                window.location.href = '/';
+            }
+        });
+
+        // Convert team names to ESPN abbreviations for helmet URLs
+        function getTeamAbbreviation(teamName) {
+            const teamAbbreviations = {
+                'Arizona Cardinals': 'ARI',
+                'Atlanta Falcons': 'ATL',
+                'Baltimore Ravens': 'BAL',
+                'Buffalo Bills': 'BUF',
+                'Carolina Panthers': 'CAR',
+                'Chicago Bears': 'CHI',
+                'Cincinnati Bengals': 'CIN',
+                'Cleveland Browns': 'CLE',
+                'Dallas Cowboys': 'DAL',
+                'Denver Broncos': 'DEN',
+                'Detroit Lions': 'DET',
+                'Green Bay Packers': 'GB',
+                'Houston Texans': 'HOU',
+                'Indianapolis Colts': 'IND',
+                'Jacksonville Jaguars': 'JAX',
+                'Kansas City Chiefs': 'KC',
+                'Las Vegas Raiders': 'LV',
+                'Los Angeles Chargers': 'LAC',
+                'Los Angeles Rams': 'LAR',
+                'Miami Dolphins': 'MIA',
+                'Minnesota Vikings': 'MIN',
+                'New England Patriots': 'NE',
+                'New Orleans Saints': 'NO',
+                'New York Giants': 'NYG',
+                'New York Jets': 'NYJ',
+                'Philadelphia Eagles': 'PHI',
+                'Pittsburgh Steelers': 'PIT',
+                'San Francisco 49ers': 'SF',
+                'Seattle Seahawks': 'SEA',
+                'Tampa Bay Buccaneers': 'TB',
+                'Tennessee Titans': 'TEN',
+                'Washington Commanders': 'WSH'
+            };
+            return teamAbbreviations[teamName] || 'NFL';
+        }
+
+        // Get current NFL week number
+        function getCurrentWeekNumber() {
+            const seasonStart = new Date('2025-09-04'); // Week 1 starts Sept 4, 2025
+            const now = new Date();
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        async function loadCurrentWeekPicks() {
+            const currentWeek = getCurrentWeekNumber();
+            console.log(`🔍 Checking current week ${currentWeek} for started games in Firestore...`);
+
+            try {
+                // Check live game status from Firestore (where nerd-game-updater updates)
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesRef = window.doc(window.db, gamesPath);
+                const gamesSnap = await window.getDoc(gamesRef);
+
+                if (!gamesSnap.exists()) {
+                    console.log(`❌ No game data found in Firestore for week ${currentWeek}`);
+                    return;
+                }
+
+                const gamesData = gamesSnap.data();
+                const games = Object.entries(gamesData)
+                    .filter(([key]) => !key.startsWith('_'))
+                    .map(([id, game]) => ({ id, ...game }));
+
+                console.log(`📊 Found ${games.length} games in Firestore for week ${currentWeek}`);
+
+                // Check if any games have started (using actual status values)
+                const hasStartedGames = games.some(game => {
+                    const status = game.status || 'scheduled';
+                    const started = status === 'IN_PROGRESS' ||
+                                   status === 'STATUS_FINAL' ||
+                                   status === 'FINAL' ||
+                                   status === 'FINAL/OT' ||
+                                   status === 'HALFTIME';
+
+                    if (started) {
+                        console.log(`🎯 Game ${game.id} has started: ${status}`);
+                    }
+                    return started;
+                });
+
+                if (!hasStartedGames) {
+                    console.log(`⏸️ No games started yet for week ${currentWeek}`);
+                    return;
+                }
+
+                console.log(`🎯 Games have started! Loading current week ${currentWeek} picks...`);
+
+                // Load current week picks for alive survivors
+                const aliveUIDs = survivorsData
+                    .filter(s => s.status === 'ALIVE')
+                    .map(s => s.userId);
+
+                console.log(`👥 Found ${aliveUIDs.length} alive survivors:`, aliveUIDs);
+
+                // Load picks for alive survivors
+                for (const userId of aliveUIDs) {
+                    try {
+                        const picksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
+                        console.log(`🔍 Loading picks for ${userId} from: ${picksPath}`);
+                        const userPicksDoc = await window.getDoc(window.doc(window.db, picksPath));
+
+                        if (userPicksDoc.exists()) {
+                            const pickData = userPicksDoc.data();
+                            console.log(`📋 Pick data for ${userId}:`, Object.keys(pickData));
+
+                            // Week 4 picks are under pickData.picks[currentWeek], not pickData[currentWeek]
+                            const picks = pickData.picks || {};
+                            const currentWeekPick = picks[currentWeek];
+
+                            if (currentWeekPick) {
+                                console.log(`🎯 Week ${currentWeek} pick found:`, currentWeekPick);
+                                if (currentWeekPick.team) {
+                                    // Find the survivor in our data and add current week pick
+                                    const survivorIndex = survivorsData.findIndex(s => s.userId === userId);
+                                    if (survivorIndex !== -1) {
+                                        survivorsData[survivorIndex].currentWeekPick = {
+                                            team: currentWeekPick.team,
+                                            week: currentWeek
+                                        };
+                                        console.log(`✅ Added Week ${currentWeek} pick for ${survivorsData[survivorIndex].name}: ${currentWeekPick.team}`);
+                                    }
+                                } else {
+                                    console.log(`⚠️ Week ${currentWeek} pick missing team:`, currentWeekPick);
+                                }
+                            } else {
+                                console.log(`❌ No Week ${currentWeek} pick found for ${userId}`);
+                            }
+                        } else {
+                            console.log(`❌ No pick document found for ${userId}`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error loading picks for ${userId}:`, error);
+                    }
+                }
+
+            } catch (error) {
+                console.error('❌ Error checking current week games:', error);
+            }
+        }
+
+        // Firebase JSON cache configuration for survivor data
+        // Simple cache: save HTML data and created date
+        async function loadCachedSurvivorHTML() {
+            try {
+                const cacheRef = window.doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-survivor-display');
+                const cacheDoc = await window.getDoc(cacheRef);
+
+                if (!cacheDoc.exists()) return null;
+
+                const data = cacheDoc.data();
+                const cacheTime = new Date(data['created-date']).getTime();
+                const now = Date.now();
+                const ageMinutes = Math.round((now - cacheTime) / 60000);
+
+                console.log('🔥 Using cached survivor HTML (age: ' + ageMinutes + ' minutes) - cache never expires, only refreshes when games finish');
+                return data.html;
+
+            } catch (error) {
+                console.error('Cache error:', error);
+                return null;
+            }
+        }
+
+        async function saveCachedSurvivorHTML(htmlContent) {
+            try {
+                const cacheRef = window.doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-survivor-display');
+                await window.setDoc(cacheRef, {
+                    'created-date': new Date().toISOString(),
+                    'html': htmlContent
+                });
+                console.log('🔥 Saved fresh survivor HTML to cache - will serve instantly until next game completion triggers refresh');
+            } catch (error) {
+                console.error('Cache save error:', error);
+            }
+        }
+
+        async function processSurvivorData(result) {
+            const survivorData = result.data;
+
+            // Process survivor data for display
+            survivorsData = [];
+
+            // Add alive survivors
+            survivorData.alive.forEach(survivor => {
+                const week1Pick = survivor.week1Pick || null;
+                const allWinningPicks = survivor.allWinningPicks || [];
+
+                // Create helmet display for winning picks
+                let winningPicksDisplay = '🚫 No Picks';
+                if (allWinningPicks.length > 0) {
+                    winningPicksDisplay = allWinningPicks.map(pick =>
+                        `<img src="${pick.helmetUrl}" alt="${pick.team}" style="width:32px;height:32px;display:inline-block;margin:1px;" title="Week ${pick.week}: ${pick.team}">`
+                    ).join(' ');
+                } else if (week1Pick) {
+                    winningPicksDisplay = week1Pick; // Fallback to text if no helmet data
+                }
+
+                survivorsData.push({
+                    userId: survivor.userId,
+                    name: survivor.displayName || survivor.name || 'Unknown Survivor',
+                    email: survivor.email || '',
+                    week1Pick: week1Pick,
+                    allWinningPicks: winningPicksDisplay,
+                    status: 'ALIVE',
+                    temperature: allWinningPicks.length > 0 ? '🔥 Warming' : '❄️ No Pick',
+                    isEliminated: false
+                });
+            });
+
+            // Add eliminated survivors
+            survivorData.eliminated.forEach(survivor => {
+                const week1Pick = survivor.week1Pick || null;
+                const allWinningPicks = survivor.allWinningPicks || [];
+
+                // Create helmet display for winning picks (for eliminated survivors too)
+                let winningPicksDisplay = '🚫 No Picks';
+                if (allWinningPicks.length > 0) {
+                    winningPicksDisplay = allWinningPicks.map(pick =>
+                        `<img src="${pick.helmetUrl}" alt="${pick.team}" style="width:32px;height:32px;display:inline-block;margin:1px;" title="Week ${pick.week}: ${pick.team}">`
+                    ).join(' ');
+                } else if (week1Pick) {
+                    winningPicksDisplay = week1Pick; // Fallback to text if no helmet data
+                }
+
+                survivorsData.push({
+                    userId: survivor.userId,
+                    name: survivor.displayName || survivor.name || 'Unknown Survivor',
+                    email: survivor.email || '',
+                    week1Pick: week1Pick,
+                    allWinningPicks: winningPicksDisplay,
+                    status: `ELIMINATED (Week ${survivor.eliminatedWeek})`,
+                    temperature: '🧊 Frozen Solid',
+                    isEliminated: true,
+                    eliminatedBy: survivor.eliminatedBy,
+                    eliminatedWeek: survivor.eliminatedWeek
+                });
+            });
+
+            // Add non-participating members
+            survivorData.nonParticipating.forEach(member => {
+                survivorsData.push({
+                    userId: member.userId,
+                    name: member.displayName || member.name || 'Unknown',
+                    email: member.email || '',
+                    week1Pick: null,
+                    allWinningPicks: '🚫 No Picks',
+                    status: 'NOT_PARTICIPATING',
+                    temperature: '🌡️ Not Entered',
+                    isEliminated: false
+                });
+            });
+
+            // Check for current week picks if any games have started
+            console.log('🔍 About to call loadCurrentWeekPicks()...');
+            try {
+                await loadCurrentWeekPicks();
+                console.log('✅ loadCurrentWeekPicks() completed');
+            } catch (error) {
+                console.error('❌ Error in loadCurrentWeekPicks():', error);
+            }
+
+            displaySurvivorData();
+        }
+
+        async function loadSurvivorData() {
+            try {
+                // Check cache first
+                const cachedHTML = await loadCachedSurvivorHTML();
+                if (cachedHTML) {
+                    // Cache hit - show cached data instantly
+                    document.body.innerHTML = cachedHTML;
+                    return;
+                }
+
+                console.log('🧊 Loading fresh survival chamber data...');
+                const response = await fetch('https://getsurvivorpooldata-np7uealtnq-uc.a.run.app');
+
+                if (!response.ok) {
+                    throw new Error(`Firebase Function error: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to load survivor data');
+                }
+
+                console.log('✅ Survivor data loaded from Firebase Function:', result.data.summary);
+
+                // Process data and display
+                await processSurvivorData(result);
+
+                // Save to cache for next visitor
+                await saveCachedSurvivorHTML(document.body.innerHTML);
+
+            } catch (error) {
+                console.error('❌ Error loading survivor data:', error);
+                showError(error.message);
+            }
+        }
+
+        function displaySurvivorData() {
+            const aliveSurvivors = survivorsData.filter(s => s.status === 'ALIVE');
+            const eliminatedSurvivors = survivorsData.filter(s => s.isEliminated);
+            const nonParticipating = survivorsData.filter(s => s.status === 'NOT_PARTICIPATING');
+
+            // Update stats
+            document.getElementById('alive-count').textContent = aliveSurvivors.length;
+            document.getElementById('eliminated-count').textContent = eliminatedSurvivors.length;
+            document.getElementById('total-count').textContent = survivorsData.length;
+
+            // Sort: alive first (alphabetical), then eliminated (by elimination week), then non-participating
+            const sortedSurvivors = [
+                ...aliveSurvivors.sort((a, b) => a.name.localeCompare(b.name)),
+                ...eliminatedSurvivors.sort((a, b) => {
+                    // Sort by elimination week, then by name
+                    if (a.eliminatedWeek !== b.eliminatedWeek) {
+                        return a.eliminatedWeek - b.eliminatedWeek;
+                    }
+                    return a.name.localeCompare(b.name);
+                }),
+                ...nonParticipating.sort((a, b) => a.name.localeCompare(b.name))
+            ];
+
+            // Generate table rows
+            const tbody = document.getElementById('survivor-body');
+            const tableRows = sortedSurvivors.map(survivor => {
+                let statusClass, statusText, statusIcon;
+
+                if (survivor.status === 'ALIVE') {
+                    statusClass = 'alive';
+                    statusText = '🐉 SHAOLIN SURVIVOR';
+                    statusIcon = '🔥';
+                } else if (survivor.isEliminated) {
+                    statusClass = 'eliminated';
+                    statusText = `☠️ FALLEN WARRIOR`;
+                    statusIcon = '🗡️';
+                } else {
+                    statusClass = 'eliminated';
+                    statusText = '👻 GHOST';
+                    statusIcon = '🌫️';
+                }
+
+                // Show past winning picks + current week pick if games started
+                let picksDisplay = survivor.allWinningPicks || '🚫 No Pick';
+
+                if (survivor.currentWeekPick && survivor.status === 'ALIVE') {
+                    // Get helmet URL for current week pick
+                    const helmetUrl = `https://a.espncdn.com/i/teamlogos/nfl/500/${getTeamAbbreviation(survivor.currentWeekPick.team)}.png`;
+                    const currentPickDisplay = `<img src="${helmetUrl}" alt="${survivor.currentWeekPick.team}" style="width:32px;height:32px;display:inline-block;margin:1px;border:2px solid #FFD700;" title="Week ${survivor.currentWeekPick.week}: ${survivor.currentWeekPick.team} (CURRENT)">`;
+
+                    if (picksDisplay === '🚫 No Pick') {
+                        picksDisplay = currentPickDisplay;
+                    } else {
+                        picksDisplay = picksDisplay + ' ' + currentPickDisplay;
+                    }
+                }
+                const eliminationInfo = survivor.isEliminated ?
+                    ` (Week ${survivor.eliminatedWeek}: ${survivor.eliminatedBy})` : '';
+
+                return `
+                    <tr class="border-b border-gray-600 ${statusClass}">
+                        <td class="px-4 py-3 font-medium">${survivor.name}</td>
+                        <td class="px-4 py-3">${picksDisplay}</td>
+                        <td class="px-4 py-3">${statusText}${eliminationInfo}</td>
+                        <td class="px-4 py-3">${statusIcon} ${survivor.temperature}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.innerHTML = tableRows;
+
+            // Show current week picks if games have started
+            displayCurrentWeekPicks();
+
+            // Show results
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('stats').classList.remove('hidden');
+            document.getElementById('survivor-table').classList.remove('hidden');
+
+            console.log(`✅ Chamber loaded: ${aliveSurvivors.length} alive, ${eliminatedSurvivors.length} eliminated, ${nonParticipating.length} not participating`);
+        }
+
+        function displayCurrentWeekPicks() {
+            const currentWeek = getCurrentWeekNumber();
+
+            // Debug logging
+            const aliveCount = survivorsData.filter(s => s.status === 'ALIVE').length;
+            const aliveWithPicksCount = survivorsData.filter(s => s.status === 'ALIVE' && s.currentWeekPick).length;
+            console.log(`📊 Week ${currentWeek} display: ${aliveCount} alive, ${aliveWithPicksCount} with current picks`);
+
+            const aliveWithCurrentPicks = survivorsData
+                .filter(s => s.status === 'ALIVE' && s.currentWeekPick)
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            const currentPicksContainer = document.getElementById('current-week-picks');
+
+            if (aliveWithCurrentPicks.length === 0) {
+                console.log(`❌ No current week picks to display - hiding container`);
+                currentPicksContainer.style.display = 'none';
+                return;
+            }
+
+            const picksList = aliveWithCurrentPicks.map(survivor => {
+                const helmetUrl = `https://a.espncdn.com/i/teamlogos/nfl/500/${getTeamAbbreviation(survivor.currentWeekPick.team)}.png`;
+                return `
+                    <div class="flex items-center space-x-3 p-3 bg-gray-800 rounded-lg border border-yellow-500" style="background: linear-gradient(45deg, #1a1000, #2a2000);">
+                        <img src="${helmetUrl}" alt="${survivor.currentWeekPick.team}" style="width:32px;height:32px;" />
+                        <div>
+                            <div class="text-yellow-300 font-semibold">${survivor.name}</div>
+                            <div class="text-yellow-500 text-sm">${survivor.currentWeekPick.team}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('current-picks-list').innerHTML = picksList;
+            document.getElementById('current-picks-count').textContent = aliveWithCurrentPicks.length;
+            document.getElementById('current-week-number').textContent = currentWeek;
+            currentPicksContainer.style.display = 'block';
+        }
+
+        function showError(message) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error').classList.remove('hidden');
+            document.getElementById('error-message').textContent = message;
+        }
+
+        // No need for DOMContentLoaded since authentication will trigger loadSurvivorData
+
+        // Header menu functionality (from nerd-universe.html)
+        document.getElementById('menu-btn').addEventListener('click', function() {
+            const menu = document.getElementById('menu-panel');
+            menu.classList.toggle('hidden');
+        });
+
+        // Close menus when clicking outside
+        document.addEventListener('click', function(event) {
+            const menuBtn = document.getElementById('menu-btn');
+            const menuPanel = document.getElementById('menu-panel');
+
+            // Close hamburger menu
+            if (!menuBtn.contains(event.target) && !menuPanel.contains(event.target)) {
+                menuPanel.classList.add('hidden');
+            }
+        });
+
+        // Global logout function for header buttons
+        window.handleLogout = async function() {
+            if (confirm('Are you sure you want to logout?')) {
+                try {
+                    // Close hamburger menu if open
+                    const menuPanel = document.getElementById('menu-panel');
+                    menuPanel.classList.add('hidden');
+
+                    await window.signOut(auth);
+                    window.location.href = './login.html';
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    alert('Error logging out. Please try again.');
+                }
+            }
+        };
+
+        async function showSurvivorCacheStatus() {
+            const container = document.getElementById('survivor-container');
+
+            try {
+                console.log('🔥 SURVIVOR_CACHE_STATUS: Checking cache status...');
+
+                const cacheDoc = await window.getDoc(window.doc(window.db, SURVIVOR_CACHE_CONFIG.cachePath));
+
+                let html = `
+                    <div class="bg-orange-900 border-2 border-orange-400 p-6 rounded-lg mb-6">
+                        <h2 class="text-2xl font-bold text-orange-400 mb-4 text-center">🔥 SURVIVOR CACHE STATUS</h2>
+                `;
+
+                if (!cacheDoc.exists) {
+                    html += `
+                        <div class="bg-red-900 border-2 border-red-400 p-4 rounded text-center">
+                            <div class="text-2xl font-bold text-red-400">❌ NO CACHE FOUND</div>
+                            <div class="text-red-300 mt-2">First visitor will generate fresh data</div>
+                        </div>
+                    `;
+                } else {
+                    const cacheData = cacheDoc.data();
+                    const createdDate = new Date(cacheData.createdDate);
+                    const now = new Date();
+                    const ageMinutes = Math.floor((now - createdDate) / (1000 * 60));
+                    const isValid = SURVIVOR_CACHE_CONFIG.isValid(cacheData.createdDate);
+
+                    html += `
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                            <div class="bg-gray-800 border-2 ${isValid ? 'border-green-400' : 'border-red-400'} p-4 rounded text-center">
+                                <div class="text-2xl font-bold ${isValid ? 'text-green-400' : 'text-red-400'}">
+                                    ${isValid ? '✅ VALID' : '❌ EXPIRED'}
+                                </div>
+                                <div class="text-sm text-gray-300">Cache Status</div>
+                            </div>
+                            <div class="bg-gray-800 border-2 border-orange-400 p-4 rounded text-center">
+                                <div class="text-2xl font-bold text-orange-400">${ageMinutes}m</div>
+                                <div class="text-sm text-gray-300">Age (${SURVIVOR_CACHE_CONFIG.cacheTimeMinutes}m max)</div>
+                            </div>
+                            <div class="bg-gray-800 border-2 border-green-400 p-4 rounded text-center">
+                                <div class="text-2xl font-bold text-green-400">${cacheData.metadata?.totalAlive || 0}</div>
+                                <div class="text-sm text-gray-300">Alive Survivors</div>
+                            </div>
+                            <div class="bg-gray-800 border-2 border-red-400 p-4 rounded text-center">
+                                <div class="text-2xl font-bold text-red-400">${cacheData.metadata?.totalEliminated || 0}</div>
+                                <div class="text-sm text-gray-300">Eliminated</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-800 border-2 border-orange-500 p-4 rounded mb-4">
+                            <h3 class="font-bold text-orange-400 mb-3">📊 Cache Details</h3>
+                            <div class="grid grid-cols-2 gap-4 text-sm text-white">
+                                <div><strong class="text-orange-300">Created:</strong> ${createdDate.toLocaleString()}</div>
+                                <div><strong class="text-orange-300">Week:</strong> ${cacheData.week || 'N/A'}</div>
+                                <div><strong class="text-orange-300">Data Source:</strong> ${cacheData.metadata?.dataSource || 'Unknown'}</div>
+                                <div><strong class="text-orange-300">Non-Participating:</strong> ${cacheData.metadata?.totalNonParticipating || 0}</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-900 border border-orange-600 p-4 rounded">
+                            <h4 class="font-bold text-orange-300 mb-2">🚀 Performance Impact</h4>
+                            <div class="text-sm text-orange-200">
+                                <div>• <strong>Cache Hit:</strong> ~100-300ms load time (99% faster)</div>
+                                <div>• <strong>Cache Miss:</strong> ~2-5 seconds for Firebase Function call</div>
+                                <div>• <strong>Firebase Path:</strong> <code class="bg-gray-800 px-1 rounded">${SURVIVOR_CACHE_CONFIG.cachePath}</code></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `
+                        <div class="text-center mt-4">
+                            <button onclick="clearSurvivorCache()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-500 transition font-bold border-2 border-red-400 mr-2">
+                                🗑️ CLEAR CACHE
+                            </button>
+                            <button onclick="testSurvivorCachePerformance()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-500 transition font-bold border-2 border-green-400 mr-2">
+                                ⚡ TEST PERFORMANCE
+                            </button>
+                            <button onclick="loadSurvivorData()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 transition font-bold border-2 border-blue-400">
+                                🔄 RELOAD DATA
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                container.innerHTML = html;
+
+            } catch (error) {
+                container.innerHTML = `<div class="text-red-600">Error checking cache status: ${error.message}</div>`;
+            }
+        }
+
+        async function clearSurvivorCache() {
+            if (confirm('Clear the Survivor Firebase cache? Next visitor will generate fresh data.')) {
+                try {
+                    await window.deleteDoc(window.doc(window.db, SURVIVOR_CACHE_CONFIG.cachePath));
+                    alert('✅ Survivor cache cleared successfully');
+                    showSurvivorCacheStatus(); // Refresh the display
+                } catch (error) {
+                    alert(`❌ Error clearing cache: ${error.message}`);
+                }
+            }
+        }
+
+        async function testSurvivorCachePerformance() {
+            const startTime = performance.now();
+            console.log('⚡ SURVIVOR_PERFORMANCE_TEST: Starting cache performance test...');
+
+            try {
+                // Test Firebase cache load
+                const cachedData = await loadSurvivorCachedData();
+                const endTime = performance.now();
+                const loadTime = Math.round(endTime - startTime);
+
+                if (cachedData) {
+                    console.log(`⚡ SURVIVOR_PERFORMANCE_TEST: ✅ Cache hit - ${loadTime}ms`);
+                    alert(`🚀 Survivor Cache Performance: ${loadTime}ms (Expected: <300ms)`);
+                } else {
+                    console.log(`⚡ SURVIVOR_PERFORMANCE_TEST: ❌ Cache miss - ${loadTime}ms`);
+                    alert(`⚠️ No cache found - would need fresh Firebase Function call (~2-5 seconds)`);
+                }
+
+            } catch (error) {
+                console.error('⚡ SURVIVOR_PERFORMANCE_TEST: Error:', error);
+                alert(`❌ Performance test failed: ${error.message}`);
+            }
+        }
+
+
+        // Make loadSurvivorData globally accessible
+        window.loadSurvivorData = loadSurvivorData;
+    </script>
+
+    <!-- Matrix Background JavaScript -->
+    <script>
+        // Matrix background effect
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        setCanvasSize();
+        window.addEventListener('resize', setCanvasSize);
+
+        // Matrix characters
+        const matrixChars = '01010101010101010101NERDFOOTBALLAI';
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        const drops = [];
+
+        // Initialize drops
+        for (let i = 0; i < columns; i++) {
+            drops[i] = 1;
+        }
+
+        function drawMatrix() {
+            // Create fading effect
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Set text properties
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.8)';
+            ctx.font = fontSize + 'px monospace';
+
+            // Draw characters
+            for (let i = 0; i < drops.length; i++) {
+                const text = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+                const x = i * fontSize;
+                const y = drops[i] * fontSize;
+
+                ctx.fillText(text, x, y);
+
+                // Reset drop if it reaches bottom or randomly
+                if (y > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+
+                drops[i]++;
+            }
+        }
+
+        // Start animation
+        setInterval(drawMatrix, 50);
+    </script>
+</body>
+</html>

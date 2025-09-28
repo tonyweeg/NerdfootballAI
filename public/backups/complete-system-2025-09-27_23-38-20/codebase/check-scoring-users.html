@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Scoring Users System</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Check Scoring Users System</h1>
+    <div>
+        <button onclick="checkYourScoring()" style="background: blue; color: white; padding: 10px; margin: 5px;">📊 Check Your Scoring Data</button>
+        <button onclick="checkAllUsersScoring()" style="background: green; color: white; padding: 10px; margin: 5px;">🏆 Check All Users Scoring</button>
+        <button onclick="findScoringSystem()" style="background: purple; color: white; padding: 10px; margin: 5px;">🔍 Find Scoring System Code</button>
+    </div>
+    <div id="output"></div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        // Auto-login with Google
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email, 'UID:', user.uid);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function checkYourScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔐 Authenticating and checking your scoring data...</p>';
+
+            try {
+                // Ensure user is authenticated first
+                const user = await autoLogin();
+                const userUID = user.uid;
+
+                let results = `<h2>📊 Your Scoring Data (UID: ${userUID})</h2>`;
+                console.log('📊 CHECKING-USER-SCORING:', userUID);
+
+                // Check the specific scoring-users path
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userUID}`;
+                console.log('🔍 CHECKING PATH:', scoringPath);
+
+                try {
+                    const doc = await firebase.firestore().doc(scoringPath).get();
+
+                    if (doc.exists) {
+                        const scoringData = doc.data();
+                        results += `<h3 style="color: green;">✅ FOUND YOUR SCORING DATA!</h3>`;
+                        results += `<pre style="background: #f0f0f0; padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto;">${JSON.stringify(scoringData, null, 2)}</pre>`;
+                        console.log('✅ SCORING DATA FOUND:', scoringData);
+
+                        // Analyze the structure
+                        results += `<h4>📋 Data Analysis:</h4><ul>`;
+                        if (scoringData.weeklyPoints) {
+                            const weeks = Object.keys(scoringData.weeklyPoints);
+                            results += `<li><strong>Weekly Points Available:</strong> Weeks ${weeks.join(', ')}</li>`;
+
+                            weeks.forEach(week => {
+                                const weekData = scoringData.weeklyPoints[week];
+                                results += `<li><strong>Week ${week}:</strong> ${weekData.totalPoints || 0} points, ${weekData.correctPicks || 0} correct picks</li>`;
+                            });
+                        }
+                        if (scoringData.seasonStats) {
+                            results += `<li><strong>Season Stats:</strong> ${JSON.stringify(scoringData.seasonStats)}</li>`;
+                        }
+                        results += `</ul>`;
+
+                    } else {
+                        results += `<h3 style="color: red;">❌ NO SCORING DATA FOUND</h3>`;
+                        results += `<p>Path checked: <code>${scoringPath}</code></p>`;
+                        console.log('❌ NO SCORING DATA AT:', scoringPath);
+                    }
+
+                } catch (error) {
+                    results += `<h3 style="color: orange;">⚠️ ERROR ACCESSING SCORING DATA</h3>`;
+                    results += `<p>Error: ${error.message}</p>`;
+                    console.error('❌ SCORING ACCESS ERROR:', error);
+                }
+
+                output.innerHTML = results;
+
+            } catch (error) {
+                console.error('❌ CHECK-SCORING-ERROR:', error);
+                output.innerHTML = `<h2>❌ Check Failed</h2><p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function checkAllUsersScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔐 Authenticating and checking all users scoring...</p>';
+
+            try {
+                await autoLogin();
+
+                let results = `<h2>🏆 All Users Scoring Data</h2>`;
+                console.log('🏆 CHECKING-ALL-USERS-SCORING');
+
+                // Check the scoring-users collection
+                const scoringCollectionPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users`;
+                console.log('🔍 CHECKING COLLECTION:', scoringCollectionPath);
+
+                try {
+                    const collectionRef = firebase.firestore().collection(scoringCollectionPath);
+                    const snapshot = await collectionRef.get();
+
+                    if (!snapshot.empty) {
+                        results += `<h3 style="color: green;">✅ FOUND ${snapshot.size} USERS WITH SCORING DATA!</h3>`;
+                        results += `<table border="1" style="border-collapse: collapse; margin: 10px 0;"><tr><th>User UID</th><th>Weeks Available</th><th>Latest Week Points</th><th>Season Total</th></tr>`;
+
+                        snapshot.forEach(doc => {
+                            const userId = doc.id;
+                            const userData = doc.data();
+
+                            let weeksAvailable = 'None';
+                            let latestWeekPoints = 0;
+                            let seasonTotal = 0;
+
+                            if (userData.weeklyPoints) {
+                                const weeks = Object.keys(userData.weeklyPoints);
+                                weeksAvailable = weeks.join(', ');
+
+                                // Get latest week points
+                                const latestWeek = Math.max(...weeks.map(Number));
+                                if (userData.weeklyPoints[latestWeek]) {
+                                    latestWeekPoints = userData.weeklyPoints[latestWeek].totalPoints || 0;
+                                }
+
+                                // Calculate season total
+                                weeks.forEach(week => {
+                                    seasonTotal += userData.weeklyPoints[week].totalPoints || 0;
+                                });
+                            }
+
+                            results += `<tr>
+                                <td>${userId}</td>
+                                <td>${weeksAvailable}</td>
+                                <td>${latestWeekPoints}</td>
+                                <td><strong>${seasonTotal}</strong></td>
+                            </tr>`;
+                        });
+
+                        results += `</table>`;
+                        console.log('✅ ALL USERS SCORING DATA FOUND');
+
+                    } else {
+                        results += `<h3 style="color: red;">❌ NO SCORING DATA COLLECTION FOUND</h3>`;
+                        results += `<p>Collection checked: <code>${scoringCollectionPath}</code></p>`;
+                        console.log('❌ NO SCORING COLLECTION AT:', scoringCollectionPath);
+                    }
+
+                } catch (error) {
+                    results += `<h3 style="color: orange;">⚠️ ERROR ACCESSING SCORING COLLECTION</h3>`;
+                    results += `<p>Error: ${error.message}</p>`;
+                    console.error('❌ SCORING COLLECTION ERROR:', error);
+                }
+
+                output.innerHTML = results;
+
+            } catch (error) {
+                console.error('❌ CHECK-ALL-SCORING-ERROR:', error);
+                output.innerHTML = `<h2>❌ Check Failed</h2><p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function findScoringSystem() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔍 Searching for scoring system code and patterns...</p>';
+
+            let results = `<h2>🔍 Scoring System Analysis</h2>`;
+
+            results += `<h3>📋 Expected Scoring System Patterns:</h3>`;
+            results += `<ul>`;
+            results += `<li><strong>Scoring Users Path:</strong> <code>artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/{uid}</code></li>`;
+            results += `<li><strong>Weekly Points Structure:</strong> <code>weeklyPoints.{weekNumber}.totalPoints</code></li>`;
+            results += `<li><strong>Season Rollup:</strong> Sum all weekly points for season total</li>`;
+            results += `<li><strong>Confidence System:</strong> Points = confidence value for correct picks</li>`;
+            results += `</ul>`;
+
+            results += `<h3>🔍 Files to Search for Scoring Code:</h3>`;
+            results += `<ul>`;
+            results += `<li>ScoringSystemManager.js</li>`;
+            results += `<li>WeeklyLeaderboardGenerator.js</li>`;
+            results += `<li>ScoringCalculator.js</li>`;
+            results += `<li>leaderboard.html</li>`;
+            results += `<li>nerdfootballConfidencePicks.html</li>`;
+            results += `<li>Any files with "scoring" or "leaderboard" in name</li>`;
+            results += `</ul>`;
+
+            results += `<h3>🎯 What We Need to Find:</h3>`;
+            results += `<ul>`;
+            results += `<li>Code that writes to <code>scoring-users/{uid}</code> path</li>`;
+            results += `<li>Functions that calculate confidence points</li>`;
+            results += `<li>Score rollup/aggregation logic</li>`;
+            results += `<li>Weekly scoring update triggers</li>`;
+            results += `</ul>`;
+
+            output.innerHTML = results;
+            console.log('🔍 SCORING SYSTEM ANALYSIS COMPLETE');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Firestore Game Data</title>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(26, 26, 26, 0.95);
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .status {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #00cc34;
+        }
+        .button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+        .progress {
+            background: #333;
+            border-radius: 4px;
+            height: 20px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            background: #00ff41;
+            height: 100%;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .error { color: #ff4444; }
+        .success { color: #44ff44; }
+        .warning { color: #ffff44; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 Firestore Game Data Updater</h1>
+            <p>Update Firestore with corrected game times (-4 hours) from JSON files</p>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <button id="signInBtn" class="button">🔐 Sign In</button>
+            <button id="signOutBtn" class="button" style="display: none;">🚪 Sign Out</button>
+            <button id="updateBtn" class="button" disabled>🚀 Update All Weeks (1-18)</button>
+            <button id="updateWeek4Btn" class="button" disabled>⚡ Update Week 4 Only</button>
+            <button id="fixGamesBtn" class="button" disabled>📚 Fix Games Data (5-18)</button>
+            <button id="fixResultsBtn" class="button" disabled>🔧 Fix Results Data (4-18)</button>
+            <button id="clearBtn" class="button">🧹 Clear Status</button>
+        </div>
+
+        <div class="progress">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="progressText" style="text-align: center; margin-bottom: 1rem;"></div>
+
+        <div id="statusLog" class="status">
+            <div class="success">📡 Ready to update Firestore game data...</div>
+            <div class="warning">⚠️ This will overwrite existing game data in Firestore</div>
+            <div style="color: #888;">📍 Target: /artifacts/nerdfootball/public/data/nerdfootball_games/{week}</div>
+            <div style="color: #888;">📂 Source: /game-data/nfl_2025_week_*.json files</div>
+            <div style="color: #888;">⏰ Time correction: All game times will be reduced by 4 hours</div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUser = null;
+        let isProcessing = false;
+
+        // UI Elements
+        const signInBtn = document.getElementById('signInBtn');
+        const signOutBtn = document.getElementById('signOutBtn');
+        const updateBtn = document.getElementById('updateBtn');
+        const updateWeek4Btn = document.getElementById('updateWeek4Btn');
+        const fixGamesBtn = document.getElementById('fixGamesBtn');
+        const fixResultsBtn = document.getElementById('fixResultsBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusLog = document.getElementById('statusLog');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+
+        // Admin check
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user && ADMIN_UIDS.includes(user.uid)) {
+                log(`✅ Admin authenticated: ${user.email}`, 'success');
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                updateBtn.disabled = false;
+                updateWeek4Btn.disabled = false;
+                fixGamesBtn.disabled = false;
+                fixResultsBtn.disabled = false;
+            } else if (user) {
+                log(`❌ Access denied: ${user.email} is not an admin`, 'error');
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                updateBtn.disabled = true;
+                updateWeek4Btn.disabled = true;
+                fixGamesBtn.disabled = true;
+                fixResultsBtn.disabled = true;
+            } else {
+                log(`🔐 Please sign in as admin to continue`, 'warning');
+                signInBtn.style.display = 'inline-block';
+                signOutBtn.style.display = 'none';
+                updateBtn.disabled = true;
+                updateWeek4Btn.disabled = true;
+                fixGamesBtn.disabled = true;
+                fixResultsBtn.disabled = true;
+            }
+        });
+
+        async function signIn() {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+                log('🔐 Sign in initiated...', 'success');
+            } catch (error) {
+                log(`❌ Sign in failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                log('🚪 Signed out successfully', 'success');
+            } catch (error) {
+                log(`❌ Sign out failed: ${error.message}`, 'error');
+            }
+        }
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : '';
+            statusLog.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            statusLog.scrollTop = statusLog.scrollHeight;
+        }
+
+        function updateProgress(current, total, status = '') {
+            const percentage = (current / total) * 100;
+            progressBar.style.width = `${percentage}%`;
+            progressText.textContent = `${status} (${current}/${total})`;
+        }
+
+        async function loadJsonFile(week) {
+            try {
+                const response = await fetch(`./game-data/nfl_2025_week_${week}.json`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return await response.json();
+            } catch (error) {
+                log(`❌ Failed to load Week ${week}: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        function correctGameTimes(gameData) {
+            const correctedData = { ...gameData };
+
+            for (const gameId in correctedData) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+
+                const game = correctedData[gameId];
+                if (game.dt) {
+                    // Parse the timestamp and subtract 4 hours
+                    const originalTime = new Date(game.dt.replace('Z', ''));
+                    const correctedTime = new Date(originalTime.getTime() - (4 * 60 * 60 * 1000));
+
+                    // Convert back to ISO string with Z
+                    correctedData[gameId].dt = correctedTime.toISOString().replace('.000Z', 'Z');
+
+                    log(`⏰ Game ${gameId}: ${game.dt} → ${correctedData[gameId].dt}`);
+                }
+            }
+
+            return correctedData;
+        }
+
+        async function updateFirestoreWeek(week) {
+            try {
+                log(`📂 Loading Week ${week} from JSON...`);
+                const jsonData = await loadJsonFile(week);
+
+                if (!jsonData) {
+                    return false;
+                }
+
+                log(`⏰ Correcting game times for Week ${week}...`);
+                const correctedData = correctGameTimes(jsonData);
+
+                const gameCount = Object.keys(correctedData).filter(key => !key.startsWith('_')).length;
+                log(`🎯 Week ${week}: ${gameCount} games to upload`);
+
+                // Upload to Firestore
+                const firestorePath = `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`;
+                const docRef = doc(db, firestorePath);
+
+                await setDoc(docRef, correctedData);
+                log(`✅ Week ${week}: Successfully uploaded to Firestore`, 'success');
+
+                return true;
+            } catch (error) {
+                log(`❌ Week ${week}: Upload failed - ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function updateAllWeeks() {
+            if (isProcessing) return;
+
+            isProcessing = true;
+            updateBtn.disabled = true;
+            updateWeek4Btn.disabled = true;
+
+            log(`🚀 Starting full update for Weeks 1-18...`, 'success');
+
+            let successCount = 0;
+            const totalWeeks = 18;
+
+            for (let week = 1; week <= totalWeeks; week++) {
+                updateProgress(week - 1, totalWeeks, `Processing Week ${week}`);
+
+                const success = await updateFirestoreWeek(week);
+                if (success) successCount++;
+
+                // Small delay between updates
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            updateProgress(totalWeeks, totalWeeks, 'Complete!');
+            log(`🎉 Update complete! ${successCount}/${totalWeeks} weeks updated successfully`, 'success');
+
+            isProcessing = false;
+            updateBtn.disabled = false;
+            updateWeek4Btn.disabled = false;
+        }
+
+        async function updateWeek4Only() {
+            if (isProcessing) return;
+
+            isProcessing = true;
+            updateBtn.disabled = true;
+            updateWeek4Btn.disabled = true;
+            fixResultsBtn.disabled = true;
+
+            log(`⚡ Updating Week 4 only...`, 'success');
+            updateProgress(0, 1, 'Processing Week 4');
+
+            const success = await updateFirestoreWeek(4);
+
+            updateProgress(1, 1, success ? 'Complete!' : 'Failed');
+
+            if (success) {
+                log(`✅ Week 4 update complete!`, 'success');
+            } else {
+                log(`❌ Week 4 update failed`, 'error');
+            }
+
+            isProcessing = false;
+            updateBtn.disabled = false;
+            updateWeek4Btn.disabled = false;
+            fixResultsBtn.disabled = false;
+        }
+
+        function createResultsStructure(gameData) {
+            const resultsData = { ...gameData };
+
+            for (const gameId in resultsData) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+
+                const game = resultsData[gameId];
+                // Ensure results structure has the expected fields
+                resultsData[gameId] = {
+                    ...game,
+                    awayScore: game.awayScore || null,
+                    homeScore: game.homeScore || null,
+                    status: game.status || 'scheduled',
+                    winner: game.winner || null,
+                    // Keep original game data
+                    a: game.a,
+                    h: game.h,
+                    dt: game.dt,
+                    stadium: game.stadium || ''
+                };
+            }
+
+            return resultsData;
+        }
+
+        async function fixGamesData() {
+            if (isProcessing) return;
+
+            isProcessing = true;
+            updateBtn.disabled = true;
+            updateWeek4Btn.disabled = true;
+            fixGamesBtn.disabled = true;
+            fixResultsBtn.disabled = true;
+
+            log(`📚 Fixing Games data for Weeks 5-18 from bible JSON files...`, 'success');
+
+            let successCount = 0;
+            const weeksToFix = 14; // Weeks 5-18
+            let currentWeekNum = 5;
+
+            for (let i = 0; i < weeksToFix; i++) {
+                const week = currentWeekNum + i;
+                updateProgress(i, weeksToFix, `Fixing Games Week ${week}`);
+
+                try {
+                    // Load JSON data from bible files
+                    log(`📂 Loading Week ${week} from bible JSON...`);
+                    const jsonData = await loadJsonFile(week);
+
+                    if (!jsonData) {
+                        log(`⚠️ Week ${week}: No bible JSON data found`, 'warning');
+                        continue;
+                    }
+
+                    // Correct game times (-4 hours)
+                    log(`⏰ Correcting game times for Week ${week}...`);
+                    const correctedData = correctGameTimes(jsonData);
+
+                    const gameCount = Object.keys(correctedData).filter(key => !key.startsWith('_')).length;
+                    log(`🎯 Week ${week}: ${gameCount} games from bible JSON`);
+
+                    // Upload to GAMES path (not results)
+                    const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`;
+                    const gamesRef = doc(db, gamesPath);
+
+                    await setDoc(gamesRef, correctedData);
+                    log(`✅ Week ${week}: Games data updated from bible JSON`, 'success');
+                    successCount++;
+
+                } catch (error) {
+                    log(`❌ Week ${week}: Games fix failed - ${error.message}`, 'error');
+                }
+
+                // Small delay between updates
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            updateProgress(weeksToFix, weeksToFix, 'Complete!');
+            log(`🎉 Games fix complete! ${successCount}/${weeksToFix} weeks updated from bible JSON`, 'success');
+
+            isProcessing = false;
+            updateBtn.disabled = false;
+            updateWeek4Btn.disabled = false;
+            fixGamesBtn.disabled = false;
+            fixResultsBtn.disabled = false;
+        }
+
+        async function fixResultsData() {
+            if (isProcessing) return;
+
+            isProcessing = true;
+            updateBtn.disabled = true;
+            updateWeek4Btn.disabled = true;
+            fixGamesBtn.disabled = true;
+            fixResultsBtn.disabled = true;
+
+            log(`🔧 Fixing Results data for Weeks 4-18...`, 'success');
+
+            let successCount = 0;
+            const weeksToFix = 15; // Weeks 4-18
+            let currentWeekNum = 4;
+
+            for (let i = 0; i < weeksToFix; i++) {
+                const week = currentWeekNum + i;
+                updateProgress(i, weeksToFix, `Fixing Results Week ${week}`);
+
+                try {
+                    // Load JSON data for this week
+                    const jsonData = await loadJsonFile(week);
+                    if (!jsonData) {
+                        log(`⚠️ Week ${week}: No JSON data found`, 'warning');
+                        continue;
+                    }
+
+                    // Correct game times
+                    const correctedData = correctGameTimes(jsonData);
+
+                    // Create proper results structure
+                    const resultsData = createResultsStructure(correctedData);
+
+                    // Upload to results path
+                    const resultsPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`;
+                    const resultsRef = doc(db, resultsPath);
+
+                    await setDoc(resultsRef, resultsData);
+                    log(`✅ Week ${week}: Results data fixed successfully`, 'success');
+                    successCount++;
+
+                } catch (error) {
+                    log(`❌ Week ${week}: Results fix failed - ${error.message}`, 'error');
+                }
+
+                // Small delay between updates
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            updateProgress(weeksToFix, weeksToFix, 'Complete!');
+            log(`🎉 Results fix complete! ${successCount}/${weeksToFix} weeks fixed`, 'success');
+
+            isProcessing = false;
+            updateBtn.disabled = false;
+            updateWeek4Btn.disabled = false;
+            fixGamesBtn.disabled = false;
+            fixResultsBtn.disabled = false;
+        }
+
+        function clearStatus() {
+            statusLog.innerHTML = '<div class="success">📡 Status cleared - ready for new operation...</div>';
+            progressBar.style.width = '0%';
+            progressText.textContent = '';
+        }
+
+        // Event listeners
+        signInBtn.addEventListener('click', signIn);
+        signOutBtn.addEventListener('click', signOutUser);
+        updateBtn.addEventListener('click', updateAllWeeks);
+        updateWeek4Btn.addEventListener('click', updateWeek4Only);
+        fixGamesBtn.addEventListener('click', fixGamesData);
+        fixResultsBtn.addEventListener('click', fixResultsData);
+        clearBtn.addEventListener('click', clearStatus);
+
+        // Initial log
+        log('🔥 Firestore Game Data Updater loaded', 'success');
+        log('🔐 Waiting for admin authentication...', 'warning');
+    </script>
+</body>
+</html>

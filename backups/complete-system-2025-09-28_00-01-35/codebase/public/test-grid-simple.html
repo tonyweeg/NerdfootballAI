@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Grid Test</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .info { color: #4af; }
+        pre { background: #111; padding: 10px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Grid Data Test</h1>
+    <div id="results">Loading...</div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        async function testGridData() {
+            let html = '<div class="info">🔍 Testing Grid Data Loading...</div>';
+
+            try {
+                // Test pool members
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = await getDoc(doc(db, poolMembersPath));
+
+                if (membersDoc.exists()) {
+                    const poolMembers = membersDoc.data();
+                    const memberCount = Object.keys(poolMembers).length;
+                    html += `<div class="success">✅ Pool Members: ${memberCount} found</div>`;
+                } else {
+                    html += '<div class="error">❌ Pool members not found</div>';
+                    return;
+                }
+
+                // Test games data
+                const gamesPath = 'artifacts/nerdfootball/public/data/nerdfootball_games/4';
+                const gamesDoc = await getDoc(doc(db, gamesPath));
+
+                if (gamesDoc.exists()) {
+                    const bibleData = gamesDoc.data();
+                    const gameIds = Object.keys(bibleData).filter(k => !k.startsWith('_') && parseInt(k) >= 401 && parseInt(k) <= 416);
+                    html += `<div class="success">✅ Games Data: ${gameIds.length} games found</div>`;
+
+                    // Show first game
+                    const firstGame = bibleData[gameIds[0]];
+                    html += `<div class="info">First game: ${firstGame.a} @ ${firstGame.h} (Status: ${firstGame.status})</div>`;
+                } else {
+                    html += '<div class="error">❌ Games data not found</div>';
+                    return;
+                }
+
+                // Test Tony's picks
+                const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/4/submissions/${tonyUID}`;
+                const picksDoc = await getDoc(doc(db, picksPath));
+
+                if (picksDoc.exists()) {
+                    const picks = picksDoc.data();
+                    const validPicks = Object.keys(picks).filter(k =>
+                        picks[k] && typeof picks[k] === 'object' && picks[k].confidence
+                    );
+                    html += `<div class="success">✅ Tony's Picks: ${validPicks.length} valid picks</div>`;
+
+                    // Show first pick
+                    if (validPicks.length > 0) {
+                        const firstPickKey = validPicks[0];
+                        const firstPick = picks[firstPickKey];
+                        html += `<div class="info">Sample pick (Game ${firstPickKey}): ${firstPick.winner} (confidence: ${firstPick.confidence})</div>`;
+                    }
+                } else {
+                    html += '<div class="error">❌ Tony\'s picks not found</div>';
+                    return;
+                }
+
+                html += '<div class="success">✅ ALL DATA LOADS SUCCESSFULLY - Grid should work!</div>';
+                html += '<div class="info">If Grid still shows only names, check browser console for JavaScript errors</div>';
+
+            } catch (error) {
+                html += `<div class="error">❌ Error: ${error.message}</div>`;
+                console.error('Test error:', error);
+            }
+
+            document.getElementById('results').innerHTML = html;
+        }
+
+        // Auto-start test
+        testGridData();
+    </script>
+</body>
+</html>

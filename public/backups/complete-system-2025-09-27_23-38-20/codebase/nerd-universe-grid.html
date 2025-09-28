@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚔️ THE GRID - NERD UNIVERSE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'nerd': {
+                            'bg': '#0a0a0a',
+                            'dark': '#1a1a1a',
+                            'darker': '#111111',
+                            'green': '#00ff41',
+                            'gold': '#ffd700',
+                            'cyan': '#00ffff',
+                            'grey': '#888888'
+                        }
+                    },
+                    fontFamily: {
+                        'mono': ['Courier New', 'monospace'],
+                        'terminal': ['Monaco', 'Consolas', 'Courier New', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Source Code Pro', 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            font-size: 14px;
+            line-height: 1.4;
+            min-height: 100vh;
+            border: none;
+        }
+
+        /* Terminal Grid - Ultra Compact */
+        .grid-container {
+            max-height: 80vh;
+            overflow: auto;
+            background: #111111;
+            scrollbar-width: thin;
+            scrollbar-color: #00ff41 #1a1a1a;
+            position: relative;
+            overflow-x: auto;
+            overflow-y: auto;
+        }
+
+        .grid-container::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .grid-container::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .grid-container::-webkit-scrollbar-thumb {
+            background: #00ff41;
+            border-radius: 3px;
+        }
+
+        .picks-table {
+            width: max-content;
+            min-width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            background: rgba(15, 15, 30, 0.95);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 100, 255, 0.3);
+        }
+
+        .picks-table th {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            padding: 6px 4px;
+            text-align: center;
+            font-weight: 700;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            color: #ffffff;
+            font-size: 12px;
+            line-height: 1.3;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            height: 36px;
+        }
+
+        .picks-table th.user-name {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%) !important;
+            font-size: 16px !important;
+            text-align: left !important;
+            z-index: 30 !important;
+            border-right: 3px solid rgba(52, 152, 219, 0.8);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.4) !important;
+            position: sticky !important;
+            left: 60px !important;
+            min-width: 150px !important;
+            padding: 8px 12px !important;
+        }
+
+        .picks-table td {
+            border: 1px solid rgba(100, 149, 237, 0.3);
+            padding: 2px 1px;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 11px;
+            line-height: 1.3;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .picks-table td:hover {
+            background: rgba(52, 152, 219, 0.1);
+            border-color: rgba(52, 152, 219, 0.5);
+        }
+
+        .user-name {
+            background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%) !important;
+            font-weight: 700 !important;
+            text-align: left !important;
+            padding: 8px 12px !important;
+            position: sticky !important;
+            left: 60px !important;
+            z-index: 25 !important;
+            width: auto;
+            min-width: 150px !important;
+            color: #ffffff !important;
+            font-size: 14px !important;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            border-right: 3px solid rgba(52, 152, 219, 0.8);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        .place-column {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 20%, #3e4955 100%) !important;
+            font-weight: 700 !important;
+            text-align: center !important;
+            padding: 8px 6px !important;
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 30 !important;
+            min-width: 60px !important;
+            max-width: 60px !important;
+            color: #ffffff !important;
+            font-size: 14px !important;
+            border-right: 3px solid rgba(231, 76, 60, 0.8);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        .total-column {
+            background: linear-gradient(135deg, #8e44ad 0%, #3498db 100%);
+            font-weight: 700;
+            text-align: center !important;
+            padding: 6px 4px !important;
+            position: sticky;
+            right: 0;
+            z-index: 5;
+            min-width: 60px;
+            max-width: 60px;
+            color: #ffffff;
+            font-size: 13px;
+            border-left: 2px solid rgba(255, 215, 0, 0.8);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            box-shadow: -2px 0 10px rgba(142, 68, 173, 0.3);
+        }
+
+        .user-name:hover {
+            background: linear-gradient(135deg, #3498db 0%, #9b59b6 100%);
+            color: #ffffff;
+            transform: translateX(2px);
+        }
+
+        .pick-cell {
+            min-width: 45px;
+            max-width: 45px;
+            font-size: 10px;
+            line-height: 1.2;
+            padding: 3px !important;
+            background: rgba(15, 25, 40, 0.8);
+        }
+
+        .pick-correct {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%) !important;
+            color: #ffffff !important;
+            border-color: rgba(46, 204, 113, 0.8) !important;
+            box-shadow: 0 2px 8px rgba(46, 204, 113, 0.4);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .pick-incorrect {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
+            color: #ffffff !important;
+            border-color: rgba(231, 76, 60, 0.8) !important;
+            box-shadow: 0 2px 8px rgba(231, 76, 60, 0.4);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .pick-pending {
+            background: rgba(52, 73, 94, 0.4) !important;
+            color: #95a5a6 !important;
+            border-color: rgba(189, 195, 199, 0.2) !important;
+        }
+
+        .pick-live {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%) !important;
+            color: #ffffff !important;
+            border-color: rgba(243, 156, 18, 0.8) !important;
+            animation: pulse 2s infinite;
+            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.4);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .team-short {
+            font-weight: 700;
+            display: block;
+            font-size: 16px;
+            color: #ffffff !important;
+        }
+
+        .confidence-num {
+            font-size: 14px;
+            font-weight: 700;
+            color: #ffffff !important;
+            opacity: 0.9;
+        }
+
+        /* Tony Highlight */
+        .tony-row {
+            background: linear-gradient(135deg, rgba(0, 206, 209, 0.15) 0%, rgba(52, 152, 219, 0.15) 100%) !important;
+            border-left: 3px solid #00ced1 !important;
+            box-shadow: 0 0 15px rgba(0, 206, 209, 0.3);
+        }
+
+        .tony-row .user-name {
+            background: linear-gradient(135deg, #00ced1 0%, #20b2aa 100%) !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            border-right: 2px solid #00ced1 !important;
+        }
+
+        /* Terminal Header */
+        .terminal-header {
+            background: #1a1a1a;
+            color: #00ff41;
+            font-family: 'Source Code Pro', monospace;
+            padding: 8px;
+            margin-bottom: 8px;
+            border: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .stat-box {
+            background: #111111;
+            border: 1px solid #333333;
+            padding: 6px 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            color: #ffd700;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .stat-label {
+            color: #888888;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        /* Modal Updates */
+        .user-expanded {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50vw;
+            max-width: 600px;
+            max-height: 50vh;
+            background: rgba(17, 17, 17, 0.95);
+            border: 2px solid #00ff41;
+            backdrop-filter: blur(10px);
+            z-index: 50;
+            overflow-y: auto;
+            color: #00ff41;
+            font-family: 'Source Code Pro', monospace;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px);
+            z-index: 40;
+        }
+
+        /* Loading Terminal Style */
+        .loading {
+            background: linear-gradient(90deg, #111111 0%, #1a1a1a 50%, #111111 100%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Navigation */
+        .nav-button {
+            background: #1a1a1a;
+            border: 1px solid #333333;
+            color: #00ff41;
+            padding: 12px 16px;
+            font-size: 18px;
+            font-family: 'Source Code Pro', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 700;
+        }
+
+        .nav-button:hover {
+            background: #333333;
+            border-color: #00ff41;
+            color: #ffd700;
+        }
+
+        .nav-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Column Group Toggle Controls */
+        .column-controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        .toggle-button {
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+            border: 1px solid rgba(52, 152, 219, 0.5);
+            color: #ffffff;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-family: 'Source Code Pro', monospace;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 6px;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .toggle-button:hover {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            border-color: #3498db;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+
+        .toggle-button.active {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: #ffffff;
+            border-color: #27ae60;
+            box-shadow: 0 2px 8px rgba(39, 174, 96, 0.4);
+        }
+
+        .toggle-button.inactive {
+            background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
+            color: rgba(255, 255, 255, 0.7);
+            border-color: #7f8c8d;
+            opacity: 0.7;
+        }
+
+        /* Column Group Hiding */
+        .column-group-completed.hidden {
+            display: none;
+        }
+
+        .column-group-active.hidden {
+            display: none;
+        }
+
+        .column-group-notstarted.hidden {
+            display: none;
+        }
+
+        /* Column Group Headers */
+        .group-header {
+            background: #1a1a1a;
+            border-bottom: 1px solid #333333;
+            font-size: 8px;
+            text-align: center;
+            color: #888888;
+            text-transform: uppercase;
+            padding: 2px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .picks-table {
+                font-size: 8px;
+            }
+
+            .user-name {
+                min-width: 150px;
+                font-size: 18px !important;
+            }
+
+            .pick-cell {
+                min-width: 32px;
+                max-width: 32px;
+                font-size: 7px;
+            }
+
+            .team-short {
+                font-size: 14px;
+            }
+
+            .confidence-num {
+                font-size: 12px;
+            }
+        }
+
+        /* Back Button */
+        .back-link {
+            color: #00ff41;
+            text-decoration: none;
+            font-size: 24px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: color 0.2s;
+            font-weight: 700;
+        }
+
+        .back-link:hover {
+            color: #ffd700;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen">
+    <!-- Terminal Header -->
+    <div class="terminal-header">
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center space-x-4">
+                <a href="/nerd-universe.html" class="back-link">
+                    ← NERD UNIVERSE
+                </a>
+                <div class="text-3xl font-bold text-gold-400">⚔️ THE GRID</div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="week-prev" class="nav-button">◄ PREV</button>
+                <div class="nav-button" id="week-display">WEEK 4 • 2025</div>
+                <button id="week-next" class="nav-button">NEXT ►</button>
+            </div>
+            <div class="text-right">
+                <div class="text-lg text-nerd-grey font-bold" id="last-updated">LOADING...</div>
+                <div class="text-lg text-nerd-cyan font-bold" id="user-info">AUTH...</div>
+            </div>
+        </div>
+
+        <!-- Compact Stats -->
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value" id="your-ranking">-</div>
+                <div class="stat-label">RANK</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="current-leader">-</div>
+                <div class="stat-label">LEADER</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="upset-alerts">-</div>
+                <div class="stat-label">UPSETS</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="contrarian-picks">-</div>
+                <div class="stat-label">EDGE</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="flex items-center justify-center min-h-screen">
+        <div class="text-center">
+            <div class="loading w-32 h-2 mb-4"></div>
+            <p class="text-nerd-green">LOADING GRID DATA...</p>
+        </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div id="main-content" class="hidden px-2">
+        <!-- Legend -->
+        <div class="mb-2 text-xs flex justify-start space-x-4 text-nerd-grey">
+            <span>🔴 LIVE</span>
+            <span>⏳ PENDING</span>
+        </div>
+
+        <!-- Column Toggle Controls -->
+        <div class="column-controls">
+            <button class="toggle-button active" id="toggle-completed" onclick="toggleColumnGroup('completed')">
+                COMPLETED (<span id="completed-count">0</span>)
+            </button>
+            <button class="toggle-button active" id="toggle-active" onclick="toggleColumnGroup('active')">
+                🔴 ACTIVE (<span id="active-count">0</span>)
+            </button>
+            <button class="toggle-button active" id="toggle-notstarted" onclick="toggleColumnGroup('notstarted')">
+                ⏳ NOT STARTED (<span id="notstarted-count">0</span>)
+            </button>
+            <button class="toggle-button" onclick="toggleAllColumns()">
+                👁️ TOGGLE ALL
+            </button>
+            <button class="toggle-button" id="sort-toggle" onclick="toggleSort()">
+                📊 SORT BY SCORE
+            </button>
+            <button class="toggle-button" onclick="showCacheStatus()">
+                🔥 CACHE STATUS
+            </button>
+            <button class="toggle-button" onclick="clearGridCache()">
+                🗑️ CLEAR CACHE
+            </button>
+        </div>
+
+        <!-- Grid Container -->
+        <div class="grid-container">
+            <table id="picks-table" class="picks-table">
+                <thead id="table-header">
+                    <!-- Table headers will be populated by JavaScript -->
+                </thead>
+                <tbody id="table-body">
+                    <!-- Table rows will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Instructions -->
+        <div class="mt-2 text-left text-xs text-nerd-grey">
+            CLICK USER NAME FOR DETAILS • SCROLL TO VIEW ALL GAMES
+        </div>
+    </div>
+
+    <!-- Expanded User Modal -->
+    <div id="user-modal" class="hidden">
+        <div class="overlay" onclick="closeUserModal()"></div>
+        <div class="user-expanded">
+            <div class="p-4">
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-lg font-bold text-nerd-gold" id="modal-user-name">USER DETAILS</h2>
+                    <button onclick="closeUserModal()" class="text-nerd-green hover:text-nerd-gold text-xl">
+                        ×
+                    </button>
+                </div>
+                <div id="modal-user-content" class="text-xs">
+                    <!-- Detailed user content will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Make available globally
+        window.auth = auth;
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.getDocs = getDocs;
+        window.collection = collection;
+        window.query = query;
+        window.where = where;
+        window.orderBy = orderBy;
+
+        // Global variables
+        let currentWeek = getCurrentWeekNumber();
+        let poolMembers = {};
+        let bibleData = {};
+        let allPicks = {};
+        let gameIds = [];
+        let isLoadingWeek = false;
+        let sortByScore = false;
+
+        // Column grouping state
+        let columnGroups = {
+            completed: { visible: true, games: [] },
+            active: { visible: true, games: [] },
+            notstarted: { visible: true, games: [] }
+        };
+
+        // Initialize the application
+        async function initialize() {
+            try {
+                await waitForFirebaseAuth();
+
+                const currentUserId = auth.currentUser?.uid;
+                const currentWeekNum = getCurrentWeekNumber();
+                console.log('⚔️ GRID SECURITY INIT:', {
+                    authenticatedUser: auth.currentUser?.uid || 'none',
+                    fallbackToTony: currentUserId,
+                    currentWeek: currentWeekNum,
+                    securityActive: currentWeek === currentWeekNum
+                });
+
+                await loadPoolMembers();
+
+                // 🔥 CACHE-FIRST LOADING - STRAIGHT CACHE GRIDDY
+                console.log('🎯 GRID_CACHE: Starting cache-first loading for week', currentWeek);
+                const cacheLoaded = await loadFirebaseCachedGrid();
+
+                if (!cacheLoaded) {
+                    console.log('🔥 GRID_CACHE: Cache miss - generating fresh grid data');
+                    await loadBibleData();
+                    await loadAllPicks();
+
+                    renderGrid();
+                    updateStats();
+
+                    // Save fresh data to cache for next visitor
+                    await saveFirebaseCachedGrid();
+                } else {
+                    console.log('⚡ GRID_CACHE: Cache hit - instant grid load!');
+                }
+
+                document.getElementById('week-display').textContent = `WEEK ${currentWeek} • 2025`;
+                setupWeekNavigation();
+                hideLoading();
+            } catch (error) {
+                console.error('❌ Error initializing grid:', error);
+                showError('GRID LOAD FAILED. REFRESH PAGE.');
+            }
+        }
+
+        // Setup week navigation
+        function setupWeekNavigation() {
+            const prevButton = document.getElementById('week-prev');
+            const nextButton = document.getElementById('week-next');
+
+            prevButton.addEventListener('click', () => changeWeek(currentWeek - 1));
+            nextButton.addEventListener('click', () => changeWeek(currentWeek + 1));
+
+            updateWeekButtons();
+        }
+
+        // Change to a different week
+        async function changeWeek(newWeek) {
+            const maxWeek = getCurrentWeekNumber();
+
+            if (newWeek < 1 || newWeek > maxWeek) return;
+
+            currentWeek = newWeek;
+            document.getElementById('week-display').textContent = `WEEK ${currentWeek} • 2025`;
+
+            document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="text-center p-4 text-nerd-grey">LOADING WEEK ' + currentWeek + '...</td></tr>';
+
+            try {
+                // 🔥 CACHE-FIRST LOADING FOR WEEK CHANGE - STRAIGHT CACHE GRIDDY
+                console.log('🎯 GRID_CACHE: Week change to', currentWeek, '- checking cache');
+                const cacheLoaded = await loadFirebaseCachedGrid();
+
+                if (!cacheLoaded) {
+                    console.log('🔥 GRID_CACHE: Cache miss for week', currentWeek, '- generating fresh data');
+                    await loadBibleData();
+                    await loadAllPicks();
+                    renderGrid();
+                    updateStats();
+
+                    // Save fresh data to cache
+                    await saveFirebaseCachedGrid();
+                } else {
+                    console.log('⚡ GRID_CACHE: Cache hit for week', currentWeek, '- instant load!');
+                }
+
+                updateWeekButtons();
+            } catch (error) {
+                console.error('❌ Error loading Week', currentWeek, 'data:', error);
+                showError(`WEEK ${currentWeek} LOAD FAILED.`);
+            }
+        }
+
+        // Update week navigation buttons
+        function updateWeekButtons() {
+            const maxWeek = getCurrentWeekNumber();
+            document.getElementById('week-prev').disabled = currentWeek <= 1;
+            document.getElementById('week-next').disabled = currentWeek >= maxWeek;
+        }
+
+        // Get current NFL week number
+        function getCurrentWeekNumber() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04T00:00:00Z');
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        // Wait for Firebase Auth
+        async function waitForFirebaseAuth() {
+            return new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    if (user) {
+                        document.getElementById('user-info').textContent = user.displayName || user.email?.substring(0, 12) || 'USER';
+                    } else {
+                        document.getElementById('user-info').textContent = 'NOT SIGNED IN';
+                    }
+                    resolve();
+                });
+                setTimeout(() => { unsubscribe(); resolve(); }, 5000);
+            });
+        }
+
+        // Load pool members
+        async function loadPoolMembers() {
+            try {
+                const poolId = 'nerduniverse-2025';
+                const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+                console.log('🔍 GRID: Loading pool members from:', poolMembersPath);
+
+                const membersDoc = await getDoc(doc(db, poolMembersPath));
+
+                if (membersDoc.exists()) {
+                    poolMembers = membersDoc.data();
+                    console.log('✅ Pool members loaded:', Object.keys(poolMembers).length);
+                } else {
+                    throw new Error('Pool members not found');
+                }
+            } catch (error) {
+                console.error('❌ FIREBASE ERROR in loadPoolMembers():', error);
+                throw error;
+            }
+        }
+
+        // Load bible data for current week
+        async function loadBibleData() {
+            if (isLoadingWeek) {
+                console.log(`⏸️ Week ${currentWeek} already loading, skipping...`);
+                return;
+            }
+
+            isLoadingWeek = true;
+            console.log(`🔄 Loading Week ${currentWeek} bible data...`);
+
+            try {
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesDoc = await getDoc(doc(db, gamesPath));
+
+                if (!gamesDoc.exists()) {
+                    throw new Error(`No games data found at ${gamesPath}`);
+                }
+
+                bibleData = gamesDoc.data();
+                gameIds = Object.keys(bibleData)
+                    .filter(k => !k.startsWith('_') && !k.includes('401772'))
+                    .filter(k => {
+                        const gameNum = parseInt(k);
+                        const weekStart = currentWeek * 100 + 1;
+                        const weekEnd = currentWeek * 100 + 16;
+                        return gameNum >= weekStart && gameNum <= weekEnd;
+                    })
+                    .sort((a, b) => parseInt(a) - parseInt(b));
+
+                console.log('✅ Bible data loaded:', gameIds.length, 'games for Week', currentWeek);
+            } catch (error) {
+                console.error('❌ Error loading bible data:', error);
+                throw error;
+            } finally {
+                isLoadingWeek = false;
+            }
+        }
+
+        // Load all picks for current week
+        async function loadAllPicks() {
+            const memberIds = Object.keys(poolMembers);
+            console.log('🔍 Loading picks for', memberIds.length, 'members, week', currentWeek);
+
+            const pickPromises = memberIds.map(async (memberId) => {
+                try {
+                    const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`;
+                    const userPicksDoc = await getDoc(doc(db, picksPath));
+                    if (userPicksDoc.exists()) {
+                        allPicks[memberId] = userPicksDoc.data();
+                    } else {
+                        allPicks[memberId] = null;
+                    }
+                } catch (error) {
+                    console.error(`❌ Error loading picks for ${memberId}:`, error);
+                    allPicks[memberId] = null;
+                }
+            });
+
+            await Promise.all(pickPromises);
+            console.log('✅ Picks loaded for', Object.keys(allPicks).length, 'users');
+        }
+
+        // 🔥 FIREBASE CACHE SYSTEM - STRAIGHT CACHE GRIDDY
+        async function loadFirebaseCachedGrid() {
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                console.log('🔍 GRID_CACHE: Checking Firebase cache at', cachePath);
+
+                const cacheDoc = await getDoc(doc(db, cachePath));
+
+                if (!cacheDoc.exists()) {
+                    console.log('❌ GRID_CACHE: No cached data found');
+                    return false;
+                }
+
+                const cacheData = cacheDoc.data();
+                const cacheAge = Date.now() - new Date(cacheData.createdDate).getTime();
+                const maxAge = 15 * 60 * 1000; // 15 minutes
+
+                if (cacheAge > maxAge) {
+                    console.log('⏰ GRID_CACHE: Cache expired (', Math.round(cacheAge / 1000 / 60), 'min old)');
+                    return false;
+                }
+
+                console.log('🎯 GRID_CACHE: Loading cached grid data (', Math.round(cacheAge / 1000), 's old)');
+
+                // Restore cached data
+                bibleData = cacheData.bibleData;
+                allPicks = cacheData.allPicks;
+                gameIds = cacheData.gameIds;
+
+                // Render from cache
+                renderGrid();
+                updateStats();
+
+                console.log('⚡ GRID_CACHE: Successfully loaded from cache!');
+                return true;
+
+            } catch (error) {
+                console.error('❌ GRID_CACHE: Error loading from cache:', error);
+                return false;
+            }
+        }
+
+        async function saveFirebaseCachedGrid() {
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                console.log('💾 GRID_CACHE: Saving grid data to Firebase cache');
+
+                const cacheData = {
+                    createdDate: new Date().toISOString(),
+                    week: currentWeek,
+                    bibleData: bibleData,
+                    allPicks: allPicks,
+                    gameIds: gameIds,
+                    metadata: {
+                        totalGames: gameIds.length,
+                        poolMembers: Object.keys(poolMembers).length,
+                        dataSource: "fresh_generation"
+                    }
+                };
+
+                await setDoc(doc(db, cachePath), cacheData);
+                console.log('✅ GRID_CACHE: Successfully saved to Firebase cache');
+
+            } catch (error) {
+                console.error('❌ GRID_CACHE: Error saving to cache:', error);
+            }
+        }
+
+        // Render the picks table
+        function renderGrid() {
+            console.log(`🎯 Rendering grid for Week ${currentWeek} with gameIds:`, gameIds);
+            renderTableHeader();
+            renderTableBody();
+
+            // Categorize games by status and update UI
+            categorizeGamesByStatus();
+            updateColumnVisibility();
+
+            console.log(`✅ Grid render complete for Week ${currentWeek}`);
+        }
+
+        // Render table header
+        function renderTableHeader() {
+            const header = document.getElementById('table-header');
+            let headerHTML = '<tr><th class="place-column">PLACE</th><th class="user-name">PLAYER</th>';
+
+            gameIds.forEach(gameId => {
+                const game = bibleData[gameId];
+                if (game && game.h && game.a) {
+                    const homeShort = getTeamShort(game.h);
+                    const awayShort = getTeamShort(game.a);
+                    headerHTML += `<th class="pick-cell">${awayShort}<br>@<br>${homeShort}</th>`;
+                } else {
+                    headerHTML += `<th class="pick-cell">G${gameId}</th>`;
+                }
+            });
+
+            headerHTML += '<th class="total-column">TOTAL</th>';
+            headerHTML += '</tr>';
+            header.innerHTML = headerHTML;
+        }
+
+        // Render table body
+        function renderTableBody() {
+            const tbody = document.getElementById('table-body');
+            const memberIds = Object.keys(poolMembers);
+            const currentUserId = auth.currentUser?.uid;
+
+            const sortedMemberIds = memberIds.sort((a, b) => {
+                if (sortByScore) {
+                    // Sort by total score (highest first)
+                    const scoreA = calculateUserTotal(allPicks[a]);
+                    const scoreB = calculateUserTotal(allPicks[b]);
+                    if (scoreA !== scoreB) return scoreB - scoreA; // Higher scores first
+
+                    // If scores are tied, fallback to alphabetical
+                    const nameA = (poolMembers[a].name || poolMembers[a].email || 'Unknown').toLowerCase();
+                    const nameB = (poolMembers[b].name || poolMembers[b].email || 'Unknown').toLowerCase();
+                    return nameA.localeCompare(nameB);
+                } else {
+                    // Alphabetical sorting
+                    const nameA = (poolMembers[a].name || poolMembers[a].email || 'Unknown').toLowerCase();
+                    const nameB = (poolMembers[b].name || poolMembers[b].email || 'Unknown').toLowerCase();
+                    return nameA.localeCompare(nameB);
+                }
+            });
+
+            // Calculate rankings with scores for all players
+            const playerRankings = sortedMemberIds.map(memberId => ({
+                memberId,
+                member: poolMembers[memberId],
+                userPicks: allPicks[memberId],
+                isCurrentUser: memberId === currentUserId,
+                score: calculateUserTotal(allPicks[memberId])
+            }));
+
+            // Calculate place/rank with ties
+            let currentPlace = 1;
+            let previousScore = null;
+            let tiedCount = 0;
+
+            playerRankings.forEach((player, index) => {
+                if (previousScore !== null && player.score !== previousScore) {
+                    currentPlace = index + 1;
+                    tiedCount = 0;
+                } else if (previousScore !== null && player.score === previousScore) {
+                    tiedCount++;
+                }
+
+                // Assign medals for top 3, then regular places
+                if (tiedCount > 0) {
+                    if (currentPlace === 1) {
+                        player.place = '🥇'; // Gold medal for tied first
+                    } else if (currentPlace === 2) {
+                        player.place = '🥈'; // Silver medal for tied second
+                    } else if (currentPlace === 3) {
+                        player.place = '🥉'; // Bronze medal for tied third
+                    } else {
+                        player.place = `T${currentPlace}`;
+                    }
+                } else {
+                    if (currentPlace === 1) {
+                        player.place = '🥇'; // Gold medal
+                    } else if (currentPlace === 2) {
+                        player.place = '🥈'; // Silver medal
+                    } else if (currentPlace === 3) {
+                        player.place = '🥉'; // Bronze medal
+                    } else {
+                        player.place = currentPlace.toString();
+                    }
+                }
+
+                previousScore = player.score;
+            });
+
+            let rowsHTML = '';
+
+            playerRankings.forEach(player => {
+                rowsHTML += `<tr ${player.isTony ? 'class="tony-row"' : ''}>`;
+                rowsHTML += `<td class="place-column">${player.place}</td>`;
+                rowsHTML += `<td class="user-name" onclick="showUserDetails('${player.memberId}')">
+                    ${player.isTony ? '👤 ' : ''}${player.member.name || player.member.email || 'Unknown'}
+                </td>`;
+
+                gameIds.forEach(gameId => {
+                    rowsHTML += createPickCellHTML(gameId, player.userPicks, player.memberId);
+                });
+
+                // Add total column
+                rowsHTML += `<td class="total-column">${player.score}</td>`;
+                rowsHTML += `</tr>`;
+            });
+
+            tbody.innerHTML = rowsHTML;
+        }
+
+        // Create individual pick cell HTML
+        function createPickCellHTML(gameId, userPicks, memberId) {
+            const currentWeekNum = getCurrentWeekNumber();
+            const isCurrentWeek = currentWeek === currentWeekNum;
+            const currentUserId = auth.currentUser?.uid;
+            const isCurrentUser = memberId === currentUserId;
+
+            const game = bibleData[gameId];
+            const gameHasStarted = game && (game.status === 'IN_PROGRESS' ||
+                                           game.status === 'FINAL' ||
+                                           game.status === 'FINAL/OT' ||
+                                           game.status === 'STATUS_FINAL' ||
+                                           game.status === 'HALFTIME');
+
+            const shouldHidePick = isCurrentWeek && !isCurrentUser && !gameHasStarted;
+
+            if (!userPicks || !userPicks[gameId]) {
+                return shouldHidePick ?
+                    `<td class="pick-cell pick-pending">-</td>` :
+                    `<td class="pick-cell pick-pending">-</td>`;
+            }
+
+            const pick = userPicks[gameId];
+            const isGameComplete = game.winner && game.winner !== 'TBD';
+            const isGameLive = game.status === 'IN_PROGRESS' || game.status === 'HALFTIME';
+            const isCorrect = isGameComplete && game.winner === pick.winner;
+
+            if (shouldHidePick) {
+                return `<td class="pick-cell pick-pending">-</td>`;
+            }
+
+            let cellClass = 'pick-cell ';
+            let statusIcon = '';
+
+            if (isGameComplete) {
+                cellClass += isCorrect ? 'pick-correct' : 'pick-incorrect';
+            } else if (isGameLive) {
+                cellClass += 'pick-live';
+            } else {
+                cellClass += 'pick-pending';
+            }
+
+            const teamShort = getTeamShort(pick.winner);
+
+            return `<td class="${cellClass}">
+                <div class="team-short">${teamShort}</div>
+                <div class="confidence-num">${pick.confidence || 0}</div>
+            </td>`;
+        }
+
+        // Get shortened team name
+        function getTeamShort(teamName) {
+            const teamShorts = {
+                'Arizona Cardinals': 'ARI', 'Atlanta Falcons': 'ATL', 'Baltimore Ravens': 'BAL',
+                'Buffalo Bills': 'BUF', 'Carolina Panthers': 'CAR', 'Chicago Bears': 'CHI',
+                'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Dallas Cowboys': 'DAL',
+                'Denver Broncos': 'DEN', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB',
+                'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX',
+                'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+                'Los Angeles Rams': 'LAR', 'Miami Dolphins': 'MIA', 'Minnesota Vikings': 'MIN',
+                'New England Patriots': 'NE', 'New Orleans Saints': 'NO', 'New York Giants': 'NYG',
+                'New York Jets': 'NYJ', 'Philadelphia Eagles': 'PHI', 'Pittsburgh Steelers': 'PIT',
+                'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA', 'Tampa Bay Buccaneers': 'TB',
+                'Tennessee Titans': 'TEN', 'Washington Commanders': 'WSH'
+            };
+            return teamShorts[teamName] || teamName?.substring(0, 3) || 'TBD';
+        }
+
+        function getTeamHelmetUrl(teamName) {
+            const teamShort = getTeamShort(teamName);
+            return `https://a.espncdn.com/i/teamlogos/nfl/500/${teamShort.toLowerCase()}.png`;
+        }
+
+        // Update strategic insights
+        function updateStats() {
+            const memberIds = Object.keys(poolMembers);
+            const currentUserId = window.auth?.currentUser?.uid;
+
+            const userRankings = calculateUserRankings(memberIds);
+            const yourRanking = userRankings.find(r => r.userId === currentUserId);
+            const leaderInfo = getLeaderInfo(userRankings);
+
+            const consensus = calculateConsensus(memberIds);
+            const upsetAlerts = getUpsetAlerts(consensus);
+            const yourContrarian = getContrarianPicks(currentUserId, consensus);
+
+            document.getElementById('your-ranking').textContent =
+                yourRanking ? `${yourRanking.rank}/${memberIds.length}` : '-';
+
+            document.getElementById('current-leader').textContent = leaderInfo;
+
+            document.getElementById('upset-alerts').textContent =
+                upsetAlerts > 0 ? `${upsetAlerts}` : '0';
+
+            document.getElementById('contrarian-picks').textContent =
+                yourContrarian > 0 ? `${yourContrarian}` : '0';
+
+            document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+        }
+
+        // Calculate user rankings based on points earned
+        function calculateUserRankings(memberIds) {
+            const rankings = memberIds.map(memberId => {
+                const member = poolMembers[memberId];
+                const userPicks = allPicks[memberId];
+                let points = 0;
+                let correctPicks = 0;
+
+                if (userPicks) {
+                    gameIds.forEach(gameId => {
+                        const pick = userPicks[gameId];
+                        const game = bibleData[gameId];
+                        if (pick && game.winner && game.winner !== 'TBD' && game.winner === pick.winner) {
+                            points += pick.confidence || 0;
+                            correctPicks++;
+                        }
+                    });
+                }
+
+                return {
+                    userId: memberId,
+                    name: member.name || member.email?.split('@')[0] || 'Unknown',
+                    points,
+                    correctPicks
+                };
+            });
+
+            rankings.sort((a, b) => {
+                if (b.points !== a.points) return b.points - a.points;
+                return b.correctPicks - a.correctPicks;
+            });
+
+            rankings.forEach((user, index) => {
+                user.rank = index + 1;
+            });
+
+            return rankings;
+        }
+
+        // Get leader info handling ties properly
+        function getLeaderInfo(rankings) {
+            if (!rankings || rankings.length === 0) return '-';
+
+            const topPoints = rankings[0].points;
+            const topCorrectPicks = rankings[0].correctPicks;
+
+            // Find all players tied for first place
+            const tiedLeaders = rankings.filter(player =>
+                player.points === topPoints && player.correctPicks === topCorrectPicks
+            );
+
+            if (tiedLeaders.length === 1) {
+                // Single leader
+                return `${tiedLeaders[0].name} (${topPoints})`;
+            } else {
+                // Multiple tied for first
+                return `${tiedLeaders.length}-way tie (${topPoints})`;
+            }
+        }
+
+        // Calculate pick consensus percentages
+        function calculateConsensus(memberIds) {
+            const consensus = {};
+
+            gameIds.forEach(gameId => {
+                const game = bibleData[gameId];
+                if (!game.h || !game.a) return;
+
+                const picks = { [game.h]: 0, [game.a]: 0 };
+                let totalPicks = 0;
+
+                memberIds.forEach(memberId => {
+                    const userPicks = allPicks[memberId];
+                    if (userPicks && userPicks[gameId] && userPicks[gameId].winner) {
+                        const winner = userPicks[gameId].winner;
+                        if (picks.hasOwnProperty(winner)) {
+                            picks[winner]++;
+                            totalPicks++;
+                        }
+                    }
+                });
+
+                if (totalPicks > 0) {
+                    consensus[gameId] = {
+                        home: game.h,
+                        away: game.a,
+                        homePercent: Math.round((picks[game.h] / totalPicks) * 100),
+                        awayPercent: Math.round((picks[game.a] / totalPicks) * 100),
+                        totalPicks
+                    };
+                }
+            });
+
+            return consensus;
+        }
+
+        // Get upset alerts (picks with <30% consensus)
+        function getUpsetAlerts(consensus) {
+            let alerts = 0;
+            Object.values(consensus).forEach(game => {
+                const minPercent = Math.min(game.homePercent, game.awayPercent);
+                if (minPercent > 0 && minPercent < 30) {
+                    alerts++;
+                }
+            });
+            return alerts;
+        }
+
+        // Get user's contrarian picks (picks with <50% consensus)
+        function getContrarianPicks(userId, consensus) {
+            const userPicks = allPicks[userId];
+            if (!userPicks) return 0;
+
+            let contrarian = 0;
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                const gameConsensus = consensus[gameId];
+
+                if (pick && gameConsensus && pick.winner) {
+                    const pickPercent = pick.winner === gameConsensus.home ?
+                        gameConsensus.homePercent : gameConsensus.awayPercent;
+
+                    if (pickPercent < 50) {
+                        contrarian++;
+                    }
+                }
+            });
+
+            return contrarian;
+        }
+
+        // Show user details modal
+        window.showUserDetails = function(memberId) {
+            const member = poolMembers[memberId];
+            const userPicks = allPicks[memberId];
+
+            document.getElementById('modal-user-name').textContent =
+                `${member.displayName || member.name || 'UNKNOWN'} - WEEK ${currentWeek}`;
+
+            if (!userPicks) {
+                document.getElementById('modal-user-content').innerHTML = `
+                    <div class="p-4 border border-red-600 bg-red-900 bg-opacity-20">
+                        <p class="text-red-400 font-bold">NO PICKS FOUND</p>
+                        <p class="text-red-300 text-xs">No picks for Week ${currentWeek}</p>
+                    </div>
+                `;
+                document.getElementById('user-modal').classList.remove('hidden');
+                return;
+            }
+
+            const analysis = analyzeUserPicks(userPicks);
+
+            const modalContent = `
+                <div class="border border-nerd-green p-4">
+                    <div class="grid grid-cols-2 gap-4 mb-4 text-xs">
+                        <div>
+                            <div class="text-nerd-gold">USER: ${member.displayName || member.name || 'Unknown'}</div>
+                            <div class="text-nerd-cyan text-xs">${member.email || 'No email'}</div>
+                            <div class="text-nerd-grey text-xs font-mono">${memberId}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-nerd-gold">POINTS: ${analysis.totalPointsEarned}</div>
+                            <div class="text-nerd-green">CORRECT: ${analysis.correctPicks}/${gameIds.length}</div>
+                            <div class="text-nerd-cyan">CONFIDENCE: ${analysis.confidenceSum}/${getMaxConfidenceSum()}</div>
+                        </div>
+                    </div>
+
+                    ${analysis.winningPicks.length > 0 ? `
+                        <div class="mb-4 p-2 border border-green-600 bg-green-900 bg-opacity-20">
+                            <div class="text-green-400 font-bold text-xs mb-1">WINS (${analysis.winningPicks.length}) - ${analysis.winningPoints} PTS</div>
+                            <div class="text-green-300 text-xs">${analysis.winningPicks.join(', ')}</div>
+                        </div>
+                    ` : ''}
+
+                    ${analysis.losingPicks.length > 0 ? `
+                        <div class="mb-4 p-2 border border-red-600 bg-red-900 bg-opacity-20">
+                            <div class="text-red-400 font-bold text-xs mb-1">LOSSES (${analysis.losingPicks.length}) - ${analysis.losingPoints} PTS LOST</div>
+                            <div class="text-red-300 text-xs">${analysis.losingPicks.join(', ')}</div>
+                        </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-4 gap-1 text-xs">
+                        ${generatePicksGrid(userPicks)}
+                    </div>
+
+                    <details class="mt-4">
+                        <summary class="cursor-pointer text-xs text-nerd-cyan hover:text-nerd-gold">RAW DATA</summary>
+                        <pre class="mt-2 p-2 bg-nerd-darker text-xs overflow-x-auto text-nerd-grey">${JSON.stringify(userPicks, null, 2)}</pre>
+                    </details>
+                </div>
+            `;
+
+            document.getElementById('modal-user-content').innerHTML = modalContent;
+            document.getElementById('user-modal').classList.remove('hidden');
+        };
+
+        // Analyze user picks for detailed view
+        function analyzeUserPicks(userPicks) {
+            let correctPicks = 0;
+            let totalPointsEarned = 0;
+            let confidenceSum = 0;
+            let winningPicks = [];
+            let losingPicks = [];
+            let winningPoints = 0;
+            let losingPoints = 0;
+
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                const game = bibleData[gameId];
+
+                if (pick && pick.winner && pick.confidence) {
+                    confidenceSum += pick.confidence;
+
+                    if (game.winner && game.winner !== 'TBD') {
+                        const isCorrect = game.winner === pick.winner;
+                        if (isCorrect) {
+                            correctPicks++;
+                            totalPointsEarned += pick.confidence;
+                            winningPicks.push(`${getTeamShort(pick.winner)} (${pick.confidence})`);
+                            winningPoints += pick.confidence;
+                        } else {
+                            losingPicks.push(`${getTeamShort(pick.winner)} (${pick.confidence}) → ${getTeamShort(game.winner)}`);
+                            losingPoints += pick.confidence;
+                        }
+                    }
+                }
+            });
+
+            return {
+                correctPicks,
+                totalPointsEarned,
+                confidenceSum,
+                winningPicks,
+                losingPicks,
+                winningPoints,
+                losingPoints,
+                isClean: confidenceSum === getMaxConfidenceSum()
+            };
+        }
+
+        // Generate picks grid for detailed view
+        function generatePicksGrid(userPicks) {
+            return gameIds.map(gameId => {
+                const pick = userPicks[gameId];
+                const game = bibleData[gameId];
+
+                if (!pick || !pick.winner) {
+                    return `<div class="p-1 bg-nerd-darker border border-nerd-grey text-center">
+                        <div class="font-bold text-nerd-grey">${gameId}</div>
+                        <div class="text-xs text-nerd-grey">NO PICK</div>
+                    </div>`;
+                }
+
+                const isGameComplete = game.winner && game.winner !== 'TBD';
+                const isCorrect = isGameComplete && game.winner === pick.winner;
+                const bgColor = isGameComplete ? (isCorrect ? 'bg-green-900 border-green-600' : 'bg-red-900 border-red-600') : 'bg-nerd-darker border-nerd-grey';
+                const textColor = isGameComplete ? (isCorrect ? 'text-green-400' : 'text-red-400') : 'text-nerd-grey';
+
+                const teamShort = getTeamShort(pick.winner);
+                const helmetUrl = getTeamHelmetUrl(pick.winner);
+
+                return `<div class="p-1 ${bgColor} border text-center">
+                    <div class="font-bold ${textColor} text-xs">${gameId}</div>
+                    <div class="text-xs ${textColor}">C${pick.confidence}</div>
+                    <div class="flex items-center justify-center mt-1">
+                        <img src="${helmetUrl}" alt="${teamShort}" class="w-4 h-4 mr-1" onerror="this.style.display='none'">
+                        <span class="text-xs ${textColor}" title="${pick.winner}">${teamShort}</span>
+                    </div>
+                    ${!isCorrect && isGameComplete ? `<div class="text-xs ${textColor} opacity-75 flex items-center justify-center">
+                        <img src="${getTeamHelmetUrl(game.winner)}" alt="${getTeamShort(game.winner)}" class="w-3 h-3 mr-1" onerror="this.style.display='none'">
+                        →${getTeamShort(game.winner)}
+                    </div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        // Get maximum confidence sum for the week
+        function getMaxConfidenceSum() {
+            const n = gameIds.length;
+            return (n * (n + 1)) / 2;
+        }
+
+        // Calculate total points for a user
+        function calculateUserTotal(userPicks) {
+            if (!userPicks) return 0;
+
+            let totalPoints = 0;
+
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                const game = bibleData[gameId];
+
+                if (pick && pick.winner && pick.confidence && game && game.winner && game.winner !== 'TBD') {
+                    // Game is complete, check if pick is correct
+                    if (pick.winner === game.winner) {
+                        totalPoints += parseInt(pick.confidence) || 0;
+                    }
+                }
+            });
+
+            return totalPoints;
+        }
+
+        // Close user details modal
+        window.closeUserModal = function() {
+            document.getElementById('user-modal').classList.add('hidden');
+        };
+
+        // Column grouping functions
+        function categorizeGamesByStatus() {
+            columnGroups.completed.games = [];
+            columnGroups.active.games = [];
+            columnGroups.notstarted.games = [];
+
+            console.log('🔍 CATEGORIZING GAMES BY STATUS:');
+
+            gameIds.forEach(gameId => {
+                const game = bibleData[gameId];
+                if (!game) return;
+
+                const status = getGameStatus(game);
+                console.log(`Game ${gameId}:`, {
+                    winner: game.winner,
+                    gameTime: game.gameTime,
+                    date: game.date,
+                    status: status
+                });
+
+                if (status === 'completed') {
+                    columnGroups.completed.games.push(gameId);
+                } else if (status === 'active') {
+                    columnGroups.active.games.push(gameId);
+                } else {
+                    columnGroups.notstarted.games.push(gameId);
+                }
+            });
+
+            console.log('📊 GAME STATUS SUMMARY:', {
+                completed: columnGroups.completed.games.length,
+                active: columnGroups.active.games.length,
+                notstarted: columnGroups.notstarted.games.length
+            });
+
+            // Update counts in UI
+            document.getElementById('completed-count').textContent = columnGroups.completed.games.length;
+            document.getElementById('active-count').textContent = columnGroups.active.games.length;
+            document.getElementById('notstarted-count').textContent = columnGroups.notstarted.games.length;
+        }
+
+        function getGameStatus(game) {
+            if (!game) return 'notstarted';
+
+            // Check if game is completed first by status field
+            if (game.status === 'FINAL' ||
+                game.status === 'FINAL/OT' ||
+                game.status === 'STATUS_FINAL' ||
+                game.status === 'final' ||
+                (game.winner && game.winner !== 'TBD')) {
+                return 'completed';
+            }
+
+            // For games without winners, check if they've started
+            const now = new Date();
+
+            // Try multiple possible game time fields
+            let gameTime = null;
+            if (game.gameTime) {
+                gameTime = new Date(game.gameTime);
+            } else if (game.date) {
+                gameTime = new Date(game.date);
+            } else if (game.time) {
+                gameTime = new Date(game.time);
+            }
+
+            // If no valid game time found, assume not started
+            if (!gameTime || isNaN(gameTime.getTime())) {
+                return 'notstarted';
+            }
+
+            // Game hasn't started yet
+            if (gameTime > now) {
+                return 'notstarted';
+            }
+
+            // Game has started but not finished (active)
+            return 'active';
+        }
+
+        // Toggle column group visibility
+        window.toggleColumnGroup = function(groupName) {
+            columnGroups[groupName].visible = !columnGroups[groupName].visible;
+
+            const button = document.getElementById(`toggle-${groupName}`);
+            if (columnGroups[groupName].visible) {
+                button.classList.add('active');
+                button.classList.remove('inactive');
+            } else {
+                button.classList.remove('active');
+                button.classList.add('inactive');
+            }
+
+            updateColumnVisibility();
+        };
+
+        // Toggle all columns
+        window.toggleAllColumns = function() {
+            const allVisible = Object.values(columnGroups).every(group => group.visible);
+            const newState = !allVisible;
+
+            Object.keys(columnGroups).forEach(groupName => {
+                columnGroups[groupName].visible = newState;
+                const button = document.getElementById(`toggle-${groupName}`);
+                if (newState) {
+                    button.classList.add('active');
+                    button.classList.remove('inactive');
+                } else {
+                    button.classList.remove('active');
+                    button.classList.add('inactive');
+                }
+            });
+
+            updateColumnVisibility();
+        };
+
+        // Toggle sort by score
+        window.toggleSort = function() {
+            sortByScore = !sortByScore;
+            const button = document.getElementById('sort-toggle');
+
+            if (sortByScore) {
+                button.classList.add('active');
+                button.textContent = '📊 SORTED BY SCORE';
+            } else {
+                button.classList.remove('active');
+                button.textContent = '📊 SORT BY SCORE';
+            }
+
+            // Re-render the table with new sort order
+            renderTableBody();
+        };
+
+        // 🔥 CACHE MANAGEMENT FUNCTIONS - STRAIGHT CACHE GRIDDY
+        window.showCacheStatus = async function() {
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cacheDoc = await getDoc(doc(db, cachePath));
+
+                if (!cacheDoc.exists()) {
+                    alert('🔍 GRID CACHE STATUS\n\n❌ No cache found for Week ' + currentWeek + '\n\nNext visitor will generate fresh data.');
+                    return;
+                }
+
+                const cacheData = cacheDoc.data();
+                const cacheAge = Date.now() - new Date(cacheData.createdDate).getTime();
+                const cacheMinutes = Math.round(cacheAge / 1000 / 60);
+                const cacheSeconds = Math.round(cacheAge / 1000);
+
+                const status = `🔥 GRID CACHE STATUS - Week ${currentWeek}
+
+✅ Cache Found: ${cacheData.metadata.totalGames} games, ${cacheData.metadata.poolMembers} players
+📅 Created: ${new Date(cacheData.createdDate).toLocaleString()}
+⏰ Age: ${cacheMinutes}min ${cacheSeconds}s ago
+🚀 Data Source: ${cacheData.metadata.dataSource}
+
+${cacheAge > 15 * 60 * 1000 ? '⚠️ Cache expired (>15min) - will regenerate on next load' : '✅ Cache fresh (<15min) - serving instant loads'}`;
+
+                alert(status);
+                console.log('🔥 GRID_CACHE: Status check completed');
+
+            } catch (error) {
+                console.error('❌ GRID_CACHE: Error checking status:', error);
+                alert('❌ Error checking cache status');
+            }
+        };
+
+        window.clearGridCache = async function() {
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                await deleteDoc(doc(db, cachePath));
+
+                console.log('🗑️ GRID_CACHE: Cache cleared for week', currentWeek);
+                alert('🗑️ Cache cleared for Week ' + currentWeek + '\n\nNext visitor will generate fresh data.');
+
+            } catch (error) {
+                console.error('❌ GRID_CACHE: Error clearing cache:', error);
+                alert('❌ Error clearing cache');
+            }
+        };
+
+        // Update column visibility in the table
+        function updateColumnVisibility() {
+            const table = document.getElementById('picks-table');
+            if (!table) return;
+
+            gameIds.forEach((gameId, index) => {
+                const columnIndex = index + 2; // +2 because first column is player names, and we're targeting game columns
+                const game = bibleData[gameId];
+                const status = getGameStatus(game);
+
+                let group = 'notstarted';
+                if (status === 'completed') group = 'completed';
+                else if (status === 'active') group = 'active';
+
+                const shouldHide = !columnGroups[group].visible;
+
+                // Hide/show header cells (skip player name and total columns)
+                const headerCell = table.querySelector(`thead tr th:nth-child(${columnIndex})`);
+                if (headerCell && !headerCell.classList.contains('total-column')) {
+                    headerCell.style.display = shouldHide ? 'none' : '';
+                }
+
+                // Hide/show body cells (skip player name and total columns)
+                const bodyCells = table.querySelectorAll(`tbody tr td:nth-child(${columnIndex})`);
+                bodyCells.forEach(cell => {
+                    if (!cell.classList.contains('total-column')) {
+                        cell.style.display = shouldHide ? 'none' : '';
+                    }
+                });
+            });
+
+            // Apply dynamic scaling based on visible groups
+            updateDynamicScaling();
+        }
+
+        // Update font sizes and cell sizes based on visible column groups
+        function updateDynamicScaling() {
+            const visibleGroups = Object.values(columnGroups).filter(group => group.visible).length;
+
+            // Calculate scale factors
+            let fontScale = 1;
+            let cellScale = 1;
+
+            if (visibleGroups === 2) {
+                // One group hidden - 25% larger
+                fontScale = 1.25;
+                cellScale = 1.25;
+            } else if (visibleGroups === 1) {
+                // Two groups hidden - 50% larger
+                fontScale = 1.5;
+                cellScale = 1.5;
+            }
+
+            // Apply scaling to table
+            const table = document.getElementById('picks-table');
+            if (table) {
+                // Base sizes
+                const baseFontSize = 12; // base table font
+                const basePickCellSize = 45; // base pick cell width
+                const basePickFontSize = 10; // base pick cell font
+                const baseHeaderFontSize = 12; // base header font
+                const baseCellFontSize = 11; // base td font
+
+                // Apply scaling
+                table.style.fontSize = `${baseFontSize * fontScale}px`;
+
+                // Scale pick cells
+                const pickCells = table.querySelectorAll('.pick-cell');
+                pickCells.forEach(cell => {
+                    const newSize = Math.round(basePickCellSize * cellScale);
+                    cell.style.minWidth = `${newSize}px`;
+                    cell.style.maxWidth = `${newSize}px`;
+                    cell.style.fontSize = `${basePickFontSize * fontScale}px`;
+                });
+
+                // Scale headers
+                const headers = table.querySelectorAll('th');
+                headers.forEach(header => {
+                    header.style.fontSize = `${baseHeaderFontSize * fontScale}px`;
+                });
+
+                // Scale table cells
+                const cells = table.querySelectorAll('td');
+                cells.forEach(cell => {
+                    if (!cell.classList.contains('pick-cell') && !cell.classList.contains('user-name') && !cell.classList.contains('total-column')) {
+                        cell.style.fontSize = `${baseCellFontSize * fontScale}px`;
+                    }
+                });
+
+                // Scale team short text (helmet icons area)
+                const teamShorts = table.querySelectorAll('.team-short');
+                teamShorts.forEach(teamShort => {
+                    teamShort.style.fontSize = `${16 * fontScale}px`;
+                });
+
+                console.log(`🎯 Applied scaling: ${visibleGroups} groups visible, ${Math.round((fontScale - 1) * 100)}% size increase`);
+            }
+        }
+
+        // Show/hide loading
+        function hideLoading() {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('loading-screen').innerHTML = `
+                <div class="text-center">
+                    <div class="text-red-600 mb-4 text-lg">⚠️ ERROR</div>
+                    <p class="text-nerd-green">${message}</p>
+                </div>
+            `;
+        }
+
+        // Initialize when page loads
+        initialize();
+    </script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Completed Weeks Migration Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">🚀 Completed Weeks Migration Admin</h1>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Migration Status</h2>
+            <div id="migration-status" class="text-gray-600">
+                Ready to migrate Week 1 & 2 data to precomputed structure
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Migration Controls</h2>
+
+            <button id="start-migration" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-4">
+                🚀 Start Migration
+            </button>
+
+            <button id="verify-migration" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mr-4">
+                ✅ Verify Migration
+            </button>
+
+            <button id="view-results" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+                📊 View Results
+            </button>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Migration Log</h2>
+            <div id="migration-log" class="bg-gray-50 p-4 rounded h-64 overflow-y-auto font-mono text-sm">
+                <div class="text-gray-500">Migration log will appear here...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Setup with Auth -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Sign in anonymously for permissions
+        try {
+            const userCredential = await signInAnonymously(auth);
+            console.log('🔑 Anonymous authentication successful:', userCredential.user.uid);
+            window.currentUser = userCredential.user;
+        } catch (error) {
+            console.error('❌ Authentication failed:', error);
+            // Try to continue anyway for read operations
+        }
+
+        // Make Firestore functions available globally
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.collection = collection;
+        window.getDocs = getDocs;
+
+        console.log('🔥 Firebase initialized for migration');
+    </script>
+
+    <!-- Load Migration Script -->
+    <script src="./completed-weeks-migrator.js"></script>
+
+    <!-- Admin Interface Script -->
+    <script>
+        // UI Elements
+        const migrationStatus = document.getElementById('migration-status');
+        const migrationLog = document.getElementById('migration-log');
+        const startMigrationBtn = document.getElementById('start-migration');
+        const verifyMigrationBtn = document.getElementById('verify-migration');
+        const viewResultsBtn = document.getElementById('view-results');
+
+        // Log function
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = type === 'error' ? 'text-red-600' : type === 'success' ? 'text-green-600' : 'text-gray-800';
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            migrationLog.appendChild(logEntry);
+            migrationLog.scrollTop = migrationLog.scrollHeight;
+        }
+
+        // Start Migration
+        startMigrationBtn.addEventListener('click', async () => {
+            log('🚀 Starting migration process...', 'info');
+            migrationStatus.textContent = 'Migration in progress...';
+            startMigrationBtn.disabled = true;
+
+            try {
+                const results = await window.migrateCompletedWeeks();
+
+                if (results.errors.length > 0) {
+                    log(`❌ Migration completed with ${results.errors.length} errors`, 'error');
+                    results.errors.forEach(error => log(`  Error: ${error}`, 'error'));
+                } else {
+                    log('✅ Migration completed successfully!', 'success');
+                    log(`  Migrated weeks: ${results.migratedWeeks.join(', ')}`, 'success');
+                    log(`  Total time: ${Math.round(results.performance.totalTime)}ms`, 'info');
+                }
+
+                migrationStatus.textContent = 'Migration completed';
+
+            } catch (error) {
+                log(`❌ Migration failed: ${error.message}`, 'error');
+                migrationStatus.textContent = 'Migration failed';
+            }
+
+            startMigrationBtn.disabled = false;
+        });
+
+        // Verify Migration
+        verifyMigrationBtn.addEventListener('click', async () => {
+            log('✅ Verifying migration data...', 'info');
+
+            try {
+                // Check Week 1
+                const week1Doc = await window.getDoc(window.doc(window.db, 'completed-weeks/week-1'));
+                if (week1Doc.exists()) {
+                    log('✅ Week 1 data found', 'success');
+                    const week1Data = week1Doc.data();
+                    log(`  Week 1 confidence participants: ${Object.keys(week1Data.confidence.userScores).length}`, 'info');
+                    log(`  Week 1 survivor participants: ${Object.keys(week1Data.survivor.userStatus).length}`, 'info');
+                } else {
+                    log('❌ Week 1 data not found', 'error');
+                }
+
+                // Check Week 2
+                const week2Doc = await window.getDoc(window.doc(window.db, 'completed-weeks/week-2'));
+                if (week2Doc.exists()) {
+                    log('✅ Week 2 data found', 'success');
+                    const week2Data = week2Doc.data();
+                    log(`  Week 2 confidence participants: ${Object.keys(week2Data.confidence.userScores).length}`, 'info');
+                    log(`  Week 2 survivor participants: ${Object.keys(week2Data.survivor.userStatus).length}`, 'info');
+                } else {
+                    log('❌ Week 2 data not found', 'error');
+                }
+
+                // Check Season Aggregate
+                const seasonDoc = await window.getDoc(window.doc(window.db, 'completed-weeks/season-aggregate'));
+                if (seasonDoc.exists()) {
+                    log('✅ Season aggregate data found', 'success');
+                    const seasonData = seasonDoc.data();
+                    log(`  Completed weeks: ${seasonData.meta.completedWeeks.join(', ')}`, 'info');
+                } else {
+                    log('❌ Season aggregate data not found', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Verification failed: ${error.message}`, 'error');
+            }
+        });
+
+        // View Results
+        viewResultsBtn.addEventListener('click', async () => {
+            log('📊 Fetching migration results...', 'info');
+
+            try {
+                // Show Week 1 leaderboard as example
+                const week1Doc = await window.getDoc(window.doc(window.db, 'completed-weeks/week-1'));
+                if (week1Doc.exists()) {
+                    const week1Data = week1Doc.data();
+                    log('📊 Week 1 Confidence Leaderboard (Top 5):', 'info');
+
+                    week1Data.confidence.leaderboard.slice(0, 5).forEach((user, index) => {
+                        log(`  ${index + 1}. ${user.displayName}: ${user.totalPoints} points`, 'info');
+                    });
+
+                    log(`📊 Week 1 Stats:`, 'info');
+                    log(`  Average Score: ${Math.round(week1Data.confidence.weekStats.averageScore)}`, 'info');
+                    log(`  High Score: ${week1Data.confidence.weekStats.highScore}`, 'info');
+                    log(`  Participants: ${week1Data.confidence.weekStats.totalParticipants}`, 'info');
+                } else {
+                    log('❌ No Week 1 data to display', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Failed to fetch results: ${error.message}`, 'error');
+            }
+        });
+
+        log('🏆 Migration Admin Interface loaded');
+    </script>
+</body>
+</html>

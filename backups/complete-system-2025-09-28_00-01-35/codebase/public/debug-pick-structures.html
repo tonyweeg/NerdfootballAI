@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Pick Document Structures</title>
+</head>
+<body>
+    <h1>Week 3 Pick Document Structure Analysis</h1>
+    <div id="auth-status">Loading...</div>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, collection, getDocs, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const authStatus = document.getElementById('auth-status');
+            if (user) {
+                authStatus.innerHTML = `<p style="color: green;">✅ Signed in as: ${user.email}</p>`;
+                debugStructures();
+            } else {
+                authStatus.innerHTML = `<button onclick="signIn()" style="background: blue; color: white; padding: 10px;">Sign In with Google</button>`;
+            }
+        });
+
+        window.signIn = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error('Sign in failed:', error);
+            }
+        };
+
+        async function debugStructures() {
+            if (!currentUser) return;
+            const results = document.getElementById('results');
+
+            try {
+                // Load all users for email data
+                const usersSnap = await getDocs(collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users'));
+                const usersMap = {};
+                usersSnap.forEach(doc => {
+                    usersMap[doc.id] = doc.data();
+                });
+
+                console.log('🔥DEBUGKEY🔥 USERS MAP:', usersMap);
+
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const picksSnap = await getDocs(collection(db, picksPath));
+
+                let structures = [];
+
+                picksSnap.forEach(doc => {
+                    const data = doc.data();
+                    const userId = doc.id;
+
+                    // Analyze document structure
+                    const keys = Object.keys(data);
+                    const gameKeys = keys.filter(k => k.match(/^3\d{2}$/)); // 301-316
+                    const nonGameKeys = keys.filter(k => !k.match(/^3\d{2}$/));
+
+                    // Check for alternative key patterns
+                    const altGameKeys = keys.filter(k => k.match(/game_3\d{2}|3\d{2}_game|\d{3}/));
+
+                    const userInfo = usersMap[userId];
+                    structures.push({
+                        userId,
+                        userName: data.userName || userInfo?.name || 'Unknown',
+                        email: userInfo?.email || 'Not found',
+                        totalKeys: keys.length,
+                        gameKeys: gameKeys.length,
+                        nonGameKeys,
+                        alternativeKeys: altGameKeys.length > 0 ? altGameKeys : null,
+                        allKeys: keys,
+                        mnfPoints: data.mnfTotalPoints || data.mondayNightPoints || 'Not found',
+                        sampleData: Object.fromEntries(Object.entries(data).slice(0, 3)) // First 3 entries
+                    });
+                });
+
+                console.log('🔥DEBUGKEY🔥 ALL DOCUMENT STRUCTURES:', structures);
+
+                // Focus on problematic users
+                const andrea = structures.find(s => s.userId === 'bEVzcZtSExT8cIjamWnGbWZ3J5s1');
+                const andrew = structures.find(s => s.userId === 'q8UNFeg4f1YrvrHATgpmcKfploo1');
+
+                console.log('🔥DEBUGKEY🔥 ANDREA STRUCTURE:', andrea);
+                console.log('🔥DEBUGKEY🔥 ANDREW STRUCTURE:', andrew);
+
+                let html = '<h2>Document Structure Analysis</h2>';
+
+                html += '<h3>🚨 Problematic Users:</h3>';
+                if (andrea) {
+                    html += `<div style="border: 2px solid red; padding: 10px; margin: 10px;">
+                        <h4>Andrea Weeg (0/15 issue)</h4>
+                        <p><strong>Game Keys Found:</strong> ${andrea.gameKeys}</p>
+                        <p><strong>Non-Game Keys:</strong> ${andrea.nonGameKeys.join(', ')}</p>
+                        <p><strong>Alternative Keys:</strong> ${andrea.alternativeKeys || 'None'}</p>
+                        <p><strong>All Keys:</strong> ${andrea.allKeys.join(', ')}</p>
+                    </div>`;
+                }
+
+                if (andrew) {
+                    html += `<div style="border: 2px solid orange; padding: 10px; margin: 10px;">
+                        <h4>Andrew Anderson (0 games but has MNF)</h4>
+                        <p><strong>Game Keys Found:</strong> ${andrew.gameKeys}</p>
+                        <p><strong>Non-Game Keys:</strong> ${andrew.nonGameKeys.join(', ')}</p>
+                        <p><strong>Alternative Keys:</strong> ${andrew.alternativeKeys || 'None'}</p>
+                        <p><strong>All Keys:</strong> ${andrew.allKeys.join(', ')}</p>
+                        <p><strong>MNF Points:</strong> ${andrew.mnfPoints}</p>
+                    </div>`;
+                }
+
+                html += '<h3>All Users Summary:</h3>';
+                html += '<table border="1"><tr><th>User</th><th>UserID</th><th>Email</th><th>Game Keys</th><th>Total Keys</th><th>Non-Game Keys</th><th>Alt Keys</th></tr>';
+
+                // Sort by unusual patterns
+                structures.sort((a, b) => a.gameKeys - b.gameKeys);
+
+                structures.forEach(s => {
+                    const suspicious = s.gameKeys === 0 || s.gameKeys < 10;
+                    const rowStyle = suspicious ? 'background-color: #ffcccc;' : '';
+                    html += `<tr style="${rowStyle}">
+                        <td>${s.userName}</td>
+                        <td title="${s.userId}">${s.userId.substring(0, 8)}...</td>
+                        <td>${s.email}</td>
+                        <td>${s.gameKeys}</td>
+                        <td>${s.totalKeys}</td>
+                        <td>${s.nonGameKeys.join(', ')}</td>
+                        <td>${s.alternativeKeys ? s.alternativeKeys.join(', ') : 'None'}</td>
+                    </tr>`;
+                });
+
+                html += '</table>';
+
+                results.innerHTML = html;
+
+            } catch (error) {
+                console.error('🔥DEBUGKEY🔥 ERROR:', error);
+                results.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Debug</title>
+</head>
+<body>
+    <h1>Firebase Auth Debug</h1>
+    <div id="status">Loading...</div>
+    <button id="refresh-token">Refresh Token</button>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged, signOut, signInWithPopup, GoogleAuthProvider } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        document.getElementById('refresh-token').addEventListener('click', async () => {
+            if (auth.currentUser) {
+                try {
+                    const token = await auth.currentUser.getIdToken(true);
+                    document.getElementById('status').innerHTML += `<p>✅ Refreshed token: ${token.substring(0, 50)}...</p>`;
+                } catch (error) {
+                    document.getElementById('status').innerHTML += `<p>❌ Token refresh error: ${error.message}</p>`;
+                }
+            }
+        });
+
+        onAuthStateChanged(auth, async (user) => {
+            const statusDiv = document.getElementById('status');
+
+            if (user) {
+                statusDiv.innerHTML = `
+                    <p>✅ Firebase Auth User:</p>
+                    <pre>UID: ${user.uid}
+Email: ${user.email}
+Display Name: ${user.displayName}
+Email Verified: ${user.emailVerified}
+Provider: ${user.providerData?.[0]?.providerId || 'unknown'}
+Creation Time: ${user.metadata?.creationTime}
+Last Sign In: ${user.metadata?.lastSignInTime}</pre>
+                `;
+
+                try {
+                    // Get ID token for debugging
+                    const token = await user.getIdToken();
+                    statusDiv.innerHTML += `<p>✅ ID Token (first 50 chars): ${token.substring(0, 50)}...</p>`;
+
+                    // Try to decode token payload (basic info)
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    statusDiv.innerHTML += `
+                        <p>✅ Token Claims:</p>
+                        <pre>Issuer: ${payload.iss}
+Audience: ${payload.aud}
+User ID: ${payload.sub}
+Auth Time: ${new Date(payload.auth_time * 1000).toISOString()}
+Issue Time: ${new Date(payload.iat * 1000).toISOString()}
+Expire Time: ${new Date(payload.exp * 1000).toISOString()}</pre>
+                    `;
+
+                    // Test 0: Emergency bypass test (should always work)
+                    const testPath0 = 'emergency-test/bypass-test';
+                    const testRef0 = doc(db, testPath0);
+
+                    try {
+                        const testDoc0 = await getDoc(testRef0);
+                        statusDiv.innerHTML += `<p>✅ Emergency bypass works: ${testDoc0.exists()}</p>`;
+                    } catch (testError0) {
+                        statusDiv.innerHTML += `<p>❌ CRITICAL: Emergency bypass failed: ${testError0.code} - ${testError0.message}</p>`;
+                    }
+
+                    // Test 1: Simple auth rule
+                    const testPath1 = 'test-auth/simple-test';
+                    const testRef1 = doc(db, testPath1);
+
+                    try {
+                        const testDoc1 = await getDoc(testRef1);
+                        statusDiv.innerHTML += `<p>✅ Simple auth test works: ${testDoc1.exists()}</p>`;
+                    } catch (testError1) {
+                        statusDiv.innerHTML += `<p>❌ Simple auth test failed: ${testError1.code} - ${testError1.message}</p>`;
+                    }
+
+                    // Test 2: Cache document access (should work for any authenticated user)
+                    const testPath2 = 'cache/espn_current_data';
+                    const testRef2 = doc(db, testPath2);
+
+                    try {
+                        const testDoc2 = await getDoc(testRef2);
+                        statusDiv.innerHTML += `<p>✅ Cache access works: ${testDoc2.exists()}</p>`;
+                    } catch (testError2) {
+                        statusDiv.innerHTML += `<p>❌ Cache access failed: ${testError2.code} - ${testError2.message}</p>`;
+                    }
+
+                } catch (error) {
+                    statusDiv.innerHTML += `<p>❌ Token/Test Error: ${error.message}</p>`;
+                }
+            } else {
+                statusDiv.innerHTML = '<p>❌ Not authenticated</p><button onclick="signInWithGoogle()">Sign In</button>';
+            }
+        });
+
+        window.signInWithGoogle = async () => {
+            try {
+                const provider = new GoogleAuthProvider();
+                const result = await signInWithPopup(auth, provider);
+                console.log('Signed in:', result.user);
+            } catch (error) {
+                console.error('Sign in error:', error);
+                document.getElementById('status').innerHTML += `<p>❌ Sign in error: ${error.message}</p>`;
+            }
+        };
+    </script>
+</body>
+</html>

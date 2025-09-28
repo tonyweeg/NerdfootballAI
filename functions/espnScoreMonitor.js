@@ -418,18 +418,21 @@ exports.scheduledScoreUpdate = onSchedule('every 2 minutes', async (event) => {
         const now = new Date();
         const month = now.getMonth() + 1; // 1-12
 
-        if (month < 9 || month > 1) {
+        // FIXED: NFL season runs September (9) through January (1) of next year
+        if (month < 9 && month > 1) {
             console.log('🏈 Off-season - skipping score update');
             return;
         }
 
         // Only run during game days (Thursday-Monday)
         const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, etc.
-        if (dayOfWeek < 4 && dayOfWeek > 1) { // Skip Tuesday-Wednesday
+        // FIXED: Skip Tuesday (2) and Wednesday (3) only
+        if (dayOfWeek === 2 || dayOfWeek === 3) {
             console.log('🏈 Non-game day - skipping score update');
             return;
         }
 
+        console.log('🏈 Running scheduled ESPN score update...');
         await monitorESPNScores();
 
     } catch (error) {
