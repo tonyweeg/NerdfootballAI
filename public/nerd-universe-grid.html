@@ -40,6 +40,7 @@
             font-size: 14px;
             line-height: 1.4;
             min-height: 100vh;
+            border: none;
         }
 
         /* Terminal Grid - Ultra Compact */
@@ -259,6 +260,7 @@
             font-family: 'Source Code Pro', monospace;
             padding: 8px;
             margin-bottom: 8px;
+            border: none;
         }
 
         .stats-grid {
@@ -543,6 +545,12 @@
             <button class="toggle-button" id="sort-toggle" onclick="toggleSort()">
                 📊 SORT BY SCORE
             </button>
+            <button class="toggle-button" onclick="showCacheStatus()">
+                🔥 CACHE STATUS
+            </button>
+            <button class="toggle-button" onclick="clearGridCache()">
+                🗑️ CLEAR CACHE
+            </button>
         </div>
 
         <!-- Grid Container -->
@@ -584,7 +592,7 @@
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-        import { getFirestore, doc, getDoc, getDocs, collection, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
         import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js';
 
         // Firebase configuration
@@ -634,7 +642,7 @@
             try {
                 await waitForFirebaseAuth();
 
-                const currentUserId = auth.currentUser?.uid || 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+                const currentUserId = auth.currentUser?.uid;
                 const currentWeekNum = getCurrentWeekNumber();
                 console.log('⚔️ GRID SECURITY INIT:', {
                     authenticatedUser: auth.currentUser?.uid || 'none',
@@ -644,13 +652,26 @@
                 });
 
                 await loadPoolMembers();
-                await loadBibleData();
-                await loadAllPicks();
+
+                // 🔥 CACHE-FIRST LOADING - STRAIGHT CACHE GRIDDY
+                console.log('🎯 GRID_CACHE: Starting cache-first loading for week', currentWeek);
+                const cacheLoaded = await loadFirebaseCachedGrid();
+
+                if (!cacheLoaded) {
+                    console.log('🔥 GRID_CACHE: Cache miss - generating fresh grid data');
+                    await loadBibleData();
+                    await loadAllPicks();
+
+                    renderGrid();
+                    updateStats();
+
+                    // Save fresh data to cache for next visitor
+                    await saveFirebaseCachedGrid();
+                } else {
+                    console.log('⚡ GRID_CACHE: Cache hit - instant grid load!');
+                }
 
                 document.getElementById('week-display').textContent = `WEEK ${currentWeek} • 2025`;
-
-                renderGrid();
-                updateStats();
                 setupWeekNavigation();
                 hideLoading();
             } catch (error) {
@@ -682,10 +703,23 @@
             document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="text-center p-4 text-nerd-grey">LOADING WEEK ' + currentWeek + '...</td></tr>';
 
             try {
-                await loadBibleData();
-                await loadAllPicks();
-                renderGrid();
-                updateStats();
+                // 🔥 CACHE-FIRST LOADING FOR WEEK CHANGE - STRAIGHT CACHE GRIDDY
+                console.log('🎯 GRID_CACHE: Week change to', currentWeek, '- checking cache');
+                const cacheLoaded = await loadFirebaseCachedGrid();
+
+                if (!cacheLoaded) {
+                    console.log('🔥 GRID_CACHE: Cache miss for week', currentWeek, '- generating fresh data');
+                    await loadBibleData();
+                    await loadAllPicks();
+                    renderGrid();
+                    updateStats();
+
+                    // Save fresh data to cache
+                    await saveFirebaseCachedGrid();
+                } else {
+                    console.log('⚡ GRID_CACHE: Cache hit for week', currentWeek, '- instant load!');
+                }
+
                 updateWeekButtons();
             } catch (error) {
                 console.error('❌ Error loading Week', currentWeek, 'data:', error);
@@ -808,6 +842,74 @@
             console.log('✅ Picks loaded for', Object.keys(allPicks).length, 'users');
         }
 
+        // 🔥 FIREBASE CACHE SYSTEM - STRAIGHT CACHE GRIDDY
+        async function loadFirebaseCachedGrid() {
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                console.log('🔍 GRID_CACHE: Checking Firebase cache at', cachePath);
+
+                const cacheDoc = await getDoc(doc(db, cachePath));
+
+                if (!cacheDoc.exists()) {
+                    console.log('❌ GRID_CACHE: No cached data found');
+                    return false;
+                }
+
+                const cacheData = cacheDoc.data();
+                const cacheAge = Date.now() - new Date(cacheData.createdDate).getTime();
+                const maxAge = 15 * 60 * 1000; // 15 minutes
+
+                if (cacheAge > maxAge) {
+                    console.log('⏰ GRID_CACHE: Cache expired (', Math.round(cacheAge / 1000 / 60), 'min old)');
+                    return false;
+                }
+
+                console.log('🎯 GRID_CACHE: Loading cached grid data (', Math.round(cacheAge / 1000), 's old)');
+
+                // Restore cached data
+                bibleData = cacheData.bibleData;
+                allPicks = cacheData.allPicks;
+                gameIds = cacheData.gameIds;
+
+                // Render from cache
+                renderGrid();
+                updateStats();
+
+                console.log('⚡ GRID_CACHE: Successfully loaded from cache!');
+                return true;
+
+            } catch (error) {
+                console.error('❌ GRID_CACHE: Error loading from cache:', error);
+                return false;
+            }
+        }
+
+        async function saveFirebaseCachedGrid() {
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                console.log('💾 GRID_CACHE: Saving grid data to Firebase cache');
+
+                const cacheData = {
+                    createdDate: new Date().toISOString(),
+                    week: currentWeek,
+                    bibleData: bibleData,
+                    allPicks: allPicks,
+                    gameIds: gameIds,
+                    metadata: {
+                        totalGames: gameIds.length,
+                        poolMembers: Object.keys(poolMembers).length,
+                        dataSource: "fresh_generation"
+                    }
+                };
+
+                await setDoc(doc(db, cachePath), cacheData);
+                console.log('✅ GRID_CACHE: Successfully saved to Firebase cache');
+
+            } catch (error) {
+                console.error('❌ GRID_CACHE: Error saving to cache:', error);
+            }
+        }
+
         // Render the picks table
         function renderGrid() {
             console.log(`🎯 Rendering grid for Week ${currentWeek} with gameIds:`, gameIds);
@@ -846,8 +948,7 @@
         function renderTableBody() {
             const tbody = document.getElementById('table-body');
             const memberIds = Object.keys(poolMembers);
-            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
-            const currentUserId = auth.currentUser?.uid || tonyUID;
+            const currentUserId = auth.currentUser?.uid;
 
             const sortedMemberIds = memberIds.sort((a, b) => {
                 if (sortByScore) {
@@ -861,9 +962,7 @@
                     const nameB = (poolMembers[b].name || poolMembers[b].email || 'Unknown').toLowerCase();
                     return nameA.localeCompare(nameB);
                 } else {
-                    // Original sorting: Tony first, then alphabetical
-                    if (a === tonyUID) return -1;
-                    if (b === tonyUID) return 1;
+                    // Alphabetical sorting
                     const nameA = (poolMembers[a].name || poolMembers[a].email || 'Unknown').toLowerCase();
                     const nameB = (poolMembers[b].name || poolMembers[b].email || 'Unknown').toLowerCase();
                     return nameA.localeCompare(nameB);
@@ -875,7 +974,7 @@
                 memberId,
                 member: poolMembers[memberId],
                 userPicks: allPicks[memberId],
-                isTony: memberId === tonyUID,
+                isCurrentUser: memberId === currentUserId,
                 score: calculateUserTotal(allPicks[memberId])
             }));
 
@@ -943,8 +1042,7 @@
         function createPickCellHTML(gameId, userPicks, memberId) {
             const currentWeekNum = getCurrentWeekNumber();
             const isCurrentWeek = currentWeek === currentWeekNum;
-            const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
-            const currentUserId = auth.currentUser?.uid || tonyUID;
+            const currentUserId = auth.currentUser?.uid;
             const isCurrentUser = memberId === currentUserId;
 
             const game = bibleData[gameId];
@@ -1019,7 +1117,7 @@
 
             const consensus = calculateConsensus(memberIds);
             const upsetAlerts = getUpsetAlerts(consensus);
-            const yourContrarian = getContrarianPicks(tonyUID, consensus);
+            const yourContrarian = getContrarianPicks(currentUserId, consensus);
 
             document.getElementById('your-ranking').textContent =
                 yourRanking ? `${yourRanking.rank}/${memberIds.length}` : '-';
@@ -1467,6 +1565,54 @@
 
             // Re-render the table with new sort order
             renderTableBody();
+        };
+
+        // 🔥 CACHE MANAGEMENT FUNCTIONS - STRAIGHT CACHE GRIDDY
+        window.showCacheStatus = async function() {
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cacheDoc = await getDoc(doc(db, cachePath));
+
+                if (!cacheDoc.exists()) {
+                    alert('🔍 GRID CACHE STATUS\n\n❌ No cache found for Week ' + currentWeek + '\n\nNext visitor will generate fresh data.');
+                    return;
+                }
+
+                const cacheData = cacheDoc.data();
+                const cacheAge = Date.now() - new Date(cacheData.createdDate).getTime();
+                const cacheMinutes = Math.round(cacheAge / 1000 / 60);
+                const cacheSeconds = Math.round(cacheAge / 1000);
+
+                const status = `🔥 GRID CACHE STATUS - Week ${currentWeek}
+
+✅ Cache Found: ${cacheData.metadata.totalGames} games, ${cacheData.metadata.poolMembers} players
+📅 Created: ${new Date(cacheData.createdDate).toLocaleString()}
+⏰ Age: ${cacheMinutes}min ${cacheSeconds}s ago
+🚀 Data Source: ${cacheData.metadata.dataSource}
+
+${cacheAge > 15 * 60 * 1000 ? '⚠️ Cache expired (>15min) - will regenerate on next load' : '✅ Cache fresh (<15min) - serving instant loads'}`;
+
+                alert(status);
+                console.log('🔥 GRID_CACHE: Status check completed');
+
+            } catch (error) {
+                console.error('❌ GRID_CACHE: Error checking status:', error);
+                alert('❌ Error checking cache status');
+            }
+        };
+
+        window.clearGridCache = async function() {
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                await deleteDoc(doc(db, cachePath));
+
+                console.log('🗑️ GRID_CACHE: Cache cleared for week', currentWeek);
+                alert('🗑️ Cache cleared for Week ' + currentWeek + '\n\nNext visitor will generate fresh data.');
+
+            } catch (error) {
+                console.error('❌ GRID_CACHE: Error clearing cache:', error);
+                alert('❌ Error clearing cache');
+            }
         };
 
         // Update column visibility in the table
