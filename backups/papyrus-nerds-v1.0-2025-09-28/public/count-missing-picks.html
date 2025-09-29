@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Count Missing Week 3 Picks</title>
+</head>
+<body>
+    <h1>Counting Missing Week 3 Picks...</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getFirestore, collection, getDocs, doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function countMissingPicks() {
+            try {
+                const results = document.getElementById('results');
+                results.innerHTML = 'Loading...';
+
+                // Get pool members
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const poolMembersSnap = await getDoc(doc(db, poolMembersPath));
+                const poolMembers = poolMembersSnap.exists() ? poolMembersSnap.data() : {};
+                const poolMemberIds = Object.keys(poolMembers);
+
+                // Get Week 3 picks
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const picksSnap = await getDocs(collection(db, picksPath));
+                const existingPickIds = [];
+                picksSnap.forEach(doc => existingPickIds.push(doc.id));
+
+                // Find missing users
+                const missingUsers = poolMemberIds.filter(uid => !existingPickIds.includes(uid));
+
+                results.innerHTML = `
+                    <h2>📊 Week 3 Picks Analysis:</h2>
+                    <p><strong>Pool Members Total:</strong> ${poolMemberIds.length}</p>
+                    <p><strong>Have Week 3 Picks:</strong> ${existingPickIds.length}</p>
+                    <p><strong>Missing Week 3 Picks:</strong> ${missingUsers.length}</p>
+                    <p><strong>Missing Users:</strong> ${missingUsers.join(', ')}</p>
+                `;
+
+            } catch (error) {
+                document.getElementById('results').innerHTML = `Error: ${error.message}`;
+                console.error('Error:', error);
+            }
+        }
+
+        countMissingPicks();
+    </script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 VERIFY TONY'S DATA - PICKS & SCORING</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>🔍 VERIFY TONY'S DATA</h1>
+    <button onclick="verifyTonyData()" style="background: blue; color: white; padding: 20px; font-size: 18px;">📊 CHECK TONY'S PICKS & SCORING</button>
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function getBibleData(weekNumber) {
+            console.log(`📖 LOADING BIBLE DATA FOR WEEK ${weekNumber}`);
+            try {
+                const response = await fetch(`./game-data/nfl_2025_week_${weekNumber}_bible.json`);
+                if (!response.ok) {
+                    return null;
+                }
+                const bibleData = await response.json();
+                return bibleData;
+            } catch (error) {
+                console.log(`❌ ERROR loading bible data for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        async function getTonyPicks(weekNumber) {
+            console.log(`🔍 LOADING TONY'S PICKS FOR WEEK ${weekNumber}`);
+            try {
+                const picksDocPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/${TONY_UID}`;
+                const picksDoc = await firebase.firestore().doc(picksDocPath).get();
+
+                if (!picksDoc.exists) {
+                    return null;
+                }
+
+                const picks = picksDoc.data();
+                return picks;
+            } catch (error) {
+                console.error(`❌ ERROR LOADING PICKS FOR WEEK ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        async function getTonyScoring() {
+            console.log(`📊 LOADING TONY'S SCORING DATA`);
+            try {
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+                const scoringDoc = await firebase.firestore().doc(scoringPath).get();
+
+                if (!scoringDoc.exists) {
+                    return null;
+                }
+
+                return scoringDoc.data();
+            } catch (error) {
+                console.error(`❌ ERROR LOADING SCORING DATA:`, error);
+                return null;
+            }
+        }
+
+        function calculateCorrectPoints(picks, bibleData) {
+            if (!picks || !bibleData || !picks.picks) {
+                return { totalPoints: 0, gamesPlayed: 0, gamesWon: 0, gameBreakdown: [] };
+            }
+
+            let totalPoints = 0;
+            let gamesWon = 0;
+            let gamesPlayed = 0;
+            const gameBreakdown = [];
+
+            for (const [gameId, pickData] of Object.entries(picks.picks)) {
+                if (gameId === 'mnfTotalPoints') continue;
+
+                const confidence = pickData.confidence;
+                const pickedTeam = pickData.team;
+
+                const bibleGame = bibleData.find(game => game.gameId === gameId);
+                if (!bibleGame) {
+                    continue;
+                }
+
+                gamesPlayed++;
+
+                if (bibleGame.status === 'Final' && bibleGame.winner) {
+                    const isWin = bibleGame.winner === pickedTeam;
+                    const points = isWin ? confidence : 0;
+
+                    if (isWin) {
+                        gamesWon++;
+                        totalPoints += points;
+                    }
+
+                    gameBreakdown.push({
+                        gameId: gameId,
+                        pickedTeam: pickedTeam,
+                        actualWinner: bibleGame.winner,
+                        confidence: confidence,
+                        points: points,
+                        result: isWin ? '✅ WIN' : '❌ LOSS'
+                    });
+                }
+            }
+
+            return {
+                totalPoints,
+                gamesPlayed,
+                gamesWon,
+                gameBreakdown
+            };
+        }
+
+        async function verifyTonyData() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🔍 VERIFYING TONY\'S DATA...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                // Get Tony's current scoring data
+                const scoringData = await getTonyScoring();
+                if (!scoringData) {
+                    output.innerHTML += '<p>❌ No scoring data found for Tony!</p>';
+                    return;
+                }
+
+                output.innerHTML += `
+                    <h2>📊 CURRENT SCORING DATA</h2>
+                    <p><strong>Display Name:</strong> ${scoringData.displayName}</p>
+                    <p><strong>Total Points:</strong> ${scoringData.totalPoints}</p>
+                    <p><strong>Weeks Played:</strong> ${scoringData.seasonStats?.weeksPlayed || 0}</p>
+                    <p><strong>Games Won:</strong> ${scoringData.seasonStats?.gamesWon || 0}</p>
+                    <p><strong>Last Updated:</strong> ${scoringData.lastUpdated || 'N/A'}</p>
+                    <hr>
+                `;
+
+                let totalCorrectPoints = 0;
+                let totalCorrectWins = 0;
+                let weeksProcessed = 0;
+
+                // Check weeks 1-3
+                for (let week = 1; week <= 3; week++) {
+                    output.innerHTML += `<h3>📅 WEEK ${week} VERIFICATION</h3>`;
+
+                    // Get Tony's picks
+                    const picks = await getTonyPicks(week);
+                    if (!picks) {
+                        output.innerHTML += `<p>❌ No picks found for Week ${week}</p>`;
+                        continue;
+                    }
+
+                    // Get bible data
+                    const bibleData = await getBibleData(week);
+                    if (!bibleData) {
+                        output.innerHTML += `<p>❌ No bible data found for Week ${week}</p>`;
+                        continue;
+                    }
+
+                    // Calculate correct points
+                    const correctCalc = calculateCorrectPoints(picks, bibleData);
+                    totalCorrectPoints += correctCalc.totalPoints;
+                    totalCorrectWins += correctCalc.gamesWon;
+                    weeksProcessed++;
+
+                    // Get current scoring data for this week
+                    const currentWeekData = scoringData.weeklyPoints?.[week] || {};
+
+                    output.innerHTML += `
+                        <table border="1" style="border-collapse: collapse; margin-bottom: 20px;">
+                            <tr>
+                                <th>Data Source</th>
+                                <th>Points</th>
+                                <th>Games Won</th>
+                                <th>Games Played</th>
+                            </tr>
+                            <tr>
+                                <td><strong>CURRENT (stored)</strong></td>
+                                <td>${currentWeekData.totalPoints || 0}</td>
+                                <td>${currentWeekData.gamesWon || 0}</td>
+                                <td>${currentWeekData.gamesPlayed || 0}</td>
+                            </tr>
+                            <tr style="background: #e8f5e8;">
+                                <td><strong>CORRECT (calculated)</strong></td>
+                                <td>${correctCalc.totalPoints}</td>
+                                <td>${correctCalc.gamesWon}</td>
+                                <td>${correctCalc.gamesPlayed}</td>
+                            </tr>
+                        </table>
+                    `;
+
+                    // Show game-by-game breakdown
+                    if (correctCalc.gameBreakdown.length > 0) {
+                        output.innerHTML += `
+                            <h4>🎯 Game-by-Game Breakdown</h4>
+                            <table border="1" style="border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+                                <tr><th>Game</th><th>Picked</th><th>Actual Winner</th><th>Confidence</th><th>Points</th><th>Result</th></tr>
+                        `;
+
+                        correctCalc.gameBreakdown.forEach(game => {
+                            const rowColor = game.result === '✅ WIN' ? '#e8f5e8' : '#ffe8e8';
+                            output.innerHTML += `
+                                <tr style="background: ${rowColor};">
+                                    <td>${game.gameId}</td>
+                                    <td>${game.pickedTeam}</td>
+                                    <td>${game.actualWinner}</td>
+                                    <td>${game.confidence}</td>
+                                    <td><strong>${game.points}</strong></td>
+                                    <td>${game.result}</td>
+                                </tr>
+                            `;
+                        });
+
+                        output.innerHTML += '</table>';
+                    }
+                }
+
+                // Final summary
+                output.innerHTML += `
+                    <hr>
+                    <h2>🏆 FINAL VERIFICATION SUMMARY</h2>
+                    <table border="1" style="border-collapse: collapse; font-size: 16px;">
+                        <tr>
+                            <th>Metric</th>
+                            <th>CURRENT (stored)</th>
+                            <th>CORRECT (calculated)</th>
+                            <th>Status</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Total Points</strong></td>
+                            <td>${scoringData.totalPoints}</td>
+                            <td>${totalCorrectPoints}</td>
+                            <td style="color: ${scoringData.totalPoints === totalCorrectPoints ? 'green' : 'red'};">
+                                ${scoringData.totalPoints === totalCorrectPoints ? '✅ CORRECT' : '❌ WRONG'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Total Games Won</strong></td>
+                            <td>${scoringData.seasonStats?.gamesWon || 0}</td>
+                            <td>${totalCorrectWins}</td>
+                            <td style="color: ${(scoringData.seasonStats?.gamesWon || 0) === totalCorrectWins ? 'green' : 'red'};">
+                                ${(scoringData.seasonStats?.gamesWon || 0) === totalCorrectWins ? '✅ CORRECT' : '❌ WRONG'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Weeks Processed</strong></td>
+                            <td>${scoringData.seasonStats?.weeksPlayed || 0}</td>
+                            <td>${weeksProcessed}</td>
+                            <td style="color: ${(scoringData.seasonStats?.weeksPlayed || 0) === weeksProcessed ? 'green' : 'red'};">
+                                ${(scoringData.seasonStats?.weeksPlayed || 0) === weeksProcessed ? '✅ CORRECT' : '❌ WRONG'}
+                            </td>
+                        </tr>
+                    </table>
+                `;
+
+                if (scoringData.totalPoints !== totalCorrectPoints || (scoringData.seasonStats?.gamesWon || 0) !== totalCorrectWins) {
+                    output.innerHTML += `
+                        <div style="background: #ffeeee; padding: 20px; margin: 20px 0; border: 2px solid red;">
+                            <h3 style="color: red;">🚨 SCORING DATA IS INCORRECT!</h3>
+                            <p><strong>You should have ${totalCorrectPoints} points, but scoring shows ${scoringData.totalPoints}</strong></p>
+                            <p><strong>You should have ${totalCorrectWins} games won, but scoring shows ${scoringData.seasonStats?.gamesWon || 0}</strong></p>
+                            <p>Run the comprehensive fix to correct this!</p>
+                        </div>
+                    `;
+                } else {
+                    output.innerHTML += `
+                        <div style="background: #eeffee; padding: 20px; margin: 20px 0; border: 2px solid green;">
+                            <h3 style="color: green;">✅ SCORING DATA IS CORRECT!</h3>
+                            <p>Your scoring data matches the bible calculations perfectly.</p>
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('❌ VERIFICATION ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ VERIFICATION FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💎 Invite Link Functionality Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .test-section { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .code-display { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <h1>💎 Pool Invite Link Functionality Test</h1>
+    
+    <div class="test-section">
+        <h2>🔍 Test Status</h2>
+        <div id="test-status" class="status info">
+            Ready to test invite functionality...
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>1️⃣ Test Invite Code Generation</h2>
+        <button onclick="testInviteGeneration()">Generate Test Invite Code</button>
+        <div id="generated-code" class="code-display" style="display: none;"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2️⃣ Test URL Parsing</h2>
+        <p>Test URLs with invite parameters:</p>
+        <button onclick="testURLParsing('ABC123')">Test: ?invite=ABC123</button>
+        <button onclick="testURLParsing('XYZ789-DEF456')">Test: ?invite=XYZ789-DEF456</button>
+        <div id="url-test-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3️⃣ Test Invite Link Creation</h2>
+        <button onclick="testInviteLinkCreation()">Create Test Invite Link</button>
+        <div id="invite-link-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4️⃣ Test Invite Validation Logic</h2>
+        <button onclick="testValidation('valid-code-123')">Test Valid Code Format</button>
+        <button onclick="testValidation('')">Test Empty Code</button>
+        <button onclick="testValidation('invalid@code!')">Test Invalid Characters</button>
+        <div id="validation-results"></div>
+    </div>
+
+    <script>
+        // Mock the required functions to test invite logic
+        
+        function generateSecureInviteCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = '';
+            for (let i = 0; i < 8; i++) {
+                code += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return code;
+        }
+        
+        function testInviteGeneration() {
+            const code = generateSecureInviteCode();
+            document.getElementById('generated-code').style.display = 'block';
+            document.getElementById('generated-code').innerHTML = `
+                <strong>Generated Code:</strong> ${code}<br>
+                <strong>Length:</strong> ${code.length} characters<br>
+                <strong>Format:</strong> ${/^[A-Z0-9]{8}$/.test(code) ? '✅ Valid' : '❌ Invalid'}
+            `;
+            updateStatus('Generated invite code successfully!', 'success');
+        }
+        
+        function testURLParsing(inviteCode) {
+            const testURL = `${window.location.origin}${window.location.pathname}?invite=${inviteCode}`;
+            const url = new URL(testURL);
+            const extractedCode = url.searchParams.get('invite');
+            
+            const results = document.getElementById('url-test-results');
+            results.innerHTML += `
+                <div class="status ${extractedCode === inviteCode ? 'success' : 'error'}" style="margin: 10px 0;">
+                    <strong>Test URL:</strong> ${testURL}<br>
+                    <strong>Expected:</strong> ${inviteCode}<br>
+                    <strong>Extracted:</strong> ${extractedCode}<br>
+                    <strong>Result:</strong> ${extractedCode === inviteCode ? '✅ PASS' : '❌ FAIL'}
+                </div>
+            `;
+        }
+        
+        function testInviteLinkCreation() {
+            const code = generateSecureInviteCode();
+            const baseURL = `${window.location.origin}/index.html`;
+            const inviteURL = `${baseURL}?invite=${code}`;
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+            
+            const mockInvite = {
+                code: code,
+                url: inviteURL,
+                poolId: 'test-pool-123',
+                createdBy: 'test-user',
+                createdAt: new Date().toISOString(),
+                expiresAt: expiresAt.toISOString(),
+                status: 'active',
+                maxUses: 10,
+                currentUses: 0
+            };
+            
+            document.getElementById('invite-link-results').innerHTML = `
+                <div class="status success">
+                    <strong>✅ Invite Link Created Successfully!</strong><br><br>
+                    <strong>Code:</strong> ${mockInvite.code}<br>
+                    <strong>URL:</strong> <a href="${mockInvite.url}" target="_blank">${mockInvite.url}</a><br>
+                    <strong>Pool ID:</strong> ${mockInvite.poolId}<br>
+                    <strong>Expires:</strong> ${new Date(mockInvite.expiresAt).toLocaleDateString()}<br>
+                    <strong>Max Uses:</strong> ${mockInvite.maxUses}<br>
+                    <strong>Current Uses:</strong> ${mockInvite.currentUses}
+                </div>
+            `;
+            updateStatus('Created invite link successfully!', 'success');
+        }
+        
+        function testValidation(testCode) {
+            const isValid = testCode && testCode.length > 0 && /^[A-Z0-9-]+$/i.test(testCode);
+            const isEmpty = !testCode || testCode.trim() === '';
+            const hasInvalidChars = testCode && !/^[A-Z0-9-]+$/i.test(testCode);
+            
+            let result = '';
+            let status = 'success';
+            
+            if (isEmpty) {
+                result = '❌ FAIL: Empty code';
+                status = 'error';
+            } else if (hasInvalidChars) {
+                result = '❌ FAIL: Invalid characters';
+                status = 'error';
+            } else {
+                result = '✅ PASS: Valid format';
+            }
+            
+            document.getElementById('validation-results').innerHTML += `
+                <div class="status ${status}" style="margin: 10px 0;">
+                    <strong>Test Code:</strong> "${testCode}"<br>
+                    <strong>Result:</strong> ${result}
+                </div>
+            `;
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('test-status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+        
+        // Initialize
+        updateStatus('💎 Ready to test invite functionality! Click buttons to run tests.', 'info');
+        
+        // Test URL parameter detection on page load
+        const urlParams = new URLSearchParams(window.location.search);
+        const inviteCode = urlParams.get('invite');
+        
+        if (inviteCode) {
+            updateStatus(`🎯 Detected invite code in URL: ${inviteCode}`, 'success');
+            document.getElementById('url-test-results').innerHTML = `
+                <div class="status success">
+                    <strong>✅ URL Parameter Detection Working!</strong><br>
+                    <strong>Detected Code:</strong> ${inviteCode}<br>
+                    <strong>Source URL:</strong> ${window.location.href}
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

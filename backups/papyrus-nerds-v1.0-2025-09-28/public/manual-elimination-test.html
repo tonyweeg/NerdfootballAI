@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manual Elimination Test</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Manual Elimination Test</h1>
+    <div id="output"></div>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        function log(message) {
+            console.log(message);
+            document.getElementById('output').innerHTML += message + '<br>';
+        }
+
+        async function testElimination() {
+            log('🚀 Starting manual elimination test...');
+
+            try {
+                // Test specific user who picked Miami
+                const userId = 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2';
+
+                log(`🔍 Checking user ${userId}...`);
+
+                // Get user's survivor picks
+                const userPicksDocRef = db.doc(`artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`);
+                const userPicksSnap = await userPicksDocRef.get();
+
+                if (!userPicksSnap.exists) {
+                    log(`❌ User ${userId} has no survivor picks document`);
+                    return;
+                }
+
+                const userPicksData = userPicksSnap.data();
+                const userPicks = userPicksData.picks || {};
+                const week1Pick = userPicks[1];
+
+                if (!week1Pick) {
+                    log(`❌ User ${userId} has no Week 1 pick`);
+                    return;
+                }
+
+                log(`📊 User ${userId} Week 1 pick: ${JSON.stringify(week1Pick)}`);
+
+                // Check current survivor status
+                const statusDocRef = db.doc('artifacts/nerdfootball/public/data/nerdSurvivor_status');
+                const statusSnap = await statusDocRef.get();
+                const allStatuses = statusSnap.exists ? statusSnap.data() : {};
+                const currentStatus = allStatuses[userId];
+
+                log(`📊 Current status for ${userId}: ${JSON.stringify(currentStatus)}`);
+
+                // If Miami Dolphins picked and not already eliminated, eliminate them
+                if (week1Pick.team === 'Miami Dolphins' && (!currentStatus || !currentStatus.eliminated)) {
+                    log(`❌ User ${userId} picked Miami Dolphins (Week 1 loser) - eliminating...`);
+
+                    const eliminationUpdate = {};
+                    eliminationUpdate[`${userId}.eliminated`] = true;
+                    eliminationUpdate[`${userId}.eliminatedWeek`] = 1;
+                    eliminationUpdate[`${userId}.eliminatedDate`] = new Date().toISOString();
+                    eliminationUpdate[`${userId}.eliminationReason`] = 'Lost in Week 1: Picked Miami Dolphins';
+
+                    log(`📝 Writing elimination update: ${JSON.stringify(eliminationUpdate)}`);
+
+                    await statusDocRef.set(eliminationUpdate, { merge: true });
+                    log(`✅ Successfully eliminated user ${userId}`);
+
+                    // Verify the write
+                    const verifySnap = await statusDocRef.get();
+                    const verifyData = verifySnap.data();
+                    const verifyStatus = verifyData[userId];
+                    log(`🔍 Verification - User ${userId} status: ${JSON.stringify(verifyStatus)}`);
+
+                } else {
+                    log(`ℹ️ User ${userId} either didn't pick Miami or is already eliminated`);
+                }
+
+                log('🎉 Manual elimination test complete!');
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+                console.error('Full error:', error);
+            }
+        }
+
+        // Run test when page loads
+        window.addEventListener('load', () => {
+            log('🔄 Page loaded, starting test in 2 seconds...');
+            setTimeout(testElimination, 2000);
+        });
+    </script>
+</body>
+</html>

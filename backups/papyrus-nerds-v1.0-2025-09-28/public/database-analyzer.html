@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NerdFootball Database Structure Analyzer</title>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #2a2a2a;
+            border-radius: 8px;
+            background: rgba(26, 26, 26, 0.95);
+        }
+        .error { color: #ff4444; }
+        .success { color: #00ff41; }
+        .warning { color: #ffaa00; }
+        .info { color: #4488ff; }
+        button {
+            padding: 12px 24px;
+            margin: 10px;
+            background: #00ff41;
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover { background: #00cc34; }
+        pre {
+            background: #111;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            border-left: 4px solid #00ff41;
+        }
+        .data-table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #333;
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 12px;
+        }
+        .data-table th {
+            background: #2a2a2a;
+            color: #00ff41;
+        }
+        .structure-item {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: #1a1a1a;
+        }
+        .field-type { color: #ffaa00; font-weight: bold; }
+        .field-name { color: #4488ff; font-weight: bold; }
+        .sample-data { color: #888; font-style: italic; }
+        .relationship {
+            background: #2a1a1a;
+            border-left: 4px solid #ff4444;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="section">
+            <h1>🏈 NerdFootball Database Structure Analyzer</h1>
+            <div id="authStatus">Loading...</div>
+        </div>
+
+        <div class="section controls">
+            <button onclick="analyzeGamesStructure()">📊 Analyze Games Data</button>
+            <button onclick="analyzeConfidencePicksStructure()">🎯 Analyze Confidence Picks</button>
+            <button onclick="analyzeSurvivorPicksStructure()">💀 Analyze Survivor Picks</button>
+            <button onclick="analyzeResultsStructure()">🏆 Analyze Game Results</button>
+            <button onclick="analyzeScoringStructure()">📈 Analyze Scoring Documents</button>
+            <button onclick="generateRelationshipMap()">🗺️ Generate Relationship Map</button>
+            <button onclick="clearAll()">🧹 Clear All</button>
+        </div>
+
+        <div id="analysisResults"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc, collection, getDocs, query, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Make globally available
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.query = query;
+        window.limit = limit;
+
+        // Auto-auth for admin
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        async function checkAdminAccess() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const adminUID = urlParams.get('admin');
+            if (adminUID && ADMIN_UIDS.includes(adminUID)) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            }
+
+            return new Promise((resolve) => {
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    unsubscribe();
+                    resolve(user && ADMIN_UIDS.includes(user.uid));
+                });
+            });
+        }
+
+        // Auto-authenticate
+        (async () => {
+            const isAdmin = await checkAdminAccess();
+            if (isAdmin) {
+                document.getElementById('authStatus').innerHTML = '<span class="success">✅ Admin authenticated - Database analysis ready</span>';
+            } else {
+                document.getElementById('authStatus').innerHTML = '<span class="error">❌ Admin access required</span>';
+            }
+        })();
+
+        // Global analysis storage
+        window.analysisData = {
+            games: null,
+            confidencePicks: null,
+            survivorPicks: null,
+            results: null,
+            scoring: null
+        };
+
+        function log(message, type = 'info') {
+            const colors = {
+                error: '#ff4444',
+                success: '#00ff41',
+                warning: '#ffaa00',
+                info: '#4488ff'
+            };
+            console.log(`%c${message}`, `color: ${colors[type]}`);
+        }
+
+        function analyzeObjectStructure(obj, sampleKey = null) {
+            const structure = {};
+            const sampleData = {};
+
+            function analyzeValue(value, path = '') {
+                if (value === null || value === undefined) {
+                    return 'null';
+                } else if (typeof value === 'boolean') {
+                    return 'boolean';
+                } else if (typeof value === 'number') {
+                    return 'number';
+                } else if (typeof value === 'string') {
+                    return 'string';
+                } else if (Array.isArray(value)) {
+                    return `array[${value.length > 0 ? analyzeValue(value[0]) : 'unknown'}]`;
+                } else if (typeof value === 'object') {
+                    const nested = {};
+                    Object.keys(value).slice(0, 5).forEach(key => {
+                        nested[key] = analyzeValue(value[key], `${path}.${key}`);
+                    });
+                    return nested;
+                }
+                return typeof value;
+            }
+
+            Object.keys(obj).slice(0, 10).forEach(key => {
+                structure[key] = analyzeValue(obj[key]);
+                if (sampleKey && key === sampleKey) {
+                    sampleData[key] = obj[key];
+                }
+            });
+
+            return { structure, sampleData };
+        }
+
+        window.analyzeGamesStructure = async function() {
+            try {
+                log('📊 Analyzing Games Data Structure...', 'info');
+
+                const results = [];
+
+                // Analyze multiple weeks to get comprehensive structure
+                for (let week = 1; week <= 4; week++) {
+                    const gamesRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`);
+                    const gamesSnap = await getDoc(gamesRef);
+
+                    if (gamesSnap.exists) {
+                        const gamesData = gamesSnap.data();
+                        const analysis = analyzeObjectStructure(gamesData, Object.keys(gamesData).find(k => !k.startsWith('_')));
+
+                        results.push({
+                            week: week,
+                            gameCount: Object.keys(gamesData).filter(k => !k.startsWith('_')).length,
+                            structure: analysis.structure,
+                            sampleGame: analysis.sampleData
+                        });
+                    }
+                }
+
+                window.analysisData.games = results;
+
+                let html = '<div class="section"><h2>📊 Games Data Structure Analysis</h2>';
+
+                results.forEach(result => {
+                    html += `<div class="structure-item">
+                        <h3>Week ${result.week} - ${result.gameCount} games</h3>
+                        <pre>${JSON.stringify(result.structure, null, 2)}</pre>
+                        ${Object.keys(result.sampleGame).length > 0 ? `<h4>Sample Game:</h4><pre>${JSON.stringify(result.sampleGame, null, 2)}</pre>` : ''}
+                    </div>`;
+                });
+
+                html += '</div>';
+
+                document.getElementById('analysisResults').innerHTML = html;
+                log('✅ Games analysis complete', 'success');
+
+            } catch (error) {
+                log(`❌ Error analyzing games: ${error.message}`, 'error');
+            }
+        };
+
+        window.analyzeConfidencePicksStructure = async function() {
+            try {
+                log('🎯 Analyzing Confidence Picks Structure...', 'info');
+
+                const results = [];
+
+                // Analyze picks for multiple weeks
+                for (let week = 1; week <= 4; week++) {
+                    try {
+                        const picksRef = collection(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`);
+                        const picksQuery = query(picksRef, limit(3)); // Sample 3 users
+                        const picksSnap = await getDocs(picksQuery);
+
+                        const weekResults = {
+                            week: week,
+                            userCount: picksSnap.size,
+                            structures: [],
+                            samples: []
+                        };
+
+                        picksSnap.forEach((doc) => {
+                            const picksData = doc.data();
+                            const analysis = analyzeObjectStructure(picksData);
+
+                            weekResults.structures.push({
+                                userId: doc.id.slice(-6),
+                                pickCount: Object.keys(picksData).length,
+                                structure: analysis.structure
+                            });
+
+                            if (weekResults.samples.length < 2) {
+                                weekResults.samples.push({
+                                    userId: doc.id.slice(-6),
+                                    samplePicks: Object.entries(picksData).slice(0, 3).reduce((acc, [key, value]) => {
+                                        acc[key] = value;
+                                        return acc;
+                                    }, {})
+                                });
+                            }
+                        });
+
+                        results.push(weekResults);
+                    } catch (error) {
+                        log(`⚠️ Week ${week} picks not found or error: ${error.message}`, 'warning');
+                    }
+                }
+
+                window.analysisData.confidencePicks = results;
+
+                let html = '<div class="section"><h2>🎯 Confidence Picks Structure Analysis</h2>';
+
+                results.forEach(result => {
+                    html += `<div class="structure-item">
+                        <h3>Week ${result.week} - ${result.userCount} users</h3>`;
+
+                    result.structures.forEach((struct, idx) => {
+                        html += `<h4>User ${struct.userId} (${struct.pickCount} picks):</h4>
+                                <pre>${JSON.stringify(struct.structure, null, 2)}</pre>`;
+                    });
+
+                    if (result.samples.length > 0) {
+                        html += '<h4>Sample Picks:</h4>';
+                        result.samples.forEach(sample => {
+                            html += `<h5>User ${sample.userId}:</h5><pre>${JSON.stringify(sample.samplePicks, null, 2)}</pre>`;
+                        });
+                    }
+
+                    html += '</div>';
+                });
+
+                html += '</div>';
+
+                document.getElementById('analysisResults').innerHTML += html;
+                log('✅ Confidence picks analysis complete', 'success');
+
+            } catch (error) {
+                log(`❌ Error analyzing confidence picks: ${error.message}`, 'error');
+            }
+        };
+
+        window.analyzeSurvivorPicksStructure = async function() {
+            try {
+                log('💀 Analyzing Survivor Picks Structure...', 'info');
+
+                // Try as collection first
+                try {
+                    const survivorRef = collection(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_picks');
+                    const survivorQuery = query(survivorRef, limit(5));
+                    const survivorSnap = await getDocs(survivorQuery);
+
+                    if (survivorSnap.empty) {
+                        log('❌ No survivor picks found in collection', 'error');
+                        return;
+                    }
+
+                    const results = [];
+                    survivorSnap.forEach((doc) => {
+                        results.push({
+                            userId: doc.id.slice(-6),
+                            data: doc.data()
+                        });
+                    });
+
+                    const analysis = analyzeObjectStructure(results[0].data);
+
+                    window.analysisData.survivorPicks = {
+                        userCount: survivorSnap.size,
+                        structure: analysis.structure,
+                        samples: results.slice(0, 3).reduce((acc, item) => {
+                            acc[item.userId] = item.data;
+                            return acc;
+                        }, {})
+                    };
+
+                } catch (collectionError) {
+                    // Try as single document
+                    log('Trying as single document...', 'info');
+                    const survivorRef = doc(db, 'artifacts/nerdfootball/public/data/nerdSurvivor_picks/data');
+                    const survivorSnap = await getDoc(survivorRef);
+
+                    if (!survivorSnap.exists) {
+                        log('❌ No survivor picks found as document either', 'error');
+                        return;
+                    }
+
+                    const survivorData = survivorSnap.data();
+                    const analysis = analyzeObjectStructure(survivorData);
+
+                    // Sample some user data
+                    const sampleUsers = Object.keys(survivorData).slice(0, 3);
+                    const samples = {};
+                    sampleUsers.forEach(userId => {
+                        samples[userId.slice(-6)] = survivorData[userId];
+                    });
+
+                    window.analysisData.survivorPicks = {
+                        userCount: Object.keys(survivorData).length,
+                        structure: analysis.structure,
+                        samples: samples
+                    };
+                }
+
+                // Render results
+                const data = window.analysisData.survivorPicks;
+                let html = '<div class="section"><h2>💀 Survivor Picks Structure Analysis</h2>';
+                html += `<div class="structure-item">
+                    <h3>Total Users: ${data.userCount}</h3>
+                    <h4>Data Structure:</h4>
+                    <pre>${JSON.stringify(data.structure, null, 2)}</pre>
+                    <h4>Sample User Data:</h4>
+                    <pre>${JSON.stringify(data.samples, null, 2)}</pre>
+                </div></div>`;
+
+                document.getElementById('analysisResults').innerHTML += html;
+                log('✅ Survivor picks analysis complete', 'success');
+
+            } catch (error) {
+                log(`❌ Error analyzing survivor picks: ${error.message}`, 'error');
+            }
+        };
+
+        window.analyzeResultsStructure = async function() {
+            try {
+                log('🏆 Analyzing Game Results Structure...', 'info');
+
+                const results = [];
+
+                // Analyze results for multiple weeks
+                for (let week = 1; week <= 4; week++) {
+                    try {
+                        const resultsRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`);
+                        const resultsSnap = await getDoc(resultsRef);
+
+                        if (resultsSnap.exists) {
+                            const resultsData = resultsSnap.data();
+                            const analysis = analyzeObjectStructure(resultsData, Object.keys(resultsData)[0]);
+
+                            results.push({
+                                week: week,
+                                gameCount: Object.keys(resultsData).length,
+                                structure: analysis.structure,
+                                sampleResult: analysis.sampleData
+                            });
+                        }
+                    } catch (error) {
+                        log(`⚠️ Week ${week} results not found: ${error.message}`, 'warning');
+                    }
+                }
+
+                window.analysisData.results = results;
+
+                let html = '<div class="section"><h2>🏆 Game Results Structure Analysis</h2>';
+
+                results.forEach(result => {
+                    html += `<div class="structure-item">
+                        <h3>Week ${result.week} - ${result.gameCount} games</h3>
+                        <pre>${JSON.stringify(result.structure, null, 2)}</pre>
+                        ${Object.keys(result.sampleResult).length > 0 ? `<h4>Sample Result:</h4><pre>${JSON.stringify(result.sampleResult, null, 2)}</pre>` : ''}
+                    </div>`;
+                });
+
+                html += '</div>';
+
+                document.getElementById('analysisResults').innerHTML += html;
+                log('✅ Results analysis complete', 'success');
+
+            } catch (error) {
+                log(`❌ Error analyzing results: ${error.message}`, 'error');
+            }
+        };
+
+        window.analyzeScoringStructure = async function() {
+            try {
+                log('📈 Analyzing Scoring Documents Structure...', 'info');
+
+                // Sample a few scoring documents
+                const scoringRef = collection(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users');
+                const scoringQuery = query(scoringRef, limit(3));
+                const scoringSnap = await getDocs(scoringQuery);
+
+                const results = [];
+
+                scoringSnap.forEach((doc) => {
+                    const scoringData = doc.data();
+                    const analysis = analyzeObjectStructure(scoringData);
+
+                    results.push({
+                        userId: doc.id.slice(-6),
+                        structure: analysis.structure,
+                        sampleData: {
+                            totalPoints: scoringData.totalPoints,
+                            weeklyPoints: Object.keys(scoringData.weeklyPoints || {}).length,
+                            lastUpdated: scoringData.lastUpdated
+                        }
+                    });
+                });
+
+                window.analysisData.scoring = results;
+
+                let html = '<div class="section"><h2>📈 Scoring Documents Structure Analysis</h2>';
+
+                results.forEach(result => {
+                    html += `<div class="structure-item">
+                        <h3>User ${result.userId}</h3>
+                        <h4>Structure:</h4>
+                        <pre>${JSON.stringify(result.structure, null, 2)}</pre>
+                        <h4>Summary:</h4>
+                        <pre>${JSON.stringify(result.sampleData, null, 2)}</pre>
+                    </div>`;
+                });
+
+                html += '</div>';
+
+                document.getElementById('analysisResults').innerHTML += html;
+                log('✅ Scoring analysis complete', 'success');
+
+            } catch (error) {
+                log(`❌ Error analyzing scoring: ${error.message}`, 'error');
+            }
+        };
+
+        window.generateRelationshipMap = function() {
+            log('🗺️ Generating Relationship Map...', 'info');
+
+            let html = '<div class="section"><h2>🗺️ NerdFootball Data Relationship Map</h2>';
+
+            // Key relationships
+            html += `
+                <div class="relationship">
+                    <h3>📊 Games → 🎯 Picks → 📈 Scoring Flow</h3>
+                    <p><strong>Path:</strong> games/{week} → picks/{week}/submissions/{userId} → scoring-users/{userId}</p>
+                    <ul>
+                        <li><span class="field-name">Games</span> contain: status, winner, scores, team info</li>
+                        <li><span class="field-name">Picks</span> contain: team selection, confidence values</li>
+                        <li><span class="field-name">Scoring</span> contains: calculated points, weekly rollups</li>
+                    </ul>
+                </div>
+
+                <div class="relationship">
+                    <h3>🏆 Games → Results Flow</h3>
+                    <p><strong>Path:</strong> games/{week} → results/{week}</p>
+                    <ul>
+                        <li>Games data gets processed into results when FINAL</li>
+                        <li>Results are used for survivor elimination calculations</li>
+                        <li>Results feed into scoring system for points calculation</li>
+                    </ul>
+                </div>
+
+                <div class="relationship">
+                    <h3>💀 Survivor Picks → Games Relationship</h3>
+                    <p><strong>Path:</strong> nerdSurvivor_picks → games/{week}</p>
+                    <ul>
+                        <li>Survivor picks stored by user and week</li>
+                        <li>Elimination calculated against final game results</li>
+                        <li>Single pick per user per week</li>
+                    </ul>
+                </div>
+
+                <div class="relationship">
+                    <h3>🔑 Key Fields for Scoring System</h3>
+                    <table class="data-table">
+                        <tr><th>Table</th><th>Key Fields</th><th>Purpose</th></tr>
+                        <tr><td>Games</td><td>status, winner, awayScore, homeScore</td><td>Determine final results</td></tr>
+                        <tr><td>Picks</td><td>team, confidence</td><td>User selections and weighting</td></tr>
+                        <tr><td>Results</td><td>winner, status</td><td>Processed game outcomes</td></tr>
+                        <tr><td>Scoring</td><td>weeklyPoints, totalPoints</td><td>Calculated user scores</td></tr>
+                    </table>
+                </div>
+
+                <div class="relationship">
+                    <h3>🚨 Critical Dependencies</h3>
+                    <ul>
+                        <li><span class="field-name">Game.status</span> must contain "FINAL" for scoring</li>
+                        <li><span class="field-name">Game.winner</span> must be populated for points calculation</li>
+                        <li><span class="field-name">Pick.confidence</span> determines point value (1-16 typically)</li>
+                        <li><span class="field-name">Pick.team</span> must match Game.winner exactly</li>
+                    </ul>
+                </div>
+            `;
+
+            html += '</div>';
+
+            document.getElementById('analysisResults').innerHTML += html;
+            log('✅ Relationship map generated', 'success');
+        };
+
+        window.clearAll = function() {
+            document.getElementById('analysisResults').innerHTML = '';
+            window.analysisData = { games: null, confidencePicks: null, survivorPicks: null, results: null, scoring: null };
+            log('🧹 Analysis cleared', 'info');
+        };
+
+        log('🏈 Database Analyzer Ready', 'success');
+    </script>
+</body>
+</html>

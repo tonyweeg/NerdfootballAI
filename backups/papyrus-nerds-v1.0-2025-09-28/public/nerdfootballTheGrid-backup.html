@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdfootballAI - The Grid v2.0</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="version" content="2.1">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #64748b; /* slate-500 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        th, td {
+            white-space: nowrap;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            background-color: #f9fafb; /* gray-50 */
+        }
+        .place-col {
+            position: sticky;
+            left: 0;
+            background-color: #f9fafb; /* gray-50 */
+            z-index: 11;
+        }
+        .player-name {
+            position: sticky;
+            left: 60px; /* Adjust based on place column width */
+            background-color: #f9fafb; /* gray-50 */
+            z-index: 10;
+        }
+        .sortable-header {
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        #settings-modal {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .grid-table tr:nth-child(even) {
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .grid-table tr:hover {
+            background-color: #e2e8f0 !important; /* slate-200 */
+        }
+        .grid-table tr:hover td {
+            background-color: #e2e8f0 !important; /* slate-200 */
+        }
+        .grid-table td.highlight-column {
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        .grid-table tr:hover td.highlight-column {
+            background-color: #cbd5e1 !important; /* slate-300 */
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #9ca3af; /* gray-400 */
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .form-btn {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            color: white;
+            background-image: linear-gradient(to bottom, #64748b, #334155);
+            border: 1px solid #1e293b;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .form-btn:hover {
+            background-image: linear-gradient(to bottom, #475569, #1e293b);
+        }
+    </style>
+</head>
+<body class="bg-slate-200 text-slate-800">
+
+    <div id="app-container" class="container mx-auto p-4 md:p-8">
+        <header class="mb-6">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <!-- Logo and title - left aligned -->
+                <a href="./index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 md:h-10 w-auto">
+                    <h1 class="text-3xl md:text-4xl font-bold text-slate-800">NerdfootballAI - The Grid</h1>
+                </a>
+                <!-- Right side elements -->
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm font-medium text-slate-600">v2.0</span>
+                    <div class="flex items-center space-x-2 relative">
+                        <span id="user-display" class="text-sm font-medium text-slate-700"></span>
+                        <button id="menu-btn" class="p-2 rounded-md hover:bg-slate-200">
+                            <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                        </button>
+                        <div id="menu-panel" class="hidden absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 ring-1 ring-black ring-opacity-5">
+                            <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                <!-- View Toggles -->
+                                <button id="menu-picks-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn active" role="menuitem">My Picks</button>
+                                <button id="leaderboard-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Leaderboard</button>
+                                
+                                <!-- Navigation Links -->
+                                <div class="border-t border-gray-200 my-1"></div>
+                                <a href="./index.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Main Picks</a>
+                                <a href="./nerdSurvivor.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Nerd Survivor</a>
+                                <a href="./survivorResults.html" class="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-50" role="menuitem">🏆 Survivor Results</a>
+                                <a href="./nerdfootballTheGrid.html" class="block px-4 py-2 text-sm text-gray-700 bg-gray-50 font-medium" role="menuitem">The Grid</a>
+                                <a href="./nerdfootballRules.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Rules of the Nerd</a>
+                                
+                                <!-- Admin Only Section -->
+                                <div id="menu-admin-controls" class="hidden">
+                                    <div class="border-t border-gray-200 my-1"></div>
+                                    <button id="menu-admin-view-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 view-toggle-btn" role="menuitem">Admin</button>
+                                    <button id="survivor-admin-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Survivor Admin</button>
+                                    <a href="./user-sync-diagnostic.html" class="block px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 font-medium" role="menuitem">💎 User Diagnostic Tool</a>
+                                </div>
+                                
+                                <!-- Account Section -->
+                                <div class="border-t border-gray-200 my-1"></div>
+                                <button id="settings-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Settings</button>
+                                <button id="logout-btn" class="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">Logout</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="text-center mt-4">
+                <p class="text-slate-600">Weekly picks at a glance.</p>
+                <div class="mt-2">
+                    <a href="#" id="yearly-leaderboard-link" class="text-slate-600 hover:text-slate-800 font-medium">View Yearly Leaderboard &rarr;</a>
+                </div>
+            </div>
+        </header>
+
+        <div id="main-content" class="bg-white p-6 rounded-2xl shadow-lg">
+            <div id="week-selector-container" class="mb-4 text-center">
+                <label for="grid-week-selector" class="text-lg font-medium text-gray-700 mr-2">Week:</label>
+                <select id="grid-week-selector" class="p-2 rounded-lg border-2 border-gray-300 bg-white"></select>
+            </div>
+            <div id="grid-container" class="overflow-x-auto">
+                <!-- The Grid will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 z-50 items-center justify-center hidden flex">
+        <div class="p-8 bg-slate-100 rounded-lg shadow-xl max-w-md w-full mx-auto border border-slate-300 relative">
+            <button id="close-settings-btn" class="absolute top-4 right-4 text-slate-500 hover:text-slate-800">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">User Settings</h2>
+            <div id="settings-error" class="text-red-600 text-center text-sm mb-4 hidden p-3 bg-red-100 rounded-md border border-red-200"></div>
+            <div id="settings-success" class="text-green-600 text-center text-sm mb-4 hidden p-3 bg-green-100 rounded-md border border-green-200"></div>
+            <form id="settings-form" class="space-y-4">
+                <div>
+                    <label for="settings-display-name" class="block text-sm font-medium text-slate-700">Display Name</label>
+                    <input type="text" id="settings-display-name" required class="mt-1 form-input">
+                </div>
+                <div>
+                    <label for="settings-email" class="block text-sm font-medium text-slate-700">Email Address</label>
+                    <input type="email" id="settings-email" required class="mt-1 form-input">
+                </div>
+                <div class="pt-4">
+                    <button type="submit" class="form-btn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, updateProfile, updateEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            
+            // 💎 Load Diamond-Level Cache System
+            const cacheScript = document.createElement('script');
+            cacheScript.src = 'gameStateCache.js';
+            document.head.appendChild(cacheScript);
+            
+            await new Promise(resolve => {
+                cacheScript.onload = resolve;
+            });
+            
+            // UI Elements
+            const allUI = {
+                userDisplay: document.getElementById('user-display'),
+                menuBtn: document.getElementById('menu-btn'),
+                menuPanel: document.getElementById('menu-panel'),
+                menuAdminControls: document.getElementById('menu-admin-controls'),
+                picksViewBtn: document.getElementById('menu-picks-view-btn'),
+                adminViewBtn: document.getElementById('menu-admin-view-btn'),
+                survivorAdminBtn: document.getElementById('survivor-admin-btn'),
+                leaderboardViewBtn: document.getElementById('leaderboard-view-btn'),
+                settingsBtn: document.getElementById('settings-btn'),
+                settingsModal: document.getElementById('settings-modal'),
+                closeSettingsBtn: document.getElementById('close-settings-btn'),
+                settingsForm: document.getElementById('settings-form'),
+                settingsDisplayName: document.getElementById('settings-display-name'),
+                settingsEmail: document.getElementById('settings-email'),
+                settingsError: document.getElementById('settings-error'),
+                settingsSuccess: document.getElementById('settings-success'),
+                logoutBtn: document.getElementById('logout-btn')
+            };
+            
+            // Hamburger menu functionality
+            allUI.menuBtn.addEventListener('click', () => {
+                allUI.menuPanel.classList.toggle('hidden');
+            });
+            
+            window.addEventListener('click', (e) => {
+                if (!allUI.menuBtn.contains(e.target) && !allUI.menuPanel.contains(e.target)) {
+                    allUI.menuPanel.classList.add('hidden');
+                }
+            });
+            
+            // Menu item functionality (redirect to main app)
+            if (allUI.survivorAdminBtn) {
+                allUI.survivorAdminBtn.addEventListener('click', () => {
+                    // Set flag to show admin panel when landing on survivor page
+                    sessionStorage.setItem('survivorAdminView', 'true');
+                    window.location.href = './nerdSurvivor.html';
+                });
+            }
+            
+            
+            if (allUI.settingsBtn) {
+                allUI.settingsBtn.addEventListener('click', () => {
+                    if (!currentUser) return;
+                    allUI.settingsDisplayName.value = currentUser.displayName || '';
+                    allUI.settingsEmail.value = currentUser.email || '';
+                    allUI.settingsError.classList.add('hidden');
+                    allUI.settingsSuccess.classList.add('hidden');
+                    allUI.settingsModal.classList.remove('hidden');
+                    allUI.settingsModal.classList.add('flex');
+                    allUI.menuPanel.classList.add('hidden');
+                });
+            }
+            
+            if (allUI.closeSettingsBtn) {
+                allUI.closeSettingsBtn.addEventListener('click', () => {
+                    allUI.settingsModal.classList.add('hidden');
+                    allUI.settingsModal.classList.remove('flex');
+                });
+            }
+
+            if (allUI.settingsForm) {
+                allUI.settingsForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const newDisplayName = allUI.settingsDisplayName.value;
+                    const newEmail = allUI.settingsEmail.value;
+                    allUI.settingsError.classList.add('hidden');
+                    allUI.settingsSuccess.classList.add('hidden');
+                    try {
+                        if (newDisplayName !== currentUser.displayName) {
+                            await updateProfile(currentUser, { displayName: newDisplayName });
+                        }
+                        if (newEmail !== currentUser.email) {
+                            await updateEmail(auth.currentUser, newEmail);
+                        }
+                        const userDocRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_users/${currentUser.uid}`);
+                        await updateDoc(userDocRef, {
+                            displayName: newDisplayName,
+                            email: newEmail
+                        });
+                        allUI.settingsSuccess.textContent = 'Settings updated successfully!';
+                        allUI.settingsSuccess.classList.remove('hidden');
+                        allUI.userDisplay.textContent = `Welcome, ${newDisplayName ? newDisplayName.split(' ')[0] : 'User'}`;
+                        setTimeout(() => {
+                            allUI.settingsModal.classList.add('hidden');
+                            allUI.settingsModal.classList.remove('flex');
+                        }, 2000);
+                    } catch (error) {
+                        console.error("Error updating settings:", error);
+                        allUI.settingsError.textContent = `Error: ${error.message}. You may need to log out and log back in to change your email.`;
+                        allUI.settingsError.classList.remove('hidden');
+                    }
+                });
+            }
+            
+            if (allUI.logoutBtn) {
+                allUI.logoutBtn.addEventListener('click', () => {
+                    window.location.href = './index.html';
+                });
+            }
+            
+            // Navigation event handlers
+            if (allUI.picksViewBtn) {
+                allUI.picksViewBtn.addEventListener('click', () => {
+                    allUI.menuPanel.classList.add('hidden');
+                    window.location.href = './index.html';
+                });
+            }
+            
+            if (allUI.adminViewBtn) {
+                allUI.adminViewBtn.addEventListener('click', () => {
+                    allUI.menuPanel.classList.add('hidden');
+                    window.location.href = './index.html?view=admin';
+                });
+            }
+            
+            if (allUI.leaderboardViewBtn) {
+                allUI.leaderboardViewBtn.addEventListener('click', () => {
+                    allUI.menuPanel.classList.add('hidden');
+                    window.location.href = './index.html?view=leaderboard';
+                });
+            }
+            
+            if (allUI.survivorAdminBtn) {
+                allUI.survivorAdminBtn.addEventListener('click', () => {
+                    allUI.menuPanel.classList.add('hidden');
+                    sessionStorage.setItem('survivorAdminView', 'true');
+                    window.location.href = './nerdSurvivor.html';
+                });
+            }
+            
+            let currentUser = null;
+            let currentWeek = 1;
+            let db, auth;
+            let currentSortField = 'place';
+            let currentSortDirection = 'asc';
+            let cachedUserScores = [];
+
+            const TEAM_ABBREVIATIONS = {
+                "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF", "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE", "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB", "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX", "Kansas City Chiefs": "KC", "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LAR", "Miami Dolphins": "MIA", "Minnesota Vikings": "MIN", "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG", "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT", "San Francisco 49ers": "SF", "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB", "Tennessee Titans": "TEN", "Washington Commanders": "WAS"
+            };
+
+            const TEAM_HELMETS = {
+                "Arizona Cardinals": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fari_Arizona_Cardinals.png?alt=media&token=38143dcd-6075-4fa3-9f3c-98518a6ec3f3",
+                "Atlanta Falcons": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fatl_Atlanta_Falcons.png?alt=media",
+                "Baltimore Ravens": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fbal_Baltimore_Ravens.png?alt=media",
+                "Buffalo Bills": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fbuf_Buffalo_Bills.png?alt=media",
+                "Carolina Panthers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcar_Carolina_Panthers.png?alt=media",
+                "Chicago Bears": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fchi_Chicago_Bears.png?alt=media",
+                "Cincinnati Bengals": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcin_Cincinnati_Bengals.png?alt=media",
+                "Cleveland Browns": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcle_Cleveland_Browns.png?alt=media",
+                "Dallas Cowboys": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fdal_Dallas_Cowboys.png?alt=media",
+                "Denver Broncos": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fden_Denver_Broncos.png?alt=media",
+                "Detroit Lions": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fdet_Detroit_Lions.png?alt=media",
+                "Green Bay Packers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fgb_Green_Bay_Packers.png?alt=media",
+                "Houston Texans": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fhou_Houston_Texans.png?alt=media",
+                "Indianapolis Colts": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Find_Indianapolis_Colts.png?alt=media",
+                "Jacksonville Jaguars": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fjax_Jacksonville_Jaguars.png?alt=media",
+                "Kansas City Chiefs": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fkc_Kansas_City_Chiefs.png?alt=media",
+                "Las Vegas Raiders": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flv_Las_Vegas_Raiders.png?alt=media",
+                "Los Angeles Chargers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flac_Los_Angeles_Chargers.png?alt=media",
+                "Los Angeles Rams": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flar_Los_Angeles_Rams.png?alt=media",
+                "Miami Dolphins": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fmia_Miami_Dolphins.png?alt=media",
+                "Minnesota Vikings": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fmin_Minnesota_Vikings.png?alt=media",
+                "New England Patriots": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fne_New_England_Patriots.png?alt=media",
+                "New Orleans Saints": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fno_New_Orleans_Saints.png?alt=media",
+                "New York Giants": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fnyg_New_York_Giants.png?alt=media",
+                "New York Jets": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fnyj_New_York_Jets.png?alt=media",
+                "Philadelphia Eagles": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fphi_Philadelphia_Eagles.png?alt=media",
+                "Pittsburgh Steelers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fpit_Pittsburgh_Steelers.png?alt=media",
+                "San Francisco 49ers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fsf_San_Francisco_49ers.png?alt=media",
+                "Seattle Seahawks": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fsea_Seattle_Seahawks.png?alt=media",
+                "Tampa Bay Buccaneers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ftb_Tampa_Bay_Buccaneers.png?alt=media",
+                "Tennessee Titans": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ften_Tennessee_Titans.png?alt=media",
+                "Washington Commanders": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fwas_Washington_Commanders.png?alt=media"
+            };
+            
+            async function getGamesForWeek(weekNumber) {
+                // BYPASS BROKEN CACHE - DIRECT FETCH
+                try {
+                    console.log(`🔥 Grid: Direct fetching schedule for week ${weekNumber}`);
+                    const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
+                    }
+                    const weekData = await response.json();
+                    return Array.isArray(weekData.games) ? weekData.games.map(game => ({
+                        id: game.id,
+                        away: game.a,
+                        home: game.h,
+                        kickoff: game.dt,
+                        stadium: game.stadium,
+                    })) : [];
+                } catch (error) {
+                    console.error(`Error fetching games for week ${weekNumber}:`, error);
+                    return [];
+                }
+            }
+
+            function getCurrentNflWeek() {
+                const seasonStartDate = new Date('2025-09-04T00:00:00Z');
+                const now = new Date();
+                if (now < seasonStartDate) return 1;
+                const diffTime = Math.abs(now - seasonStartDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const week = Math.ceil(diffDays / 7);
+                return week > 18 ? 18 : week;
+            }
+
+            const appId = () => 'nerdfootball'; 
+            const poolId = 'NERDPOOL'; // Default pool for the Grid
+            const picksPath = (week, uid) => `artifacts/${appId()}/public/data/nerdfootball_picks/${week}/submissions/${uid}`;
+            const resultsPath = (week) => `artifacts/${appId()}/public/data/nerdfootball_results/${week}`;
+            const usersPath = () => `artifacts/${appId()}/public/data/nerdfootball_users`;
+            const poolMembersPath = () => `artifacts/${appId()}/pools/${poolId}/metadata/members`;
+
+            async function initializeGridApp() {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+                    authDomain: "nerdfootball.firebaseapp.com",
+                    projectId: "nerdfootball",
+                    storageBucket: "nerdfootball.appspot.com",
+                    messagingSenderId: "969304790725",
+                    appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+                    measurementId: "G-8RVRHE3HRC"
+                };
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                onAuthStateChanged(auth, user => {
+                    currentUser = user;
+                    if (user) {
+                        allUI.userDisplay.textContent = `Welcome, ${user.displayName ? user.displayName.split(' ')[0] : 'User'}`;
+                        // Show admin controls if admin user
+                        if (user.uid === "WxSPmEildJdqs6T5hIpBUZrscwt2") {
+                            allUI.menuAdminControls.classList.remove('hidden');
+                        }
+                    } else {
+                        allUI.userDisplay.textContent = '';
+                        allUI.menuAdminControls.classList.add('hidden');
+                    }
+                    renderGrid();
+                });
+            }
+            
+            async function renderGrid() {
+                try {
+                    console.log('🚨 renderGrid STARTED');
+                    const gridContainer = document.getElementById('grid-container');
+                    const weekSelector = document.getElementById('grid-week-selector');
+                    const mainContent = document.getElementById('main-content');
+                    
+                    
+                    if (!currentUser) {
+                        console.log('🚨 No current user');
+                        mainContent.innerHTML = `<p class="text-center">Please <a href="./index.html" class="font-bold text-slate-600 hover:text-slate-808">log in</a> to view The Grid.</p>`;
+                        return;
+                    }
+                    
+                    console.log('🚨 Setting loader');
+                    gridContainer.innerHTML = `<div class="loader"></div>`;
+                    const selectedWeek = weekSelector.value;
+                    console.log('🚨 Getting games for week', selectedWeek);
+                    const games = await getGamesForWeek(selectedWeek);
+                    console.log('🚨 Got games:', games.length);
+
+                    const now = new Date();
+
+                // BYPASS BROKEN CACHE - DIRECT FETCH ALL DATA
+                let gridData;
+                try {
+                    console.log(`🔥 Grid: Direct fetching ALL data for week ${selectedWeek}`);
+                    
+                    // CRITICAL FIX: Use pool members path (same as admin) instead of legacy users path
+                    let userMap = new Map();
+                    
+                    try {
+                        // Primary source: Pool members (same as admin panel uses)
+                        const poolMembersDoc = await getDoc(doc(db, poolMembersPath()));
+                        console.log('🔥 Fetching from POOL MEMBERS path:', poolMembersPath());
+                        
+                        if (poolMembersDoc.exists()) {
+                            const members = poolMembersDoc.data();
+                            console.log('✅ Pool members found:', Object.keys(members).length);
+                            
+                            // Convert pool members to user format - NO GHOST USERS HERE!
+                            for (const [uid, memberData] of Object.entries(members)) {
+                                userMap.set(uid, {
+                                    id: uid,
+                                    uid: uid,
+                                    displayName: memberData.displayName || memberData.email || 'Unknown',
+                                    email: memberData.email || '',
+                                    role: memberData.role || 'member',
+                                    ...memberData
+                                });
+                                console.log('✅ Added pool member:', memberData.displayName, uid);
+                            }
+                            console.log(`🎯 SUCCESS: Using pool members (${userMap.size} users)`);
+                        } else {
+                            throw new Error('Pool members document does not exist');
+                        }
+                    } catch (poolError) {
+                        console.log('⚠️ Pool members not found, falling back to legacy users with ghost blocking');
+                        
+                        // Fallback to legacy users path with comprehensive ghost blocking
+                        const usersCollectionPath = usersPath();
+                        console.log('🚨 Fetching users from LEGACY path:', usersCollectionPath);
+                        const usersSnap = await getDocs(collection(db, usersCollectionPath));
+                        console.log('🚨 Users snapshot size:', usersSnap.size);
+                        
+                        // Process legacy users with ghost blocking
+                        usersSnap.forEach(doc => {
+                            // IMMEDIATE GHOST BLOCKING
+                            if (doc.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
+                                console.log('🚫 GHOST USER BLOCKED FROM LEGACY:', doc.id);
+                                return;
+                            }
+                            
+                            const userData = { id: doc.id, uid: doc.id, ...doc.data() };
+                            userMap.set(doc.id, userData);
+                            console.log('✅ Added legacy user:', userData.displayName || userData.email, doc.id);
+                        });
+                        console.log(`⚠️ FALLBACK: Using legacy users (${userMap.size} users)`);
+                    }
+                    
+                    console.log(`✅ Final user count: ${userMap.size} users loaded`);
+                    
+                    // CRITICAL: ADMIN PROTECTION - Eliminate ALL conflicts with admin users
+                    emailToUsers.forEach((users, email) => {
+                        if (users.length > 1) {
+                            console.log(`🚫 EMAIL CONFLICT: ${users.length} users with email "${email}"`);
+                            users.forEach(u => console.log(`   - ${u.id} (name: ${u.displayName || 'none'}) (role: ${u.role || 'none'})`));
+                            
+                            // Find real admin users (those with proper admin data)
+                            const adminUsers = users.filter(u => 
+                                u.role === 'admin' || 
+                                u.isAdmin === true || 
+                                u.id !== 'okl4sw2aDhW3yKpOfOwe5lH7OQj1' // Any non-ghost is preferred over ghost
+                            );
+                            
+                            // If we have admin users, eliminate ALL non-admin duplicates
+                            if (adminUsers.length > 0) {
+                                console.log(`🔥 ADMIN EMAIL PROTECTION: Eliminating ${users.length - adminUsers.length} ghost/duplicate users`);
+                                
+                                // Remove ALL non-admin users with this email from candidates
+                                users.forEach(user => {
+                                    if (!adminUsers.includes(user)) {
+                                        const ghostIndex = userCandidates.findIndex(u => u.id === user.id);
+                                        if (ghostIndex !== -1) {
+                                            userCandidates.splice(ghostIndex, 1);
+                                            console.log(`🚫🚫 ELIMINATED GHOST/DUPLICATE: ${user.id} (protecting admin with same email)`);
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                    
+                    // Process each name group, keeping only the best user
+                    nameToUsers.forEach((users, displayName) => {
+                        if (users.length === 1) {
+                            // Single user - keep it UNLESS it's the known ghost
+                            const user = users[0];
+                            if (user.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
+                                console.log('🚫🚫 BLOCKING KNOWN GHOST USER:', user.id);
+                                return;
+                            }
+                            userMap.set(user.id, user);
+                            console.log('✅ Single user kept:', displayName, user.id);
+                        } else {
+                            // Multiple users with same name - keep the most complete one
+                            console.log(`🚫 GHOST CONFLICT: ${users.length} users named "${displayName}"`);
+                            users.forEach(u => console.log(`   - ${u.id} (email: ${u.email || 'none'})`));
+                            
+                            // Filter out known ghost users first
+                            const validUsers = users.filter(u => u.id !== 'okl4sw2aDhW3yKpOfOwe5lH7OQj1');
+                            if (validUsers.length === 0) {
+                                console.log('🚫 ALL USERS WERE GHOSTS - SKIPPING GROUP');
+                                return;
+                            }
+                            
+                            // Find the best user (most complete profile) from valid users
+                            const bestUser = validUsers.reduce((best, current) => {
+                                const bestScore = (best.email ? 1 : 0) + (best.displayName ? 1 : 0) + (Object.keys(best).length);
+                                const currentScore = (current.email ? 1 : 0) + (current.displayName ? 1 : 0) + (Object.keys(current).length);
+                                return currentScore > bestScore ? current : best;
+                            });
+                            
+                            userMap.set(bestUser.id, bestUser);
+                            console.log(`✅ Best user selected: ${displayName} -> ${bestUser.id}`);
+                            
+                            // Log rejected ghosts
+                            users.forEach(user => {
+                                if (user.id !== bestUser.id) {
+                                    console.log(`🚫 GHOST ELIMINATED: ${user.id} (duplicate of ${bestUser.id})`);
+                                }
+                            });
+                        }
+                    });
+                    console.log('🚨 Raw user count:', rawUserCount);
+                    console.log('🚨 Deduplicated user count:', userMap.size);
+                    
+                    // If no users found in legacy path, try pool members
+                    if (userMap.size === 0) {
+                        console.log('🚨 No users in legacy path, trying pool members');
+                        const poolMembersDoc = await getDoc(doc(db, poolMembersPath()));
+                        if (poolMembersDoc.exists()) {
+                            const members = poolMembersDoc.data();
+                            console.log('🚨 Pool members found:', Object.keys(members).length);
+                            for (const [uid, memberData] of Object.entries(members)) {
+                                userMap.set(uid, {
+                                    id: uid,
+                                    uid: uid,
+                                    displayName: memberData.displayName || 'Unknown',
+                                    email: memberData.email || '',
+                                    ...memberData
+                                });
+                            }
+                        }
+                    }
+                    
+                    const allUsers = Array.from(userMap.values());
+
+                    // Fetch results
+                    const resultsDocRef = doc(db, resultsPath(selectedWeek));
+                    const resultsSnap = await getDoc(resultsDocRef);
+                    const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+
+                    // Fetch picks
+                    const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
+                    const picksSnap = await getDocs(picksCollectionRef);
+                    const allPicks = {};
+                    picksSnap.forEach(doc => {
+                        allPicks[doc.id] = doc.data();
+                    });
+                    
+                    gridData = { allUsers, gameResults, allPicks };
+                } catch (error) {
+                    console.error('❌ Grid cache error:', error);
+                    // Fallback to direct fetch if cache fails
+                    const usersSnap = await getDocs(collection(db, usersPath()));
+                    const userMap = new Map();
+                    const seenNames = new Set(); // Track display names to prevent ghosts
+                    usersSnap.forEach(doc => {
+                        const userData = { id: doc.id, uid: doc.id, ...doc.data() };
+                        // Deduplicate by both ID and display name
+                        const displayName = userData.displayName || userData.email || doc.id;
+                        if (!userMap.has(doc.id) && !seenNames.has(displayName)) {
+                            userMap.set(doc.id, userData);
+                            seenNames.add(displayName);
+                        }
+                    });
+                    const allUsers = Array.from(userMap.values());
+                    
+                    const resultsDocRef = doc(db, resultsPath(selectedWeek));
+                    const resultsSnap = await getDoc(resultsDocRef);
+                    const gameResults = resultsSnap.exists() ? resultsSnap.data() : {};
+                    
+                    const picksCollectionRef = collection(db, `artifacts/${appId()}/public/data/nerdfootball_picks/${selectedWeek}/submissions`);
+                    const picksSnap = await getDocs(picksCollectionRef);
+                    const allPicks = {};
+                    picksSnap.forEach(doc => {
+                        allPicks[doc.id] = doc.data();
+                    });
+                    
+                    gridData = { allUsers, gameResults, allPicks };
+                }
+                
+                // 🚀 Extract cached data - ZERO server calls for repeated access!
+                const { allUsers, gameResults, allPicks } = gridData;
+                
+                console.log('🚨 allUsers count:', allUsers.length);
+                const userScores = allUsers.map(user => {
+                    let totalPoints = 0;
+                    let pointsLeft = 0;
+                    const userPicks = allPicks[user.id] || {};
+                    
+                    games.forEach(game => {
+                        const pick = userPicks[game.id];
+                        if (pick) {
+                            if (gameResults[game.id]) {
+                                if (pick.winner === gameResults[game.id]) {
+                                    totalPoints += pick.confidence;
+                                }
+                            } else { 
+                                pointsLeft += pick.confidence;
+                            }
+                        }
+                    });
+
+                    return {
+                        ...user,
+                        totalPoints,
+                        pointsLeft,
+                        possibleTotal: totalPoints + pointsLeft,
+                        picks: userPicks
+                    };
+                });
+                
+                cachedUserScores = userScores;
+                console.log('🚨 cachedUserScores count:', cachedUserScores.length);
+                applySorting();
+                console.log('🚨 After sorting, cachedUserScores count:', cachedUserScores.length);
+                
+                let tableHTML = `<table class="min-w-full divide-y divide-gray-200 grid-table">`;
+                tableHTML += `<thead class="bg-gray-50"><tr>`;
+                tableHTML += `<th class="place-col sortable-header px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100" onclick="sortGrid('place')">Place ↕</th>`;
+                tableHTML += `<th class="player-name sortable-header px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100" onclick="sortGrid('player')">Player ↕</th>`;
+                tableHTML += `<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>`;
+                tableHTML += `<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Possible</th>`;
+                games.forEach(game => {
+                    const awayAbbr = TEAM_ABBREVIATIONS[game.away] || game.away;
+                    const homeAbbr = TEAM_ABBREVIATIONS[game.home] || game.home;
+                    tableHTML += `<th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">${awayAbbr}@${homeAbbr}</th>`;
+                });
+                tableHTML += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+
+                cachedUserScores.forEach((user, userIndex) => {
+                    const isCurrentUser = user.uid === currentUser.uid;
+                    
+                    // Find the next game that hasn't started
+                    const nextGame = games.find(game => {
+                        const kickoffTime = game.kickoff.endsWith('Z') ? game.kickoff.slice(0, -1) : game.kickoff;
+                        const gameTime = new Date(kickoffTime);
+                        return now < gameTime;
+                    });
+                    
+                    // Check if user has pick for the next game
+                    const hasNextGamePick = nextGame ? (user.picks[nextGame.id] && user.picks[nextGame.id].winner) : true;
+                    
+                    const rowClass = isCurrentUser ? 'bg-blue-50 font-bold' : '';
+                    tableHTML += `<tr class="${rowClass}">`;
+                    tableHTML += `<td class="place-col px-3 py-2 text-sm font-bold text-center text-gray-700">${userIndex + 1}</td>`;
+                    
+                    // Highlight name in red if missing next game pick (unless it's the current user)
+                    let nameClass;
+                    if (isCurrentUser) {
+                        nameClass = 'font-bold text-blue-700';
+                    } else if (!hasNextGamePick) {
+                        nameClass = 'font-bold text-red-600'; // RED for missing picks
+                    } else {
+                        nameClass = 'font-medium text-gray-900';
+                    }
+                    
+                    tableHTML += `<td class="player-name px-3 py-2 text-sm ${nameClass}">${user.displayName}${isCurrentUser ? ' (You)' : ''}${!hasNextGamePick && !isCurrentUser ? ' ⚠️' : ''}</td>`;
+                    const anyGameStarted = games.some(game => now >= new Date(game.kickoff));
+                    if (!anyGameStarted) {
+                        // Show all zeros before any game starts
+                        tableHTML += `<td class="px-3 py-2 text-sm font-bold text-gray-400">0</td>`;
+                        tableHTML += `<td class="px-3 py-2 text-sm text-gray-400">0</td>`;
+                    } else {
+                        // Show actual scores after any game starts
+                        tableHTML += `<td class="px-3 py-2 text-sm font-bold">${user.totalPoints}</td>`;
+                        tableHTML += `<td class="px-3 py-2 text-sm">${user.possibleTotal}</td>`;
+                    }
+                    games.forEach((game, gameIndex) => {
+                        const pick = user.picks[game.id];
+                        // Parse kickoff time properly - remove trailing 'Z' if present
+                        const kickoffTime = game.kickoff.endsWith('Z') ? game.kickoff.slice(0, -1) : game.kickoff;
+                        const gameTime = new Date(kickoffTime);
+                        const gameStarted = now >= gameTime;
+                        const isCurrentUser = user.uid === currentUser.uid;
+                        
+                        // Debug first game for tonight
+                        if (gameIndex === 0 && userIndex === 0) {
+                            console.log('🚨 GRID DEBUG:', {
+                                game: game.away + ' @ ' + game.home,
+                                kickoff: game.kickoff,
+                                gameTime: gameTime.toISOString(),
+                                now: now.toISOString(),
+                                gameStarted: gameStarted,
+                                isCurrentUser: isCurrentUser
+                            });
+                        }
+                        
+                        let cellContent = '-';
+                        let cellClass = '';
+                        
+                        // CRITICAL SECURITY: Only show picks if:
+                        // 1. It's the current user's own picks, OR
+                        // 2. The game has already started
+                        if (!isCurrentUser && !gameStarted) {
+                            // Hide other users' picks before game starts
+                            cellContent = `<div class="text-center text-gray-400 text-sm">-</div>`;
+                            cellClass = 'text-gray-400';
+                        } else if (!gameStarted && isCurrentUser) {
+                            // Show current user's own picks even before game starts
+                            if (pick && pick.winner) {
+                                const pickedHelmet = TEAM_HELMETS[pick.winner] || '';
+                                cellContent = `<div class="text-center">
+                                    <div class="flex justify-center mb-1">
+                                        <img src="${pickedHelmet}" alt="${pick.winner}" class="w-4 h-4">
+                                    </div>
+                                    <div class="text-xs text-gray-600">${pick.confidence}</div>
+                                </div>`;
+                            }
+                        } else if (gameStarted) {
+                            // Show ALL picks after game has started
+                            if (pick && pick.winner) {
+                                const pickedHelmet = TEAM_HELMETS[pick.winner] || '';
+                                cellContent = `<div class="text-center">
+                                    <div class="flex justify-center mb-1">
+                                        <img src="${pickedHelmet}" alt="${pick.winner}" class="w-4 h-4">
+                                    </div>
+                                    <div class="text-xs text-gray-600">${pick.confidence}</div>
+                                </div>`;
+                                if(gameResults[game.id]){
+                                    cellClass = pick.winner === gameResults[game.id] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                                }
+                            }
+                        }
+                        tableHTML += `<td class="px-2 py-2 ${cellClass} game-cell" data-game="${gameIndex}">${cellContent}</td>`;
+                    });
+                    tableHTML += `</tr>`;
+                });
+
+                tableHTML += `</tbody></table>`;
+                console.log('🚨 Table HTML length:', tableHTML.length);
+                console.log('🚨 Setting gridContainer.innerHTML');
+                gridContainer.innerHTML = tableHTML;
+                console.log('🚨 gridContainer.innerHTML set successfully');
+                
+                // Add column hover effects
+                const gameCells = gridContainer.querySelectorAll('.game-cell');
+                gameCells.forEach(cell => {
+                    cell.addEventListener('mouseenter', () => {
+                        const gameIndex = cell.dataset.game;
+                        const allCellsInColumn = gridContainer.querySelectorAll(`.game-cell[data-game="${gameIndex}"]`);
+                        allCellsInColumn.forEach(c => c.classList.add('highlight-column'));
+                    });
+                    
+                    cell.addEventListener('mouseleave', () => {
+                        const gameIndex = cell.dataset.game;
+                        const allCellsInColumn = gridContainer.querySelectorAll(`.game-cell[data-game="${gameIndex}"]`);
+                        allCellsInColumn.forEach(c => c.classList.remove('highlight-column'));
+                    });
+                });
+                console.log('🚨 renderGrid COMPLETED SUCCESSFULLY');
+                } catch (error) {
+                    console.error('💥 CRITICAL ERROR in renderGrid:', error);
+                    gridContainer.innerHTML = `<p class="text-red-600">Error loading grid: ${error.message}</p>`;
+                }
+            }
+
+            function applySorting() {
+                // First, separate current user from others
+                const currentUserIndex = cachedUserScores.findIndex(u => u.uid === currentUser.uid);
+                let currentUserData = null;
+                let otherUsers = [...cachedUserScores];
+                
+                if (currentUserIndex !== -1) {
+                    currentUserData = otherUsers.splice(currentUserIndex, 1)[0];
+                }
+                
+                // Sort the other users
+                if (currentSortField === 'place') {
+                    // Sort by total points (descending for place)
+                    otherUsers.sort((a, b) => {
+                        if (currentSortDirection === 'asc') {
+                            return b.totalPoints - a.totalPoints; // Higher points = lower place number
+                        } else {
+                            return a.totalPoints - b.totalPoints; // Lower points = higher place number
+                        }
+                    });
+                } else if (currentSortField === 'player') {
+                    // Sort by display name
+                    otherUsers.sort((a, b) => {
+                        const nameA = (a.displayName || '').toLowerCase();
+                        const nameB = (b.displayName || '').toLowerCase();
+                        if (currentSortDirection === 'asc') {
+                            return nameA.localeCompare(nameB);
+                        } else {
+                            return nameB.localeCompare(nameA);
+                        }
+                    });
+                }
+                
+                // Put current user at top
+                if (currentUserData) {
+                    cachedUserScores = [currentUserData, ...otherUsers];
+                } else {
+                    cachedUserScores = otherUsers;
+                }
+            }
+
+            window.sortGrid = function(field) {
+                if (currentSortField === field) {
+                    // Toggle direction if same field
+                    currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    // New field, default to ascending
+                    currentSortField = field;
+                    currentSortDirection = 'asc';
+                }
+                
+                applySorting();
+                renderGrid(); // Re-render with new sort
+            }
+
+            function populateWeekSelectors() {
+                const weekSelector = document.getElementById('grid-week-selector');
+                const options = Array.from({ length: 18 }, (_, i) => `<option value="${i + 1}">Week ${i + 1}</option>`).join('');
+                weekSelector.innerHTML = options;
+                weekSelector.value = currentWeek;
+            }
+            
+            document.getElementById('grid-week-selector').addEventListener('change', renderGrid);
+            document.getElementById('yearly-leaderboard-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = './index.html?view=leaderboard&lb=season';
+            });
+            
+            currentWeek = getCurrentNflWeek();
+            populateWeekSelectors();
+            initializeGridApp();
+        });
+    </script>
+</body>
+</html>

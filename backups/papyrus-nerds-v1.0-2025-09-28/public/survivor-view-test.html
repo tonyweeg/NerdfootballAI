@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor Pool Test View</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">🏈 Survivor Pool Test View</h1>
+
+        <!-- Auth Status -->
+        <div id="authStatus" class="mb-6 p-4 bg-yellow-100 border border-yellow-300 rounded">
+            <p class="text-yellow-800">🔐 Checking authentication...</p>
+        </div>
+
+        <!-- User Info -->
+        <div id="userInfo" class="mb-6 p-4 bg-blue-100 border border-blue-200 rounded hidden">
+            <h2 class="text-lg font-bold mb-2">👤 Your Survivor Status</h2>
+            <div id="survivorStatus"></div>
+        </div>
+
+        <!-- Current Week Picks -->
+        <div id="currentWeekSection" class="mb-6 bg-white rounded-lg shadow p-6 hidden">
+            <h2 class="text-xl font-bold mb-4">📅 Current Week Picks</h2>
+            <div id="currentWeekContent"></div>
+        </div>
+
+        <!-- Pick History -->
+        <div id="pickHistorySection" class="mb-6 bg-white rounded-lg shadow p-6 hidden">
+            <h2 class="text-xl font-bold mb-4">📊 Your Pick History</h2>
+            <div id="pickHistoryContent"></div>
+        </div>
+
+        <!-- Available Teams -->
+        <div id="availableTeamsSection" class="mb-6 bg-white rounded-lg shadow p-6 hidden">
+            <h2 class="text-xl font-bold mb-4">✅ Available Teams for Picks</h2>
+            <div id="availableTeamsContent"></div>
+        </div>
+
+        <!-- Results Area -->
+        <div id="results" class="mt-6"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, getDocs, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let isAuthenticated = false;
+
+        // Authentication handler
+        onAuthStateChanged(auth, async (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user) {
+                currentUser = user;
+                isAuthenticated = true;
+                authStatus.innerHTML = `<p class="text-green-800">✅ Authenticated: ${user.email}</p>`;
+                await loadSurvivorData();
+            } else {
+                authStatus.innerHTML = `<p class="text-red-800">❌ Please sign in to view survivor data</p>`;
+                isAuthenticated = false;
+            }
+        });
+
+        async function loadSurvivorData() {
+            if (!currentUser) return;
+
+            try {
+                addResult('🔍 Loading your survivor data...', 'info');
+
+                // Check if user is pool member
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = doc(db, poolMembersPath);
+                const membersSnap = await getDoc(membersDoc);
+
+                if (!membersSnap.exists() || !membersSnap.data()[currentUser.uid]) {
+                    addResult('❌ You are not a pool member', 'error');
+                    return;
+                }
+
+                const memberInfo = membersSnap.data()[currentUser.uid];
+
+                // Display user info
+                const userInfoDiv = document.getElementById('userInfo');
+                const survivorStatusDiv = document.getElementById('survivorStatus');
+                survivorStatusDiv.innerHTML = `
+                    <p><strong>Name:</strong> ${memberInfo.name || currentUser.email}</p>
+                    <p><strong>Pool:</strong> nerduniverse-2025</p>
+                    <p><strong>UID:</strong> ${currentUser.uid}</p>
+                `;
+                userInfoDiv.classList.remove('hidden');
+
+                // Load survivor picks data
+                await loadSurvivorPicks();
+                await loadCurrentWeekInfo();
+                await loadAvailableTeams();
+
+            } catch (error) {
+                console.error('Error loading survivor data:', error);
+                addResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadSurvivorPicks() {
+            try {
+                addResult('📊 Loading your survivor picks data...', 'info');
+
+                // Load user's survivor picks document using legacy path
+                const survivorPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${currentUser.uid}`;
+                const survivorDoc = doc(db, survivorPicksPath);
+                const survivorSnap = await getDoc(survivorDoc);
+
+                const pickHistoryContent = document.getElementById('pickHistoryContent');
+                let historyHTML = '<div class="space-y-2">';
+
+                if (survivorSnap.exists()) {
+                    const picksData = survivorSnap.data();
+                    addResult(`✅ Found survivor picks document`, 'success');
+
+                    // Display all weeks data using picks.{week} structure
+                    const picks = picksData.picks || {};
+
+                    for (let week = 1; week <= 18; week++) {
+                        const weekKey = week.toString();
+                        const weekData = picks[weekKey];
+
+                        if (weekData) {
+                            const team = weekData.team || 'No team';
+                            const gameId = weekData.gameId || 'No game ID';
+                            const result = weekData.result || 'Pending';
+                            const alive = weekData.alive !== false;
+                            const status = alive ? '✅ Alive' : '💀 Eliminated';
+
+                            historyHTML += `
+                                <div class="p-3 border rounded ${alive ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-semibold">Week ${week}</span>
+                                        <span class="${alive ? 'text-green-600' : 'text-red-600'}">${status}</span>
+                                    </div>
+                                    <div class="text-sm text-gray-600">
+                                        <p><strong>Team:</strong> ${team}</p>
+                                        <p><strong>Game ID:</strong> ${gameId}</p>
+                                        <p><strong>Result:</strong> ${result}</p>
+                                        ${weekData.submittedAt ? `<p><strong>Submitted:</strong> ${new Date(weekData.submittedAt).toLocaleString()}</p>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            historyHTML += `
+                                <div class="p-3 border rounded bg-gray-50 border-gray-200">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-semibold">Week ${week}</span>
+                                        <span class="text-gray-500">No pick</span>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    // Show raw data for debugging
+                    historyHTML += `
+                        <div class="mt-4 p-3 bg-gray-50 border border-gray-200 rounded">
+                            <h4 class="font-semibold mb-2">🔍 Raw Data (for debugging):</h4>
+                            <pre class="text-xs text-gray-600 overflow-auto">${JSON.stringify(picksData, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    addResult('❌ No survivor picks document found', 'error');
+                    historyHTML += `
+                        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded">
+                            <p class="text-yellow-800">No survivor picks found for your account.</p>
+                            <p class="text-sm text-gray-600 mt-2">Document path: ${survivorPicksPath}</p>
+                        </div>
+                    `;
+                }
+
+                historyHTML += '</div>';
+                pickHistoryContent.innerHTML = historyHTML;
+                document.getElementById('pickHistorySection').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error loading survivor picks:', error);
+                addResult(`❌ Error loading picks: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadCurrentWeekInfo() {
+            try {
+                // Determine current week (simple logic for now)
+                const currentWeek = getCurrentWeek();
+
+                addResult(`📅 Checking Week ${currentWeek} status...`, 'info');
+
+                const currentWeekContent = document.getElementById('currentWeekContent');
+
+                // Check if user has pick for current week using legacy survivor picks path
+                const survivorPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${currentUser.uid}`;
+                const survivorDoc = doc(db, survivorPicksPath);
+                const survivorSnap = await getDoc(survivorDoc);
+
+                if (survivorSnap.exists()) {
+                    const picksData = survivorSnap.data();
+                    const picks = picksData.picks || {};
+                    const weekKey = currentWeek.toString();
+                    const currentWeekPick = picks[weekKey];
+
+                    if (currentWeekPick) {
+                        const team = currentWeekPick.team || currentWeekPick.teamPicked || 'No team selected';
+                        const result = currentWeekPick.result || 'Pending';
+                        const alive = currentWeekPick.alive !== false;
+
+                        currentWeekContent.innerHTML = `
+                            <div class="p-4 bg-blue-50 border border-blue-200 rounded">
+                                <h3 class="font-bold">Week ${currentWeek} - Current Pick</h3>
+                                <p><strong>Team:</strong> ${team}</p>
+                                <p><strong>Status:</strong> ${result}</p>
+                                <p><strong>Alive:</strong> ${alive ? '✅ Yes' : '💀 Eliminated'}</p>
+                                ${currentWeekPick.submittedAt ? `<p><strong>Submitted:</strong> ${new Date(currentWeekPick.submittedAt).toLocaleString()}</p>` : ''}
+                            </div>
+                        `;
+                    } else {
+                        currentWeekContent.innerHTML = `
+                            <div class="p-4 bg-yellow-50 border border-yellow-200 rounded">
+                                <h3 class="font-bold">Week ${currentWeek} - No Pick Yet</h3>
+                                <p>You haven't made a pick for this week yet.</p>
+                                <button onclick="makePickForWeek(${currentWeek})" class="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                                    Make Pick
+                                </button>
+                            </div>
+                        `;
+                    }
+                } else {
+                    currentWeekContent.innerHTML = `
+                        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded">
+                            <h3 class="font-bold">Week ${currentWeek} - No Survivor Data</h3>
+                            <p>No survivor picks document found for your account.</p>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('currentWeekSection').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error loading current week info:', error);
+                addResult(`❌ Error loading current week: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadAvailableTeams() {
+            try {
+                addResult('🏈 Loading available teams...', 'info');
+
+                // Get teams already picked by user using legacy survivor picks
+                const usedTeams = new Set();
+                const survivorPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${currentUser.uid}`;
+                const survivorDoc = doc(db, survivorPicksPath);
+                const survivorSnap = await getDoc(survivorDoc);
+
+                if (survivorSnap.exists()) {
+                    const picksData = survivorSnap.data();
+                    const picks = picksData.picks || {};
+
+                    // Check all weeks for picked teams using correct structure
+                    for (let week = 1; week <= 18; week++) {
+                        const weekKey = week.toString();
+                        const weekData = picks[weekKey];
+                        if (weekData && weekData.team) {
+                            usedTeams.add(weekData.team);
+                        }
+                    }
+                }
+
+                // NFL teams list
+                const nflTeams = [
+                    'Arizona Cardinals', 'Atlanta Falcons', 'Baltimore Ravens', 'Buffalo Bills',
+                    'Carolina Panthers', 'Chicago Bears', 'Cincinnati Bengals', 'Cleveland Browns',
+                    'Dallas Cowboys', 'Denver Broncos', 'Detroit Lions', 'Green Bay Packers',
+                    'Houston Texans', 'Indianapolis Colts', 'Jacksonville Jaguars', 'Kansas City Chiefs',
+                    'Las Vegas Raiders', 'Los Angeles Chargers', 'Los Angeles Rams', 'Miami Dolphins',
+                    'Minnesota Vikings', 'New England Patriots', 'New Orleans Saints', 'New York Giants',
+                    'New York Jets', 'Philadelphia Eagles', 'Pittsburgh Steelers', 'San Francisco 49ers',
+                    'Seattle Seahawks', 'Tampa Bay Buccaneers', 'Tennessee Titans', 'Washington Commanders'
+                ];
+
+                const availableTeamsContent = document.getElementById('availableTeamsContent');
+                let teamsHTML = '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">';
+
+                nflTeams.forEach(team => {
+                    const isUsed = usedTeams.has(team);
+                    teamsHTML += `
+                        <div class="p-2 border rounded text-center ${isUsed ? 'bg-red-50 border-red-200 text-red-600' : 'bg-green-50 border-green-200 text-green-600'}">
+                            <span class="text-sm">${team}</span>
+                            <div class="text-xs">${isUsed ? '❌ Used' : '✅ Available'}</div>
+                        </div>
+                    `;
+                });
+
+                teamsHTML += '</div>';
+                teamsHTML += `
+                    <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                        <p class="text-sm"><strong>Summary:</strong> ${nflTeams.length - usedTeams.size} teams available, ${usedTeams.size} teams used</p>
+                    </div>
+                `;
+
+                availableTeamsContent.innerHTML = teamsHTML;
+                document.getElementById('availableTeamsSection').classList.remove('hidden');
+
+                addResult('✅ Available teams loaded', 'success');
+
+            } catch (error) {
+                console.error('Error loading available teams:', error);
+                addResult(`❌ Error loading teams: ${error.message}`, 'error');
+            }
+        }
+
+        function getCurrentWeek() {
+            // Simple logic - could be enhanced with actual date checking
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04'); // Week 1 start
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        window.makePickForWeek = function(week) {
+            addResult(`🎯 Pick functionality for Week ${week} would be implemented here`, 'info');
+        };
+
+        function addResult(message, type) {
+            const results = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+
+            let bgClass, textClass;
+            switch (type) {
+                case 'success':
+                    bgClass = 'bg-green-50 border-green-300';
+                    textClass = 'text-green-800';
+                    break;
+                case 'error':
+                    bgClass = 'bg-red-50 border-red-300';
+                    textClass = 'text-red-800';
+                    break;
+                case 'info':
+                    bgClass = 'bg-blue-50 border-blue-300';
+                    textClass = 'text-blue-800';
+                    break;
+                default:
+                    bgClass = 'bg-gray-50 border-gray-300';
+                    textClass = 'text-gray-800';
+            }
+
+            resultDiv.className = `p-3 border rounded mb-2 ${bgClass}`;
+            resultDiv.innerHTML = `<p class="${textClass}"><span class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</span> ${message}</p>`;
+
+            results.appendChild(resultDiv);
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

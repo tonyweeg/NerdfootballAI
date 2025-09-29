@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Week 4 Scoring Issue</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #333; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .warning { color: #ff0; }
+        button { padding: 10px 20px; margin: 10px; }
+        pre { background: #111; padding: 10px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>🏈 Week 4 Scoring Issue Diagnosis</h1>
+
+    <div class="section">
+        <h2>🔐 Authentication</h2>
+        <button id="signInBtn">Sign In</button>
+        <button id="signOutBtn" style="display:none">Sign Out</button>
+        <div id="authStatus">Not signed in</div>
+    </div>
+
+    <div class="section">
+        <h2>📊 Week 4 Games Status</h2>
+        <button id="checkGamesBtn" disabled>Check Week 4 Games</button>
+        <div id="gamesStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>👤 User Scoring Data</h2>
+        <button id="checkScoringBtn" disabled>Check Tony's Scoring Data</button>
+        <div id="scoringStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>🔧 Manual Fix</h2>
+        <button id="fixScoringBtn" disabled>Process Week 4 Scoring</button>
+        <div id="fixStatus"></div>
+    </div>
+
+    <div class="section">
+        <h2>📝 Debug Log</h2>
+        <button id="clearLogBtn">Clear Log</button>
+        <pre id="debugLog">Ready to debug Week 4 scoring issue...</pre>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Global access for debugging
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.auth = auth;
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        let currentUser = null;
+
+        // UI Elements
+        const signInBtn = document.getElementById('signInBtn');
+        const signOutBtn = document.getElementById('signOutBtn');
+        const authStatus = document.getElementById('authStatus');
+        const checkGamesBtn = document.getElementById('checkGamesBtn');
+        const checkScoringBtn = document.getElementById('checkScoringBtn');
+        const fixScoringBtn = document.getElementById('fixScoringBtn');
+        const gamesStatus = document.getElementById('gamesStatus');
+        const scoringStatus = document.getElementById('scoringStatus');
+        const fixStatus = document.getElementById('fixStatus');
+        const debugLog = document.getElementById('debugLog');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '📝';
+            debugLog.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        // Authentication
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user) {
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                authStatus.innerHTML = `<span class="success">✅ Signed in as: ${user.email}</span>`;
+
+                checkGamesBtn.disabled = false;
+                checkScoringBtn.disabled = false;
+
+                if (ADMIN_UIDS.includes(user.uid)) {
+                    fixScoringBtn.disabled = false;
+                    authStatus.innerHTML += ` <span class="success">(Admin)</span>`;
+                }
+
+                log(`Authenticated as ${user.email}`, 'success');
+            } else {
+                signInBtn.style.display = 'inline-block';
+                signOutBtn.style.display = 'none';
+                authStatus.innerHTML = '<span class="error">❌ Not signed in</span>';
+                checkGamesBtn.disabled = true;
+                checkScoringBtn.disabled = true;
+                fixScoringBtn.disabled = true;
+                log('Not authenticated', 'warning');
+            }
+        });
+
+        async function signIn() {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                log(`Sign in failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                log('Signed out successfully', 'success');
+            } catch (error) {
+                log(`Sign out failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkWeek4Games() {
+            try {
+                log('🏈 Checking Week 4 games status...');
+                gamesStatus.innerHTML = 'Loading...';
+
+                const gamesPath = 'artifacts/nerdfootball/public/data/nerdfootball_games/4';
+                const gamesRef = doc(db, gamesPath);
+                const gamesSnap = await getDoc(gamesRef);
+
+                if (!gamesSnap.exists()) {
+                    log('No Week 4 games found', 'error');
+                    gamesStatus.innerHTML = '<span class="error">❌ No Week 4 games found</span>';
+                    return;
+                }
+
+                const data = gamesSnap.data();
+                const gameIds = Object.keys(data).filter(key => !key.startsWith('_'));
+
+                log(`Found ${gameIds.length} games in Week 4`);
+
+                let finalGames = 0;
+                let inProgressGames = 0;
+                let scheduledGames = 0;
+                let gameDetails = [];
+
+                gameIds.forEach(gameId => {
+                    const game = data[gameId];
+                    const status = game.status || 'scheduled';
+
+                    if (status.includes('FINAL')) {
+                        finalGames++;
+                    } else if (status === 'IN_PROGRESS') {
+                        inProgressGames++;
+                    } else {
+                        scheduledGames++;
+                    }
+
+                    gameDetails.push(`Game ${gameId}: ${game.a} @ ${game.h} - ${status}`);
+                });
+
+                const summary = `
+                    <div class="success">📊 Week 4 Games Summary:</div>
+                    <div>• FINAL: ${finalGames}</div>
+                    <div>• IN_PROGRESS: ${inProgressGames}</div>
+                    <div>• SCHEDULED: ${scheduledGames}</div>
+                    <div>• Total: ${gameIds.length}</div>
+                    <details style="margin-top: 10px;">
+                        <summary>Game Details</summary>
+                        <pre>${gameDetails.join('\n')}</pre>
+                    </details>
+                `;
+
+                gamesStatus.innerHTML = summary;
+
+                if (finalGames > 0 && scheduledGames === 0 && inProgressGames === 0) {
+                    log('All Week 4 games are final - scoring should have been processed', 'warning');
+                } else {
+                    log(`Week 4 games status: ${finalGames} final, ${inProgressGames} in progress, ${scheduledGames} scheduled`);
+                }
+
+            } catch (error) {
+                log(`Error checking Week 4 games: ${error.message}`, 'error');
+                gamesStatus.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        async function checkTonyScoringData() {
+            try {
+                log('👤 Checking Tony\'s scoring data...');
+                scoringStatus.innerHTML = 'Loading...';
+
+                const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+                const scoreRef = doc(db, scorePath);
+                const scoreSnap = await getDoc(scoreRef);
+
+                if (!scoreSnap.exists()) {
+                    log('No scoring data found for Tony', 'error');
+                    scoringStatus.innerHTML = '<span class="error">❌ No scoring data document found</span>';
+                    return;
+                }
+
+                const scoreData = scoreSnap.data();
+                const weeklyPoints = scoreData.weeklyPoints || {};
+
+                const weekData = {
+                    week1: weeklyPoints['1'] || weeklyPoints[1] || null,
+                    week2: weeklyPoints['2'] || weeklyPoints[2] || null,
+                    week3: weeklyPoints['3'] || weeklyPoints[3] || null,
+                    week4: weeklyPoints['4'] || weeklyPoints[4] || null
+                };
+
+                let summary = '<div class="success">📊 Tony\'s Weekly Scoring Data:</div>';
+
+                for (let week = 1; week <= 4; week++) {
+                    const data = weekData[`week${week}`];
+                    if (data) {
+                        summary += `<div>• Week ${week}: ${data.totalPoints || 0} points (${data.correctPicks || 0}/${data.totalPicks || 0} correct)</div>`;
+                        log(`Week ${week}: ${data.totalPoints || 0} points`, 'success');
+                    } else {
+                        summary += `<div class="error">• Week ${week}: ❌ NO DATA</div>`;
+                        log(`Week ${week}: No scoring data found`, 'error');
+                    }
+                }
+
+                summary += `<details style="margin-top: 10px;"><summary>Raw Data</summary><pre>${JSON.stringify(weeklyPoints, null, 2)}</pre></details>`;
+                scoringStatus.innerHTML = summary;
+
+                if (!weekData.week4) {
+                    log('CONFIRMED: Week 4 scoring data is missing', 'error');
+                }
+
+            } catch (error) {
+                log(`Error checking scoring data: ${error.message}`, 'error');
+                scoringStatus.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        async function fixWeek4Scoring() {
+            try {
+                log('🔧 Attempting to process Week 4 scoring...');
+                fixStatus.innerHTML = 'Processing...';
+
+                // Load the scoring system
+                if (!window.ScoringSystemManager) {
+                    log('Loading ScoringSystemManager...', 'info');
+
+                    // Load required scripts
+                    await loadScript('./ScoringCalculator.js');
+                    await loadScript('./WeeklyLeaderboardGenerator.js');
+                    await loadScript('./ScoringSystemManager.js');
+
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for scripts to load
+                }
+
+                if (window.ScoringSystemManager) {
+                    log('Processing Week 4 scoring...', 'info');
+                    const result = await window.ScoringSystemManager.processWeekScoring(4, true);
+
+                    if (result.success) {
+                        log(`Week 4 scoring processed successfully!`, 'success');
+                        fixStatus.innerHTML = '<span class="success">✅ Week 4 scoring processed successfully!</span>';
+
+                        // Re-check scoring data
+                        await checkTonyScoringData();
+                    } else {
+                        log(`Week 4 scoring failed`, 'error');
+                        fixStatus.innerHTML = '<span class="error">❌ Week 4 scoring failed</span>';
+                    }
+                } else {
+                    log('ScoringSystemManager not available', 'error');
+                    fixStatus.innerHTML = '<span class="error">❌ Scoring system not available</span>';
+                }
+
+            } catch (error) {
+                log(`Error fixing Week 4 scoring: ${error.message}`, 'error');
+                fixStatus.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Event listeners
+        signInBtn.addEventListener('click', signIn);
+        signOutBtn.addEventListener('click', signOutUser);
+        checkGamesBtn.addEventListener('click', checkWeek4Games);
+        checkScoringBtn.addEventListener('click', checkTonyScoringData);
+        fixScoringBtn.addEventListener('click', fixWeek4Scoring);
+        clearLogBtn.addEventListener('click', () => {
+            debugLog.textContent = 'Debug log cleared...\n';
+        });
+
+        log('Week 4 Scoring Diagnostic Tool Ready');
+    </script>
+</body>
+</html>

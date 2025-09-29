@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Working Scoring Check - EXACT PATTERN</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Working Scoring Check - forEach Pattern</h1>
+    <button onclick="checkScoring()" style="background: red; color: white; padding: 15px;">🏆 CHECK SCORING DATA (WORKING METHOD)</button>
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function checkScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>🔐 Authenticating and checking scoring using WORKING method...</p>';
+
+            try {
+                await autoLogin();
+
+                let results = '<h2>🏆 Scoring Data Check - Working Method</h2>';
+                console.log('🏆 WORKING-SCORING-CHECK-STARTING');
+
+                // Use EXACT same pattern as execute-gameid-fix.html
+                const scoringCollectionPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users`;
+                console.log('🔍 CHECKING COLLECTION:', scoringCollectionPath);
+
+                const scoringSnapshot = await firebase.firestore().collection(scoringCollectionPath).get();
+
+                if (scoringSnapshot.empty) {
+                    results += `<h3 style="color: orange;">⚠️ No scoring documents found</h3>`;
+                    results += `<p>Collection path checked: <code>${scoringCollectionPath}</code></p>`;
+                    results += `<p><strong>This means the scoring system hasn't been run yet!</strong></p>`;
+                } else {
+                    results += `<h3 style="color: green;">✅ FOUND ${scoringSnapshot.size} SCORING DOCUMENTS!</h3>`;
+                    results += `<table border="1" style="border-collapse: collapse;"><tr><th>User ID</th><th>Display Name</th><th>Total Points</th><th>Weeks Played</th><th>Weeks Data</th><th>Last Week</th><th>Actions</th></tr>`;
+
+                    // Use EXACT same forEach pattern as working tools - Show ALL users
+                    scoringSnapshot.forEach(doc => {
+                        const userId = doc.id;
+                        const scoringData = doc.data();
+
+                        console.log(`✅ SCORING DATA FOR ${userId}:`, scoringData);
+
+                        const displayName = scoringData.displayName || scoringData.email || 'Unknown';
+                        const totalPoints = scoringData.totalPoints || 0;
+                        const weeksPlayed = scoringData.seasonStats?.weeksPlayed || 0;
+
+                        // Calculate actual weeks with data
+                        const weeklyPoints = scoringData.weeklyPoints || {};
+                        const weeksWithData = Object.keys(weeklyPoints).length;
+                        const lastWeek = scoringData.lastUpdatedWeek || 'N/A';
+
+                        // Highlight Tony in yellow, others in normal rows
+                        const rowStyle = userId === 'WxSPmEildJdqs6T5hIpBUZrscwt2' ? ' style="background: #ffffcc;"' : '';
+
+                        results += `<tr${rowStyle}>
+                            <td>${userId.slice(-6)}</td>
+                            <td><strong>${displayName}</strong></td>
+                            <td><strong>${totalPoints}</strong></td>
+                            <td>${weeksPlayed}</td>
+                            <td>${weeksWithData}</td>
+                            <td>${lastWeek}</td>
+                            <td><button onclick="showUserData('${userId}', '${displayName}')">Details</button></td>
+                        </tr>`;
+                    });
+
+                    results += `</table>`;
+                }
+
+                output.innerHTML = results;
+                console.log('🏆 WORKING-SCORING-CHECK-COMPLETE');
+
+            } catch (error) {
+                console.error('❌ WORKING-SCORING-ERROR:', error);
+                output.innerHTML = `<h2>❌ Check Failed</h2><p style="color: red;">Error: ${error.message}</p><p>Stack: ${error.stack}</p>`;
+            }
+        }
+
+        async function showUserData(userId, displayName) {
+            console.log(`🔍 SHOWING DETAILS FOR: ${displayName} (${userId})`);
+
+            // Create details section
+            const detailsDiv = document.createElement('div');
+            detailsDiv.id = `details-${userId}`;
+            detailsDiv.style.cssText = 'border: 2px solid #333; margin: 20px 0; padding: 20px; background: #f9f9f9;';
+            detailsDiv.innerHTML = `<h2>🏆 Detailed Scoring for ${displayName}</h2><p>Loading detailed data...</p>`;
+
+            // Insert after the table
+            const output = document.getElementById('output');
+            output.appendChild(detailsDiv);
+
+            try {
+                // Get the user's detailed scoring data
+                const scoringDocPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+                const scoringDoc = await firebase.firestore().doc(scoringDocPath).get();
+
+                if (!scoringDoc.exists) {
+                    detailsDiv.innerHTML = `<h2>❌ No scoring data found for ${displayName}</h2>`;
+                    return;
+                }
+
+                const scoringData = scoringDoc.data();
+                console.log(`📊 FULL SCORING DATA FOR ${displayName}:`, scoringData);
+
+                let detailsHTML = `
+                    <h2>🏆 Detailed Scoring for ${displayName}</h2>
+                    <p><strong>User ID:</strong> ${userId}</p>
+                    <p><strong>Total Points:</strong> ${scoringData.totalPoints || 0}</p>
+                    <p><strong>Weeks Played:</strong> ${scoringData.seasonStats?.weeksPlayed || 0}</p>
+                    <p><strong>Last Updated Week:</strong> ${scoringData.lastUpdatedWeek || 'N/A'}</p>
+                    <hr>
+                    <h3>📈 Weekly Breakdown:</h3>
+                    <table border="1" style="border-collapse: collapse; width: 100%;">
+                        <tr><th>Week</th><th>Points</th><th>Games</th><th>Wins</th><th>Details</th></tr>
+                `;
+
+                const weeklyPoints = scoringData.weeklyPoints || {};
+                for (let week = 1; week <= 18; week++) {
+                    const weekData = weeklyPoints[week];
+                    if (weekData) {
+                        detailsHTML += `
+                            <tr>
+                                <td><strong>Week ${week}</strong></td>
+                                <td><strong>${weekData.totalPoints || 0}</strong></td>
+                                <td>${weekData.gamesPlayed || 0}</td>
+                                <td>${weekData.gamesWon || 0}</td>
+                                <td>${JSON.stringify(weekData.gameResults || {})}</td>
+                            </tr>
+                        `;
+                    }
+                }
+
+                detailsHTML += '</table>';
+
+                // Show season stats
+                if (scoringData.seasonStats) {
+                    detailsHTML += `
+                        <hr>
+                        <h3>🏆 Season Stats:</h3>
+                        <p><strong>Total Games:</strong> ${scoringData.seasonStats.totalGames || 0}</p>
+                        <p><strong>Games Won:</strong> ${scoringData.seasonStats.gamesWon || 0}</p>
+                        <p><strong>Win Percentage:</strong> ${((scoringData.seasonStats.gamesWon || 0) / (scoringData.seasonStats.totalGames || 1) * 100).toFixed(1)}%</p>
+                    `;
+                }
+
+                detailsDiv.innerHTML = detailsHTML;
+
+            } catch (error) {
+                console.error(`❌ ERROR LOADING DETAILS FOR ${displayName}:`, error);
+                detailsDiv.innerHTML = `<h2>❌ Error loading details</h2><p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

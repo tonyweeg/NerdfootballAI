@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📊 VIEW ALL SCORING DOCUMENTS</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>📊 ALL SCORING DOCUMENTS VIEWER</h1>
+    <div style="background: #eeffee; padding: 20px; border: 2px solid green; margin: 20px 0;">
+        <h3>📊 COMPREHENSIVE SCORING OVERVIEW</h3>
+        <p>View all users' scoring documents after the fixes to verify everyone's data is correct.</p>
+        <p><strong>Document Path:</strong> <code>artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users</code></p>
+    </div>
+
+    <button onclick="viewAllScoring()" style="background: blue; color: white; padding: 20px; font-size: 18px;">📊 VIEW ALL SCORING DOCUMENTS</button>
+    <button onclick="viewDetailedBreakdown()" style="background: purple; color: white; padding: 15px; margin: 10px;">📋 DETAILED WEEKLY BREAKDOWN</button>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function viewAllScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>📊 LOADING ALL SCORING DOCUMENTS...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                // Get all scoring documents
+                const scoringCollectionPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users';
+                const scoringSnapshot = await firebase.firestore().collection(scoringCollectionPath).get();
+
+                if (scoringSnapshot.empty) {
+                    output.innerHTML += '<p>❌ NO SCORING DOCUMENTS FOUND!</p>';
+                    return;
+                }
+
+                output.innerHTML += `<h3>📊 FOUND ${scoringSnapshot.size} SCORING DOCUMENTS</h3>`;
+
+                // Sort users by total points (descending)
+                const users = [];
+                scoringSnapshot.forEach(doc => {
+                    const userData = doc.data();
+                    users.push({
+                        userId: doc.id,
+                        displayName: userData.displayName || userData.email || `User ${doc.id.slice(-6)}`,
+                        totalPoints: userData.totalPoints || 0,
+                        seasonStats: userData.seasonStats || {},
+                        weeklyPoints: userData.weeklyPoints || {},
+                        lastUpdated: userData.lastUpdated,
+                        week1Fixed: userData.week1Fixed,
+                        week2Fixed: userData.week2Fixed,
+                        week3Fixed: userData.week3Fixed
+                    });
+                });
+
+                // Sort by total points descending
+                users.sort((a, b) => b.totalPoints - a.totalPoints);
+
+                // Create summary table
+                output.innerHTML += `
+                    <h3>🏆 LEADERBOARD - ALL USERS RANKED BY TOTAL POINTS</h3>
+                    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;">
+                        <tr>
+                            <th>Rank</th>
+                            <th>User</th>
+                            <th>Total Points</th>
+                            <th>Games Won</th>
+                            <th>Games Played</th>
+                            <th>Weeks Played</th>
+                            <th>Avg/Week</th>
+                            <th>Win %</th>
+                            <th>Week Fixes</th>
+                            <th>Last Updated</th>
+                        </tr>
+                `;
+
+                users.forEach((user, index) => {
+                    const rank = index + 1;
+                    const rankStyle = rank <= 3 ? 'background: gold;' : rank <= 10 ? 'background: lightblue;' : '';
+
+                    const weekFixes = [];
+                    if (user.week1Fixed) weekFixes.push('1');
+                    if (user.week2Fixed) weekFixes.push('2');
+                    if (user.week3Fixed) weekFixes.push('3');
+                    const weekFixesStr = weekFixes.length > 0 ? weekFixes.join(',') : 'None';
+
+                    const lastUpdated = user.lastUpdated ?
+                        new Date(user.lastUpdated).toLocaleDateString() : 'Never';
+
+                    output.innerHTML += `
+                        <tr style="${rankStyle}">
+                            <td><strong>#${rank}</strong></td>
+                            <td><strong>${user.displayName}</strong></td>
+                            <td><strong>${user.totalPoints}</strong></td>
+                            <td>${user.seasonStats.gamesWon || 0}</td>
+                            <td>${user.seasonStats.totalGames || 0}</td>
+                            <td>${user.seasonStats.weeksPlayed || 0}</td>
+                            <td>${user.seasonStats.averagePointsPerWeek || 0}</td>
+                            <td>${user.seasonStats.winPercentage || 0}%</td>
+                            <td>${weekFixesStr}</td>
+                            <td>${lastUpdated}</td>
+                        </tr>
+                    `;
+                });
+
+                output.innerHTML += '</table>';
+
+                // Show statistics
+                const totalUsers = users.length;
+                const usersWithPoints = users.filter(u => u.totalPoints > 0).length;
+                const totalPoints = users.reduce((sum, u) => sum + u.totalPoints, 0);
+                const averagePoints = totalUsers > 0 ? Math.round(totalPoints / totalUsers) : 0;
+                const highestScore = users.length > 0 ? users[0].totalPoints : 0;
+                const lowestScore = users.length > 0 ? users[users.length - 1].totalPoints : 0;
+
+                output.innerHTML += `
+                    <hr>
+                    <h3>📈 SCORING STATISTICS</h3>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
+                            <strong>Total Users:</strong> ${totalUsers}<br>
+                            <strong>Users with Points:</strong> ${usersWithPoints}<br>
+                            <strong>Users with 0 Points:</strong> ${totalUsers - usersWithPoints}
+                        </div>
+                        <div style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
+                            <strong>Total Points:</strong> ${totalPoints}<br>
+                            <strong>Average Points:</strong> ${averagePoints}<br>
+                            <strong>Highest Score:</strong> ${highestScore}<br>
+                            <strong>Lowest Score:</strong> ${lowestScore}
+                        </div>
+                    </div>
+                `;
+
+                // Show week fixes summary
+                const week1Fixed = users.filter(u => u.week1Fixed).length;
+                const week2Fixed = users.filter(u => u.week2Fixed).length;
+                const week3Fixed = users.filter(u => u.week3Fixed).length;
+
+                output.innerHTML += `
+                    <h3>🔧 WEEK FIXES SUMMARY</h3>
+                    <p><strong>Week 1 Fixed:</strong> ${week1Fixed} users</p>
+                    <p><strong>Week 2 Fixed:</strong> ${week2Fixed} users</p>
+                    <p><strong>Week 3 Fixed:</strong> ${week3Fixed} users</p>
+                `;
+
+            } catch (error) {
+                console.error('❌ ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ ERROR</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function viewDetailedBreakdown() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>📋 LOADING DETAILED WEEKLY BREAKDOWN...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                // Get all scoring documents
+                const scoringCollectionPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users';
+                const scoringSnapshot = await firebase.firestore().collection(scoringCollectionPath).get();
+
+                if (scoringSnapshot.empty) {
+                    output.innerHTML += '<p>❌ NO SCORING DOCUMENTS FOUND!</p>';
+                    return;
+                }
+
+                output.innerHTML += `<h3>📋 DETAILED WEEKLY BREAKDOWN - ${scoringSnapshot.size} USERS</h3>`;
+
+                // Sort users by total points
+                const users = [];
+                scoringSnapshot.forEach(doc => {
+                    const userData = doc.data();
+                    users.push({
+                        userId: doc.id,
+                        displayName: userData.displayName || userData.email || `User ${doc.id.slice(-6)}`,
+                        totalPoints: userData.totalPoints || 0,
+                        weeklyPoints: userData.weeklyPoints || {}
+                    });
+                });
+
+                users.sort((a, b) => b.totalPoints - a.totalPoints);
+
+                // Create detailed weekly table
+                output.innerHTML += `
+                    <table border="1" style="border-collapse: collapse; width: 100%; font-size: 11px;">
+                        <tr>
+                            <th rowspan="2">Rank</th>
+                            <th rowspan="2">User</th>
+                            <th rowspan="2">Total</th>
+                            <th colspan="3">Week 1</th>
+                            <th colspan="3">Week 2</th>
+                            <th colspan="3">Week 3</th>
+                        </tr>
+                        <tr>
+                            <th>Pts</th>
+                            <th>Won</th>
+                            <th>Played</th>
+                            <th>Pts</th>
+                            <th>Won</th>
+                            <th>Played</th>
+                            <th>Pts</th>
+                            <th>Won</th>
+                            <th>Played</th>
+                        </tr>
+                `;
+
+                users.forEach((user, index) => {
+                    const rank = index + 1;
+                    const rankStyle = rank <= 3 ? 'background: gold;' : rank <= 10 ? 'background: lightblue;' : '';
+
+                    const week1 = user.weeklyPoints[1] || { totalPoints: 0, gamesWon: 0, gamesPlayed: 0 };
+                    const week2 = user.weeklyPoints[2] || { totalPoints: 0, gamesWon: 0, gamesPlayed: 0 };
+                    const week3 = user.weeklyPoints[3] || { totalPoints: 0, gamesWon: 0, gamesPlayed: 0 };
+
+                    output.innerHTML += `
+                        <tr style="${rankStyle}">
+                            <td><strong>#${rank}</strong></td>
+                            <td><strong>${user.displayName}</strong></td>
+                            <td><strong>${user.totalPoints}</strong></td>
+                            <td>${week1.totalPoints}</td>
+                            <td>${week1.gamesWon}</td>
+                            <td>${week1.gamesPlayed}</td>
+                            <td>${week2.totalPoints}</td>
+                            <td>${week2.gamesWon}</td>
+                            <td>${week2.gamesPlayed}</td>
+                            <td>${week3.totalPoints}</td>
+                            <td>${week3.gamesWon}</td>
+                            <td>${week3.gamesPlayed}</td>
+                        </tr>
+                    `;
+                });
+
+                output.innerHTML += '</table>';
+
+            } catch (error) {
+                console.error('❌ ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ ERROR</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

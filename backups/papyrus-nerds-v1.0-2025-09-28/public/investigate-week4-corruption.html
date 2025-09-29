@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Week 4 Scoring Investigation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js';
+        import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Expose Firebase to window
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.collection = collection;
+        window.getDocs = getDocs;
+
+        console.log('🔥 Firebase initialized');
+    </script>
+</head>
+<body class="bg-gray-900 text-white p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-yellow-400 mb-6">🔍 Week 4 Scoring Investigation</h1>
+
+        <div class="space-y-4">
+            <button id="investigateBtn" class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded text-white font-bold">
+                🚨 INVESTIGATE WEEK 4 CORRUPTION
+            </button>
+
+            <button id="testScoringBtn" class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded text-white font-bold">
+                🧪 TEST WEEK 4 SCORING CALC
+            </button>
+
+            <button id="clearWeek4Btn" class="bg-orange-600 hover:bg-orange-700 px-6 py-3 rounded text-white font-bold">
+                🗑️ CLEAR WEEK 4 DATA
+            </button>
+        </div>
+
+        <div id="results" class="mt-8 bg-gray-800 p-6 rounded border overflow-auto max-h-96 text-sm font-mono">
+            <p class="text-green-400">🔧 Investigation tools ready. Open console for detailed output.</p>
+        </div>
+    </div>
+
+    <script src="./ScoringCalculator.js"></script>
+
+    <script>
+        const results = document.getElementById('results');
+
+        function log(message, data = null) {
+            console.log(message, data || '');
+            const p = document.createElement('p');
+            p.textContent = message + (data ? ` ${JSON.stringify(data)}` : '');
+            results.appendChild(p);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        async function investigateWeek4Corruption() {
+            try {
+                log('🔍 INVESTIGATING Week 4 scoring corruption...');
+
+                // Get pool members
+                const membersRef = window.doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                const membersSnap = await window.getDoc(membersRef);
+
+                if (!membersSnap.exists()) {
+                    log('❌ No pool members found');
+                    return;
+                }
+
+                const allMembers = Object.values(membersSnap.data());
+                const validMembers = allMembers.filter(member => member && member.uid && member.uid !== 'undefined');
+
+                log(`📊 Found ${validMembers.length} valid pool members`);
+
+                // Check first 5 users for Week 4 data
+                const corruptions = [];
+
+                for (const member of validMembers.slice(0, 5)) {
+                    const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${member.uid}`;
+                    const docRef = window.doc(window.db, scorePath);
+                    const docSnap = await window.getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        const weeklyPoints = data.weeklyPoints || {};
+                        const week4Score = weeklyPoints[4] || weeklyPoints['4'] || null;
+
+                        if (week4Score && week4Score.totalPoints > 100) {
+                            corruptions.push({
+                                user: member.displayName || member.email || member.uid.slice(-6),
+                                uid: member.uid.slice(-6),
+                                week4Points: week4Score.totalPoints,
+                                week4Data: week4Score
+                            });
+
+                            log(`🚨 CORRUPTION FOUND: ${member.displayName || member.uid.slice(-6)} has ${week4Score.totalPoints} points in Week 4`);
+                        }
+                    }
+                }
+
+                if (corruptions.length === 0) {
+                    log('✅ No corrupted Week 4 scores found');
+                } else {
+                    log(`🚨 Found ${corruptions.length} corrupted Week 4 scores`, corruptions);
+                }
+
+                return corruptions;
+
+            } catch (error) {
+                log('❌ Error investigating:', error.message);
+            }
+        }
+
+        async function testWeek4ScoringCalc() {
+            try {
+                log('🧪 TESTING Week 4 scoring calculation...');
+
+                // Test getWeekGamesWithResults
+                if (!window.ScoringCalculator) {
+                    log('❌ ScoringCalculator not loaded');
+                    return;
+                }
+
+                const weekGames = await window.ScoringCalculator.getWeekGamesWithResults(4);
+                log(`📊 Week 4 games returned: ${weekGames.length}`);
+
+                if (weekGames.length === 0) {
+                    log('🔍 Testing direct Week 4 JSON fetch...');
+                    const response = await fetch('./nfl_2025_week_4.json');
+                    const weekData = await response.json();
+                    log(`📄 Week 4 JSON structure:`, Object.keys(weekData));
+                    log(`📄 Has 'games' property: ${!!weekData.games}`);
+                    log(`📄 Raw game count: ${Object.keys(weekData).filter(k => !k.startsWith('_')).length}`);
+
+                    // Convert to proper format
+                    const gameIds = Object.keys(weekData).filter(k => !k.startsWith('_'));
+                    const gamesArray = gameIds.map(id => ({
+                        id: id,
+                        ...weekData[id]
+                    }));
+                    log(`📄 Converted games array length: ${gamesArray.length}`);
+
+                    // Check for completed games
+                    const completedGames = gamesArray.filter(g => g.winner && g.status === 'final');
+                    log(`📄 Completed games in Week 4: ${completedGames.length}`);
+                }
+
+            } catch (error) {
+                log('❌ Error testing scoring calc:', error.message);
+            }
+        }
+
+        async function clearWeek4Data() {
+            try {
+                log('🗑️ CLEARING Week 4 data...');
+
+                const membersRef = window.doc(window.db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                const membersSnap = await window.getDoc(membersRef);
+
+                if (!membersSnap.exists()) {
+                    log('❌ No pool members found');
+                    return;
+                }
+
+                const allMembers = Object.values(membersSnap.data());
+                const validMembers = allMembers.filter(member => member && member.uid && member.uid !== 'undefined');
+
+                let cleared = 0;
+
+                for (const member of validMembers) {
+                    const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${member.uid}`;
+                    const docRef = window.doc(window.db, scorePath);
+                    const docSnap = await window.getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        const weeklyPoints = data.weeklyPoints || {};
+
+                        if (weeklyPoints[4] || weeklyPoints['4']) {
+                            // Remove Week 4 data
+                            delete weeklyPoints[4];
+                            delete weeklyPoints['4'];
+
+                            // Update document
+                            await window.setDoc(docRef, {
+                                ...data,
+                                weeklyPoints: weeklyPoints,
+                                lastUpdated: new Date().toISOString()
+                            });
+
+                            cleared++;
+                            log(`🗑️ Cleared Week 4 data for ${member.displayName || member.uid.slice(-6)}`);
+                        }
+                    }
+                }
+
+                log(`✅ Cleared Week 4 data for ${cleared} users`);
+
+            } catch (error) {
+                log('❌ Error clearing data:', error.message);
+            }
+        }
+
+        document.getElementById('investigateBtn').addEventListener('click', investigateWeek4Corruption);
+        document.getElementById('testScoringBtn').addEventListener('click', testWeek4ScoringCalc);
+        document.getElementById('clearWeek4Btn').addEventListener('click', clearWeek4Data);
+
+        // Auto-run investigation on load
+        setTimeout(investigateWeek4Corruption, 1000);
+    </script>
+</body>
+</html>

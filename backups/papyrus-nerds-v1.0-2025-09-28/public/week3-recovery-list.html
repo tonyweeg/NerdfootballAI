@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Week 3 Recovery List</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .disaster { background-color: #ffcccc; }
+        .partial { background-color: #fff3cd; }
+        .fixed { background-color: #d4edda; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .status { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🛠️ Week 3 Pick Recovery List</h1>
+    <div id="auth-status">Loading...</div>
+    <div id="summary"></div>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const authStatus = document.getElementById('auth-status');
+            if (user) {
+                authStatus.innerHTML = `<p style="color: green;">✅ Signed in as: ${user.email}</p>`;
+                generateRecoveryList();
+            } else {
+                authStatus.innerHTML = `<button onclick="signIn()" style="background: blue; color: white; padding: 10px;">Sign In with Google</button>`;
+            }
+        });
+
+        window.signIn = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error('Sign in failed:', error);
+            }
+        };
+
+        async function generateRecoveryList() {
+            if (!currentUser) return;
+
+            try {
+                // Load users data
+                const usersSnap = await getDocs(collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users'));
+                const usersMap = {};
+                usersSnap.forEach(doc => {
+                    usersMap[doc.id] = doc.data();
+                });
+
+                // Load Week 3 picks
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const picksSnap = await getDocs(collection(db, picksPath));
+
+                let affectedUsers = [];
+
+                picksSnap.forEach(doc => {
+                    const data = doc.data();
+                    const userId = doc.id;
+                    const userInfo = usersMap[userId];
+
+                    // Count game keys (301-316)
+                    const keys = Object.keys(data);
+                    const gameKeys = keys.filter(k => k.match(/^3\d{2}$/));
+
+                    // Only include users with missing picks
+                    if (gameKeys.length < 16) {
+                        let severity = '';
+                        let cssClass = '';
+
+                        if (gameKeys.length === 0) {
+                            severity = 'TOTAL DISASTER';
+                            cssClass = 'disaster';
+                        } else if (gameKeys.length <= 5) {
+                            severity = 'SEVERE';
+                            cssClass = 'disaster';
+                        } else if (gameKeys.length <= 13) {
+                            severity = 'MODERATE';
+                            cssClass = 'partial';
+                        } else {
+                            severity = 'MINOR';
+                            cssClass = 'partial';
+                        }
+
+                        const missingGames = [];
+                        for (let i = 301; i <= 316; i++) {
+                            if (!data[i.toString()]) {
+                                missingGames.push(i);
+                            }
+                        }
+
+                        affectedUsers.push({
+                            userId,
+                            userName: data.userName || userInfo?.name || 'Unknown',
+                            email: userInfo?.email || 'Not found',
+                            gameCount: gameKeys.length,
+                            severity,
+                            cssClass,
+                            missingGames,
+                            mnfPoints: data.mnfTotalPoints || 'Missing',
+                            status: 'NEEDS FIX'
+                        });
+                    }
+                });
+
+                // Sort by severity (worst first)
+                affectedUsers.sort((a, b) => a.gameCount - b.gameCount);
+
+                console.log('🔥DEBUGKEY🔥 AFFECTED USERS LIST:', affectedUsers);
+
+                // Generate summary
+                const totalDisaster = affectedUsers.filter(u => u.gameCount === 0).length;
+                const severe = affectedUsers.filter(u => u.gameCount > 0 && u.gameCount <= 5).length;
+                const moderate = affectedUsers.filter(u => u.gameCount > 5 && u.gameCount <= 13).length;
+                const minor = affectedUsers.filter(u => u.gameCount > 13).length;
+
+                document.getElementById('summary').innerHTML = `
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                        <h3>📊 Recovery Summary</h3>
+                        <p><strong>Total Affected Users:</strong> ${affectedUsers.length}</p>
+                        <p>🔴 <strong>Total Disaster (0 games):</strong> ${totalDisaster}</p>
+                        <p>🟠 <strong>Severe (1-5 games):</strong> ${severe}</p>
+                        <p>🟡 <strong>Moderate (6-13 games):</strong> ${moderate}</p>
+                        <p>🟢 <strong>Minor (14-15 games):</strong> ${minor}</p>
+                    </div>
+                `;
+
+                // Generate table
+                let html = `
+                    <h3>🛠️ Users Requiring Fixes</h3>
+                    <table>
+                        <tr>
+                            <th>Priority</th>
+                            <th>User</th>
+                            <th>Email</th>
+                            <th>Games</th>
+                            <th>Severity</th>
+                            <th>Missing Games</th>
+                            <th>MNF</th>
+                            <th>Status</th>
+                        </tr>
+                `;
+
+                affectedUsers.forEach((user, index) => {
+                    html += `
+                        <tr class="${user.cssClass}" id="user-${user.userId}">
+                            <td>${index + 1}</td>
+                            <td>${user.userName}</td>
+                            <td>${user.email}</td>
+                            <td>${user.gameCount}/16</td>
+                            <td>${user.severity}</td>
+                            <td>${user.missingGames.join(', ')}</td>
+                            <td>${user.mnfPoints}</td>
+                            <td class="status">${user.status}</td>
+                        </tr>
+                    `;
+                });
+
+                html += '</table>';
+
+                html += `
+                    <div style="margin-top: 20px;">
+                        <h3>📧 Email List for Notifications:</h3>
+                        <textarea readonly style="width: 100%; height: 100px;">
+${affectedUsers.map(u => u.email).filter(e => e !== 'Not found').join('; ')}
+                        </textarea>
+                    </div>
+                `;
+
+                document.getElementById('results').innerHTML = html;
+
+            } catch (error) {
+                console.error('🔥DEBUGKEY🔥 ERROR:', error);
+                document.getElementById('results').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Function to update status (will be called by recovery script)
+        window.updateUserStatus = function(userId, status) {
+            const row = document.getElementById(`user-${userId}`);
+            if (row) {
+                const statusCell = row.querySelector('.status');
+                statusCell.textContent = status;
+                if (status === 'FIXED') {
+                    row.className = 'fixed';
+                }
+            }
+        };
+    </script>
+</body>
+</html>

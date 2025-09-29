@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Pool Member - David Dulany Fix</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">🛠️ Add Pool Member - David Dulany Fix</h1>
+
+        <!-- Auth Status -->
+        <div id="authStatus" class="mb-6 p-4 bg-yellow-100 border border-yellow-300 rounded">
+            <p class="text-yellow-800">🔐 Checking authentication...</p>
+        </div>
+
+        <!-- Fix Panel -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold mb-4">👤 David Dulany Pool Member Fix</h2>
+
+            <div class="bg-blue-50 border border-blue-200 rounded p-4 mb-6">
+                <h3 class="font-semibold text-blue-800 mb-2">User Details:</h3>
+                <p><strong>Name:</strong> David Dulany</p>
+                <p><strong>UID:</strong> XAEvbGQ77bWsbo9WuTkJhdMUIAH2</p>
+                <p><strong>Email:</strong> daviddulany1975@gmail.com</p>
+                <p><strong>Issue:</strong> Shows as "Not Pool Member" but should be a pool member</p>
+            </div>
+
+            <div class="space-y-4">
+                <button id="checkCurrentStatus" class="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 disabled:opacity-50" disabled>
+                    🔍 Check Current Pool Status
+                </button>
+
+                <button id="addToPool" class="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 disabled:opacity-50" disabled>
+                    ✅ Add David to Pool Members
+                </button>
+
+                <button id="verifyFix" class="bg-purple-600 text-white px-6 py-3 rounded hover:bg-purple-700 disabled:opacity-50" disabled>
+                    🔍 Verify Fix
+                </button>
+            </div>
+
+            <div id="results" class="mt-6">
+                <!-- Results will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Admin UIDs
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
+            'CX0etIyJbGg33nmHCo4eezPWrsr2',
+            'sm17z8ovI8NAGmyQvogD86lIurr1',
+            'dN91P1yGG4YBttxeGWmpAM2xhl22'
+        ];
+
+        // David Dulany's info
+        const DAVID_UID = 'XAEvbGQ77bWsbo9WuTkJhdMUIAH2';
+        const DAVID_INFO = {
+            name: 'David Dulany',
+            email: 'daviddulany1975@gmail.com',
+            addedAt: new Date().toISOString(),
+            addedBy: 'admin-fix-tool',
+            isActive: true
+        };
+
+        let isAuthenticated = false;
+
+        // Authentication
+        onAuthStateChanged(auth, (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user && ADMIN_UIDS.includes(user.uid)) {
+                authStatus.innerHTML = `<p class="text-green-800">✅ Admin authenticated: ${user.email}</p>`;
+                isAuthenticated = true;
+                enableButtons();
+            } else {
+                authStatus.innerHTML = `<p class="text-red-800">❌ Admin access required. Please sign in with admin account.</p>`;
+                isAuthenticated = false;
+            }
+        });
+
+        function enableButtons() {
+            document.getElementById('checkCurrentStatus').disabled = false;
+            document.getElementById('addToPool').disabled = false;
+            document.getElementById('verifyFix').disabled = false;
+        }
+
+        document.getElementById('checkCurrentStatus').addEventListener('click', checkCurrentStatus);
+        document.getElementById('addToPool').addEventListener('click', addToPool);
+        document.getElementById('verifyFix').addEventListener('click', verifyFix);
+
+        async function checkCurrentStatus() {
+            if (!isAuthenticated) return;
+
+            addResult('🔍 Checking David\'s current pool status...', 'info');
+
+            try {
+                const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = doc(db, membersPath);
+                const membersSnap = await getDoc(membersDoc);
+
+                if (membersSnap.exists()) {
+                    const members = membersSnap.data();
+                    const totalMembers = Object.keys(members).length;
+
+                    if (members[DAVID_UID]) {
+                        addResult(`✅ David is ALREADY a pool member! (${totalMembers} total members)`, 'success');
+                        addResult(`📊 David's info: ${JSON.stringify(members[DAVID_UID], null, 2)}`, 'info');
+                    } else {
+                        addResult(`❌ David is NOT in pool members (${totalMembers} total members)`, 'error');
+                        addResult('📋 Current members: ' + Object.values(members).map(m => m.name || 'Unknown').join(', '), 'info');
+                    }
+                } else {
+                    addResult('❌ Pool members document does not exist!', 'error');
+                }
+
+            } catch (error) {
+                console.error('Check failed:', error);
+                addResult(`❌ Check failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function addToPool() {
+            if (!isAuthenticated) return;
+
+            const confirmed = confirm('Add David Dulany to pool members?\n\nThis will add him to the nerduniverse-2025 pool.');
+            if (!confirmed) return;
+
+            addResult('➕ Adding David to pool members...', 'info');
+
+            try {
+                const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = doc(db, membersPath);
+                const membersSnap = await getDoc(membersDoc);
+
+                let currentMembers = {};
+                if (membersSnap.exists()) {
+                    currentMembers = membersSnap.data();
+                    addResult(`📊 Current pool has ${Object.keys(currentMembers).length} members`, 'info');
+                }
+
+                // Check if already exists
+                if (currentMembers[DAVID_UID]) {
+                    addResult('✅ David is already a pool member!', 'success');
+                    return;
+                }
+
+                // Add David
+                currentMembers[DAVID_UID] = DAVID_INFO;
+
+                // Save updated members
+                await setDoc(membersDoc, currentMembers);
+
+                addResult(`✅ SUCCESS! David added to pool members`, 'success');
+                addResult(`📊 Pool now has ${Object.keys(currentMembers).length} members`, 'success');
+                addResult(`👤 David's info: ${JSON.stringify(DAVID_INFO, null, 2)}`, 'info');
+
+            } catch (error) {
+                console.error('Add failed:', error);
+                addResult(`❌ Add failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function verifyFix() {
+            if (!isAuthenticated) return;
+
+            addResult('🔍 Verifying David is now a pool member...', 'info');
+
+            try {
+                const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = doc(db, membersPath);
+                const membersSnap = await getDoc(membersDoc);
+
+                if (membersSnap.exists()) {
+                    const members = membersSnap.data();
+
+                    if (members[DAVID_UID]) {
+                        addResult('🎉 VERIFICATION SUCCESS: David is now a pool member!', 'success');
+                        addResult('📊 Pool member data: ' + JSON.stringify(members[DAVID_UID], null, 2), 'success');
+                        addResult('✅ David should now show as "Pool Member" in all tools', 'success');
+                    } else {
+                        addResult('❌ VERIFICATION FAILED: David still not found in pool', 'error');
+                    }
+                } else {
+                    addResult('❌ Pool members document not found', 'error');
+                }
+
+            } catch (error) {
+                console.error('Verification failed:', error);
+                addResult(`❌ Verification failed: ${error.message}`, 'error');
+            }
+        }
+
+        function addResult(message, type) {
+            const results = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+
+            let bgClass, textClass;
+            switch (type) {
+                case 'success':
+                    bgClass = 'bg-green-50 border-green-300';
+                    textClass = 'text-green-800';
+                    break;
+                case 'error':
+                    bgClass = 'bg-red-50 border-red-300';
+                    textClass = 'text-red-800';
+                    break;
+                case 'info':
+                    bgClass = 'bg-blue-50 border-blue-300';
+                    textClass = 'text-blue-800';
+                    break;
+                default:
+                    bgClass = 'bg-gray-50 border-gray-300';
+                    textClass = 'text-gray-800';
+            }
+
+            resultDiv.className = `p-3 border rounded mb-2 ${bgClass}`;
+            resultDiv.innerHTML = `<p class="${textClass}"><span class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</span> ${message}</p>`;
+
+            results.appendChild(resultDiv);
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

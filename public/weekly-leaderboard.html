@@ -52,6 +52,25 @@
             if (todayStr < '2025-09-04') return 1;
             return 18;
         };
+
+        // Get the most recent week with actual game data for leaderboard display
+        window.getMostRecentWeekWithData = function() {
+            const currentWeek = window.getCurrentNFLWeek();
+            const today = new Date();
+
+            // Check if current week has games that have started
+            const currentWeekData = window.NFL_2025_WEEKS[currentWeek];
+            if (currentWeekData) {
+                const gamesDate = new Date(currentWeekData.games);
+                // If games have started for current week, show current week
+                if (today >= gamesDate) {
+                    return currentWeek;
+                }
+            }
+
+            // Otherwise, show the most recent completed week
+            return Math.max(1, currentWeek - 1);
+        };
     </script>
     <!-- <script src="https://cdn.tailwindcss.com"></script> -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -463,6 +482,56 @@
             left: 100%;
         }
 
+        /* WEEKLY SHAOLIN LEADERS - Podium Styling */
+        .rank-gold {
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        .rank-silver {
+            color: #c0c0c0;
+            text-shadow: 0 0 10px rgba(192, 192, 192, 0.5);
+        }
+        .rank-bronze {
+            color: #cd7f32;
+            text-shadow: 0 0 10px rgba(205, 127, 50, 0.5);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        .weekly-podium {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            border: 2px solid #00ff41;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+        }
+
+        .weekly-podium-card {
+            background: linear-gradient(145deg, #1a1a1a 0%, #000 100%);
+            border: 2px solid;
+            transition: all 0.3s ease;
+        }
+
+        .weekly-podium-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+        }
+
+        .weekly-podium-card.gold {
+            border-color: #ffd700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+        }
+
+        .weekly-podium-card.silver {
+            border-color: #c0c0c0;
+            box-shadow: 0 0 15px rgba(192, 192, 192, 0.4);
+        }
+
+        .weekly-podium-card.bronze {
+            border-color: #cd7f32;
+            box-shadow: 0 0 15px rgba(205, 127, 50, 0.4);
+        }
+
         /* Mobile responsive adjustments */
         @media (max-width: 768px) {
             .wu-tang-stat-inline {
@@ -509,9 +578,6 @@
                     <div class="text-sm terminal-muted">Real-time Nintendo-style rankings</div>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <div id="live-status" class="hidden px-3 py-1 rounded-full text-xs font-bold live-indicator text-white">
-                        🔴 LIVE GAMES
-                    </div>
                     <span id="user-display" class="text-sm terminal-secondary">Loading...</span>
                     <div id="auth-status" class="text-sm terminal-muted">Authenticating...</div>
                 </div>
@@ -542,6 +608,23 @@
                 </div>
 
                 <button id="week-up" class="game-button text-sm">NEXT ►</button>
+            </div>
+        </div>
+
+        <!-- 🥇 WEEKLY SHAOLIN LEADERS - Top 3 Podium -->
+        <div id="weekly-leaders" class="hidden weekly-podium rounded-2xl p-6 mb-6">
+            <div class="text-center mb-6">
+                <h2 class="text-3xl font-bold terminal-accent glow-text mb-2">🥋 Weekly Shaolin Leaders</h2>
+                <div id="weekly-stats" class="text-terminal-secondary">
+                    <span id="weekly-participants">0</span> warriors •
+                    <span id="weekly-high-score">0</span> pts high score •
+                    Week <span id="weekly-week-number">0</span> Champions
+                </div>
+            </div>
+
+            <!-- Top 3 Weekly Podium -->
+            <div id="weekly-podium" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Will be populated by JavaScript -->
             </div>
         </div>
 
@@ -666,7 +749,7 @@
         window.auth = auth;
 
         // Global variables
-        let currentWeek = window.getCurrentNFLWeek();
+        let currentWeek = window.getMostRecentWeekWithData();
         let leaderboardData = null;
         let updateInterval = null;
 
@@ -678,7 +761,6 @@
         const currentWeekDisplay = document.getElementById('current-week-display');
         const userDisplay = document.getElementById('user-display');
         const authStatus = document.getElementById('auth-status');
-        const liveStatus = document.getElementById('live-status');
 
         // Authentication handling
         async function initializeAuth() {
@@ -789,6 +871,9 @@
             // Ensure leaderboard structure is restored if it was replaced by showNoDataMessage
             ensureLeaderboardStructure();
 
+            // 🥋 Render Weekly Shaolin Leaders (Top 3)
+            renderWeeklyShaolin(data, currentWeek);
+
             renderWuTangStats(data, currentWeek, auth.currentUser);
             renderFullLeaderboard(data.standings);
 
@@ -798,6 +883,64 @@
             }
 
             showLeaderboard();
+        }
+
+        // 🥋 Render Weekly Shaolin Leaders Podium
+        function renderWeeklyShaolin(data, weekNumber) {
+            const weeklyLeaders = document.getElementById('weekly-leaders');
+            const weeklyPodium = document.getElementById('weekly-podium');
+            const topThree = data.standings ? data.standings.slice(0, 3) : [];
+
+            // Update weekly stats
+            document.getElementById('weekly-participants').textContent = data.standings?.length || 0;
+            document.getElementById('weekly-high-score').textContent = data.metadata?.highScore || 0;
+            document.getElementById('weekly-week-number').textContent = weekNumber;
+
+            // Render top 3 podium
+            weeklyPodium.innerHTML = '';
+
+            topThree.forEach((player, index) => {
+                const position = index + 1;
+                let rankClass = '';
+                let icon = '';
+                let cardClass = '';
+
+                switch (position) {
+                    case 1:
+                        rankClass = 'rank-gold';
+                        icon = '🥇';
+                        cardClass = 'gold';
+                        break;
+                    case 2:
+                        rankClass = 'rank-silver';
+                        icon = '🥈';
+                        cardClass = 'silver';
+                        break;
+                    case 3:
+                        rankClass = 'rank-bronze';
+                        icon = '🥉';
+                        cardClass = 'bronze';
+                        break;
+                }
+
+                const accuracyPercent = player.totalPicks > 0 ?
+                    ((player.correctPicks / player.totalPicks) * 100).toFixed(1) : '0.0';
+
+                weeklyPodium.innerHTML += `
+                    <div class="weekly-podium-card ${cardClass} p-6 text-center rounded-lg">
+                        <div class="text-5xl mb-3">${icon}</div>
+                        <div class="text-2xl ${rankClass} font-bold mb-2">#${position}</div>
+                        <div class="text-lg terminal-text font-semibold mb-2">${player.name.split('@')[0]}</div>
+                        <div class="text-2xl terminal-accent font-bold mb-2">${player.totalPoints} pts</div>
+                        <div class="text-sm terminal-secondary">${player.correctPicks}/${player.totalPicks} correct</div>
+                        <div class="text-xs terminal-muted">${accuracyPercent}% accuracy</div>
+                        ${!player.hasPicks ? '<div class="text-xs text-red-400 mt-1">No picks submitted</div>' : ''}
+                    </div>
+                `;
+            });
+
+            // Show the weekly leaders section
+            weeklyLeaders.classList.remove('hidden');
         }
 
         // Ensure the original leaderboard HTML structure exists
@@ -1019,13 +1162,7 @@
                 weekStatus.className = 'text-xs text-gray-400';
             }
 
-            // Show/hide live indicator
-            if (gameStates.live > 0) {
-                liveStatus.classList.remove('hidden');
-                liveStatus.textContent = `🔴 ${gameStates.live} LIVE GAMES`;
-            } else {
-                liveStatus.classList.add('hidden');
-            }
+            // Live indicator removed - will add back later
         }
 
         // Real-time updates for live games
@@ -1046,36 +1183,15 @@
             }
         }
 
-        // Utility functions - Dynamic NFL week calculation
+        // Utility functions - Use the correct NFL week calculation (same as window.getCurrentNFLWeek)
         function getCurrentWeekNumber() {
-            const now = new Date();
-
-            // 2025 NFL Season start date (September 4, 2025 - Thursday of Week 1)
-            const seasonStart = new Date('2025-09-04T00:00:00Z');
-
-            // Calculate days since season started
-            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
-
-            // Each week starts on Thursday (7 days per week)
-            const weeksSinceStart = Math.floor(daysSinceStart / 7);
-
-            // Week 1 starts at week 0 calculation, so add 1
-            const currentWeek = weeksSinceStart + 1;
-
-            // Clamp to valid NFL season range (1-18)
-            const week = Math.max(1, Math.min(18, currentWeek));
-
-            console.log(`📅 Current Date: ${now.toISOString()}`);
-            console.log(`📅 Season Start: ${seasonStart.toISOString()}`);
-            console.log(`📅 Days Since Start: ${daysSinceStart}`);
-            console.log(`📅 Calculated NFL Week: ${week}`);
-
-            return week;
+            return window.getCurrentNFLWeek();
         }
 
         function showLoading() {
             loadingScreen.classList.remove('hidden');
             weekControls.classList.add('hidden');
+            document.getElementById('weekly-leaders').classList.add('hidden');
             leaderboardContainer.classList.add('hidden');
             errorContainer.classList.add('hidden');
         }
@@ -1083,6 +1199,7 @@
         function showLeaderboard() {
             loadingScreen.classList.add('hidden');
             weekControls.classList.remove('hidden');
+            document.getElementById('weekly-leaders').classList.remove('hidden');
             leaderboardContainer.classList.remove('hidden');
             errorContainer.classList.add('hidden');
         }
@@ -1151,6 +1268,7 @@
             document.getElementById('error-message').textContent = message;
             loadingScreen.classList.add('hidden');
             weekControls.classList.add('hidden');
+            document.getElementById('weekly-leaders').classList.add('hidden');
             leaderboardContainer.classList.add('hidden');
             errorContainer.classList.remove('hidden');
         }

@@ -531,6 +531,157 @@
             }
         }
 
+        // Helper functions for real-time season calculation (from gold standard leaderboard.html)
+        function getCurrentWeekNumber() {
+            // Week 1 started Sept 4, 2025 - calculate current week based on date
+            const week1Start = new Date('2025-09-04');
+            const today = new Date();
+            const diffTime = today - week1Start;
+            const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
+            return Math.max(1, Math.min(18, diffWeeks));
+        }
+
+        async function loadBibleData(weekNumber) {
+            console.log(`🔍 Loading Week ${weekNumber} bible data from Firestore...`);
+
+            try {
+                // Load from Firestore (single source of truth)
+                const gamesRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_games').doc(weekNumber.toString());
+                const gamesSnap = await gamesRef.get();
+
+                if (!gamesSnap.exists) {
+                    console.warn(`No games found for Week ${weekNumber} in Firestore`);
+                    return null;
+                }
+
+                const bibleData = gamesSnap.data();
+                console.log(`✅ Loaded Week ${weekNumber} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
+
+                return bibleData;
+            } catch (error) {
+                console.error(`❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
+                return null;
+            }
+        }
+
+        function analyzePicks(picks, bibleData) {
+            const issues = [];
+            const gameIds = Object.keys(picks).filter(key => !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints', 'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated', 'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key));
+
+            // All weeks now use consistent Firestore structure
+            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata') : [];
+            const expectedGameCount = expectedGameIds.length;
+
+            // Check for expected game IDs
+            const missingGames = expectedGameIds.filter(id => !gameIds.includes(id));
+            const extraGames = gameIds.filter(id => !expectedGameIds.includes(id));
+
+            if (missingGames.length > 0) {
+                issues.push(`Missing games: ${missingGames.join(', ')}`);
+            }
+            if (extraGames.length > 0) {
+                issues.push(`Extra games: ${extraGames.join(', ')}`);
+            }
+
+            // Check confidence values and calculate accuracy
+            const confidenceValues = [];
+            let correctPicks = 0;
+            let totalValidPicks = 0;
+            let totalPointsEarned = 0;
+            const pickResults = {};
+            const winningPicks = []; // Track winning picks with team names and points
+
+            gameIds.forEach(gameId => {
+                const pick = picks[gameId];
+                if (pick && typeof pick === 'object') {
+                    if (pick.winner === '[object Object]' || typeof pick.winner === 'object') {
+                        issues.push(`Game ${gameId}: Winner corrupted`);
+                        pickResults[gameId] = { isValid: false, isCorrect: false };
+                    } else if (pick.winner && bibleData && bibleData[gameId]) {
+                        // Compare user pick with bible result
+                        const actualWinner = bibleData[gameId].winner;
+                        const userPick = pick.winner;
+                        const isCorrect = actualWinner === userPick;
+
+                        pickResults[gameId] = {
+                            isValid: true,
+                            isCorrect: isCorrect,
+                            userPick: userPick,
+                            actualWinner: actualWinner
+                        };
+
+                        totalValidPicks++;
+                        if (isCorrect) {
+                            correctPicks++;
+                            // Add confidence points for correct picks
+                            if (typeof pick.confidence === 'number' && pick.confidence >= 1 && pick.confidence <= expectedGameCount) {
+                                totalPointsEarned += pick.confidence;
+
+                                // Store winning pick with validation
+                                if (typeof userPick === 'string' && userPick.length > 0 && userPick !== '[object Object]') {
+                                    winningPicks.push({
+                                        team: userPick,
+                                        points: pick.confidence,
+                                        gameId: gameId
+                                    });
+                                }
+                            }
+                        }
+                    } else {
+                        pickResults[gameId] = { isValid: false, isCorrect: false };
+                    }
+
+                    if (pick.confidence !== undefined) {
+                        if (typeof pick.confidence !== 'number' || pick.confidence < 1 || pick.confidence > expectedGameCount) {
+                            issues.push(`Game ${gameId}: Invalid confidence ${pick.confidence} (should be 1-${expectedGameCount})`);
+                        } else {
+                            confidenceValues.push(pick.confidence);
+                        }
+                    } else {
+                        issues.push(`Game ${gameId}: Missing confidence`);
+                    }
+                }
+            });
+
+            // Check for duplicate confidence values
+            const uniqueConfidence = [...new Set(confidenceValues)];
+            if (confidenceValues.length !== uniqueConfidence.length) {
+                const duplicates = confidenceValues.filter((val, idx) => confidenceValues.indexOf(val) !== idx);
+                issues.push(`Duplicate confidence: ${[...new Set(duplicates)].join(', ')}`);
+            }
+
+            // Calculate losing points total and validate sum
+            let totalLosingPoints = 0;
+            Object.keys(pickResults).forEach(gameId => {
+                const result = pickResults[gameId];
+                const pick = picks[gameId];
+                if (result.isValid && !result.isCorrect && pick && typeof pick.confidence === 'number') {
+                    totalLosingPoints += pick.confidence;
+                }
+            });
+
+            // Expected total confidence points: 1+2+3+...+n = n×(n+1)/2
+            const expectedTotal = expectedGameCount * (expectedGameCount + 1) / 2;
+            const actualTotal = totalPointsEarned + totalLosingPoints;
+            const isSumValid = actualTotal === expectedTotal;
+
+            return {
+                totalGames: gameIds.length,
+                issues,
+                confidenceValues: confidenceValues.sort((a, b) => a - b),
+                gameIds,
+                correctPicks,
+                totalValidPicks,
+                totalPointsEarned,
+                totalLosingPoints,
+                expectedTotal,
+                actualTotal,
+                isSumValid,
+                pickResults,
+                winningPicks: winningPicks.sort((a, b) => b.points - a.points) // Sort by points descending
+            };
+        }
+
         async function loadUniverseStats() {
             try {
                 // Get season leaderboard data for stats
@@ -654,44 +805,171 @@
 
         async function loadSeasonData() {
             const seasonContainer = document.getElementById('seasonLeaderboard');
-            seasonContainer.innerHTML = '<div class="loading">Loading season data...</div>';
+            seasonContainer.innerHTML = '<div class="loading">Loading season data with real-time calculation...</div>';
 
             try {
-                const response = await fetch('https://getseasonleaderboard-np7uealtnq-uc.a.run.app');
-                const data = await response.json();
+                console.log('⚡ Starting real-time season calculation for Masters Audit...');
+                const startTime = Date.now();
 
-                if (data.success) {
-                    const standings = data.data.standings;
-
-                    seasonContainer.innerHTML = `
-                        <table class="leaderboard-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>User</th>
-                                    <th>Total Points</th>
-                                    <th>Correct Picks</th>
-                                    <th>Avg Accuracy</th>
-                                    <th>Weeks Played</th>
-                                    <th>Points Behind</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${standings.map(user => `
-                                    <tr>
-                                        <td class="rank-cell">${user.rank}</td>
-                                        <td>${user.name.split('@')[0]}</td>
-                                        <td class="points-cell">${user.totalPoints}</td>
-                                        <td>${user.totalCorrectPicks}/${user.totalPicks}</td>
-                                        <td class="accuracy-cell">${Math.round(user.avgAccuracy)}%</td>
-                                        <td>${user.weeksPlayed}</td>
-                                        <td>${user.pointsFromLeader}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    `;
+                // Load pool members for validation
+                let poolMembers = {};
+                try {
+                    const membersRef = db.collection('artifacts').doc('nerdfootball').collection('pools').doc('nerduniverse-2025').collection('metadata').doc('members');
+                    const membersSnap = await membersRef.get();
+                    if (membersSnap.exists) {
+                        poolMembers = membersSnap.data();
+                    }
+                } catch (e) {
+                    console.warn('Could not load pool members:', e);
                 }
+
+                // Batch load all user names in one query (MUCH FASTER!)
+                const userNames = {};
+                const userEmails = {};
+
+                try {
+                    const usersRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_users');
+                    const usersSnap = await usersRef.get();
+
+                    usersSnap.forEach(userDoc => {
+                        const userData = userDoc.data();
+                        userNames[userDoc.id] = userData.userName || userData.displayName || userData.name || 'Unknown User';
+                        userEmails[userDoc.id] = userData.email || userData.emailAddress || 'No Email';
+                    });
+
+                    console.log(`✅ Loaded ${usersSnap.size} total users in batch`);
+                } catch (e) {
+                    console.warn('Could not batch load users:', e);
+                }
+
+                // Initialize season totals for all users
+                const seasonTotals = {};
+                const actualCurrentWeek = getCurrentWeekNumber();
+
+                // Process each week (1-18)
+                for (let weekNumber = 1; weekNumber <= 18; weekNumber++) {
+                    console.log(`📊 Processing Week ${weekNumber}...`);
+
+                    try {
+                        // Load bible data for this week
+                        const bibleData = await loadBibleData(weekNumber);
+                        if (!bibleData) {
+                            console.warn(`No bible data for Week ${weekNumber}, skipping...`);
+                            continue;
+                        }
+
+                        // Load picks for this week
+                        const picksRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_picks').doc(weekNumber.toString()).collection('submissions');
+                        const picksSnap = await picksRef.get();
+
+                        if (picksSnap.size === 0) {
+                            console.warn(`No picks for Week ${weekNumber}, skipping...`);
+                            continue;
+                        }
+
+                        // Process each user's picks for this week
+                        picksSnap.forEach(userDoc => {
+                            const userId = userDoc.id;
+                            const picks = userDoc.data();
+
+                            // Initialize user if not exists
+                            if (!seasonTotals[userId]) {
+                                seasonTotals[userId] = {
+                                    userId,
+                                    userName: userNames[userId] || 'Unknown',
+                                    userEmail: userEmails[userId] || 'No Email',
+                                    isPoolMember: !!poolMembers[userId],
+                                    totalPointsEarned: 0,
+                                    totalCorrectPicks: 0,
+                                    totalValidPicks: 0,
+                                    weeklyBreakdown: {},
+                                    winningPicks: [],
+                                    weeksPlayed: 0
+                                };
+                            }
+
+                            // Analyze picks for this week
+                            const analysis = analyzePicks(picks, bibleData);
+
+                            // Add to season totals
+                            seasonTotals[userId].totalPointsEarned += analysis.totalPointsEarned;
+                            seasonTotals[userId].totalCorrectPicks += analysis.correctPicks;
+                            seasonTotals[userId].totalValidPicks += analysis.totalValidPicks;
+                            seasonTotals[userId].weeksPlayed += 1;
+
+                            // Store weekly breakdown
+                            seasonTotals[userId].weeklyBreakdown[weekNumber] = {
+                                pointsEarned: analysis.totalPointsEarned,
+                                correctPicks: analysis.correctPicks,
+                                totalPicks: analysis.totalValidPicks
+                            };
+
+                            // Add winning picks with week context
+                            if (analysis.winningPicks && analysis.winningPicks.length > 0) {
+                                analysis.winningPicks.forEach(pick => {
+                                    seasonTotals[userId].winningPicks.push({
+                                        ...pick,
+                                        week: weekNumber
+                                    });
+                                });
+                            }
+                        });
+
+                    } catch (error) {
+                        console.warn(`Error processing Week ${weekNumber}:`, error);
+                    }
+                }
+
+                // Convert to array and sort by total points
+                const sortedUsers = Object.values(seasonTotals)
+                    .filter(user => user.totalValidPicks > 0) // Only users with picks
+                    .sort((a, b) => b.totalPointsEarned - a.totalPointsEarned);
+
+                const seasonData = sortedUsers.map((user, index) => ({
+                    rank: index + 1,
+                    name: user.userName,
+                    email: user.userEmail,
+                    totalPoints: user.totalPointsEarned,
+                    totalCorrectPicks: user.totalCorrectPicks,
+                    totalValidPicks: user.totalValidPicks,
+                    avgAccuracy: user.totalValidPicks > 0 ? ((user.totalCorrectPicks / user.totalValidPicks) * 100).toFixed(1) : '0.0',
+                    weeksPlayed: user.weeksPlayed,
+                    pointsFromLeader: index === 0 ? 0 : sortedUsers[0].totalPointsEarned - user.totalPointsEarned
+                }));
+
+                console.log(`✅ Real-time calculation completed in ${Date.now() - startTime}ms`);
+                console.log(`📊 Processed ${seasonData.length} users across ${actualCurrentWeek - 1} weeks`);
+
+                // Render the season leaderboard with correct data
+                seasonContainer.innerHTML = `
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>User</th>
+                                <th>Total Points</th>
+                                <th>Correct Picks</th>
+                                <th>Avg Accuracy</th>
+                                <th>Weeks Played</th>
+                                <th>Points Behind</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${seasonData.map(user => `
+                                <tr>
+                                    <td class="rank-cell">${user.rank}</td>
+                                    <td>${user.name.split('@')[0]}</td>
+                                    <td class="points-cell">${user.totalPoints}</td>
+                                    <td>${user.totalCorrectPicks}/${user.totalValidPicks}</td>
+                                    <td class="accuracy-cell">${user.avgAccuracy}%</td>
+                                    <td>${user.weeksPlayed}</td>
+                                    <td>${user.pointsFromLeader}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
             } catch (error) {
                 console.error('Error loading season data:', error);
                 seasonContainer.innerHTML = '<div class="error">Failed to load season data: ' + error.message + '</div>';

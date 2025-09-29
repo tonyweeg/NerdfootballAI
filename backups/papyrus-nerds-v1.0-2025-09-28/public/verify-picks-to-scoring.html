@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 VERIFY PICKS TO SCORING MATCH</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>🔍 VERIFY PICKS TO SCORING MATCH</h1>
+    <div style="background: #ffffee; padding: 20px; border: 2px solid orange; margin: 20px 0;">
+        <h3>🔍 VERIFICATION SYSTEM</h3>
+        <p>This verifies that each user's scoring document EXACTLY matches:</p>
+        <ul>
+            <li>✅ Their actual picks in Firestore</li>
+            <li>✅ The teams that won the games</li>
+            <li>✅ Correct point calculations (confidence values)</li>
+        </ul>
+        <p><strong>If mismatches found</strong> → Automatically fixes the scoring document!</p>
+    </div>
+
+    <button onclick="verifyAllUsers()" style="background: orange; color: white; padding: 20px; font-size: 18px;">🔍 VERIFY ALL USERS - PICKS TO SCORING</button>
+    <button onclick="verifySpecificUser()" style="background: blue; color: white; padding: 15px; margin: 10px;">👤 VERIFY SPECIFIC USER</button>
+
+    <div style="margin: 20px 0;">
+        <input type="text" id="userIdInput" placeholder="Enter User ID (e.g., WxSPmEildJdqs6T5hIpBUZrscwt2)" style="width: 400px; padding: 10px;">
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function getWeekResults(weekNumber) {
+            try {
+                const resultsPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${weekNumber}`;
+                const resultsDoc = await firebase.firestore().doc(resultsPath).get();
+                return resultsDoc.exists ? resultsDoc.data() : null;
+            } catch (error) {
+                console.error(`Error loading results for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        async function getUserWeekPicks(userId, weekNumber) {
+            try {
+                const picksDocPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/${userId}`;
+                const picksDoc = await firebase.firestore().doc(picksDocPath).get();
+                return picksDoc.exists ? picksDoc.data() : null;
+            } catch (error) {
+                console.error(`Error loading picks for ${userId} week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        async function getUserScoringDocument(userId) {
+            try {
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+                const scoringDoc = await firebase.firestore().doc(scoringPath).get();
+                return scoringDoc.exists ? scoringDoc.data() : null;
+            } catch (error) {
+                console.error(`Error loading scoring document for ${userId}:`, error);
+                return null;
+            }
+        }
+
+        function calculateCorrectWeekScore(userPicks, weekResults) {
+            if (!userPicks || !weekResults) {
+                return { totalPoints: 0, gamesPlayed: 0, gamesWon: 0, gameResults: {} };
+            }
+
+            let totalPoints = 0;
+            let gamesWon = 0;
+            let gamesPlayed = 0;
+            const gameResults = {};
+
+            for (const [gameId, pickData] of Object.entries(userPicks)) {
+                if (gameId === 'mnfTotalPoints' || gameId === 'timestamp' || gameId === 'lastUpdated') continue;
+
+                const confidence = pickData.confidence;
+                const pickedTeam = pickData.team || pickData.winner;
+
+                if (!pickedTeam || !confidence) continue;
+
+                const gameResult = weekResults[gameId];
+                if (!gameResult || !gameResult.winner) continue;
+
+                gamesPlayed++;
+                const isWin = gameResult.winner === pickedTeam;
+                const points = isWin ? confidence : 0;
+
+                if (isWin) {
+                    gamesWon++;
+                    totalPoints += points;
+                }
+
+                gameResults[gameId] = {
+                    pickedTeam: pickedTeam,
+                    actualWinner: gameResult.winner,
+                    confidence: confidence,
+                    points: points,
+                    result: isWin ? 'win' : 'loss',
+                    gameStatus: 'Final'
+                };
+            }
+
+            return { totalPoints, gamesPlayed, gamesWon, gameResults };
+        }
+
+        async function verifyUserScoring(userId, displayName) {
+            console.log(`🔍 VERIFYING ${displayName} (${userId})`);
+
+            const verification = {
+                userId: userId,
+                displayName: displayName,
+                status: 'UNKNOWN',
+                issues: [],
+                corrections: [],
+                weekVerifications: {}
+            };
+
+            try {
+                // Get user's scoring document
+                const scoringDoc = await getUserScoringDocument(userId);
+                if (!scoringDoc) {
+                    verification.status = 'ERROR';
+                    verification.issues.push('No scoring document found');
+                    return verification;
+                }
+
+                // Verify each week (1-3)
+                let correctSeasonPoints = 0;
+                let correctSeasonGames = 0;
+                let correctSeasonWins = 0;
+                let correctWeeksPlayed = 0;
+                const correctWeeklyData = {};
+
+                for (let week = 1; week <= 3; week++) {
+                    const weekResults = await getWeekResults(week);
+                    const userPicks = await getUserWeekPicks(userId, week);
+
+                    if (!weekResults || !userPicks) {
+                        verification.weekVerifications[week] = {
+                            status: 'SKIPPED',
+                            reason: `Missing ${!weekResults ? 'results' : 'picks'} for week ${week}`
+                        };
+                        continue;
+                    }
+
+                    // Calculate what the scoring SHOULD be
+                    const correctWeekScore = calculateCorrectWeekScore(userPicks, weekResults);
+                    correctWeeklyData[week] = correctWeekScore;
+
+                    if (correctWeekScore.gamesPlayed > 0) {
+                        correctSeasonPoints += correctWeekScore.totalPoints;
+                        correctSeasonGames += correctWeekScore.gamesPlayed;
+                        correctSeasonWins += correctWeekScore.gamesWon;
+                        correctWeeksPlayed++;
+                    }
+
+                    // Compare with stored scoring data
+                    const storedWeekData = scoringDoc.weeklyPoints?.[week] || {};
+                    const storedPoints = storedWeekData.totalPoints || 0;
+                    const storedWins = storedWeekData.gamesWon || 0;
+                    const storedGames = storedWeekData.gamesPlayed || 0;
+
+                    const weekMatches = (
+                        storedPoints === correctWeekScore.totalPoints &&
+                        storedWins === correctWeekScore.gamesWon &&
+                        storedGames === correctWeekScore.gamesPlayed
+                    );
+
+                    verification.weekVerifications[week] = {
+                        status: weekMatches ? 'MATCH' : 'MISMATCH',
+                        stored: { points: storedPoints, wins: storedWins, games: storedGames },
+                        correct: { points: correctWeekScore.totalPoints, wins: correctWeekScore.gamesWon, games: correctWeekScore.gamesPlayed }
+                    };
+
+                    if (!weekMatches) {
+                        verification.issues.push(`Week ${week}: Stored(${storedPoints}pts, ${storedWins}w, ${storedGames}g) ≠ Correct(${correctWeekScore.totalPoints}pts, ${correctWeekScore.gamesWon}w, ${correctWeekScore.gamesPlayed}g)`);
+                    }
+                }
+
+                // Verify season totals
+                const storedSeasonPoints = scoringDoc.totalPoints || 0;
+                const storedSeasonWins = scoringDoc.seasonStats?.gamesWon || 0;
+                const storedSeasonGames = scoringDoc.seasonStats?.totalGames || 0;
+
+                const seasonMatches = (
+                    storedSeasonPoints === correctSeasonPoints &&
+                    storedSeasonWins === correctSeasonWins &&
+                    storedSeasonGames === correctSeasonGames
+                );
+
+                if (!seasonMatches) {
+                    verification.issues.push(`Season Totals: Stored(${storedSeasonPoints}pts, ${storedSeasonWins}w, ${storedSeasonGames}g) ≠ Correct(${correctSeasonPoints}pts, ${correctSeasonWins}w, ${correctSeasonGames}g)`);
+                }
+
+                // Determine overall status
+                if (verification.issues.length === 0) {
+                    verification.status = 'PERFECT_MATCH';
+                } else {
+                    verification.status = 'MISMATCHES_FOUND';
+
+                    // Store correction data
+                    verification.correctionData = {
+                        totalPoints: correctSeasonPoints,
+                        weeklyPoints: correctWeeklyData,
+                        seasonStats: {
+                            totalGames: correctSeasonGames,
+                            gamesWon: correctSeasonWins,
+                            weeksPlayed: correctWeeksPlayed,
+                            averagePointsPerWeek: correctWeeksPlayed > 0 ? Math.round((correctSeasonPoints / correctWeeksPlayed) * 100) / 100 : 0,
+                            winPercentage: correctSeasonGames > 0 ? Math.round((correctSeasonWins / correctSeasonGames) * 10000) / 100 : 0
+                        }
+                    };
+                }
+
+            } catch (error) {
+                verification.status = 'ERROR';
+                verification.issues.push(`Verification error: ${error.message}`);
+            }
+
+            return verification;
+        }
+
+        async function fixUserScoring(userId, correctionData, displayName) {
+            try {
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+                const currentDoc = await firebase.firestore().doc(scoringPath).get();
+                const currentData = currentDoc.exists ? currentDoc.data() : {};
+
+                const updatedScoringData = {
+                    ...currentData,
+                    userId: userId,
+                    displayName: displayName,
+                    totalPoints: correctionData.totalPoints,
+                    weeklyPoints: correctionData.weeklyPoints,
+                    seasonStats: correctionData.seasonStats,
+                    lastUpdated: new Date().toISOString(),
+                    verificationFixed: true,
+                    verificationFixedTimestamp: new Date().toISOString()
+                };
+
+                await firebase.firestore().doc(scoringPath).set(updatedScoringData);
+                return true;
+            } catch (error) {
+                console.error(`Error fixing scoring for ${userId}:`, error);
+                return false;
+            }
+        }
+
+        async function verifySpecificUser() {
+            const userIdInput = document.getElementById('userIdInput').value.trim();
+            if (!userIdInput) {
+                alert('Please enter a User ID');
+                return;
+            }
+
+            const output = document.getElementById('output');
+            output.innerHTML = `<h2>🔍 VERIFYING USER: ${userIdInput.slice(-6)}</h2>`;
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                const verification = await verifyUserScoring(userIdInput, `User ${userIdInput.slice(-6)}`);
+
+                output.innerHTML += `
+                    <div style="background: ${verification.status === 'PERFECT_MATCH' ? '#eeffee' : '#ffeeee'}; padding: 20px; margin: 20px 0; border: 2px solid ${verification.status === 'PERFECT_MATCH' ? 'green' : 'red'};">
+                        <h3>${verification.status === 'PERFECT_MATCH' ? '✅' : '❌'} ${verification.displayName}: ${verification.status}</h3>
+                        ${verification.issues.length > 0 ? '<h4>Issues Found:</h4><ul>' + verification.issues.map(issue => `<li>${issue}</li>`).join('') + '</ul>' : '<p>All scoring data matches picks and game results perfectly!</p>'}
+
+                        <h4>Week-by-Week Verification:</h4>
+                        <table border="1" style="border-collapse: collapse;">
+                            <tr><th>Week</th><th>Status</th><th>Stored</th><th>Correct</th></tr>
+                `;
+
+                for (let week = 1; week <= 3; week++) {
+                    const weekVerif = verification.weekVerifications[week];
+                    if (weekVerif) {
+                        const statusColor = weekVerif.status === 'MATCH' ? 'green' : weekVerif.status === 'MISMATCH' ? 'red' : 'orange';
+                        output.innerHTML += `
+                            <tr>
+                                <td>Week ${week}</td>
+                                <td style="color: ${statusColor};">${weekVerif.status}</td>
+                                <td>${weekVerif.stored ? `${weekVerif.stored.points}pts, ${weekVerif.stored.wins}w, ${weekVerif.stored.games}g` : 'N/A'}</td>
+                                <td>${weekVerif.correct ? `${weekVerif.correct.points}pts, ${weekVerif.correct.wins}w, ${weekVerif.correct.games}g` : 'N/A'}</td>
+                            </tr>
+                        `;
+                    }
+                }
+
+                output.innerHTML += '</table>';
+
+                if (verification.status === 'MISMATCHES_FOUND') {
+                    output.innerHTML += `
+                        <button onclick="fixSpecificUser('${userIdInput}', '${verification.displayName}')" style="background: red; color: white; padding: 10px; margin: 10px;">
+                            🔧 FIX THIS USER'S SCORING
+                        </button>
+                    `;
+
+                    // Store correction data globally for the fix function
+                    window.correctionData = verification.correctionData;
+                }
+
+                output.innerHTML += '</div>';
+
+            } catch (error) {
+                console.error('❌ VERIFICATION ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ VERIFICATION FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function fixSpecificUser(userId, displayName) {
+            if (!window.correctionData) {
+                alert('No correction data available');
+                return;
+            }
+
+            const success = await fixUserScoring(userId, window.correctionData, displayName);
+            if (success) {
+                alert(`✅ ${displayName} scoring fixed! Run verification again to confirm.`);
+            } else {
+                alert(`❌ Failed to fix ${displayName} scoring.`);
+            }
+        }
+
+        async function verifyAllUsers() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🔍 VERIFYING ALL USERS - PICKS TO SCORING MATCH</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                // Get all scoring documents
+                const scoringCollectionPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users';
+                const scoringSnapshot = await firebase.firestore().collection(scoringCollectionPath).get();
+
+                if (scoringSnapshot.empty) {
+                    output.innerHTML += '<p>❌ NO USERS FOUND!</p>';
+                    return;
+                }
+
+                output.innerHTML += `<h3>🔍 VERIFYING ${scoringSnapshot.size} USERS</h3>`;
+
+                let perfectMatches = 0;
+                let mismatchesFound = 0;
+                let errors = 0;
+                const fixes = [];
+
+                output.innerHTML += '<table border="1" style="border-collapse: collapse; width: 100%; font-size: 12px;"><tr><th>User</th><th>Status</th><th>Issues</th><th>Actions</th></tr>';
+
+                for (const userDoc of scoringSnapshot.docs) {
+                    const userId = userDoc.id;
+                    const userData = userDoc.data();
+                    const displayName = userData.displayName || userData.email || `User ${userId.slice(-6)}`;
+
+                    const verification = await verifyUserScoring(userId, displayName);
+
+                    let statusColor = 'black';
+                    let actionButton = '';
+
+                    if (verification.status === 'PERFECT_MATCH') {
+                        perfectMatches++;
+                        statusColor = 'green';
+                    } else if (verification.status === 'MISMATCHES_FOUND') {
+                        mismatchesFound++;
+                        statusColor = 'red';
+                        fixes.push({ userId, displayName, correctionData: verification.correctionData });
+                        actionButton = `<button onclick="fixUser('${userId}', '${displayName}', ${fixes.length - 1})" style="background: red; color: white; padding: 5px;">🔧 FIX</button>`;
+                    } else {
+                        errors++;
+                        statusColor = 'orange';
+                    }
+
+                    const issuesList = verification.issues.length > 0 ? verification.issues.join('; ') : 'None';
+
+                    output.innerHTML += `
+                        <tr>
+                            <td><strong>${displayName}</strong></td>
+                            <td style="color: ${statusColor};">${verification.status}</td>
+                            <td style="font-size: 10px;">${issuesList}</td>
+                            <td>${actionButton}</td>
+                        </tr>
+                    `;
+                }
+
+                output.innerHTML += '</table>';
+
+                output.innerHTML += `
+                    <hr>
+                    <h3>📊 VERIFICATION SUMMARY</h3>
+                    <p><strong>Perfect Matches:</strong> ${perfectMatches} users ✅</p>
+                    <p><strong>Mismatches Found:</strong> ${mismatchesFound} users ❌</p>
+                    <p><strong>Errors:</strong> ${errors} users ⚠️</p>
+                `;
+
+                if (fixes.length > 0) {
+                    output.innerHTML += `
+                        <button onclick="fixAllMismatches()" style="background: red; color: white; padding: 15px; font-size: 16px;">
+                            🔧 FIX ALL ${fixes.length} USERS WITH MISMATCHES
+                        </button>
+                    `;
+
+                    // Store fixes globally
+                    window.allFixes = fixes;
+                }
+
+            } catch (error) {
+                console.error('❌ VERIFICATION ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ VERIFICATION FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function fixUser(userId, displayName, fixIndex) {
+            if (!window.allFixes || !window.allFixes[fixIndex]) {
+                alert('Fix data not available');
+                return;
+            }
+
+            const fix = window.allFixes[fixIndex];
+            const success = await fixUserScoring(userId, fix.correctionData, displayName);
+            if (success) {
+                alert(`✅ ${displayName} scoring fixed!`);
+            } else {
+                alert(`❌ Failed to fix ${displayName} scoring.`);
+            }
+        }
+
+        async function fixAllMismatches() {
+            if (!window.allFixes || window.allFixes.length === 0) {
+                alert('No fixes available');
+                return;
+            }
+
+            let fixedCount = 0;
+            let errorCount = 0;
+
+            for (const fix of window.allFixes) {
+                const success = await fixUserScoring(fix.userId, fix.correctionData, fix.displayName);
+                if (success) {
+                    fixedCount++;
+                } else {
+                    errorCount++;
+                }
+            }
+
+            alert(`✅ Fixed ${fixedCount} users. Errors: ${errorCount}. Refresh to verify fixes.`);
+        }
+    </script>
+</body>
+</html>

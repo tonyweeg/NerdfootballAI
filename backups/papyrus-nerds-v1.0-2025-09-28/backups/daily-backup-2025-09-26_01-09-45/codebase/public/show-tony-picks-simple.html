@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📋 SHOW TONY'S PICKS - SIMPLE</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>📋 TONY'S PICKS - SIMPLE VIEW</h1>
+    <button onclick="showTonyPicks()" style="background: green; color: white; padding: 20px; font-size: 18px;">📋 SHOW MY PICKS</button>
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function showTonyPicks() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>📋 LOADING TONY\'S PICKS...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                // Check all possible paths for Tony's picks
+                const possiblePaths = [
+                    `artifacts/nerdfootball/public/data/nerdfootball_picks/1/submissions/${TONY_UID}`,
+                    `artifacts/nerdfootball/public/data/nerdfootball_picks/2/submissions/${TONY_UID}`,
+                    `artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions/${TONY_UID}`,
+                ];
+
+                output.innerHTML += '<h2>🔍 SEARCHING FOR PICKS IN ALL LOCATIONS...</h2>';
+
+                let foundPicks = false;
+
+                for (let week = 1; week <= 3; week++) {
+                    output.innerHTML += `<h3>📅 WEEK ${week}</h3>`;
+
+                    try {
+                        const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions/${TONY_UID}`;
+                        console.log(`🔍 CHECKING PATH: ${picksPath}`);
+
+                        const picksDoc = await firebase.firestore().doc(picksPath).get();
+
+                        if (picksDoc.exists) {
+                            foundPicks = true;
+                            const picks = picksDoc.data();
+                            console.log(`✅ FOUND PICKS FOR WEEK ${week}:`, picks);
+
+                            output.innerHTML += `<p style="color: green;">✅ FOUND PICKS FOR WEEK ${week}</p>`;
+
+                            if (picks.picks) {
+                                output.innerHTML += `
+                                    <table border="1" style="border-collapse: collapse; margin-bottom: 20px;">
+                                        <tr><th>Game ID</th><th>Team Picked</th><th>Confidence</th></tr>
+                                `;
+
+                                for (const [gameId, pickData] of Object.entries(picks.picks)) {
+                                    if (gameId === 'mnfTotalPoints') continue;
+                                    output.innerHTML += `
+                                        <tr>
+                                            <td>${gameId}</td>
+                                            <td><strong>${pickData.team}</strong></td>
+                                            <td>${pickData.confidence}</td>
+                                        </tr>
+                                    `;
+                                }
+
+                                output.innerHTML += '</table>';
+                            } else {
+                                output.innerHTML += '<p>⚠️ Picks document exists but no picks data found</p>';
+                                output.innerHTML += `<pre>${JSON.stringify(picks, null, 2)}</pre>`;
+                            }
+                        } else {
+                            output.innerHTML += `<p style="color: red;">❌ No picks found at: ${picksPath}</p>`;
+                        }
+                    } catch (error) {
+                        console.error(`❌ ERROR CHECKING WEEK ${week}:`, error);
+                        output.innerHTML += `<p style="color: red;">❌ Error checking Week ${week}: ${error.message}</p>`;
+                    }
+                }
+
+                if (!foundPicks) {
+                    output.innerHTML += `
+                        <div style="background: #ffeeee; padding: 20px; border: 2px solid red; margin: 20px 0;">
+                            <h3>❌ NO PICKS FOUND ANYWHERE!</h3>
+                            <p><strong>Tony's UID:</strong> ${TONY_UID}</p>
+                            <p><strong>Paths checked:</strong></p>
+                            <ul>
+                                ${possiblePaths.map(path => `<li>${path}</li>`).join('')}
+                            </ul>
+                            <p>This suggests either:</p>
+                            <ol>
+                                <li>The picks are stored in a different location</li>
+                                <li>The UID is wrong</li>
+                                <li>The picks haven't been made yet</li>
+                            </ol>
+                        </div>
+                    `;
+                }
+
+                // Also check Tony's scoring data to see if there are clues
+                try {
+                    const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+                    const scoringDoc = await firebase.firestore().doc(scoringPath).get();
+
+                    if (scoringDoc.exists) {
+                        const scoringData = scoringDoc.data();
+                        output.innerHTML += `
+                            <hr>
+                            <h3>📊 SCORING DATA (for reference)</h3>
+                            <p><strong>Display Name:</strong> ${scoringData.displayName}</p>
+                            <p><strong>Total Points:</strong> ${scoringData.totalPoints}</p>
+                            <p><strong>Weekly Points:</strong></p>
+                            <pre>${JSON.stringify(scoringData.weeklyPoints || {}, null, 2)}</pre>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('Error loading scoring data:', error);
+                }
+
+            } catch (error) {
+                console.error('❌ MAIN ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

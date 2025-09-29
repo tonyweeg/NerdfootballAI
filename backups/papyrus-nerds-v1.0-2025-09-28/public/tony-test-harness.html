@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🧪 TONY TEST HARNESS - GRACEFUL SCORING</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>🧪 TONY TEST HARNESS - GRACEFUL SCORING</h1>
+
+    <div style="background: #eeeeff; padding: 20px; border: 2px solid blue; margin: 20px 0;">
+        <h3>🎯 TONY'S DATA ALWAYS VISIBLE</h3>
+        <p><strong>Search Term:</strong> "TONY-DEBUG" - Look for this in console logs</p>
+        <p><strong>Auto-Auth:</strong> Automatically signs you in for testing</p>
+        <p><strong>Graceful Logic:</strong> Skips bad data, processes what's valid, flags issues</p>
+    </div>
+
+    <button onclick="testTonyScoring()" style="background: blue; color: white; padding: 20px; font-size: 18px;">🧪 TEST TONY'S SCORING (GRACEFUL)</button>
+    <button onclick="populateAndTest()" style="background: green; color: white; padding: 15px; margin: 10px;">🚀 POPULATE RESULTS + TEST TONY</button>
+    <button onclick="testAllUsers()" style="background: purple; color: white; padding: 15px; margin: 10px;">👥 TEST ALL USERS (GRACEFUL)</button>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+        async function autoLogin() {
+            console.log('TONY-DEBUG: Starting auto-login...');
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('TONY-DEBUG: Already authenticated:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('TONY-DEBUG: Not authenticated - signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            const result = await window.auth.signInWithPopup(provider);
+                            console.log('TONY-DEBUG: Sign-in successful:', result.user.email);
+                            unsubscribe();
+                            resolve(result.user);
+                        } catch (error) {
+                            console.error('TONY-DEBUG: Sign-in failed:', error);
+                            unsubscribe();
+                            resolve(null);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function getResultsData(weekNumber) {
+            console.log(`TONY-DEBUG: Loading results for week ${weekNumber}...`);
+            try {
+                const resultsPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${weekNumber}`;
+                const resultsDoc = await firebase.firestore().doc(resultsPath).get();
+
+                if (!resultsDoc.exists) {
+                    console.log(`TONY-DEBUG: No results found for week ${weekNumber}`);
+                    return null;
+                }
+
+                const resultsData = resultsDoc.data();
+                const gameCount = Object.keys(resultsData).filter(key =>
+                    key !== 'timestamp' && key !== 'lastUpdated' && key !== 'populatedFromJSON'
+                ).length;
+
+                console.log(`TONY-DEBUG: Week ${weekNumber} results loaded - ${gameCount} games`);
+                return resultsData;
+            } catch (error) {
+                console.error(`TONY-DEBUG: Error loading results for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        async function getTonyPicks(weekNumber) {
+            console.log(`TONY-DEBUG: Loading Tony's picks for week ${weekNumber}...`);
+            try {
+                const picksDocPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/${TONY_UID}`;
+                const picksDoc = await firebase.firestore().doc(picksDocPath).get();
+
+                if (!picksDoc.exists) {
+                    console.log(`TONY-DEBUG: No picks found for Tony week ${weekNumber}`);
+                    return null;
+                }
+
+                const picks = picksDoc.data();
+                const pickCount = Object.keys(picks).filter(key =>
+                    key !== 'timestamp' && key !== 'lastUpdated' && key !== 'mnfTotalPoints'
+                ).length;
+
+                console.log(`TONY-DEBUG: Tony week ${weekNumber} picks loaded - ${pickCount} picks`);
+                console.log('TONY-DEBUG: Tony picks data:', picks);
+                return picks;
+            } catch (error) {
+                console.error(`TONY-DEBUG: Error loading Tony's picks for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        function calculateGracefulWeekScore(userPicks, weekResults, weekNumber, userId = 'unknown') {
+            console.log(`TONY-DEBUG: Calculating graceful score for week ${weekNumber}, user ${userId}`);
+
+            if (!userPicks || !weekResults) {
+                console.log(`TONY-DEBUG: Missing data - picks: ${!!userPicks}, results: ${!!weekResults}`);
+                return {
+                    totalPoints: 0,
+                    gamesPlayed: 0,
+                    gamesWon: 0,
+                    gameResults: {},
+                    issues: [`Missing ${!userPicks ? 'picks' : 'results'} for week ${weekNumber}`]
+                };
+            }
+
+            let totalPoints = 0;
+            let gamesWon = 0;
+            let gamesPlayed = 0;
+            const gameResults = {};
+            const issues = [];
+            const skippedGames = [];
+
+            // Track confidence values to detect duplicates
+            const confidenceValues = {};
+
+            for (const [gameId, pickData] of Object.entries(userPicks)) {
+                if (gameId === 'mnfTotalPoints' || gameId === 'timestamp' || gameId === 'lastUpdated') continue;
+
+                console.log(`TONY-DEBUG: Processing game ${gameId}, pick:`, pickData);
+
+                // GRACEFUL: Skip if no confidence or invalid confidence
+                const confidence = pickData.confidence;
+                if (!confidence || isNaN(confidence) || confidence < 1 || confidence > 16) {
+                    console.log(`TONY-DEBUG: Skipping game ${gameId} - invalid confidence: ${confidence}`);
+                    skippedGames.push(`${gameId}: invalid confidence (${confidence})`);
+                    continue;
+                }
+
+                // GRACEFUL: Track duplicate confidence values
+                if (confidenceValues[confidence]) {
+                    console.log(`TONY-DEBUG: Duplicate confidence ${confidence} found in games ${confidenceValues[confidence]} and ${gameId}`);
+                    issues.push(`Duplicate confidence ${confidence}: games ${confidenceValues[confidence]} and ${gameId}`);
+                }
+                confidenceValues[confidence] = gameId;
+
+                // GRACEFUL: Skip if no team picked
+                const pickedTeam = pickData.team || pickData.winner;
+                if (!pickedTeam) {
+                    console.log(`TONY-DEBUG: Skipping game ${gameId} - no team picked`);
+                    skippedGames.push(`${gameId}: no team picked`);
+                    continue;
+                }
+
+                // GRACEFUL: Skip if no result data for this game
+                const gameResult = weekResults[gameId];
+                if (!gameResult) {
+                    console.log(`TONY-DEBUG: Skipping game ${gameId} - no result data`);
+                    skippedGames.push(`${gameId}: no result data`);
+                    continue;
+                }
+
+                // GRACEFUL: Skip if no winner determined yet
+                if (!gameResult.winner) {
+                    console.log(`TONY-DEBUG: Skipping game ${gameId} - no winner determined`);
+                    skippedGames.push(`${gameId}: no winner yet`);
+                    continue;
+                }
+
+                // Valid game - count it
+                gamesPlayed++;
+                const isWin = gameResult.winner === pickedTeam;
+                const points = isWin ? confidence : 0;
+
+                if (isWin) {
+                    gamesWon++;
+                    totalPoints += points;
+                    console.log(`TONY-DEBUG: WIN - Game ${gameId}: ${pickedTeam} = ${points} points`);
+                } else {
+                    console.log(`TONY-DEBUG: LOSS - Game ${gameId}: ${pickedTeam} vs ${gameResult.winner} = 0 points`);
+                }
+
+                gameResults[gameId] = {
+                    pickedTeam: pickedTeam,
+                    actualWinner: gameResult.winner,
+                    confidence: confidence,
+                    points: points,
+                    result: isWin ? 'win' : 'loss',
+                    gameStatus: 'Final'
+                };
+            }
+
+            if (skippedGames.length > 0) {
+                issues.push(`Skipped ${skippedGames.length} games: ${skippedGames.join('; ')}`);
+            }
+
+            const result = {
+                totalPoints,
+                gamesPlayed,
+                gamesWon,
+                gameResults,
+                issues
+            };
+
+            console.log(`TONY-DEBUG: Week ${weekNumber} final score:`, result);
+            return result;
+        }
+
+        async function testTonyScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🧪 TESTING TONY\'S SCORING (GRACEFUL)</h2>';
+
+            try {
+                const user = await autoLogin();
+                if (!user) {
+                    output.innerHTML += '<p style="color: red;">❌ Authentication failed</p>';
+                    return;
+                }
+
+                output.innerHTML += `<p style="color: green;">✅ Authenticated as: ${user.email}</p>`;
+                console.log('TONY-DEBUG: Starting Tony scoring test...');
+
+                let totalSeasonPoints = 0;
+                let totalSeasonGames = 0;
+                let totalSeasonWins = 0;
+                let totalWeeksPlayed = 0;
+                const allIssues = [];
+
+                output.innerHTML += '<h3>🎯 TONY\'S WEEK-BY-WEEK RESULTS</h3>';
+                output.innerHTML += '<table border="1" style="border-collapse: collapse; width: 100%;"><tr><th>Week</th><th>Points</th><th>Games Won</th><th>Games Played</th><th>Issues</th></tr>';
+
+                for (let week = 1; week <= 3; week++) {
+                    console.log(`TONY-DEBUG: Testing Tony's week ${week}...`);
+
+                    const weekResults = await getResultsData(week);
+                    const tonyPicks = await getTonyPicks(week);
+
+                    const weekScore = calculateGracefulWeekScore(tonyPicks, weekResults, week, TONY_UID);
+
+                    if (weekScore.gamesPlayed > 0) {
+                        totalSeasonPoints += weekScore.totalPoints;
+                        totalSeasonGames += weekScore.gamesPlayed;
+                        totalSeasonWins += weekScore.gamesWon;
+                        totalWeeksPlayed++;
+                    }
+
+                    if (weekScore.issues.length > 0) {
+                        allIssues.push(...weekScore.issues.map(issue => `Week ${week}: ${issue}`));
+                    }
+
+                    const issuesText = weekScore.issues.length > 0 ? weekScore.issues.join('<br>') : '✅ No issues';
+                    const issueColor = weekScore.issues.length > 0 ? 'orange' : 'green';
+
+                    output.innerHTML += `
+                        <tr>
+                            <td><strong>Week ${week}</strong></td>
+                            <td><strong>${weekScore.totalPoints}</strong></td>
+                            <td>${weekScore.gamesWon}</td>
+                            <td>${weekScore.gamesPlayed}</td>
+                            <td style="color: ${issueColor}; font-size: 12px;">${issuesText}</td>
+                        </tr>
+                    `;
+                }
+
+                output.innerHTML += '</table>';
+
+                // Show season summary
+                const avgPoints = totalWeeksPlayed > 0 ? Math.round((totalSeasonPoints / totalWeeksPlayed) * 100) / 100 : 0;
+                const winPct = totalSeasonGames > 0 ? Math.round((totalSeasonWins / totalSeasonGames) * 10000) / 100 : 0;
+
+                output.innerHTML += `
+                    <div style="background: #eeffee; padding: 20px; margin: 20px 0; border: 2px solid green;">
+                        <h3>🏆 TONY'S SEASON SUMMARY</h3>
+                        <p><strong>Total Points:</strong> ${totalSeasonPoints}</p>
+                        <p><strong>Games Won:</strong> ${totalSeasonWins} of ${totalSeasonGames}</p>
+                        <p><strong>Weeks Played:</strong> ${totalWeeksPlayed}</p>
+                        <p><strong>Average Points/Week:</strong> ${avgPoints}</p>
+                        <p><strong>Win Percentage:</strong> ${winPct}%</p>
+                    </div>
+                `;
+
+                // Show all issues
+                if (allIssues.length > 0) {
+                    output.innerHTML += `
+                        <div style="background: #ffffee; padding: 15px; margin: 20px 0; border: 2px solid orange;">
+                            <h4>⚠️ ISSUES FOUND (${allIssues.length})</h4>
+                            <ul>
+                                ${allIssues.map(issue => `<li>${issue}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                } else {
+                    output.innerHTML += `
+                        <div style="background: #eeffee; padding: 15px; margin: 20px 0; border: 2px solid green;">
+                            <h4>✅ NO ISSUES FOUND</h4>
+                            <p>Tony's picks and scoring are clean!</p>
+                        </div>
+                    `;
+                }
+
+                console.log('TONY-DEBUG: Tony scoring test complete');
+
+            } catch (error) {
+                console.error('TONY-DEBUG: Test error:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ TEST FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function populateAndTest() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🚀 POPULATE RESULTS + TEST TONY</h2>';
+
+            try {
+                const user = await autoLogin();
+                if (!user) {
+                    output.innerHTML += '<p style="color: red;">❌ Authentication failed</p>';
+                    return;
+                }
+
+                output.innerHTML += `<p style="color: green;">✅ Authenticated as: ${user.email}</p>`;
+
+                // Step 1: Populate results for all weeks
+                output.innerHTML += '<h3>📊 Step 1: Populating Results...</h3>';
+
+                for (let week = 1; week <= 3; week++) {
+                    output.innerHTML += `<p>📊 Populating Week ${week}...</p>`;
+
+                    // Load from JSON and populate Firestore (simplified version)
+                    try {
+                        const response = await fetch(`./game-data/nfl_2025_week_${week}.json`);
+                        if (response.ok) {
+                            const jsonData = await response.json();
+
+                            const firestoreData = {};
+                            let gamesWithWinners = 0;
+
+                            for (const [gameId, gameData] of Object.entries(jsonData)) {
+                                if (gameId === 'timestamp' || gameId === 'lastUpdated') continue;
+
+                                let winner = null;
+                                if (gameData.status === 'final' && gameData.homeScore !== undefined && gameData.awayScore !== undefined) {
+                                    if (gameData.homeScore > gameData.awayScore) {
+                                        winner = gameData.h;
+                                    } else if (gameData.awayScore > gameData.homeScore) {
+                                        winner = gameData.a;
+                                    }
+                                }
+
+                                firestoreData[gameId] = {
+                                    home: gameData.h || null,
+                                    away: gameData.a || null,
+                                    homeScore: gameData.homeScore !== undefined ? gameData.homeScore : null,
+                                    awayScore: gameData.awayScore !== undefined ? gameData.awayScore : null,
+                                    status: gameData.status || 'scheduled',
+                                    winner: winner || null
+                                };
+
+                                if (winner) gamesWithWinners++;
+                            }
+
+                            firestoreData.lastUpdated = new Date().toISOString();
+                            firestoreData.populatedFromJSON = true;
+
+                            const resultsPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`;
+                            await firebase.firestore().doc(resultsPath).set(firestoreData);
+
+                            output.innerHTML += `<p style="color: green;">✅ Week ${week}: ${gamesWithWinners} games with winners</p>`;
+                        }
+                    } catch (error) {
+                        output.innerHTML += `<p style="color: red;">❌ Week ${week} population failed: ${error.message}</p>`;
+                    }
+                }
+
+                // Step 2: Test Tony's scoring
+                output.innerHTML += '<h3>🧪 Step 2: Testing Tony\'s Scoring...</h3>';
+                await testTonyScoring();
+
+            } catch (error) {
+                console.error('TONY-DEBUG: Populate and test error:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ POPULATE AND TEST FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function testAllUsers() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>👥 TESTING ALL USERS (GRACEFUL)</h2>';
+
+            try {
+                const user = await autoLogin();
+                if (!user) {
+                    output.innerHTML += '<p style="color: red;">❌ Authentication failed</p>';
+                    return;
+                }
+
+                output.innerHTML += `<p style="color: green;">✅ Authenticated as: ${user.email}</p>`;
+                output.innerHTML += '<p>📊 This will be a comprehensive test of all users with graceful error handling...</p>';
+                output.innerHTML += '<p><strong>Coming next:</strong> Full graceful scoring for all 53+ users!</p>';
+
+            } catch (error) {
+                console.error('TONY-DEBUG: All users test error:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ ALL USERS TEST FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        // Auto-start when page loads
+        window.addEventListener('load', async () => {
+            console.log('TONY-DEBUG: Page loaded, starting auto-authentication...');
+            try {
+                await autoLogin();
+                console.log('TONY-DEBUG: Auto-authentication complete');
+            } catch (error) {
+                console.error('TONY-DEBUG: Auto-authentication failed:', error);
+            }
+        });
+    </script>
+</body>
+</html>
