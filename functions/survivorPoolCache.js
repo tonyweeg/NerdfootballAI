@@ -378,6 +378,7 @@ async function generateSurvivorPoolData(poolId) {
  */
 async function loadNFLResultsForAllWeeks() {
     const nflResults = {};
+    const currentWeek = getCurrentWeekNumber();
 
     // Check weeks 1-18 for available NFL results
     for (let week = 1; week <= 18; week++) {
@@ -393,24 +394,44 @@ async function loadNFLResultsForAllWeeks() {
                 const gameCount = Object.keys(weekData).length;
                 console.log(`🎯 Week ${week} has ${gameCount} games in database`);
 
+                // ENHANCED DEBUG: Show actual Week 4 data structure
+                if (week === 4) {
+                    console.log(`🔥 WEEK 4 RAW DATA:`, JSON.stringify(weekData, null, 2));
+                    console.log(`🔥 WEEK 4 GAME KEYS:`, Object.keys(weekData));
+                }
+
                 if (gameCount > 0) {
                     // Extract winning AND losing teams for this week
                     const winningTeams = [];
                     const losingTeams = [];
 
                     Object.entries(weekData).forEach(([gameId, game]) => {
+                        // ENHANCED DEBUG: Show each Week 4 game processing
+                        if (week === 4) {
+                            console.log(`🔥 WEEK 4 PROCESSING GAME ${gameId}:`, JSON.stringify(game, null, 2));
+                        }
+
                         // Skip metadata objects - only process actual games
-                        if (gameId.startsWith('_') || !game.a || !game.h || !game.hasOwnProperty('status')) {
-                            console.log(`⏭️  Skipping non-game object: ${gameId}`);
+                        // FIXED: Handle both ESPN format (awayTeam/homeTeam) and legacy format (a/h)
+                        const hasTeams = (game.a && game.h) || (game.awayTeam && game.homeTeam);
+                        if (gameId.startsWith('_') || !hasTeams || !game.hasOwnProperty('status')) {
+                            console.log(`⏭️  Skipping non-game object: ${gameId} (hasTeams: ${hasTeams}, hasStatus: ${game.hasOwnProperty('status')})`);
+                            if (week === 4) {
+                                console.log(`🔥 WEEK 4 SKIPPED GAME ${gameId} - hasTeams: ${hasTeams}, hasStatus: ${game.hasOwnProperty('status')}`);
+                            }
                             return;
                         }
 
                         console.log(`🎯 Processing game ${gameId}:`, JSON.stringify(game, null, 2));
-                        // CRITICAL: Only eliminate on FINAL or FINAL/OT games
-                        if ((game.status === 'final' || game.status === 'final/ot') && game.winner) {
+                        // CRITICAL: ESPN writes STATUS_FINAL, not FINAL - fix status detection
+                        const isFinalGame = game.status === 'STATUS_FINAL' || game.status === 'FINAL' || game.status === 'FINAL/OT' || game.status === 'final' || game.status === 'final/ot';
+                        if (isFinalGame && game.winner) {
                             // Collect winners and losers using correct field names
                             winningTeams.push(game.winner);
-                            const loser = game.winner === game.h ? game.a : game.h;
+                            // FIXED: Handle both ESPN format (awayTeam/homeTeam) and legacy format (a/h)
+                            const homeTeam = game.h || game.homeTeam;
+                            const awayTeam = game.a || game.awayTeam;
+                            const loser = game.winner === homeTeam ? awayTeam : homeTeam;
                             losingTeams.push(loser);
                             console.log(`✅ FINAL Game - Winner: ${game.winner}, Loser: ${loser}, Status: ${game.status}`);
                         } else {
@@ -420,12 +441,23 @@ async function loadNFLResultsForAllWeeks() {
 
                     console.log(`🏆 Week ${week} WINNERS: [${winningTeams.join(', ')}]`);
                     console.log(`💀 Week ${week} LOSERS: [${losingTeams.join(', ')}]`);
+                    if (week === 4) console.log(`🔥 WEEK 4 DEBUG: ${winningTeams.length} winners, ${losingTeams.length} losers from ${gameCount} total games`);
 
-                    nflResults[week] = {
-                        winningTeams,
-                        losingTeams,
-                        gameCount
-                    };
+                    // ENHANCED LOGIC: Include week if ANY FINAL games exist (not just if all complete)
+                    // This is crucial for current week processing during Sunday games
+                    // EMERGENCY FIX: Force include Week 4 for elimination processing
+                    if (winningTeams.length > 0 || week === currentWeek || week === 4) {
+                        nflResults[week] = {
+                            winningTeams,
+                            losingTeams,
+                            gameCount,
+                            isCurrentWeek: week === currentWeek,
+                            finalGamesCount: winningTeams.length
+                        };
+                        console.log(`✅ Added Week ${week} to processing (${winningTeams.length} final games, currentWeek: ${week === currentWeek})`);
+                    } else {
+                        console.log(`⏭️ Skipping Week ${week} - no final games and not current week`);
+                    }
                 }
             }
         } catch (error) {
@@ -434,6 +466,16 @@ async function loadNFLResultsForAllWeeks() {
     }
 
     console.log(`📊 Loaded NFL results for weeks: ${Object.keys(nflResults).join(', ')}`);
+    console.log(`🚀 ENHANCED LOGIC ACTIVE - Current week ${currentWeek} will be processed even with partial games`);
+
+    // Log current week status for debugging
+    if (nflResults[currentWeek]) {
+        const currentWeekData = nflResults[currentWeek];
+        console.log(`⚡ Week ${currentWeek} STATUS: ${currentWeekData.finalGamesCount}/${currentWeekData.gameCount} games final`);
+        console.log(`🏆 Week ${currentWeek} WINNERS: [${currentWeekData.winningTeams.join(', ')}]`);
+        console.log(`💀 Week ${currentWeek} LOSERS: [${currentWeekData.losingTeams.join(', ')}]`);
+    }
+
     return nflResults;
 }
 
@@ -469,4 +511,4 @@ function getCurrentWeekNumber() {
 
     // Fallback - if we're before week 1, return 1; if after week 18, return 18
     return todayStr < '2025-09-04' ? 1 : 18;
-}
+}// Force deployment Sun Sep 28 20:09:50 EDT 2025
