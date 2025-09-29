@@ -862,17 +862,35 @@
                 }
 
                 bibleData = gamesDoc.data();
+
+                // 🔍 DEBUG: Show all available games in database
+                const allGameKeys = Object.keys(bibleData).filter(k => !k.startsWith('_'));
+                console.log(`🔍 GRID_DEBUG: All games in Week ${currentWeek} database:`, allGameKeys.sort((a,b) => parseInt(a) - parseInt(b)));
+
+                // Check for game 415 specifically
+                if (bibleData['415']) {
+                    console.log('🎮 GRID_DEBUG: Game 415 found in database:', JSON.stringify(bibleData['415'], null, 2));
+                } else {
+                    console.log('❌ GRID_DEBUG: Game 415 NOT FOUND in database');
+                }
+
                 gameIds = Object.keys(bibleData)
                     .filter(k => !k.startsWith('_') && !k.includes('401772'))
                     .filter(k => {
                         const gameNum = parseInt(k);
                         const weekStart = currentWeek * 100 + 1;
                         const weekEnd = currentWeek * 100 + 16;
-                        return gameNum >= weekStart && gameNum <= weekEnd;
+                        const inRange = gameNum >= weekStart && gameNum <= weekEnd;
+
+                        // 🔍 DEBUG: Log each game's filtering decision
+                        console.log(`🔍 GRID_DEBUG: Game ${k} (${gameNum}): range ${weekStart}-${weekEnd}, included: ${inRange}`);
+
+                        return inRange;
                     })
                     .sort((a, b) => parseInt(a) - parseInt(b));
 
                 console.log('✅ Bible data loaded:', gameIds.length, 'games for Week', currentWeek);
+                console.log('🎯 GRID_DEBUG: Final filtered game IDs:', gameIds);
             } catch (error) {
                 console.error('❌ Error loading bible data:', error);
                 throw error;
