@@ -339,18 +339,70 @@ window.ScoringCalculator = {
     },
 
     /**
-     * Get games for a week with results
+     * Get games for a week with results - FIXED to read from Firebase
      */
     async getWeekGamesWithResults(weekNumber) {
         try {
-            const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
-            if (!response.ok) throw new Error(`Failed to fetch week ${weekNumber} games`);
+            console.log(`🔥 FIXED: Reading Week ${weekNumber} games from Firebase (not JSON files)`);
 
-            const weekData = await response.json();
-            return weekData.games || [];
+            // Read from Firebase database where ESPN Score Monitor updates the data
+            const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`;
+            const docRef = window.doc(window.db, gamesPath);
+            const docSnap = await window.getDoc(docRef);
+
+            if (!docSnap.exists()) {
+                console.error(`❌ Week ${weekNumber} games document not found in Firebase`);
+                return [];
+            }
+
+            const weekData = docSnap.data();
+            console.log(`📊 Week ${weekNumber} Firebase data contains ${Object.keys(weekData).length} keys`);
+
+            // Convert games object to array format
+            // Firebase stores games as {gameId: gameData} but we need array of games with id property
+            const gameIds = Object.keys(weekData).filter(key => !key.startsWith('_') && !key.startsWith('game_'));
+            const games = gameIds.map(id => ({
+                id: id,
+                ...weekData[id]
+            }));
+
+            console.log(`✅ Week ${weekNumber}: Found ${games.length} games in Firebase with live ESPN data`);
+
+            // Debug log for Week 4 specifically
+            if (weekNumber === 4) {
+                const finalGames = games.filter(g => g.status && g.status.includes('FINAL'));
+                const inProgressGames = games.filter(g => g.status === 'IN_PROGRESS');
+                const scheduledGames = games.filter(g => g.status === 'scheduled');
+
+                console.log(`🎯 Week 4 STATUS: ${finalGames.length} FINAL, ${inProgressGames.length} IN_PROGRESS, ${scheduledGames.length} scheduled`);
+                finalGames.forEach(g => {
+                    console.log(`  ✅ Game ${g.id}: ${g.winner} beat opponent (${g.awayScore}-${g.homeScore})`);
+                });
+            }
+
+            return games;
+
         } catch (error) {
-            console.error(`❌ Error fetching week ${weekNumber} games:`, error);
-            return [];
+            console.error(`❌ Error fetching week ${weekNumber} games from Firebase:`, error);
+
+            // Fallback to JSON files (legacy)
+            console.log(`⚠️ Falling back to JSON files for Week ${weekNumber}`);
+            try {
+                const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
+                if (!response.ok) throw new Error(`Failed to fetch week ${weekNumber} games`);
+
+                const weekData = await response.json();
+
+                // Convert games object to array format
+                const gameIds = Object.keys(weekData).filter(key => !key.startsWith('_'));
+                return gameIds.map(id => ({
+                    id: id,
+                    ...weekData[id]
+                }));
+            } catch (fallbackError) {
+                console.error(`❌ Fallback JSON fetch also failed:`, fallbackError);
+                return [];
+            }
         }
     },
 
