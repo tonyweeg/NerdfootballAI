@@ -426,9 +426,12 @@ exports.scheduledScoreUpdate = onSchedule('every 2 minutes', async (event) => {
 
         // Only run during game days (Thursday-Monday)
         const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, etc.
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        console.log(`🏈 Current day: ${dayNames[dayOfWeek]} (${dayOfWeek}) - Date: ${now.toISOString()}`);
+
         // FIXED: Skip Tuesday (2) and Wednesday (3) only
         if (dayOfWeek === 2 || dayOfWeek === 3) {
-            console.log('🏈 Non-game day - skipping score update');
+            console.log('🏈 Non-game day (Tue/Wed) - skipping score update');
             return;
         }
 

@@ -205,9 +205,12 @@ async function calculateUserWeeklyScore(userId, weekNumber, userPicks, completed
 
         // Process each pick against completed games
         Object.entries(userPicks).forEach(([gameId, pick]) => {
-            if (!pick || !pick.team || !pick.confidence) {
+            if (!pick || (!pick.team && !pick.winner) || !pick.confidence) {
                 return; // Skip invalid picks
             }
+
+            // Support both 'team' and 'winner' field names
+            const userPickedTeam = pick.team || pick.winner;
 
             totalPicks++;
             const confidence = parseInt(pick.confidence) || 1;
@@ -215,21 +218,37 @@ async function calculateUserWeeklyScore(userId, weekNumber, userPicks, completed
             // Find the corresponding completed game
             const completedGame = completedGames.find(g => g.gameId === gameId);
 
-            if (completedGame && completedGame.winner) {
-                const isCorrect = pick.team === completedGame.winner;
-
-                if (isCorrect) {
+            if (completedGame) {
+                // TIE GAME LOGIC: If winner is null or undefined, it's a tie - everyone gets points
+                if (!completedGame.winner) {
                     correctPicks++;
                     totalPoints += confidence;
-                }
 
-                pickResults[gameId] = {
-                    team: pick.team,
-                    confidence: confidence,
-                    correct: isCorrect,
-                    points: isCorrect ? confidence : 0,
-                    gameWinner: completedGame.winner
-                };
+                    pickResults[gameId] = {
+                        team: userPickedTeam,
+                        confidence: confidence,
+                        correct: true,
+                        points: confidence,
+                        gameWinner: 'TIE',
+                        isTie: true
+                    };
+                } else {
+                    // Normal game with winner
+                    const isCorrect = userPickedTeam === completedGame.winner;
+
+                    if (isCorrect) {
+                        correctPicks++;
+                        totalPoints += confidence;
+                    }
+
+                    pickResults[gameId] = {
+                        team: userPickedTeam,
+                        confidence: confidence,
+                        correct: isCorrect,
+                        points: isCorrect ? confidence : 0,
+                        gameWinner: completedGame.winner
+                    };
+                }
             }
         });
 
