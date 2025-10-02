@@ -453,10 +453,66 @@
         </div>
     </div>
 
+    <div id="deepStar6Modal" class="hidden modal-overlay">
+        <div class="cache-card modal-content" style="border-color: #ff0000;">
+            <h2 class="text-3xl font-black text-red-500 mb-6">☠️ DEEP STAR 6 THAT SUCKA</h2>
+
+            <input type="hidden" id="deepStar6UserId">
+
+            <div class="space-y-6">
+                <div class="bg-red-900/30 border-2 border-red-500 rounded-lg p-4">
+                    <p class="text-xl font-bold text-white mb-2" id="deepStar6UserName"></p>
+                    <p class="text-sm text-gray-400 font-mono" id="deepStar6UserUID"></p>
+                </div>
+
+                <div class="bg-black/50 rounded-lg p-4">
+                    <p class="text-lg font-bold text-red-400 mb-3">🗑️ WHAT WILL BE DELETED:</p>
+                    <ul class="text-sm text-gray-300 space-y-2">
+                        <li>• Pool membership</li>
+                        <li>• All confidence picks (18 weeks)</li>
+                        <li>• All survivor picks (18 weeks)</li>
+                        <li>• All scoring data (18 weeks)</li>
+                        <li>• All elimination records</li>
+                        <li>• All rollup stats (season & weekly)</li>
+                    </ul>
+                </div>
+
+                <div class="bg-yellow-900/30 border-2 border-yellow-500 rounded-lg p-4">
+                    <p class="text-lg font-bold text-yellow-400 mb-2">⚠️ SAFETY</p>
+                    <p class="text-sm text-gray-300">USER DATA WILL BE ARCHIVED FIRST (backup)</p>
+                </div>
+
+                <div class="bg-black/80 rounded-lg p-4 text-center">
+                    <p class="text-2xl font-black text-red-500 mb-3">⚠️ TYPE TO CONFIRM ⚠️</p>
+                    <p class="text-lg text-white mb-4">Type <span class="text-red-400 font-black">FEEEEE</span> to confirm</p>
+                    <input type="text"
+                           id="deepStar6ConfirmInput"
+                           placeholder="Type FEEEEE here"
+                           class="text-center text-2xl font-bold"
+                           style="border: 2px solid #ff0000;"
+                           oninput="validateDeepStar6Confirmation()">
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button id="deepStar6ExecuteBtn"
+                        onclick="executeDeepStar6()"
+                        class="btn-asteroid btn-danger flex-1 text-lg py-3"
+                        style="background: linear-gradient(135deg, #8b0000 0%, #4a0000 100%);"
+                        disabled>
+                    ☠️ EXECUTE DEEP STAR 6
+                </button>
+                <button onclick="closeDeepStar6Modal()" class="btn-asteroid flex-1 text-lg py-3">
+                    ❌ CANCEL
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
         import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
@@ -485,6 +541,7 @@
         window.doc = doc;
         window.getDoc = getDoc;
         window.setDoc = setDoc;
+        window.deleteDoc = deleteDoc;
 
         let currentUser = null;
         let isAdmin = false;
@@ -626,7 +683,7 @@
                     </div>
                 </div>
 
-                <div class="flex gap-2">
+                <div class="flex gap-2 mb-2">
                     <button onclick="editUser('${uid}')"
                             class="btn-asteroid flex-1 text-sm py-2">
                         ✏️ EDIT
@@ -634,6 +691,13 @@
                     <button onclick="confirmRemoveUser('${uid}', '${userData.name?.replace(/'/g, "\\'")}')"
                             class="btn-asteroid btn-danger flex-1 text-sm py-2">
                         🗑️ REMOVE
+                    </button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="confirmDeepStar6('${uid}', '${userData.name?.replace(/'/g, "\\'")}')"
+                            class="btn-asteroid btn-danger w-full text-sm py-2"
+                            style="background: linear-gradient(135deg, #8b0000 0%, #4a0000 100%);">
+                        ☠️ DEEP STAR 6
                     </button>
                 </div>
             `;
@@ -951,6 +1015,200 @@
 
             console.log(`🎮 NERD_CRUD: ${message}`);
         }
+
+        window.confirmDeepStar6 = async (uid, userName) => {
+            if (!isAdmin) return;
+
+            try {
+                console.log('💥 DEEP_STAR_6: Opening modal for', { uid, userName });
+
+                document.getElementById('deepStar6UserId').value = uid;
+                document.getElementById('deepStar6UserName').textContent = userName;
+                document.getElementById('deepStar6UserUID').textContent = `UID: ${uid}`;
+                document.getElementById('deepStar6ConfirmInput').value = '';
+                document.getElementById('deepStar6ExecuteBtn').disabled = true;
+                document.getElementById('deepStar6Modal').classList.remove('hidden');
+
+                logAction(`⚠️ DEEP STAR 6 modal opened for ${userName}`, 'warning');
+            } catch (error) {
+                console.error('❌ DEEP_STAR_6: Modal open error:', error);
+                logAction(`❌ Failed to open DEEP STAR 6 modal: ${error.message}`, 'error');
+            }
+        };
+
+        window.closeDeepStar6Modal = () => {
+            document.getElementById('deepStar6Modal').classList.add('hidden');
+            document.getElementById('deepStar6ConfirmInput').value = '';
+            document.getElementById('deepStar6ExecuteBtn').disabled = true;
+            console.log('💥 DEEP_STAR_6: Modal closed');
+        };
+
+        window.validateDeepStar6Confirmation = () => {
+            const input = document.getElementById('deepStar6ConfirmInput').value;
+            const btn = document.getElementById('deepStar6ExecuteBtn');
+            btn.disabled = input !== 'FEEEEE';
+            console.log('💥 DEEP_STAR_6: Confirmation validation', { input, valid: input === 'FEEEEE' });
+        };
+
+        window.executeDeepStar6 = async () => {
+            if (!isAdmin) {
+                logAction('❌ Admin access required', 'error');
+                return;
+            }
+
+            const uid = document.getElementById('deepStar6UserId').value;
+            const userName = document.getElementById('deepStar6UserName').textContent;
+            const confirmInput = document.getElementById('deepStar6ConfirmInput').value;
+
+            if (confirmInput !== 'FEEEEE') {
+                logAction('❌ Invalid confirmation text', 'error');
+                return;
+            }
+
+            try {
+                logAction('🔒 Archiving complete user data snapshot...', 'info');
+                console.log('💥 DEEP_STAR_6: Starting execution for', { uid, userName });
+
+                const timestamp = new Date().toISOString();
+                let deletionCount = 0;
+
+                const membersRef = doc(db, POOL_MEMBERS_PATH);
+                const membersSnap = await getDoc(membersRef);
+
+                if (!membersSnap.exists()) {
+                    logAction('❌ Pool members not found', 'error');
+                    return;
+                }
+
+                const members = membersSnap.data();
+                const userData = members[uid];
+
+                if (!userData) {
+                    logAction(`❌ User ${userName} not found`, 'error');
+                    return;
+                }
+
+                const archiveData = {
+                    userData: userData,
+                    uid: uid,
+                    archivedAt: timestamp,
+                    archivedBy: currentUser.uid,
+                    reason: 'DEEP_STAR_6_deletion'
+                };
+
+                const archiveRef = doc(db,
+                    `artifacts/nerdfootball/pools/nerduniverse-2025/metadata/deep_star_6_archive/${uid}/${timestamp.replace(/[:.]/g, '-')}`);
+                await setDoc(archiveRef, archiveData);
+
+                logAction(`📦 User data archived to deep_star_6_archive/${uid}/${timestamp}`, 'success');
+                console.log('💥 DEEP_STAR_6: User data archived', { uid, timestamp });
+
+                logAction(`💥 DEEP STAR 6 initiated for ${userName} (${uid})`, 'warning');
+
+                for (let week = 1; week <= 18; week++) {
+                    const confPath1 = `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`;
+                    const confDoc1 = doc(db, confPath1, uid);
+                    try {
+                        await deleteDoc(confDoc1);
+                        deletionCount++;
+                        console.log(`💥 DEEP_STAR_6: Deleted confidence picks week ${week} (path 1)`, uid);
+                    } catch (e) {
+                        console.log(`💥 DEEP_STAR_6: No data at confidence path 1 week ${week}`, uid);
+                    }
+
+                    const confPath2 = `artifacts/nerdfootball/pools/nerduniverse-2025/confidence/2025/weeks/${week}/users`;
+                    const confDoc2 = doc(db, confPath2, uid);
+                    try {
+                        await deleteDoc(confDoc2);
+                        deletionCount++;
+                        console.log(`💥 DEEP_STAR_6: Deleted confidence picks week ${week} (path 2)`, uid);
+                    } catch (e) {
+                        console.log(`💥 DEEP_STAR_6: No data at confidence path 2 week ${week}`, uid);
+                    }
+
+                    const survPath1 = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${week}`;
+                    const survDoc1 = doc(db, survPath1, uid);
+                    try {
+                        await deleteDoc(survDoc1);
+                        deletionCount++;
+                        console.log(`💥 DEEP_STAR_6: Deleted survivor picks week ${week} (path 1)`, uid);
+                    } catch (e) {
+                        console.log(`💥 DEEP_STAR_6: No data at survivor path 1 week ${week}`, uid);
+                    }
+
+                    const survPath2 = `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/weeks/${week}/users`;
+                    const survDoc2 = doc(db, survPath2, uid);
+                    try {
+                        await deleteDoc(survDoc2);
+                        deletionCount++;
+                        console.log(`💥 DEEP_STAR_6: Deleted survivor picks week ${week} (path 2)`, uid);
+                    } catch (e) {
+                        console.log(`💥 DEEP_STAR_6: No data at survivor path 2 week ${week}`, uid);
+                    }
+
+                    const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scores/2025/weeks/${week}/users`;
+                    const scoreDoc = doc(db, scorePath, uid);
+                    try {
+                        await deleteDoc(scoreDoc);
+                        deletionCount++;
+                        console.log(`💥 DEEP_STAR_6: Deleted scoring data week ${week}`, uid);
+                    } catch (e) {
+                        console.log(`💥 DEEP_STAR_6: No data at scoring path week ${week}`, uid);
+                    }
+
+                    const rollupWeeklyPath = `artifacts/nerdfootball/pools/nerduniverse-2025/rollups/weekly/2025/week_${week}/users`;
+                    const rollupWeeklyDoc = doc(db, rollupWeeklyPath, uid);
+                    try {
+                        await deleteDoc(rollupWeeklyDoc);
+                        deletionCount++;
+                        console.log(`💥 DEEP_STAR_6: Deleted weekly rollup week ${week}`, uid);
+                    } catch (e) {
+                        console.log(`💥 DEEP_STAR_6: No data at weekly rollup week ${week}`, uid);
+                    }
+
+                    if (week % 3 === 0) {
+                        logAction(`🗑️ Processed week ${week} of 18...`, 'info');
+                    }
+                }
+
+                const rollupSeasonPath = `artifacts/nerdfootball/pools/nerduniverse-2025/rollups/season/2025/users`;
+                const rollupSeasonDoc = doc(db, rollupSeasonPath, uid);
+                try {
+                    await deleteDoc(rollupSeasonDoc);
+                    deletionCount++;
+                    console.log(`💥 DEEP_STAR_6: Deleted season rollup`, uid);
+                } catch (e) {
+                    console.log(`💥 DEEP_STAR_6: No data at season rollup`, uid);
+                }
+
+                const eliminationPath = `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/eliminations`;
+                const eliminationDoc = doc(db, eliminationPath, uid);
+                try {
+                    await deleteDoc(eliminationDoc);
+                    deletionCount++;
+                    console.log(`💥 DEEP_STAR_6: Deleted eliminations`, uid);
+                    logAction('🗑️ Deleted eliminations', 'info');
+                } catch (e) {
+                    console.log(`💥 DEEP_STAR_6: No data at eliminations`, uid);
+                }
+
+                delete members[uid];
+                await setDoc(membersRef, members);
+                deletionCount++;
+                console.log(`💥 DEEP_STAR_6: Deleted pool membership`, uid);
+                logAction('🗑️ Deleted pool membership', 'info');
+
+                logAction(`✅ DEEP STAR 6 complete - ${deletionCount} documents deleted`, 'success');
+                console.log(`💥 DEEP_STAR_6: Execution complete`, { uid, userName, deletionCount, timestamp });
+
+                closeDeepStar6Modal();
+                await loadAllUsers();
+
+            } catch (error) {
+                console.error('❌ DEEP_STAR_6: Execution error:', error);
+                logAction(`❌ DEEP STAR 6 failed: ${error.message}`, 'error');
+            }
+        };
 
         console.log('🚀 NERD_CRUD: User & Pool Manager initialized');
     </script>
