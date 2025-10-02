@@ -3,7 +3,40 @@
 **Project**: NerdFootball User & Pool Management Interface
 **Design Aesthetic**: Straight Cache Homey (Cyberpunk/Asteroids Terminal Theme)
 **Access Level**: ADMIN ONLY
-**File Name**: `user-pool-manager.html`
+**File Name**: `nerdfootball-nerd-crud.html`
+**Menu Location**: ADMIN TOOLS section in nerd-universe.html (NOT hamburger menu)
+
+---
+
+## ✅ REQUIREMENTS AGREEMENT (CONFIRMED WITH TONY)
+
+### A) User Removal Behavior
+**CONFIRMED: Option A** - Remove ONLY from pool members
+- User removed from `artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members`
+- Picks, scores, and historical data remain intact
+- User data archived to `removed_members/{uid}` before removal
+- No cascading deletion
+
+### B) User Data Updates
+**CONFIRMED: Option B** - Update ONLY pool members document
+- Name/email changes affect only `metadata/members`
+- Historical picks and leaderboard data stays as-is (immutable)
+- Preserves data integrity for past weeks
+
+### C) New User Initialization
+**CONFIRMED: Option C (Modified)** - No genesis documents on user add
+- Adding user creates entry in pool members ONLY
+- User has NO picks, scores, or pool-specific data initially
+- Genesis documents created by pool interfaces when user first makes picks:
+  - `nerdfootballConfidencePicks.html` creates confidence pick structures
+  - `NerdSurvivorPicks.html` creates survivor pick structures
+- Pool participation flags control access, NOT data initialization
+
+### D) File Name & Menu Integration
+**CONFIRMED:**
+- File: `nerdfootball-nerd-crud.html`
+- Location: ADMIN TOOLS section in `nerd-universe.html`
+- NOT in hamburger menu
 
 ---
 
@@ -129,7 +162,7 @@ const ADMIN_UIDS = [
 ## 💻 STEP-BY-STEP IMPLEMENTATION GUIDE
 
 ### STEP 1: Create HTML File Structure
-**File**: `/Users/tonyweeg/nerdfootball-project/public/user-pool-manager.html`
+**File**: `/Users/tonyweeg/nerdfootball-project/public/nerdfootball-nerd-crud.html`
 
 ```html
 <!DOCTYPE html>
@@ -1107,11 +1140,12 @@ firebase deploy --only hosting
 open https://nerdfootball.web.app/user-pool-manager.html
 ```
 
-### Step 5: Add to Nerd Universe Menu
-Edit `nerd-universe.html` and add menu link:
+### Step 5: Add to Nerd Universe ADMIN TOOLS Section
+Edit `nerd-universe.html` and add to ADMIN TOOLS section:
 ```html
-<a href="user-pool-manager.html?admin=WxSPmEildJdqs6T5hIpBUZrscwt2"
-   class="menu-item">
+<!-- In ADMIN TOOLS section, NOT hamburger menu -->
+<a href="nerdfootball-nerd-crud.html"
+   class="admin-tool-link">
     🎮 USER & POOL MANAGER
 </a>
 ```
