@@ -1,6 +1,103 @@
 # 💎 CLAUDE.md - Diamond Level Development Standards for NerdFootball
 
-## Core Philosophy
+## 🎯 CORE DEVELOPMENT PHILOSOPHY
+
+**NerdFootball is an OOP design company using the strictest OOP design patterns for maximum efficiency.**
+
+### Development Commandments
+1. **NEVER GUESS** - Always work through small, logical, atomic tasks
+2. **PLAN EVERYTHING** - Every feature requires a plan document created BEFORE implementation
+3. **JIRA-STYLE MANAGEMENT** - Manage projects internally with epic/task breakdown
+4. **USE AGENTS** - Leverage specialized agents when needed for specific expertise
+5. **DOUBLE-CHECK ALWAYS** - Verify work before proceeding to next step
+6. **JUNIOR-DEV READY** - Code must be clean, efficient, bug-free, and junior-developer friendly
+7. **TEST LIKE QA** - Use console debugging for unexpected behavior
+8. **MUTUAL AGREEMENT** - Feature complete requires agreement between developer and product owner
+9. **MERGE ONLY WHEN COMPLETE** - Merge to main only after feature is complete and tested
+10. **DOCUMENT EVERYTHING** - Always backup documentation and create resumable plan documents
+
+### The Diamond Development Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. LEARN REQUIREMENTS                                           │
+│    → Clarify until 100% clear                                   │
+│    → Ask a/b questions until no ambiguity exists                │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 2. BUILD REQUIREMENTS V1                                        │
+│    → Create comprehensive plan document                         │
+│    → Include step-by-step implementation guide                  │
+│    → Design for junior developer handoff                        │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 3. ACHIEVE AGREEMENT                                            │
+│    → Ensure developer and product owner agree on process        │
+│    → Refine plan based on feedback                              │
+│    → Confirm understanding of requirements                      │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 4. HAND OFF TO JUNIOR DEVELOPER                                 │
+│    → Implement following plan document exactly                  │
+│    → Use OOP design patterns strictly                           │
+│    → Create clean, efficient, bug-free code                     │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 5. TEST LIKE QA SPECIALIST                                      │
+│    → Comprehensive testing against plan checklist               │
+│    → Console debugging for unexpected behavior                  │
+│    → Verify all acceptance criteria met                         │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 6. DEBUG UNEXPECTED BEHAVIOR                                    │
+│    → Use browser console for real-time analysis                 │
+│    → Console log patterns with emoji prefixes                   │
+│    → Fix issues surgically without breaking existing features   │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 7. MUTUAL AGREEMENT ON COMPLETION                               │
+│    → Developer confirms all requirements met                    │
+│    → Product owner verifies feature works as expected           │
+│    → Both parties sign off on completion                        │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 8. MERGE BRANCH TO MAIN                                         │
+│    → Only after full approval                                   │
+│    → All tests passing                                          │
+│    → Documentation updated                                      │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 9. DEPLOY TO PRODUCTION                                         │
+│    → Firebase deploy with confidence                            │
+│    → Verify deployment success                                  │
+│    → Test in production environment                             │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ 10. BACKUP DOCUMENTATION                                        │
+│     → Commit plan documents to git                              │
+│     → Update CLAUDE.md if needed                                │
+│     → Create resumable reference for future work                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Principles
+- **Plan Documents Are Living Documentation** - They evolve with features and enable resumable work
+- **All Work Happens in Feature Branches** - Named descriptively (e.g., `USERS_COME_TO_TOWN`)
+- **Never Deploy Incomplete Features** - Partial implementations stay in branches
+- **OOP Design Patterns** - Strict adherence to object-oriented principles
+- **Atomic Tasks** - Break down complex features into smallest logical units
+- **Console Debugging First** - It's the fastest way to test and validate
+
+## Diamond Level Standard
 **"Diamond Level" means absolute precision, no mistakes, and comprehensive verification at every step.**
 
 ## 🤖 SPECIALIZED AGENTS
