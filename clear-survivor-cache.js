@@ -1,30 +1,27 @@
 const admin = require('firebase-admin');
-
-// Initialize Firebase Admin
 const serviceAccount = require('./serviceAccountKey.json');
+
 admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: 'https://nerdfootball-default-rtdb.firebaseio.com'
+    credential: admin.credential.cert(serviceAccount)
 });
 
 const db = admin.firestore();
 
 async function clearSurvivorCache() {
-    try {
-        console.log('🗑️ Clearing survivor cache...');
+    console.log('🗑️  CLEARING SURVIVOR CACHE TO FORCE REFRESH\n');
 
-        const cachePath = 'artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-survivor-display';
-        const cacheRef = db.doc(cachePath);
+    const cacheRef = db.doc('cache/survivor_pool_2025');
 
-        await cacheRef.delete();
-        console.log('✅ Survivor cache cleared successfully!');
-        console.log('🔄 Next visitor will generate fresh cache without user auth info');
+    console.log('Deleting survivor cache document...');
+    await cacheRef.delete();
 
-    } catch (error) {
-        console.error('❌ Error clearing cache:', error);
-    } finally {
-        process.exit(0);
-    }
+    console.log('✅ Survivor cache cleared!');
+    console.log('📊 Next call to getSurvivorPoolData will regenerate with Week 5 results');
+
+    process.exit(0);
 }
 
-clearSurvivorCache();
+clearSurvivorCache().catch(err => {
+    console.error('Error:', err);
+    process.exit(1);
+});
