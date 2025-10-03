@@ -693,9 +693,8 @@
                 const actualCurrentWeek = getCurrentWeekNumber();
                 const completedWeeks = actualCurrentWeek - 1;
 
-                let highScore = 0;
-                let totalScores = 0;
-                let userCount = 0;
+                const userSeasonTotals = {};
+                let weeklyHighScore = 0;
 
                 for (let weekNumber = 1; weekNumber <= completedWeeks; weekNumber++) {
                     const bibleData = await loadBibleData(weekNumber);
@@ -705,26 +704,32 @@
                     const picksSnap = await picksRef.get();
 
                     picksSnap.forEach(userDoc => {
+                        const userId = userDoc.id;
                         const picks = userDoc.data();
                         const analysis = analyzePicks(picks, bibleData);
 
-                        if (analysis.totalPointsEarned > highScore) {
-                            highScore = analysis.totalPointsEarned;
+                        if (!userSeasonTotals[userId]) {
+                            userSeasonTotals[userId] = 0;
                         }
-                        totalScores += analysis.totalPointsEarned;
-                        userCount++;
+                        userSeasonTotals[userId] += analysis.totalPointsEarned;
+
+                        if (analysis.totalPointsEarned > weeklyHighScore) {
+                            weeklyHighScore = analysis.totalPointsEarned;
+                        }
                     });
                 }
 
-                const averageScore = userCount > 0 ? Math.round(totalScores / userCount) : 0;
+                const seasonScores = Object.values(userSeasonTotals);
+                const seasonHighScore = seasonScores.length > 0 ? Math.max(...seasonScores) : 0;
+                const averageScore = seasonScores.length > 0 ? Math.round(seasonScores.reduce((a, b) => a + b, 0) / seasonScores.length) : 0;
 
                 document.getElementById('totalUsers').textContent = totalUsers;
                 document.getElementById('completedWeeks').textContent = completedWeeks;
-                document.getElementById('highScore').textContent = highScore;
+                document.getElementById('highScore').textContent = seasonHighScore;
                 document.getElementById('averageScore').textContent = averageScore;
                 document.getElementById('survivalRate').textContent = '-';
 
-                console.log(`✅ Universe stats calculated: ${totalUsers} users, ${completedWeeks} weeks, high: ${highScore}, avg: ${averageScore}`);
+                console.log(`✅ Universe stats calculated: ${totalUsers} users, ${completedWeeks} weeks, season high: ${seasonHighScore}, avg: ${averageScore}`);
 
             } catch (error) {
                 console.error('Error loading universe stats:', error);
