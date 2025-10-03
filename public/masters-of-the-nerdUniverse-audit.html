@@ -388,6 +388,46 @@
             animation: spin 20s linear infinite;
             pointer-events: none;
         }
+
+        /* Week Navigation Buttons */
+        .nav-button {
+            background: rgba(26, 26, 26, 0.9);
+            border: 2px solid var(--nerd-gold);
+            color: var(--nerd-white);
+            padding: 0.75rem 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-button:hover:not(:disabled) {
+            background: var(--nerd-gold);
+            color: var(--nerd-black);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+        }
+
+        .nav-button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            border-color: var(--nerd-surface);
+        }
+
+        #week-display {
+            background: linear-gradient(135deg, var(--nerd-gold), var(--nerd-cyan));
+            border-color: var(--nerd-cyan);
+            cursor: default;
+            font-size: 1.1rem;
+        }
+
+        #week-display:hover {
+            transform: none;
+        }
     </style>
 </head>
 <body>
@@ -439,13 +479,10 @@
                 <div class="section-header">
                     <div class="section-title">📊 Weekly Leaderboards (All Users)</div>
                     <div class="section-meta">
-                        <div class="week-navigation" style="display: flex; align-items: center; gap: 1rem;">
-                            <button class="week-nav-btn" onclick="loadSpecificWeek(1)">Week 1</button>
-                            <button class="week-nav-btn" onclick="loadSpecificWeek(2)">Week 2</button>
-                            <button class="week-nav-btn" onclick="loadSpecificWeek(3)">Week 3</button>
-                            <button class="week-nav-btn" onclick="loadSpecificWeek(4)">Week 4</button>
-                            <button class="week-nav-btn active" onclick="loadWeeklyData()">All Weeks</button>
-                            <button class="refresh-btn" onclick="loadWeeklyData()">Refresh</button>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <button id="week-down" class="nav-button">◄ PREV</button>
+                            <div class="nav-button" id="week-display">WEEK <span id="current-week-display">5</span></div>
+                            <button id="week-up" class="nav-button">NEXT ►</button>
                         </div>
                     </div>
                 </div>
@@ -504,6 +541,7 @@
 
         // Week configuration
         const CURRENT_WEEK = getCurrentWeekNumber(); // Dynamic week calculation
+        let displayWeek = CURRENT_WEEK; // Track currently displayed week
 
         // Helper functions for real-time season calculation (from gold standard leaderboard.html)
         function getCurrentWeekNumber() {
@@ -514,10 +552,34 @@
             return Math.max(1, Math.min(18, diffWeeks));
         }
 
+        // Week navigation functions
+        function changeWeek(newWeek) {
+            if (newWeek < 1 || newWeek > 18 || newWeek === displayWeek) return;
+
+            displayWeek = newWeek;
+            updateWeekDisplay();
+            loadWeeklyData(displayWeek);
+        }
+
+        function updateWeekDisplay() {
+            document.getElementById('current-week-display').textContent = displayWeek;
+
+            // Update button states
+            document.getElementById('week-up').disabled = displayWeek >= 18;
+            document.getElementById('week-down').disabled = displayWeek <= 1;
+        }
+
+        function initializeWeekControls() {
+            document.getElementById('week-up').onclick = () => changeWeek(displayWeek + 1);
+            document.getElementById('week-down').onclick = () => changeWeek(displayWeek - 1);
+            updateWeekDisplay();
+        }
+
         // Initialize dashboard (no authentication required - public data)
         document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('mainContent').style.display = 'block';
+            initializeWeekControls();
             await initializeAuditDashboard();
         });
 
@@ -736,24 +798,38 @@
             }
         }
 
-        async function loadWeeklyData() {
+        async function loadWeeklyData(specificWeek = null) {
             const weeklyGrid = document.getElementById('weeklyGrid');
             weeklyGrid.innerHTML = '<div class="loading">Loading weekly data...</div>';
 
             try {
-                const weeklyPromises = [];
-                for (let week = 1; week <= CURRENT_WEEK; week++) {
-                    weeklyPromises.push(loadWeekData(week));
-                }
+                if (specificWeek) {
+                    // Load only the specified week
+                    console.log(`📊 Loading Week ${specificWeek} data...`);
+                    const weekData = await loadWeekData(specificWeek);
 
-                const weeklyResults = await Promise.all(weeklyPromises);
-
-                weeklyGrid.innerHTML = '';
-                weeklyResults.forEach(weekData => {
+                    weeklyGrid.innerHTML = '';
                     if (weekData) {
                         weeklyGrid.appendChild(createWeekCard(weekData));
+                    } else {
+                        weeklyGrid.innerHTML = '<div class="error">No data available for Week ' + specificWeek + '</div>';
                     }
-                });
+                } else {
+                    // Load all weeks (original behavior)
+                    const weeklyPromises = [];
+                    for (let week = 1; week <= CURRENT_WEEK; week++) {
+                        weeklyPromises.push(loadWeekData(week));
+                    }
+
+                    const weeklyResults = await Promise.all(weeklyPromises);
+
+                    weeklyGrid.innerHTML = '';
+                    weeklyResults.forEach(weekData => {
+                        if (weekData) {
+                            weeklyGrid.appendChild(createWeekCard(weekData));
+                        }
+                    });
+                }
 
             } catch (error) {
                 console.error('Error loading weekly data:', error);
