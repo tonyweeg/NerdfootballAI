@@ -276,7 +276,8 @@ async function analyzeGameStates(bibleData) {
 
     for (const gameId of gameIds) {
         const game = bibleData[gameId];
-        if (game.winner && game.winner !== 'TBD') {
+        // Game is completed if status is final (includes ties where winner is null)
+        if (game.status === 'STATUS_FINAL' || game.status === 'final') {
             completed++;
         } else if (game.status === 'IN_PROGRESS' || game.status === 'HALFTIME') {
             live++;
