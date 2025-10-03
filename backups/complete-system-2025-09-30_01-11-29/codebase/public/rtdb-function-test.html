@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RTDB Function Test</title>
+    <meta name="cache-control" content="no-cache">
+    <meta name="version" content="test-2.0">
+    <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="container mx-auto">
+        <h1 class="text-3xl font-bold mb-6">🚀 Real-Time Function Test</h1>
+        
+        <div class="bg-white rounded-lg p-6 mb-6 shadow">
+            <h2 class="text-xl font-semibold mb-4">1. Firebase Status</h2>
+            <div id="firebase-status" class="text-gray-600">Initializing...</div>
+        </div>
+        
+        <div class="bg-white rounded-lg p-6 mb-6 shadow">
+            <h2 class="text-xl font-semibold mb-4">2. Direct RTDB Test (Bypass Functions)</h2>
+            <button id="direct-write-btn" class="bg-purple-500 text-white px-4 py-2 rounded disabled:opacity-50" disabled>
+                Direct RTDB Write
+            </button>
+            <div id="direct-result" class="mt-4 text-gray-600"></div>
+        </div>
+        
+        <div class="bg-white rounded-lg p-6 shadow">
+            <h2 class="text-xl font-semibold mb-4">3. RTDB Live Data</h2>
+            <div id="live-data" class="text-gray-600">No data yet...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getDatabase, ref, onValue, set, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const rtdb = getDatabase(app);
+        
+        const firebaseStatus = document.getElementById('firebase-status');
+        const directWriteBtn = document.getElementById('direct-write-btn');
+        const directResult = document.getElementById('direct-result');
+        const liveData = document.getElementById('live-data');
+        
+        firebaseStatus.innerHTML = '✅ Firebase initialized! Checking auth...';
+        
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                firebaseStatus.innerHTML = `🟢 Signed in as: ${user.displayName || user.email}`;
+                directWriteBtn.disabled = false;
+                
+                // Setup RTDB listener for test path
+                const testPath = 'test/rtdb-flow-test';
+                const testRef = ref(rtdb, testPath);
+                
+                onValue(testRef, 
+                    (snapshot) => {
+                        const data = snapshot.val();
+                        if (data) {
+                            console.log('📡 RTDB data received:', data);
+                            liveData.innerHTML = `<pre class="text-xs bg-gray-100 p-2 rounded overflow-x-auto">${JSON.stringify(data, null, 2)}</pre>`;
+                        } else {
+                            liveData.innerHTML = 'No data in RTDB yet';
+                        }
+                    },
+                    (error) => {
+                        console.error('RTDB error:', error);
+                        liveData.innerHTML = `❌ RTDB Error: ${error.message}`;
+                    }
+                );
+            } else {
+                firebaseStatus.innerHTML = `❌ Not signed in. <button onclick="signIn()" class="bg-green-500 text-white px-2 py-1 rounded text-sm">Sign In</button>`;
+                directWriteBtn.disabled = true;
+            }
+        });
+        
+        window.signIn = async () => {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error('Sign-in failed:', error);
+                firebaseStatus.innerHTML = '❌ Sign-in failed: ' + error.message;
+            }
+        };
+        
+        // Direct RTDB write button (bypass Cloud Functions)
+        directWriteBtn.addEventListener('click', async () => {
+            try {
+                directResult.innerHTML = '🔄 Writing directly to RTDB...';
+                directWriteBtn.disabled = true;
+                
+                // Create test game data
+                const testGameData = {
+                    timestamp: serverTimestamp(),
+                    lastUpdate: new Date().toISOString(),
+                    games: {
+                        'test-game-001': {
+                            gameId: 'test-game-001',
+                            homeTeam: 'Kansas City Chiefs',
+                            awayTeam: 'Buffalo Bills',
+                            homeScore: 21,
+                            awayScore: 17,
+                            status: 'live',
+                            quarter: 'Q3',
+                            timeRemaining: '8:45',
+                            possession: 'KC',
+                            redzone: false
+                        },
+                        'test-game-002': {
+                            gameId: 'test-game-002',
+                            homeTeam: 'New England Patriots',
+                            awayTeam: 'Miami Dolphins',
+                            homeScore: 14,
+                            awayScore: 10,
+                            status: 'live',
+                            quarter: 'Q4',
+                            timeRemaining: '12:30',
+                            possession: 'MIA',
+                            redzone: true
+                        }
+                    },
+                    metadata: {
+                        activeGames: 2,
+                        totalGames: 2,
+                        lastSync: serverTimestamp()
+                    }
+                };
+                
+                // Write to RTDB test path
+                const testPath = ref(rtdb, 'test/rtdb-flow-test');
+                await set(testPath, testGameData);
+                
+                console.log('✅ Direct RTDB write successful');
+                directResult.innerHTML = '✅ Successfully wrote test data to RTDB! Check the Live Data section below.';
+                
+            } catch (error) {
+                console.error('❌ Direct RTDB write failed:', error);
+                directResult.innerHTML = `❌ Direct write failed: ${error.message}`;
+            } finally {
+                directWriteBtn.disabled = false;
+            }
+        });
+        
+        console.log('🚀 Test page ready!');
+    </script>
+</body>
+</html>

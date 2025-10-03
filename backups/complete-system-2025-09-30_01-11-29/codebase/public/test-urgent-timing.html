@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>URGENT: Test Timezone Fix</title>
+</head>
+<body>
+    <h1>URGENT TIMEZONE FIX TEST</h1>
+    <div id="test-results"></div>
+
+    <script>
+        // Simulate ESPN timestamp parsing
+        function testTimingFix() {
+            const results = document.getElementById('test-results');
+
+            // Current time
+            const now = new Date();
+            results.innerHTML += `<p><strong>Current Time:</strong> ${now.toString()}</p>`;
+            results.innerHTML += `<p><strong>Current UTC:</strong> ${now.toISOString()}</p>`;
+
+            // Test 1PM EDT game (should have started)
+            const onePMGame = '2025-09-14T13:00:00Z';
+            results.innerHTML += `<h2>1PM Game Test</h2>`;
+            results.innerHTML += `<p>ESPN Timestamp: ${onePMGame}</p>`;
+
+            // Manual conversion test
+            const gameDate = new Date('2025-09-14T13:00:00'); // Without Z
+            const edtOffset = 4 * 60 * 60 * 1000; // 4 hours
+            const gameUTC = new Date(gameDate.getTime() + edtOffset);
+
+            results.innerHTML += `<p>Game Time (corrected UTC): ${gameUTC.toISOString()}</p>`;
+            results.innerHTML += `<p>Has Started: ${now >= gameUTC}</p>`;
+
+            const minutesUntil = Math.round((gameUTC.getTime() - now.getTime()) / 60000);
+            results.innerHTML += `<p>Minutes until start: ${minutesUntil}</p>`;
+
+            if (now >= gameUTC) {
+                results.innerHTML += `<p style="color: green;"><strong>✅ CORRECT: 1PM game should be locked</strong></p>`;
+            } else {
+                results.innerHTML += `<p style="color: red;"><strong>❌ BUG: 1PM game should be locked but isn't</strong></p>`;
+            }
+        }
+
+        // Run test
+        testTimingFix();
+    </script>
+</body>
+</html>

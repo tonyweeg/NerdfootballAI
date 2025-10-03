@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔍 CHECK TONY'S SCORING DOCUMENT</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>🔍 TONY'S SCORING DOCUMENT CHECKER</h1>
+    <p><strong>Document Path:</strong> <code>artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/WxSPmEildJdqs6T5hIpBUZrscwt2</code></p>
+
+    <button onclick="checkTonyDocument()" style="background: blue; color: white; padding: 15px; margin: 10px;">📊 CHECK CURRENT DOCUMENT</button>
+    <button onclick="runSingleUserFix()" style="background: red; color: white; padding: 15px; margin: 10px;">🔧 FIX TONY'S SCORING ONLY</button>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+        const TONY_SCORING_PATH = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function checkTonyDocument() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🔍 CHECKING TONY\'S SCORING DOCUMENT...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                console.log(`📊 CHECKING DOCUMENT: ${TONY_SCORING_PATH}`);
+
+                const scoringDoc = await firebase.firestore().doc(TONY_SCORING_PATH).get();
+
+                if (!scoringDoc.exists) {
+                    output.innerHTML += '<div style="background: #ffeeee; padding: 20px; border: 2px solid red;"><h3>❌ DOCUMENT DOES NOT EXIST!</h3></div>';
+                    return;
+                }
+
+                const data = scoringDoc.data();
+                console.log('📊 TONY\'S CURRENT SCORING DATA:', data);
+
+                output.innerHTML += `
+                    <div style="background: #eeeeff; padding: 20px; border: 2px solid blue; margin: 20px 0;">
+                        <h3>📊 CURRENT SCORING DOCUMENT CONTENTS</h3>
+                        <p><strong>Display Name:</strong> ${data.displayName || 'N/A'}</p>
+                        <p><strong>Total Points:</strong> ${data.totalPoints || 0}</p>
+                        <p><strong>Last Updated:</strong> ${data.lastUpdated || 'N/A'}</p>
+                        <p><strong>Last Updated Week:</strong> ${data.lastUpdatedWeek || 'N/A'}</p>
+                        <p><strong>Correction Applied:</strong> ${data.correctionApplied ? '✅ YES' : '❌ NO'}</p>
+
+                        <h4>🏆 Season Stats:</h4>
+                        <p><strong>Total Games:</strong> ${data.seasonStats?.totalGames || 0}</p>
+                        <p><strong>Games Won:</strong> ${data.seasonStats?.gamesWon || 0}</p>
+                        <p><strong>Weeks Played:</strong> ${data.seasonStats?.weeksPlayed || 0}</p>
+                        <p><strong>Average Points/Week:</strong> ${data.seasonStats?.averagePointsPerWeek || 0}</p>
+
+                        <h4>📅 Weekly Breakdown:</h4>
+                `;
+
+                const weeklyPoints = data.weeklyPoints || {};
+                if (Object.keys(weeklyPoints).length === 0) {
+                    output.innerHTML += '<p><em>No weekly data found</em></p>';
+                } else {
+                    output.innerHTML += '<table border="1" style="border-collapse: collapse; width: 100%;"><tr><th>Week</th><th>Points</th><th>Games Won</th><th>Games Played</th></tr>';
+
+                    for (let week = 1; week <= 18; week++) {
+                        const weekData = weeklyPoints[week];
+                        if (weekData) {
+                            output.innerHTML += `
+                                <tr>
+                                    <td><strong>Week ${week}</strong></td>
+                                    <td>${weekData.totalPoints || 0}</td>
+                                    <td>${weekData.gamesWon || 0}</td>
+                                    <td>${weekData.gamesPlayed || 0}</td>
+                                </tr>
+                            `;
+                        }
+                    }
+
+                    output.innerHTML += '</table>';
+                }
+
+                output.innerHTML += `
+                        <h4>🔍 RAW DOCUMENT DATA:</h4>
+                        <pre style="background: #f5f5f5; padding: 10px; overflow: auto; max-height: 400px;">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('❌ ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ ERROR</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function getBibleData(weekNumber) {
+            try {
+                const response = await fetch(`./game-data/nfl_2025_week_${weekNumber}_bible.json`);
+                if (!response.ok) return null;
+                return await response.json();
+            } catch (error) {
+                console.log(`No bible data for week ${weekNumber}`);
+                return null;
+            }
+        }
+
+        async function getTonyPicks(weekNumber) {
+            try {
+                const picksDocPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/${TONY_UID}`;
+                const picksDoc = await firebase.firestore().doc(picksDocPath).get();
+                return picksDoc.exists ? picksDoc.data() : null;
+            } catch (error) {
+                console.error(`Error loading picks for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        function calculateWeekPoints(picks, bibleData) {
+            if (!picks || !bibleData) {
+                return { totalPoints: 0, gamesPlayed: 0, gamesWon: 0, gameResults: {} };
+            }
+
+            let totalPoints = 0;
+            let gamesWon = 0;
+            let gamesPlayed = 0;
+            const gameResults = {};
+
+            console.log('🧮 CALCULATING WITH PICKS:', picks);
+
+            for (const [gameId, pickData] of Object.entries(picks)) {
+                if (gameId === 'mnfTotalPoints') continue;
+
+                const confidence = pickData.confidence;
+                const pickedTeam = pickData.team || pickData.winner; // Handle both formats!
+
+                if (!pickedTeam || !confidence) {
+                    console.log(`⚠️ INVALID PICK DATA FOR GAME ${gameId}:`, pickData);
+                    continue;
+                }
+
+                const bibleGame = bibleData.find(game => game.gameId === gameId);
+                if (!bibleGame) {
+                    console.log(`⚠️ NO BIBLE DATA FOR GAME ${gameId}`);
+                    continue;
+                }
+
+                gamesPlayed++;
+
+                if (bibleGame.status === 'Final' && bibleGame.winner) {
+                    const isWin = bibleGame.winner === pickedTeam;
+                    const points = isWin ? confidence : 0;
+
+                    if (isWin) {
+                        gamesWon++;
+                        totalPoints += points;
+                    }
+
+                    gameResults[gameId] = {
+                        pickedTeam: pickedTeam,
+                        actualWinner: bibleGame.winner,
+                        confidence: confidence,
+                        points: points,
+                        result: isWin ? 'win' : 'loss',
+                        gameStatus: 'Final'
+                    };
+
+                    console.log(`🎯 GAME ${gameId}: ${pickedTeam} vs ${bibleGame.winner} = ${isWin ? 'WIN' : 'LOSS'} (${points} points)`);
+                }
+            }
+
+            return { totalPoints, gamesPlayed, gamesWon, gameResults };
+        }
+
+        async function runSingleUserFix() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🔧 FIXING TONY\'S SCORING...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                const userWeeklyData = {};
+                let seasonTotalPoints = 0;
+                let seasonTotalGames = 0;
+                let seasonTotalWins = 0;
+                let weeksPlayed = 0;
+
+                // Process weeks 1-3
+                for (let week = 1; week <= 3; week++) {
+                    output.innerHTML += `<p>📅 Processing Week ${week}...</p>`;
+
+                    const bibleData = await getBibleData(week);
+                    if (!bibleData) {
+                        output.innerHTML += `<p>❌ No bible data for Week ${week}</p>`;
+                        continue;
+                    }
+
+                    const picks = await getTonyPicks(week);
+                    if (!picks) {
+                        output.innerHTML += `<p>❌ No picks for Week ${week}</p>`;
+                        continue;
+                    }
+
+                    const weekResults = calculateWeekPoints(picks, bibleData);
+                    output.innerHTML += `<p>✅ Week ${week}: ${weekResults.totalPoints} points, ${weekResults.gamesWon} wins</p>`;
+
+                    userWeeklyData[week] = weekResults;
+                    seasonTotalPoints += weekResults.totalPoints;
+                    seasonTotalGames += weekResults.gamesPlayed;
+                    seasonTotalWins += weekResults.gamesWon;
+
+                    if (weekResults.gamesPlayed > 0) {
+                        weeksPlayed++;
+                    }
+                }
+
+                // Create the corrected scoring document
+                const correctedScoringData = {
+                    userId: TONY_UID,
+                    displayName: 'Ållfåther',
+                    totalPoints: seasonTotalPoints,
+                    weeklyPoints: userWeeklyData,
+                    seasonStats: {
+                        totalGames: seasonTotalGames,
+                        gamesWon: seasonTotalWins,
+                        weeksPlayed: weeksPlayed,
+                        averagePointsPerWeek: weeksPlayed > 0 ? (seasonTotalPoints / weeksPlayed) : 0
+                    },
+                    lastUpdatedWeek: 3,
+                    lastUpdated: new Date().toISOString(),
+                    correctionApplied: true,
+                    correctionTimestamp: new Date().toISOString()
+                };
+
+                console.log('💾 SAVING CORRECTED DATA:', correctedScoringData);
+
+                // Save to Firestore
+                await firebase.firestore().doc(TONY_SCORING_PATH).set(correctedScoringData);
+
+                output.innerHTML += `
+                    <div style="background: #eeffee; padding: 20px; border: 2px solid green; margin: 20px 0;">
+                        <h3>✅ TONY'S SCORING FIXED!</h3>
+                        <p><strong>New Total Points:</strong> ${seasonTotalPoints}</p>
+                        <p><strong>Games Won:</strong> ${seasonTotalWins}</p>
+                        <p><strong>Weeks Played:</strong> ${weeksPlayed}</p>
+                        <p><strong>Document Updated:</strong> ${new Date().toLocaleString()}</p>
+                    </div>
+                `;
+
+                // Show the fix button to verify
+                output.innerHTML += '<p><button onclick="checkTonyDocument()" style="background: blue; color: white; padding: 10px;">📊 CHECK UPDATED DOCUMENT</button></p>';
+
+            } catch (error) {
+                console.error('❌ FIX ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ FIX FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

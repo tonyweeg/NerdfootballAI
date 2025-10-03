@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdFootball Game Updater</title>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(26, 26, 26, 0.95);
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #00ff41;
+            padding-bottom: 1rem;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .button:hover {
+            background: #00cc34;
+        }
+        .button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+        .button.danger {
+            background: #ff4444;
+            color: #fff;
+        }
+        .button.danger:hover {
+            background: #cc3333;
+        }
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 20px;
+            margin: 2rem 0;
+        }
+        .game-card {
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 1.5rem;
+            position: relative;
+        }
+        .game-card.in-progress {
+            border-color: #ff6600;
+            box-shadow: 0 0 10px rgba(255, 102, 0, 0.3);
+        }
+        .game-card.final {
+            border-color: #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .game-id {
+            background: #00ff41;
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .game-status {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-scheduled { background: #666; color: #fff; }
+        .status-in-progress { background: #ff6600; color: #fff; }
+        .status-final { background: #00ff41; color: #000; }
+        .teams {
+            text-align: center;
+            margin: 1rem 0;
+        }
+        .team-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            font-size: 16px;
+        }
+        .team-name {
+            flex: 1;
+            text-align: left;
+        }
+        .team-score {
+            font-weight: bold;
+            font-size: 20px;
+            min-width: 40px;
+            text-align: center;
+        }
+        .game-details {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #333;
+            font-size: 12px;
+            color: #888;
+        }
+        .game-controls {
+            margin-top: 1rem;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .game-controls .button {
+            font-size: 12px;
+            padding: 8px 16px;
+        }
+        .status-log {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 4px 0;
+            padding: 4px 0;
+        }
+        .log-success { color: #44ff44; }
+        .log-error { color: #ff4444; }
+        .log-info { color: #4488ff; }
+        .auto-refresh-controls {
+            text-align: center;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #1a1a1a;
+            border-radius: 8px;
+        }
+        .manual-update-section {
+            background: #2a1a1a;
+            border: 2px solid #ff6600;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        .manual-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 1rem 0;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .input-group label {
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: #888;
+        }
+        .input-group input, .input-group select {
+            background: #333;
+            border: 1px solid #666;
+            border-radius: 4px;
+            padding: 8px;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .winner-display {
+            color: #00ff41;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏈 NerdFootball Game Updater</h1>
+            <p>Real-time game management and score updates</p>
+        </div>
+
+        <div class="controls">
+            <button id="signInBtn" class="button">🔐 Admin Sign In</button>
+            <button id="signOutBtn" class="button" style="display: none;">🚪 Sign Out</button>
+            <button id="loadGamesBtn" class="button" disabled>📥 Load Current Games</button>
+            <button id="espnUpdateBtn" class="button" disabled>🔥 Update from ESPN</button>
+            <button id="clearLogBtn" class="button">🧹 Clear Log</button>
+        </div>
+
+        <div class="auto-refresh-controls">
+            <label>
+                <input type="checkbox" id="autoRefreshCheck"> Auto-refresh every 30 seconds
+            </label>
+            <div id="lastUpdateTime" style="margin-top: 10px; color: #888; font-size: 12px;"></div>
+        </div>
+
+        <div class="manual-update-section">
+            <h3>📝 Manual Game Update</h3>
+            <div class="manual-inputs">
+                <div class="input-group">
+                    <label>Game ID:</label>
+                    <select id="gameSelect">
+                        <option value="">Select Game...</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Away Score:</label>
+                    <input type="number" id="awayScore" min="0" max="99">
+                </div>
+                <div class="input-group">
+                    <label>Home Score:</label>
+                    <input type="number" id="homeScore" min="0" max="99">
+                </div>
+                <div class="input-group">
+                    <label>Status:</label>
+                    <select id="statusSelect">
+                        <option value="scheduled">Scheduled</option>
+                        <option value="IN_PROGRESS">In Progress</option>
+                        <option value="FINAL">Final</option>
+                        <option value="FINAL/OT">Final (OT)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Quarter:</label>
+                    <select id="periodSelect">
+                        <option value="">-</option>
+                        <option value="1">1st</option>
+                        <option value="2">2nd</option>
+                        <option value="3">3rd</option>
+                        <option value="4">4th</option>
+                        <option value="OT">OT</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Clock:</label>
+                    <input type="text" id="clockInput" placeholder="15:00" maxlength="5">
+                </div>
+            </div>
+            <div style="text-align: center; margin: 1rem 0;">
+                <button id="manualUpdateBtn" class="button" disabled>💾 Update Game</button>
+                <button id="setFinalBtn" class="button danger" disabled>🏁 Set Final</button>
+            </div>
+        </div>
+
+        <div id="statusLog" class="status-log">
+            <div class="log-info">[System] Game updater ready...</div>
+            <div class="log-info">[System] Sign in as admin to manage games</div>
+        </div>
+
+        <div id="gamesContainer" class="games-grid">
+            <!-- Games will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+        import { getFirestore, doc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const functions = getFunctions(app);
+
+        // UI Elements
+        const signInBtn = document.getElementById('signInBtn');
+        const signOutBtn = document.getElementById('signOutBtn');
+        const loadGamesBtn = document.getElementById('loadGamesBtn');
+        const espnUpdateBtn = document.getElementById('espnUpdateBtn');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const autoRefreshCheck = document.getElementById('autoRefreshCheck');
+        const lastUpdateTime = document.getElementById('lastUpdateTime');
+        const statusLog = document.getElementById('statusLog');
+        const gamesContainer = document.getElementById('gamesContainer');
+        const gameSelect = document.getElementById('gameSelect');
+        const manualUpdateBtn = document.getElementById('manualUpdateBtn');
+        const setFinalBtn = document.getElementById('setFinalBtn');
+
+        // State
+        let currentUser = null;
+        let currentGames = {};
+        let autoRefreshInterval = null;
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        // Authentication
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const isAdmin = user && ADMIN_UIDS.includes(user.uid);
+
+            if (isAdmin) {
+                log(`✅ Admin authenticated: ${user.email}`, 'success');
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                loadGamesBtn.disabled = false;
+                espnUpdateBtn.disabled = false;
+                manualUpdateBtn.disabled = false;
+                setFinalBtn.disabled = false;
+                loadCurrentGames();
+            } else if (user) {
+                log(`❌ Access denied: ${user.email} is not an admin`, 'error');
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+            } else {
+                log(`🔐 Please sign in as admin to manage games`, 'info');
+                signInBtn.style.display = 'inline-block';
+                signOutBtn.style.display = 'none';
+                loadGamesBtn.disabled = true;
+                espnUpdateBtn.disabled = true;
+                manualUpdateBtn.disabled = true;
+                setFinalBtn.disabled = true;
+            }
+        });
+
+        async function signIn() {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                log(`❌ Sign in failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                log('🚪 Signed out successfully', 'success');
+            } catch (error) {
+                log(`❌ Sign out failed: ${error.message}`, 'error');
+            }
+        }
+
+        function getCurrentWeek() {
+            const seasonStart = new Date('2025-09-04');
+            const now = new Date();
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        async function loadCurrentGames() {
+            try {
+                const currentWeek = getCurrentWeek();
+                log(`📥 Loading Week ${currentWeek} games...`, 'info');
+
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesRef = doc(db, gamesPath);
+                const gamesSnap = await getDoc(gamesRef);
+
+                if (!gamesSnap.exists()) {
+                    log('❌ No games found for current week', 'error');
+                    return;
+                }
+
+                currentGames = gamesSnap.data();
+                renderGames();
+                populateGameSelect();
+                log(`✅ Loaded ${Object.keys(currentGames).filter(k => !k.startsWith('_')).length} games`, 'success');
+
+            } catch (error) {
+                log(`❌ Error loading games: ${error.message}`, 'error');
+            }
+        }
+
+        function renderGames() {
+            const gameEntries = Object.entries(currentGames)
+                .filter(([key]) => !key.startsWith('_'))
+                .sort(([a], [b]) => parseInt(a) - parseInt(b));
+
+            gamesContainer.innerHTML = gameEntries.map(([gameId, game]) => {
+                const statusClass = game.status?.includes('FINAL') ? 'final' :
+                                  game.status === 'IN_PROGRESS' ? 'in-progress' : '';
+
+                const statusBadgeClass = game.status?.includes('FINAL') ? 'status-final' :
+                                       game.status === 'IN_PROGRESS' ? 'status-in-progress' :
+                                       'status-scheduled';
+
+                const score = (game.awayScore !== null && game.homeScore !== null) ?
+                              `${game.awayScore} - ${game.homeScore}` : 'vs';
+
+                const winner = game.winner ? `🏆 Winner: ${game.winner}` : '';
+
+                const gameDetails = [];
+                if (game.period) gameDetails.push(`Quarter: ${game.period}`);
+                if (game.clock) gameDetails.push(`Clock: ${game.clock}`);
+                if (game.gameDetail) gameDetails.push(`Detail: ${game.gameDetail}`);
+                if (game.lastPlay) gameDetails.push(`Last Play: ${game.lastPlay.substring(0, 80)}...`);
+
+                return `
+                    <div class="game-card ${statusClass}">
+                        <div class="game-header">
+                            <div class="game-id">Game ${gameId}</div>
+                            <div class="game-status ${statusBadgeClass}">${game.status || 'scheduled'}</div>
+                        </div>
+                        <div class="teams">
+                            <div class="team-line">
+                                <span class="team-name">${game.a || 'Away Team'}</span>
+                                <span class="team-score">${game.awayScore !== null ? game.awayScore : '-'}</span>
+                            </div>
+                            <div class="team-line">
+                                <span class="team-name">${game.h || 'Home Team'}</span>
+                                <span class="team-score">${game.homeScore !== null ? game.homeScore : '-'}</span>
+                            </div>
+                        </div>
+                        ${winner ? `<div class="winner-display">${winner}</div>` : ''}
+                        <div class="game-details">
+                            <div>📍 ${game.stadium || 'Stadium TBD'}</div>
+                            <div>⏰ ${new Date(game.dt).toLocaleString()}</div>
+                            ${gameDetails.map(detail => `<div>${detail}</div>`).join('')}
+                            <div style="color: #666;">Updated: ${new Date(game.lastUpdated || game.dt).toLocaleTimeString()}</div>
+                        </div>
+                        <div class="game-controls">
+                            <button class="button" onclick="selectGame('${gameId}')">📝 Edit</button>
+                            <button class="button" onclick="quickFinal('${gameId}')">🏁 Final</button>
+                            <button class="button" onclick="refreshGame('${gameId}')">🔄 Refresh</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function populateGameSelect() {
+            gameSelect.innerHTML = '<option value="">Select Game...</option>';
+            Object.entries(currentGames)
+                .filter(([key]) => !key.startsWith('_'))
+                .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                .forEach(([gameId, game]) => {
+                    gameSelect.innerHTML += `<option value="${gameId}">Game ${gameId}: ${game.a} @ ${game.h}</option>`;
+                });
+        }
+
+        window.selectGame = function(gameId) {
+            const game = currentGames[gameId];
+            if (!game) return;
+
+            gameSelect.value = gameId;
+            document.getElementById('awayScore').value = game.awayScore || '';
+            document.getElementById('homeScore').value = game.homeScore || '';
+            document.getElementById('statusSelect').value = game.status || 'scheduled';
+            document.getElementById('periodSelect').value = game.period || '';
+            document.getElementById('clockInput').value = game.clock || '';
+
+            log(`📝 Selected Game ${gameId} for editing`, 'info');
+        };
+
+        window.quickFinal = async function(gameId) {
+            const game = currentGames[gameId];
+            if (!game) return;
+
+            const awayScore = game.awayScore || 0;
+            const homeScore = game.homeScore || 0;
+
+            if (confirm(`Set Game ${gameId} as FINAL with score ${game.a} ${awayScore} - ${homeScore} ${game.h}?`)) {
+                await updateGame(gameId, {
+                    status: 'FINAL',
+                    awayScore: awayScore,
+                    homeScore: homeScore,
+                    winner: awayScore > homeScore ? game.a : homeScore > awayScore ? game.h : null,
+                    period: '',
+                    clock: '0:00',
+                    gameDetail: 'Final'
+                });
+            }
+        };
+
+        window.refreshGame = async function(gameId) {
+            await loadCurrentGames();
+            log(`🔄 Game ${gameId} refreshed`, 'info');
+        };
+
+        async function updateESPNScores() {
+            try {
+                log('🔥 Triggering ESPN score update...', 'info');
+                espnUpdateBtn.disabled = true;
+                espnUpdateBtn.textContent = '🔄 Updating...';
+
+                const updateScores = httpsCallable(functions, 'updateScoresCallable');
+                const result = await updateScores();
+
+                if (result.data.success) {
+                    log(`✅ ESPN update successful!`, 'success');
+                    await loadCurrentGames();
+                } else {
+                    log(`❌ ESPN update failed: ${result.data.error}`, 'error');
+                }
+
+            } catch (error) {
+                log(`❌ ESPN update error: ${error.message}`, 'error');
+            } finally {
+                espnUpdateBtn.disabled = false;
+                espnUpdateBtn.textContent = '🔥 Update from ESPN';
+                lastUpdateTime.textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            }
+        }
+
+        async function manualUpdate() {
+            const gameId = gameSelect.value;
+            if (!gameId) {
+                log('❌ Please select a game first', 'error');
+                return;
+            }
+
+            const awayScore = parseInt(document.getElementById('awayScore').value) || 0;
+            const homeScore = parseInt(document.getElementById('homeScore').value) || 0;
+            const status = document.getElementById('statusSelect').value;
+            const period = document.getElementById('periodSelect').value;
+            const clock = document.getElementById('clockInput').value;
+
+            const game = currentGames[gameId];
+            const winner = status.includes('FINAL') ?
+                          (awayScore > homeScore ? game.a : homeScore > awayScore ? game.h : null) : null;
+
+            await updateGame(gameId, {
+                awayScore,
+                homeScore,
+                status,
+                period,
+                clock,
+                winner,
+                gameDetail: status === 'IN_PROGRESS' ? `${clock} - ${period}${period === 'OT' ? '' : getOrdinalSuffix(period)}` : status
+            });
+        }
+
+        async function updateGame(gameId, updates) {
+            try {
+                const currentWeek = getCurrentWeek();
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesRef = doc(db, gamesPath);
+
+                const updateData = {};
+                updateData[`${gameId}.lastUpdated`] = new Date().toISOString();
+
+                Object.entries(updates).forEach(([key, value]) => {
+                    updateData[`${gameId}.${key}`] = value;
+                });
+
+                await updateDoc(gamesRef, updateData);
+
+                log(`✅ Game ${gameId} updated successfully`, 'success');
+                await loadCurrentGames();
+
+            } catch (error) {
+                log(`❌ Update failed: ${error.message}`, 'error');
+            }
+        }
+
+        function getOrdinalSuffix(num) {
+            const numStr = num.toString();
+            const lastDigit = numStr[numStr.length - 1];
+            const secondLastDigit = numStr[numStr.length - 2];
+
+            if (secondLastDigit === '1') return 'th';
+            if (lastDigit === '1') return 'st';
+            if (lastDigit === '2') return 'nd';
+            if (lastDigit === '3') return 'rd';
+            return 'th';
+        }
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : 'log-info';
+            statusLog.innerHTML += `<div class="log-entry ${className}">[${timestamp}] ${message}</div>`;
+            statusLog.scrollTop = statusLog.scrollHeight;
+        }
+
+        function clearLog() {
+            statusLog.innerHTML = '<div class="log-info">[System] Log cleared</div>';
+        }
+
+        function toggleAutoRefresh() {
+            if (autoRefreshCheck.checked) {
+                autoRefreshInterval = setInterval(async () => {
+                    if (currentUser && ADMIN_UIDS.includes(currentUser.uid)) {
+                        await updateESPNScores();
+                    }
+                }, 30000);
+                log('⏰ Auto-refresh enabled (30 seconds)', 'success');
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+                log('⏹️ Auto-refresh disabled', 'info');
+            }
+        }
+
+        // Event listeners
+        signInBtn.addEventListener('click', signIn);
+        signOutBtn.addEventListener('click', signOutUser);
+        loadGamesBtn.addEventListener('click', loadCurrentGames);
+        espnUpdateBtn.addEventListener('click', updateESPNScores);
+        clearLogBtn.addEventListener('click', clearLog);
+        manualUpdateBtn.addEventListener('click', manualUpdate);
+        setFinalBtn.addEventListener('click', () => {
+            const gameId = gameSelect.value;
+            if (gameId) quickFinal(gameId);
+        });
+        autoRefreshCheck.addEventListener('change', toggleAutoRefresh);
+
+        // Initial load message
+        log('🏈 NerdFootball Game Updater ready', 'success');
+    </script>
+</body>
+</html>
