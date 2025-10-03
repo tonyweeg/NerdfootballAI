@@ -247,6 +247,20 @@
             background: #0a0a0a;
         }
 
+        @keyframes engineBoostAnimation {
+            0% {
+                transform: translateX(-50%) scale(0);
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateX(-50%) scale(3);
+                opacity: 0;
+            }
+        }
+
         ::-webkit-scrollbar-thumb {
             background: linear-gradient(135deg, #6a0dad 0%, #4b0082 100%);
             border-radius: 5px;
@@ -369,18 +383,22 @@
 
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm text-gray-400 mb-2">User ID (Firebase UID) *</label>
-                    <input type="text" id="addUserId" placeholder="Enter Firebase UID">
+                    <label class="block text-sm text-gray-400 mb-2">Select User *</label>
+                    <select id="addUserSelect" class="w-full bg-gray-900 text-green-400 border border-green-400 rounded p-2" onchange="handleUserSelection()">
+                        <option value="">Loading users...</option>
+                    </select>
                 </div>
+
+                <input type="hidden" id="addUserId">
 
                 <div>
                     <label class="block text-sm text-gray-400 mb-2">Display Name *</label>
-                    <input type="text" id="addUserName" placeholder="John Doe">
+                    <input type="text" id="addUserName" placeholder="Auto-populated" readonly style="background-color: #1a1a2e;">
                 </div>
 
                 <div>
                     <label class="block text-sm text-gray-400 mb-2">Email *</label>
-                    <input type="email" id="addUserEmail" placeholder="user@example.com">
+                    <input type="email" id="addUserEmail" placeholder="Auto-populated" readonly style="background-color: #1a1a2e;">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -513,6 +531,7 @@
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
         import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
         import { getFirestore, doc, getDoc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
@@ -527,12 +546,14 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const functions = getFunctions(app);
 
         const ADMIN_UIDS = [
             'WxSPmEildJdqs6T5hIpBUZrscwt2',
             'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'
         ];
 
+        const POOL_ID = 'nerduniverse-2025';
         const POOL_MEMBERS_PATH = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
         const GHOST_USER_ID = 'okl4sw2aDhW3yKpOfOwe5lH7OQj1';
 
@@ -608,7 +629,14 @@
                 let survivorCount = 0;
                 let bothCount = 0;
 
-                for (const [uid, userData] of Object.entries(members)) {
+                // Sort users alphabetically by name
+                const sortedMembers = Object.entries(members).sort((a, b) => {
+                    const nameA = (a[1].name || a[1].email || 'zzz').toLowerCase();
+                    const nameB = (b[1].name || b[1].email || 'zzz').toLowerCase();
+                    return nameA.localeCompare(nameB);
+                });
+
+                for (const [uid, userData] of sortedMembers) {
                     if (uid === GHOST_USER_ID) {
                         console.log('🚫 NERD_CRUD: Skipping ghost user:', uid);
                         continue;
@@ -651,6 +679,7 @@
             const card = document.createElement('div');
             card.className = 'cache-card';
             card.style.borderColor = '#00d4ff';
+            card.setAttribute('data-user-id', uid);
 
             const confEnabled = userData.participation?.confidence?.enabled ?? true;
             const survEnabled = userData.participation?.survivor?.enabled ?? true;
@@ -705,7 +734,7 @@
             return card;
         }
 
-        window.showAddUserModal = () => {
+        window.showAddUserModal = async () => {
             document.getElementById('addUserModal').classList.remove('hidden');
             document.getElementById('addUserId').value = '';
             document.getElementById('addUserName').value = '';
@@ -713,6 +742,94 @@
             document.getElementById('addUserConfidence').checked = true;
             document.getElementById('addUserSurvivor').checked = true;
             console.log('🎮 NERD_CRUD: Add user modal opened');
+
+            await loadAvailableUsers();
+        };
+
+        async function loadAvailableUsers() {
+            const selectElement = document.getElementById('addUserSelect');
+            selectElement.innerHTML = '<option value="">Loading users...</option>';
+
+            try {
+                console.log('🔍 NERD_CRUD: Fetching available users not in pool...');
+
+                const getAuthUsers = httpsCallable(functions, 'getAuthUsersNotInPool');
+                const result = await getAuthUsers({ poolId: POOL_ID });
+
+                const { users, totalAuthUsers, totalPoolMembers } = result.data;
+
+                console.log('🔍 NERD_CRUD: Found users', {
+                    usersNotInPool: users.length,
+                    totalAuthUsers,
+                    totalPoolMembers
+                });
+
+                if (users.length === 0) {
+                    selectElement.innerHTML = '<option value="">No users available - all Firebase Auth users are already in pool</option>';
+                    return;
+                }
+
+                selectElement.innerHTML = '<option value="">-- Select a user to add --</option>';
+
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify({ uid: user.uid, displayName: user.displayName, email: user.email });
+
+                    // Build status indicator
+                    let statusIndicator = '';
+                    if (user.poolStatus === 'N') {
+                        statusIndicator = '[NOT IN POOL]';
+                    } else if (user.poolStatus === 'C+S') {
+                        statusIndicator = '[C+S]';
+                    } else if (user.poolStatus === 'C') {
+                        statusIndicator = '[C ONLY]';
+                    } else if (user.poolStatus === 'S') {
+                        statusIndicator = '[S ONLY]';
+                    }
+
+                    option.textContent = `${user.displayName} (${user.email}) ${statusIndicator}`;
+
+                    if (user.disabled) {
+                        option.textContent += ' [DISABLED]';
+                        option.style.color = '#ff6b6b';
+                    }
+                    selectElement.appendChild(option);
+                });
+
+                logAction(`✅ Loaded ${users.length} available users`, 'success');
+
+            } catch (error) {
+                console.error('🔍 NERD_CRUD: Error loading available users', error);
+                selectElement.innerHTML = '<option value="">Error loading users - check console</option>';
+                logAction(`❌ Failed to load users: ${error.message}`, 'error');
+            }
+        }
+
+        window.handleUserSelection = () => {
+            const selectElement = document.getElementById('addUserSelect');
+            const selectedValue = selectElement.value;
+
+            if (!selectedValue) {
+                document.getElementById('addUserId').value = '';
+                document.getElementById('addUserName').value = '';
+                document.getElementById('addUserEmail').value = '';
+                return;
+            }
+
+            try {
+                const userData = JSON.parse(selectedValue);
+                console.log('🎮 NERD_CRUD: User selected', userData);
+
+                document.getElementById('addUserId').value = userData.uid;
+                document.getElementById('addUserName').value = userData.displayName;
+                document.getElementById('addUserEmail').value = userData.email;
+
+                logAction(`👤 Selected: ${userData.displayName}`, 'info');
+
+            } catch (error) {
+                console.error('🎮 NERD_CRUD: Error parsing user selection', error);
+                logAction('❌ Error selecting user', 'error');
+            }
         };
 
         window.closeAddUserModal = () => {
@@ -1050,6 +1167,71 @@
             console.log('💥 DEEP_STAR_6: Confirmation validation', { input, valid: input === 'FEEEEE' });
         };
 
+        window.animateDeepStar6 = async (userId) => {
+            console.log('🚀 DEEP_STAR_6_ANIMATION: Starting jettison sequence for', userId);
+
+            // Find the user card
+            const userCard = document.querySelector(`[data-user-id="${userId}"]`);
+            if (!userCard) {
+                console.log('⚠️ DEEP_STAR_6_ANIMATION: User card not found');
+                return;
+            }
+
+            // Random angle for jettison (between -45 and 45 degrees from vertical)
+            const angle = Math.random() * 90 - 45;
+            const distance = 2000; // pixels off screen
+
+            // Calculate final position
+            const radians = (angle * Math.PI) / 180;
+            const translateX = Math.sin(radians) * distance;
+            const translateY = -Math.cos(radians) * distance;
+
+            // Apply jettison animation
+            userCard.style.transition = 'all 1.5s cubic-bezier(0.17, 0.67, 0.83, 0.67)';
+            userCard.style.transform = `translate(${translateX}px, ${translateY}px) rotate(${angle * 4}deg) scale(0.2)`;
+            userCard.style.opacity = '0';
+
+            console.log('💥 DEEP_STAR_6_ANIMATION: Card jettisoned at angle', angle);
+
+            // Wait for jettison to complete
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Speed up starfield (3x faster)
+            const starfield = document.querySelector('.star-field');
+            if (starfield) {
+                starfield.style.animationDuration = '20s'; // Normal: 60s, Boost: 20s (3x faster)
+                console.log('⚡ DEEP_STAR_6_ANIMATION: Starfield accelerated to 3x speed');
+
+                // Engine boost effect
+                const engineBoost = document.createElement('div');
+                engineBoost.className = 'engine-boost';
+                engineBoost.style.cssText = `
+                    position: fixed;
+                    bottom: -100px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 200px;
+                    height: 200px;
+                    background: radial-gradient(circle, rgba(100, 200, 255, 0.8) 0%, rgba(100, 200, 255, 0) 70%);
+                    border-radius: 50%;
+                    animation: engineBoostAnimation 2s ease-out forwards;
+                    pointer-events: none;
+                    z-index: 9999;
+                `;
+
+                document.body.appendChild(engineBoost);
+                console.log('🔥 DEEP_STAR_6_ANIMATION: Engine boost activated');
+
+                // Remove boost after animation
+                setTimeout(() => {
+                    engineBoost.remove();
+                    // Return starfield to normal speed
+                    starfield.style.animationDuration = '60s';
+                    console.log('🌟 DEEP_STAR_6_ANIMATION: Starfield returned to normal speed');
+                }, 2000);
+            }
+        };
+
         window.executeDeepStar6 = async () => {
             if (!isAdmin) {
                 logAction('❌ Admin access required', 'error');
@@ -1066,140 +1248,21 @@
             }
 
             try {
-                logAction('🔒 Archiving complete user data snapshot...', 'info');
-                console.log('💥 DEEP_STAR_6: Starting execution for', { uid, userName });
+                logAction('💥 Initiating DEEP STAR 6 via Cloud Function...', 'warning');
+                console.log('💥 DEEP_STAR_6: Calling Cloud Function for', { uid, userName });
 
-                const timestamp = new Date().toISOString();
-                let deletionCount = 0;
+                // Call Firebase Cloud Function (server-side deletion with admin privileges)
+                const deepStar6Function = httpsCallable(functions, 'deepStar6User');
+                const result = await deepStar6Function({ userId: uid, userName: userName });
 
-                const membersRef = doc(db, POOL_MEMBERS_PATH);
-                const membersSnap = await getDoc(membersRef);
+                console.log('💥 DEEP_STAR_6: Cloud Function result', result.data);
 
-                if (!membersSnap.exists()) {
-                    logAction('❌ Pool members not found', 'error');
-                    return;
-                }
+                logAction(`📦 User archived to: ${result.data.archiveId}`, 'success');
+                logAction(`🗑️ Deleted ${result.data.deletionCount} documents`, 'success');
+                logAction(`✅ ${result.data.message}`, 'success');
 
-                const members = membersSnap.data();
-                const userData = members[uid];
-
-                if (!userData) {
-                    logAction(`❌ User ${userName} not found`, 'error');
-                    return;
-                }
-
-                const archiveData = {
-                    userData: userData,
-                    uid: uid,
-                    archivedAt: timestamp,
-                    archivedBy: currentUser.uid,
-                    reason: 'DEEP_STAR_6_deletion'
-                };
-
-                const archiveRef = doc(db,
-                    `artifacts/nerdfootball/pools/nerduniverse-2025/metadata/deep_star_6_archive/${uid}/${timestamp.replace(/[:.]/g, '-')}`);
-                await setDoc(archiveRef, archiveData);
-
-                logAction(`📦 User data archived to deep_star_6_archive/${uid}/${timestamp}`, 'success');
-                console.log('💥 DEEP_STAR_6: User data archived', { uid, timestamp });
-
-                logAction(`💥 DEEP STAR 6 initiated for ${userName} (${uid})`, 'warning');
-
-                for (let week = 1; week <= 18; week++) {
-                    const confPath1 = `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`;
-                    const confDoc1 = doc(db, confPath1, uid);
-                    try {
-                        await deleteDoc(confDoc1);
-                        deletionCount++;
-                        console.log(`💥 DEEP_STAR_6: Deleted confidence picks week ${week} (path 1)`, uid);
-                    } catch (e) {
-                        console.log(`💥 DEEP_STAR_6: No data at confidence path 1 week ${week}`, uid);
-                    }
-
-                    const confPath2 = `artifacts/nerdfootball/pools/nerduniverse-2025/confidence/2025/weeks/${week}/users`;
-                    const confDoc2 = doc(db, confPath2, uid);
-                    try {
-                        await deleteDoc(confDoc2);
-                        deletionCount++;
-                        console.log(`💥 DEEP_STAR_6: Deleted confidence picks week ${week} (path 2)`, uid);
-                    } catch (e) {
-                        console.log(`💥 DEEP_STAR_6: No data at confidence path 2 week ${week}`, uid);
-                    }
-
-                    const survPath1 = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${week}`;
-                    const survDoc1 = doc(db, survPath1, uid);
-                    try {
-                        await deleteDoc(survDoc1);
-                        deletionCount++;
-                        console.log(`💥 DEEP_STAR_6: Deleted survivor picks week ${week} (path 1)`, uid);
-                    } catch (e) {
-                        console.log(`💥 DEEP_STAR_6: No data at survivor path 1 week ${week}`, uid);
-                    }
-
-                    const survPath2 = `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/weeks/${week}/users`;
-                    const survDoc2 = doc(db, survPath2, uid);
-                    try {
-                        await deleteDoc(survDoc2);
-                        deletionCount++;
-                        console.log(`💥 DEEP_STAR_6: Deleted survivor picks week ${week} (path 2)`, uid);
-                    } catch (e) {
-                        console.log(`💥 DEEP_STAR_6: No data at survivor path 2 week ${week}`, uid);
-                    }
-
-                    const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scores/2025/weeks/${week}/users`;
-                    const scoreDoc = doc(db, scorePath, uid);
-                    try {
-                        await deleteDoc(scoreDoc);
-                        deletionCount++;
-                        console.log(`💥 DEEP_STAR_6: Deleted scoring data week ${week}`, uid);
-                    } catch (e) {
-                        console.log(`💥 DEEP_STAR_6: No data at scoring path week ${week}`, uid);
-                    }
-
-                    const rollupWeeklyPath = `artifacts/nerdfootball/pools/nerduniverse-2025/rollups/weekly/2025/week_${week}/users`;
-                    const rollupWeeklyDoc = doc(db, rollupWeeklyPath, uid);
-                    try {
-                        await deleteDoc(rollupWeeklyDoc);
-                        deletionCount++;
-                        console.log(`💥 DEEP_STAR_6: Deleted weekly rollup week ${week}`, uid);
-                    } catch (e) {
-                        console.log(`💥 DEEP_STAR_6: No data at weekly rollup week ${week}`, uid);
-                    }
-
-                    if (week % 3 === 0) {
-                        logAction(`🗑️ Processed week ${week} of 18...`, 'info');
-                    }
-                }
-
-                const rollupSeasonPath = `artifacts/nerdfootball/pools/nerduniverse-2025/rollups/season/2025/users`;
-                const rollupSeasonDoc = doc(db, rollupSeasonPath, uid);
-                try {
-                    await deleteDoc(rollupSeasonDoc);
-                    deletionCount++;
-                    console.log(`💥 DEEP_STAR_6: Deleted season rollup`, uid);
-                } catch (e) {
-                    console.log(`💥 DEEP_STAR_6: No data at season rollup`, uid);
-                }
-
-                const eliminationPath = `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/eliminations`;
-                const eliminationDoc = doc(db, eliminationPath, uid);
-                try {
-                    await deleteDoc(eliminationDoc);
-                    deletionCount++;
-                    console.log(`💥 DEEP_STAR_6: Deleted eliminations`, uid);
-                    logAction('🗑️ Deleted eliminations', 'info');
-                } catch (e) {
-                    console.log(`💥 DEEP_STAR_6: No data at eliminations`, uid);
-                }
-
-                delete members[uid];
-                await setDoc(membersRef, members);
-                deletionCount++;
-                console.log(`💥 DEEP_STAR_6: Deleted pool membership`, uid);
-                logAction('🗑️ Deleted pool membership', 'info');
-
-                logAction(`✅ DEEP STAR 6 complete - ${deletionCount} documents deleted`, 'success');
-                console.log(`💥 DEEP_STAR_6: Execution complete`, { uid, userName, deletionCount, timestamp });
+                // DEEP STAR 6 ANIMATION SEQUENCE
+                await animateDeepStar6(uid);
 
                 closeDeepStar6Modal();
                 await loadAllUsers();

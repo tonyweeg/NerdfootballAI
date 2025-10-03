@@ -3,8 +3,13 @@ require('dotenv').config();
 
 const functions = require('firebase-functions');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { setGlobalOptions } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+
+// Set global options for v2 functions
+setGlobalOptions({ region: 'us-central1' });
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -573,6 +578,229 @@ function forceFreshESPNData() {
 
 exports.clearESPNCache = clearESPNCache;
 exports.forceFreshESPNData = forceFreshESPNData;
+
+// ☠️ DEEP STAR 6 - Complete user deletion with backup
+exports.deepStar6User = onCall(async (request) => {
+    const { userId, userName } = request.data;
+
+    console.log('💥 DEEP_STAR_6: Function invoked', { uid: userId });
+
+    // Verify authentication
+    if (!request.auth) {
+        console.error('💥 DEEP_STAR_6: No authentication');
+        throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    // Verify admin access
+    const ADMIN_UIDS = [
+        'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
+        'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'  // Additional admin
+    ];
+
+    if (!ADMIN_UIDS.includes(request.auth.uid)) {
+        console.error('💥 DEEP_STAR_6: Access denied for', request.auth.uid);
+        throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    if (!userId) {
+        throw new HttpsError('invalid-argument', 'userId is required');
+    }
+
+    const db = admin.firestore();
+    const POOL_ID = 'nerduniverse-2025';
+    let deletionCount = 0;
+
+    try {
+        // STEP 1: Archive complete user data
+        console.log('💥 DEEP_STAR_6: Archiving user data', userId);
+        const timestamp = new Date().toISOString();
+
+        const membersRef = db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/metadata/members`);
+        const membersSnap = await membersRef.get();
+
+        if (!membersSnap.exists) {
+            throw new HttpsError('not-found', 'Pool members not found');
+        }
+
+        const members = membersSnap.data();
+        const userData = members[userId];
+
+        if (!userData) {
+            throw new HttpsError('not-found', `User ${userId} not found in pool`);
+        }
+
+        // Archive user data
+        const archiveRef = db.collection(
+            `artifacts/nerdfootball/pools/${POOL_ID}/deep_star_6_archive`
+        ).doc(`${userId}_${timestamp.replace(/[:.]/g, '-')}`);
+
+        await archiveRef.set({
+            userData: userData,
+            uid: userId,
+            archivedAt: timestamp,
+            archivedBy: request.auth.uid,
+            reason: 'DEEP_STAR_6_deletion'
+        });
+
+        console.log('💥 DEEP_STAR_6: User archived', { userId, timestamp });
+
+        // STEP 2: Delete all user data (18 weeks) - individually with error handling
+        let deletionCount = 0;
+
+        for (let week = 1; week <= 18; week++) {
+            try {
+                // Confidence picks - path 1
+                await db.doc(`artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions/${userId}`).delete();
+                deletionCount++;
+            } catch (e) { /* ignore missing docs */ }
+
+            try {
+                // Confidence picks - path 2
+                await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/confidence/2025/weeks/${week}/users/${userId}`).delete();
+                deletionCount++;
+            } catch (e) { /* ignore missing docs */ }
+
+            try {
+                // Survivor picks - path 2
+                await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/survivor/2025/weeks/${week}/users/${userId}`).delete();
+                deletionCount++;
+            } catch (e) { /* ignore missing docs */ }
+
+            try {
+                // Scoring data
+                await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/scores/2025/weeks/${week}/users/${userId}`).delete();
+                deletionCount++;
+            } catch (e) { /* ignore missing docs */ }
+
+            try {
+                // Weekly rollups
+                await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/rollups/weekly/2025/week_${week}/users/${userId}`).delete();
+                deletionCount++;
+            } catch (e) { /* ignore missing docs */ }
+        }
+
+        try {
+            // Season rollup - skip if bad path
+            // await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/rollups/season/2025/users/${userId}`).delete();
+            // deletionCount++;
+        } catch (e) { /* ignore */ }
+
+        try {
+            // Eliminations
+            await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/survivor/2025/eliminations/${userId}`).delete();
+            deletionCount++;
+        } catch (e) { /* ignore missing docs */ }
+
+        console.log('💥 DEEP_STAR_6: Deletions complete', { userId, deletionCount });
+
+        // STEP 3: Remove from pool members (separate transaction)
+        delete members[userId];
+        await membersRef.set(members);
+        deletionCount++;
+
+        console.log('💥 DEEP_STAR_6: Pool membership deleted', userId);
+
+        console.log('💥 DEEP_STAR_6: Execution complete', {
+            userId,
+            userName,
+            deletionCount,
+            archiveId: archiveRef.id,
+            executedBy: request.auth.uid,
+            timestamp
+        });
+
+        return {
+            success: true,
+            userId,
+            userName,
+            deletionCount,
+            archiveId: archiveRef.id,
+            timestamp,
+            message: `DEEP STAR 6 complete - ${deletionCount} documents deleted`
+        };
+
+    } catch (error) {
+        console.error('💥 DEEP_STAR_6: Execution error', { userId, error: error.message });
+        throw new HttpsError('internal', `DEEP STAR 6 failed: ${error.message}`);
+    }
+});
+
+// Get Firebase Auth users NOT in pool (for easy adding)
+exports.getAuthUsersNotInPool = onCall(async (request) => {
+    console.log('🔍 GET_AUTH_USERS_NOT_IN_POOL: Function invoked');
+
+    // Check authentication
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    // Check admin access
+    const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+    if (!ADMIN_UIDS.includes(request.auth.uid)) {
+        throw new HttpsError('permission-denied', 'Admin access required');
+    }
+
+    try {
+        const poolId = request.data.poolId || 'nerduniverse-2025';
+
+        // Get all pool members
+        const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersSnap = await poolMembersRef.get();
+        const poolMembers = poolMembersSnap.exists ? poolMembersSnap.data() : {};
+
+        console.log('🔍 GET_AUTH_USERS_NOT_IN_POOL: Pool has', Object.keys(poolMembers).length, 'members');
+
+        // Get all Firebase Auth users
+        const listUsersResult = await admin.auth().listUsers(1000); // Max 1000 users
+        const allAuthUsers = listUsersResult.users;
+
+        console.log('🔍 GET_AUTH_USERS_NOT_IN_POOL: Firebase Auth has', allAuthUsers.length, 'users');
+
+        // Map users with pool membership status
+        const usersWithStatus = allAuthUsers
+            .map(user => {
+                const memberData = poolMembers[user.uid];
+                let poolStatus = 'N'; // Neither
+
+                if (memberData) {
+                    const hasConfidence = memberData.participation?.confidence?.enabled || false;
+                    const hasSurvivor = memberData.participation?.survivor?.enabled || false;
+
+                    if (hasConfidence && hasSurvivor) {
+                        poolStatus = 'C+S';
+                    } else if (hasConfidence) {
+                        poolStatus = 'C';
+                    } else if (hasSurvivor) {
+                        poolStatus = 'S';
+                    }
+                }
+
+                return {
+                    uid: user.uid,
+                    email: user.email || 'No email',
+                    displayName: user.displayName || user.email || 'No name',
+                    disabled: user.disabled || false,
+                    poolStatus: poolStatus,
+                    inPool: !!memberData
+                };
+            })
+            .filter(user => !user.inPool) // Only users NOT in pool
+            .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+        console.log('🔍 GET_AUTH_USERS_NOT_IN_POOL: Found', usersWithStatus.length, 'users not in pool');
+
+        return {
+            success: true,
+            users: usersWithStatus,
+            totalAuthUsers: allAuthUsers.length,
+            totalPoolMembers: Object.keys(poolMembers).length
+        };
+
+    } catch (error) {
+        console.error('🔍 GET_AUTH_USERS_NOT_IN_POOL: Error', error);
+        throw new HttpsError('internal', `Failed to get auth users: ${error.message}`);
+    }
+});
 
 // Pool Email System - Get all pool members with emails
 exports.getPoolMembersEmails = functions.https.onCall(async (data, context) => {
