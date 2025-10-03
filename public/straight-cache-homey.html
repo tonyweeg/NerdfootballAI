@@ -375,12 +375,12 @@
                     </div>
                     <div class="mb-4">
                         <p class="text-sm text-gray-400">Cache Path</p>
-                        <p class="text-xs text-purple-300 break-all">cache/weekly_leaderboard_*</p>
+                        <p class="text-xs text-purple-300 break-all">cache/weekly_leaderboard_2025_week_*</p>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
                             <p class="text-xs text-gray-400">EXPIRY</p>
-                            <p class="metric-value text-lg">5 MIN</p>
+                            <p class="metric-value text-lg">2 MIN</p>
                         </div>
                         <div>
                             <p class="text-xs text-gray-400">AGE</p>
@@ -396,15 +396,45 @@
                         <button onclick="deleteCache('weekly')" class="btn-asteroid btn-danger flex-1">DELETE</button>
                     </div>
                 </div>
+
+                <div class="cache-card" style="border-color: #ff1744;" id="survivorCacheCard">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold text-red-400">💀 SURVIVOR POOL</h2>
+                        <span class="status-online" id="survivorStatus"></span>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-400">Cache Path</p>
+                        <p class="text-xs text-purple-300 break-all">cache/survivor_pool_2025</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <p class="text-xs text-gray-400">EXPIRY</p>
+                            <p class="metric-value text-lg">10 SEC</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400">AGE</p>
+                            <p class="metric-value text-lg" id="survivorAge">--</p>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-xs text-gray-400">CREATED</p>
+                        <p class="text-sm" id="survivorCreated">--</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="refreshSurvivorCache()" class="btn-asteroid btn-success flex-1">REFRESH</button>
+                        <button onclick="deleteCache('survivor')" class="btn-asteroid btn-danger flex-1">DELETE</button>
+                    </div>
+                </div>
             </div>
 
             <div class="endpoint-test">
                 <h3 class="text-xl font-bold text-blue-400 mb-4">🎯 ENDPOINT TESTING</h3>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                     <button onclick="testEndpoint('ai')" class="btn-asteroid text-sm py-2">TEST AI</button>
                     <button onclick="testEndpoint('espn')" class="btn-asteroid text-sm py-2">TEST ESPN</button>
                     <button onclick="testEndpoint('season')" class="btn-asteroid text-sm py-2">TEST SEASON</button>
                     <button onclick="testEndpoint('weekly')" class="btn-asteroid text-sm py-2">TEST WEEKLY</button>
+                    <button onclick="testEndpoint('survivor')" class="btn-asteroid text-sm py-2">TEST SURVIVOR</button>
                 </div>
                 <div class="log-output" id="testLog">
                     <div class="text-gray-500">🔍 CACHE_TEST: Awaiting endpoint tests...</div>
@@ -493,7 +523,8 @@
                 loadAICache(),
                 loadESPNCache(),
                 loadSeasonCache(),
-                loadWeeklyCache()
+                loadWeeklyCache(),
+                loadSurvivorCache()
             ]);
         }
 
@@ -569,24 +600,47 @@
         async function loadWeeklyCache() {
             try {
                 const currentWeek = getCurrentNFLWeek();
-                const cacheRef = doc(db, 'cache', `weekly_leaderboard_${currentWeek}`);
+                const cacheRef = doc(db, 'cache', `weekly_leaderboard_2025_week_${currentWeek}`);
                 const cacheSnap = await getDoc(cacheRef);
 
                 if (cacheSnap.exists()) {
                     const data = cacheSnap.data();
                     const created = data.generatedAt ? new Date(data.generatedAt) : null;
                     const age = created ? Math.floor((Date.now() - created.getTime()) / 1000) : null;
-                    const expiry = 5 * 60;
+                    const expiry = 2 * 60;
 
                     updateCacheUI('weekly', created, age, expiry);
                     console.log('✅ CACHE_LOAD: Weekly cache loaded', { week: currentWeek, age, expiry });
                 } else {
-                    updateCacheUI('weekly', null, null, 5 * 60);
+                    updateCacheUI('weekly', null, null, 2 * 60);
                     console.log('⚠️ CACHE_LOAD: Weekly cache not found for week', currentWeek);
                 }
             } catch (error) {
                 console.error('❌ CACHE_LOAD: Weekly cache error:', error);
-                updateCacheUI('weekly', null, null, 5 * 60, true);
+                updateCacheUI('weekly', null, null, 2 * 60, true);
+            }
+        }
+
+        async function loadSurvivorCache() {
+            try {
+                const cacheRef = doc(db, 'cache', 'survivor_pool_2025');
+                const cacheSnap = await getDoc(cacheRef);
+
+                if (cacheSnap.exists()) {
+                    const data = cacheSnap.data();
+                    const created = data.generatedAt ? new Date(data.generatedAt) : null;
+                    const age = created ? Math.floor((Date.now() - created.getTime()) / 1000) : null;
+                    const expiry = 10;
+
+                    updateCacheUI('survivor', created, age, expiry);
+                    console.log('✅ CACHE_LOAD: Survivor cache loaded', { age, expiry });
+                } else {
+                    updateCacheUI('survivor', null, null, 10);
+                    console.log('⚠️ CACHE_LOAD: Survivor cache not found');
+                }
+            } catch (error) {
+                console.error('❌ CACHE_LOAD: Survivor cache error:', error);
+                updateCacheUI('survivor', null, null, 10, true);
             }
         }
 
@@ -660,7 +714,7 @@
         window.refreshSeasonCache = async () => {
             logTest('🔄 CACHE_REFRESH: Refreshing Season cache...');
             try {
-                const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/generateSeasonLeaderboardCache');
+                const response = await fetch('https://generateseasonleaderboardcache-np7uealtnq-uc.a.run.app');
                 const data = await response.json();
                 logTest(`✅ CACHE_REFRESH: Season cache refreshed - ${JSON.stringify(data)}`);
                 await loadSeasonCache();
@@ -673,12 +727,24 @@
             logTest('🔄 CACHE_REFRESH: Refreshing Weekly cache...');
             try {
                 const week = getCurrentNFLWeek();
-                const response = await fetch(`https://us-central1-nerdfootball.cloudfunctions.net/generateWeeklyLeaderboardCache?week=${week}`);
+                const response = await fetch(`https://generateweeklyleaderboardcache-np7uealtnq-uc.a.run.app?week=${week}`);
                 const data = await response.json();
                 logTest(`✅ CACHE_REFRESH: Weekly cache refreshed - ${JSON.stringify(data)}`);
                 await loadWeeklyCache();
             } catch (error) {
                 logTest(`❌ CACHE_REFRESH: Weekly cache refresh failed - ${error.message}`);
+            }
+        };
+
+        window.refreshSurvivorCache = async () => {
+            logTest('🔄 CACHE_REFRESH: Refreshing Survivor cache...');
+            try {
+                const response = await fetch('https://getsurvivorpooldata-np7uealtnq-uc.a.run.app');
+                const data = await response.json();
+                logTest(`✅ CACHE_REFRESH: Survivor cache refreshed - ${JSON.stringify(data)}`);
+                await loadSurvivorCache();
+            } catch (error) {
+                logTest(`❌ CACHE_REFRESH: Survivor cache refresh failed - ${error.message}`);
             }
         };
 
@@ -703,7 +769,10 @@
                         break;
                     case 'weekly':
                         const week = getCurrentNFLWeek();
-                        cacheRef = doc(db, 'cache', `weekly_leaderboard_${week}`);
+                        cacheRef = doc(db, 'cache', `weekly_leaderboard_2025_week_${week}`);
+                        break;
+                    case 'survivor':
+                        cacheRef = doc(db, 'cache', 'survivor_pool_2025');
                         break;
                 }
 
@@ -719,8 +788,9 @@
             const endpoints = {
                 ai: 'https://nerdfootball.web.app/ai-picks-helper.html',
                 espn: 'https://us-central1-nerdfootball.cloudfunctions.net/refreshESPNCache',
-                season: 'https://us-central1-nerdfootball.cloudfunctions.net/generateSeasonLeaderboardCache',
-                weekly: `https://us-central1-nerdfootball.cloudfunctions.net/generateWeeklyLeaderboardCache?week=${getCurrentNFLWeek()}`
+                season: 'https://generateseasonleaderboardcache-np7uealtnq-uc.a.run.app',
+                weekly: `https://generateweeklyleaderboardcache-np7uealtnq-uc.a.run.app?week=${getCurrentNFLWeek()}`,
+                survivor: 'https://getsurvivorpooldata-np7uealtnq-uc.a.run.app'
             };
 
             const url = endpoints[endpointType];
@@ -748,7 +818,8 @@
                 refreshAICache(),
                 refreshESPNCache(),
                 refreshSeasonCache(),
-                refreshWeeklyCache()
+                refreshWeeklyCache(),
+                refreshSurvivorCache()
             ]);
             logTest('✅ CACHE_REFRESH_ALL: All caches refreshed');
         };
