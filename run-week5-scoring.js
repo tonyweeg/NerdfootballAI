@@ -78,18 +78,25 @@ async function runWeek5Scoring() {
             }
         });
 
-        // Update the picks document with Week 5 points
-        const picksDocRef = db.collection('artifacts').doc('nerdfootball')
-            .collection('public').doc('data')
-            .collection('nerdfootball_picks').doc(weekNumber.toString())
-            .collection('submissions').doc(userId);
+        // Write to scoring-users path (where leaderboard cache reads from)
+        const scoringDocRef = db.collection('artifacts').doc('nerdfootball')
+            .collection('pools').doc('nerduniverse-2025')
+            .collection('scoring-users').doc(userId);
 
-        batch.update(picksDocRef, {
-            totalPoints: totalPoints,
-            correctPicks: correctPicks,
-            totalValidPicks: totalValidPicks,
-            lastScored: new Date().toISOString()
-        });
+        // Read existing data first
+        const existingData = { weeklyPoints: {} };
+        batch.set(scoringDocRef, {
+            weeklyPoints: {
+                ...existingData.weeklyPoints,
+                [weekNumber.toString()]: {
+                    totalPoints: totalPoints,
+                    gamesWon: correctPicks,
+                    gamesPlayed: totalValidPicks,
+                    lastUpdated: new Date().toISOString()
+                }
+            },
+            lastUpdated: new Date().toISOString()
+        }, { merge: true });
 
         if (totalPoints > 0) {
             console.log(`✅ ${picks.userName || userId}: ${totalPoints} pts (${correctPicks}/${totalValidPicks})`);
