@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head><title>FORCE CREATE POOL</title></head>
+<body>
+    <h1>FORCE CREATE POOL MEMBERS</h1>
+    <button id="create" style="padding: 20px; background: red; color: white; font-size: 18px;">CREATE NOW</button>
+    <div id="status"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const app = initializeApp({
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        });
+
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        document.getElementById('create').onclick = async () => {
+            const status = document.getElementById('status');
+
+            try {
+                status.innerHTML = '⏳ Creating pool members...';
+
+                // Create the pool members document with Tony as admin
+                const poolRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+
+                const memberData = {
+                    'WxSPmEildJdqs6T5hIpBUZrscwt2': {
+                        displayName: 'Tony Weeg',
+                        email: 'tonyweeg@gmail.com',
+                        role: 'admin',
+                        joinedAt: new Date().toISOString(),
+                        participation: {
+                            confidence: true,
+                            survivor: true
+                        }
+                    }
+                };
+
+                await setDoc(poolRef, memberData);
+
+                status.innerHTML = '✅ SUCCESS! Pool created. <a href="/nerd-universe-grid.html" style="color: green; font-size: 18px;">TRY GRID NOW</a>';
+
+            } catch (error) {
+                status.innerHTML = `❌ FAILED: ${error.message}`;
+                console.error('Full error:', error);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('status').innerHTML = `✅ Authenticated as: ${user.uid}`;
+            } else {
+                document.getElementById('status').innerHTML = '❌ Not authenticated - <a href="/login.html">Login first</a>';
+            }
+        });
+    </script>
+</body>
+</html>

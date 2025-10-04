@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Weekly Scoring System</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #333; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .warning { color: #ff0; }
+        button { padding: 10px 20px; margin: 10px; }
+        pre { background: #111; padding: 10px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>🏆 Test Weekly Scoring System</h1>
+
+    <div class="section">
+        <h2>🔐 Authentication</h2>
+        <button id="signInBtn">Sign In</button>
+        <button id="signOutBtn" style="display:none">Sign Out</button>
+        <div id="authStatus">Not signed in</div>
+    </div>
+
+    <div class="section">
+        <h2>🏆 Weekly Scoring Test</h2>
+        <div>
+            <label>Week: <input type="number" id="weekInput" value="4" min="1" max="18"></label>
+            <button id="testScoringBtn" disabled>Test Weekly Scoring</button>
+        </div>
+        <div id="scoringResults"></div>
+    </div>
+
+    <div class="section">
+        <h2>📊 Verify Tony's Scoring Data After</h2>
+        <button id="verifyScoringBtn" disabled>Check Tony's Updated Scoring</button>
+        <div id="verifyResults"></div>
+    </div>
+
+    <div class="section">
+        <h2>📝 Debug Log</h2>
+        <button id="clearLogBtn">Clear Log</button>
+        <pre id="debugLog">Ready to test weekly scoring...</pre>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const functions = getFunctions(app);
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        let currentUser = null;
+
+        // UI Elements
+        const signInBtn = document.getElementById('signInBtn');
+        const signOutBtn = document.getElementById('signOutBtn');
+        const authStatus = document.getElementById('authStatus');
+        const testScoringBtn = document.getElementById('testScoringBtn');
+        const verifyScoringBtn = document.getElementById('verifyScoringBtn');
+        const weekInput = document.getElementById('weekInput');
+        const scoringResults = document.getElementById('scoringResults');
+        const verifyResults = document.getElementById('verifyResults');
+        const debugLog = document.getElementById('debugLog');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '📝';
+            debugLog.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        // Auto-authentication for admin users
+        async function waitForFirebaseAuth() {
+            return new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    resolve();
+                });
+
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve();
+                }, 5000);
+            });
+        }
+
+        async function checkAdminAccess() {
+            // Check for admin URL parameter first
+            const urlParams = new URLSearchParams(window.location.search);
+            const adminUID = urlParams.get('admin');
+            if (adminUID && ADMIN_UIDS.includes(adminUID)) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            }
+
+            // Wait for Firebase Auth state
+            await waitForFirebaseAuth();
+            const currentUser = auth.currentUser;
+            if (currentUser && ADMIN_UIDS.includes(currentUser.uid)) {
+                return true;
+            }
+
+            return false;
+        }
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            currentUser = user;
+
+            // Check admin access
+            const isAdmin = await checkAdminAccess();
+
+            if (user && isAdmin) {
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                authStatus.innerHTML = `<span class="success">✅ Signed in as: ${user.email} (Admin)</span>`;
+
+                testScoringBtn.disabled = false;
+                verifyScoringBtn.disabled = false;
+
+                log(`Authenticated as admin: ${user.email}`, 'success');
+            } else if (user && !isAdmin) {
+                signInBtn.style.display = 'none';
+                signOutBtn.style.display = 'inline-block';
+                authStatus.innerHTML = `<span class="error">❌ Access denied: ${user.email} is not an admin</span>`;
+                testScoringBtn.disabled = true;
+                verifyScoringBtn.disabled = true;
+                log(`Access denied for ${user.email}`, 'error');
+            } else {
+                signInBtn.style.display = 'inline-block';
+                signOutBtn.style.display = 'none';
+                authStatus.innerHTML = '<span class="error">❌ Not signed in</span>';
+                testScoringBtn.disabled = true;
+                verifyScoringBtn.disabled = true;
+                log('Not authenticated', 'warning');
+            }
+        });
+
+        async function signIn() {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                log(`Sign in failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function signOutUser() {
+            try {
+                await signOut(auth);
+                log('Signed out successfully', 'success');
+            } catch (error) {
+                log(`Sign out failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testWeeklyScoring() {
+            try {
+                const weekNumber = parseInt(weekInput.value);
+                log(`🏆 Testing weekly scoring for Week ${weekNumber}...`);
+                scoringResults.innerHTML = 'Processing weekly scoring...';
+
+                const processWeeklyScoring = httpsCallable(functions, 'processWeeklyScoring');
+                const result = await processWeeklyScoring({ weekNumber });
+
+                if (result.data.success) {
+                    const data = result.data;
+                    const summary = `
+                        <div class="success">✅ Weekly Scoring Complete!</div>
+                        <div>📊 Week: ${data.weekNumber}</div>
+                        <div>🎯 Completed games: ${data.completedGames}</div>
+                        <div>👥 Users processed: ${data.usersProcessed}</div>
+                        <div>📋 Users with picks: ${data.usersWithPicks}</div>
+                        <div>⏭️ Users skipped: ${data.usersSkipped}</div>
+                        <div>❌ Errors: ${data.errors.length}</div>
+                        ${data.errors.length > 0 ? `<details><summary>Errors</summary><pre>${JSON.stringify(data.errors, null, 2)}</pre></details>` : ''}
+                    `;
+                    scoringResults.innerHTML = summary;
+                    log(`Weekly scoring successful: ${data.usersProcessed} users processed`, 'success');
+                } else {
+                    scoringResults.innerHTML = `<span class="error">❌ Error: ${result.data.error}</span>`;
+                    log(`Weekly scoring failed: ${result.data.error}`, 'error');
+                }
+
+            } catch (error) {
+                log(`Error testing weekly scoring: ${error.message}`, 'error');
+                scoringResults.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        async function verifyTonyScoringData() {
+            try {
+                log('👤 Checking Tony\'s updated scoring data...');
+                verifyResults.innerHTML = 'Loading...';
+
+                const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+                const scoreRef = doc(db, scorePath);
+                const scoreSnap = await getDoc(scoreRef);
+
+                if (!scoreSnap.exists()) {
+                    log('No scoring data found for Tony', 'error');
+                    verifyResults.innerHTML = '<span class="error">❌ No scoring data document found</span>';
+                    return;
+                }
+
+                const scoreData = scoreSnap.data();
+                const weeklyPoints = scoreData.weeklyPoints || {};
+
+                const weekData = {
+                    week1: weeklyPoints['1'] || weeklyPoints[1] || null,
+                    week2: weeklyPoints['2'] || weeklyPoints[2] || null,
+                    week3: weeklyPoints['3'] || weeklyPoints[3] || null,
+                    week4: weeklyPoints['4'] || weeklyPoints[4] || null
+                };
+
+                let summary = '<div class="success">📊 Tony\'s Updated Weekly Scoring Data:</div>';
+
+                for (let week = 1; week <= 4; week++) {
+                    const data = weekData[`week${week}`];
+                    if (data) {
+                        summary += `<div>• Week ${week}: ${data.totalPoints || 0} points (${data.correctPicks || 0}/${data.totalPicks || 0} correct) - ${data.accuracy || 0}% accuracy</div>`;
+                        log(`Week ${week}: ${data.totalPoints || 0} points`, 'success');
+                    } else {
+                        summary += `<div class="error">• Week ${week}: ❌ NO DATA</div>`;
+                        log(`Week ${week}: No scoring data found`, 'error');
+                    }
+                }
+
+                summary += `<details style="margin-top: 10px;"><summary>Raw Data</summary><pre>${JSON.stringify(weeklyPoints, null, 2)}</pre></details>`;
+                verifyResults.innerHTML = summary;
+
+                if (weekData.week4) {
+                    log('SUCCESS: Week 4 scoring data is now present!', 'success');
+                } else {
+                    log('Week 4 scoring data is still missing', 'warning');
+                }
+
+            } catch (error) {
+                log(`Error checking scoring data: ${error.message}`, 'error');
+                verifyResults.innerHTML = `<span class="error">❌ Error: ${error.message}</span>`;
+            }
+        }
+
+        // Event listeners
+        signInBtn.addEventListener('click', signIn);
+        signOutBtn.addEventListener('click', signOutUser);
+        testScoringBtn.addEventListener('click', testWeeklyScoring);
+        verifyScoringBtn.addEventListener('click', verifyTonyScoringData);
+        clearLogBtn.addEventListener('click', () => {
+            debugLog.textContent = 'Debug log cleared...\n';
+        });
+
+        log('Weekly Scoring Test Tool Ready');
+    </script>
+</body>
+</html>

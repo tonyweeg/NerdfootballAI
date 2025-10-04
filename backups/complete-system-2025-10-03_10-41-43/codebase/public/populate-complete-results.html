@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>[DATA] POPULATE COMPLETE RESULTS</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>[DATA] POPULATE COMPLETE RESULTS</h1>
+    <div style="background: #eeffee; padding: 20px; border: 2px solid green; margin: 20px 0;">
+        <h3>[OK] STEP 1: FIX RESULTS DATA</h3>
+        <p>This will populate Firestore results documents with ALL 16 games per week using the JSON files that have complete data.</p>
+        <p><strong>Source:</strong> <code>game-data/nfl_2025_week_*.json</code></p>
+        <p><strong>Target:</strong> <code>artifacts/nerdfootball/public/data/nerdfootball_results/{week}</code></p>
+    </div>
+
+    <button onclick="populateWeek(1)" style="background: red; color: white; padding: 15px; margin: 5px;">[DATA] POPULATE WEEK 1</button>
+    <button onclick="populateWeek(2)" style="background: orange; color: white; padding: 15px; margin: 5px;">[DATA] POPULATE WEEK 2</button>
+    <button onclick="populateWeek(3)" style="background: green; color: white; padding: 15px; margin: 5px;">[DATA] POPULATE WEEK 3</button>
+    <br><br>
+    <button onclick="populateAllWeeks()" style="background: purple; color: white; padding: 20px; font-size: 18px;">[GO] POPULATE ALL WEEKS 1-3</button>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function loadJSONResults(weekNumber) {
+            try {
+                console.log(`📁 LOADING JSON DATA FOR WEEK ${weekNumber}`);
+                const response = await fetch(`./game-data/nfl_2025_week_${weekNumber}.json`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load week ${weekNumber} JSON: ${response.status}`);
+                }
+                const jsonData = await response.json();
+                console.log(`✅ JSON DATA WEEK ${weekNumber}:`, jsonData);
+                return jsonData;
+            } catch (error) {
+                console.error(`❌ ERROR loading JSON for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        async function populateWeekResults(weekNumber) {
+            const output = document.getElementById('output');
+            output.innerHTML += `<h3>📊 POPULATING WEEK ${weekNumber}...</h3>`;
+
+            try {
+                // Load complete data from JSON file
+                const jsonData = await loadJSONResults(weekNumber);
+                if (!jsonData) {
+                    output.innerHTML += `<p style="color: red;">❌ Failed to load JSON data for Week ${weekNumber}</p>`;
+                    return;
+                }
+
+                // Count games in JSON
+                const gameIds = Object.keys(jsonData).filter(key =>
+                    key !== 'timestamp' && key !== 'lastUpdated'
+                );
+                output.innerHTML += `<p>📁 JSON file has ${gameIds.length} games</p>`;
+
+                // Convert JSON format to Firestore format with winners
+                const firestoreData = {};
+                let gamesWithWinners = 0;
+                let gamesWithoutWinners = 0;
+
+                for (const [gameId, gameData] of Object.entries(jsonData)) {
+                    if (gameId === 'timestamp' || gameId === 'lastUpdated') continue;
+
+                    // Determine winner based on scores
+                    let winner = null;
+                    if (gameData.status === 'final' && gameData.homeScore !== undefined && gameData.awayScore !== undefined) {
+                        if (gameData.homeScore > gameData.awayScore) {
+                            winner = gameData.h; // home team wins
+                        } else if (gameData.awayScore > gameData.homeScore) {
+                            winner = gameData.a; // away team wins
+                        }
+                        // tie games have no winner
+                    }
+
+                    firestoreData[gameId] = {
+                        home: gameData.h || null,
+                        away: gameData.a || null,
+                        homeScore: gameData.homeScore !== undefined ? gameData.homeScore : null,
+                        awayScore: gameData.awayScore !== undefined ? gameData.awayScore : null,
+                        status: gameData.status || 'scheduled',
+                        winner: winner || null,
+                        dateTime: gameData.dt || null,
+                        stadium: gameData.stadium || null
+                    };
+
+                    if (winner) {
+                        gamesWithWinners++;
+                    } else {
+                        gamesWithoutWinners++;
+                    }
+                }
+
+                // Add metadata
+                firestoreData.lastUpdated = new Date().toISOString();
+                firestoreData.populatedFromJSON = true;
+                firestoreData.sourceFile = `nfl_2025_week_${weekNumber}.json`;
+                firestoreData.totalGames = gameIds.length;
+                firestoreData.gamesWithWinners = gamesWithWinners;
+
+                output.innerHTML += `<p>🎯 ${gamesWithWinners} games have winners, ${gamesWithoutWinners} games TBD/tied</p>`;
+
+                // Save to Firestore
+                const resultsPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${weekNumber}`;
+                await firebase.firestore().doc(resultsPath).set(firestoreData);
+
+                output.innerHTML += `<p style="color: green;">✅ Week ${weekNumber} results populated with ${gameIds.length} games!</p>`;
+
+                // Show some example data
+                const firstFewGames = gameIds.slice(0, 3);
+                output.innerHTML += '<h4>📋 Sample Results:</h4><ul>';
+                for (const gameId of firstFewGames) {
+                    const game = firestoreData[gameId];
+                    output.innerHTML += `<li><strong>Game ${gameId}:</strong> ${game.away} @ ${game.home} = ${game.winner || 'TBD'} (${game.awayScore}-${game.homeScore})</li>`;
+                }
+                output.innerHTML += '</ul>';
+
+            } catch (error) {
+                console.error(`❌ ERROR populating week ${weekNumber}:`, error);
+                output.innerHTML += `<p style="color: red;">❌ Error populating Week ${weekNumber}: ${error.message}</p>`;
+            }
+        }
+
+        async function populateWeek(weekNumber) {
+            const output = document.getElementById('output');
+            output.innerHTML = `<h2>📊 POPULATING WEEK ${weekNumber}</h2>`;
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                await populateWeekResults(weekNumber);
+
+                output.innerHTML += `<h2 style="color: green;">✅ WEEK ${weekNumber} POPULATION COMPLETE!</h2>`;
+
+            } catch (error) {
+                console.error('❌ POPULATION ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ WEEK ${weekNumber} POPULATION FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+
+        async function populateAllWeeks() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🚀 POPULATING ALL WEEKS 1-3</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                for (let week = 1; week <= 3; week++) {
+                    await populateWeekResults(week);
+                }
+
+                output.innerHTML += `
+                    <hr>
+                    <h2 style="color: green;">🚀 ALL WEEKS POPULATION COMPLETE!</h2>
+                    <div style="background: #eeffee; padding: 20px; border: 2px solid green;">
+                        <h3>✅ STEP 1 COMPLETE: RESULTS DATA FIXED</h3>
+                        <p><strong>All 3 weeks now have complete game results with winners!</strong></p>
+
+                        <h4>🔄 NEXT STEPS:</h4>
+                        <ol>
+                            <li>✅ <strong>Results Fixed:</strong> All weeks have 16 games with winners</li>
+                            <li>🧹 <strong>Clean Documents:</strong> Remove gameDetails from scoring docs</li>
+                            <li>🔄 <strong>Re-run Scoring:</strong> Recalculate all users with complete data</li>
+                            <li>✅ <strong>Verify Accuracy:</strong> Everyone gets credit for all wins</li>
+                        </ol>
+
+                        <p><strong>Ready for Step 2:</strong> <a href="cleanup-and-diagnostic.html">Clean gameDetails</a></p>
+                        <p><strong>Ready for Step 3:</strong> <a href="WEEK-BY-WEEK-FIX.html">Re-run Scoring</a></p>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('❌ ALL WEEKS POPULATION ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ ALL WEEKS POPULATION FAILED</h2><p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

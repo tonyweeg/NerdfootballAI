@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>[TEST] PIPELINE TEST HARNESS</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #00ff00;
+            margin: 20px;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .pipeline-section {
+            border: 2px solid #00ff00;
+            padding: 15px;
+            background: #001100;
+        }
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .game-result {
+            border: 1px solid #00ff00;
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .winner {
+            background: #002200;
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .no-winner {
+            background: #220000;
+            color: #ff4444;
+        }
+        .user-score {
+            border: 2px solid #ffaa00;
+            padding: 10px;
+            margin: 5px 0;
+            background: #221100;
+        }
+        button {
+            background: #004400;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background: #006600;
+        }
+        .debug-output {
+            background: #111;
+            border: 1px solid #666;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <h1>[TEST] PIPELINE TEST HARNESS - COMPLETE SCORING FIX</h1>
+
+    <div style="background: #004400; padding: 20px; border: 2px solid #00ff00; margin: 20px 0;">
+        <h2>[TARGET] TESTING THE COMPLETE PIPELINE FIX</h2>
+        <p><strong>TONY-DEBUG:</strong> Look for this prefix in console for easy debugging</p>
+        <p><strong>PURPOSE:</strong> Show before/after results in a clean grid format</p>
+        <p><strong>AUTHENTICATION:</strong> Auto-login enabled for testing</p>
+    </div>
+
+    <button onclick="runCompletePipelineTest()">[GO] RUN COMPLETE PIPELINE TEST</button>
+    <button onclick="showTonyCurrentScoring()">[TARGET] SHOW TONY'S CURRENT SCORING</button>
+    <button onclick="showGameResultsGrid()">[BALL] SHOW GAME RESULTS GRID</button>
+    <button onclick="clearOutput()">[CLEAN] CLEAR OUTPUT</button>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('TONY-DEBUG: [AUTH] AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('TONY-DEBUG: [AUTH] NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('TONY-DEBUG: [AUTH] SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('TONY-DEBUG: [AUTH] SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function getCurrentGameResults(weekNumber) {
+            try {
+                console.log(`TONY-DEBUG: [DATA] Getting current game results for Week ${weekNumber}`);
+                const resultsPath = `artifacts/nerdfootball/public/data/nerdfootball_results/${weekNumber}`;
+                const resultsDoc = await firebase.firestore().doc(resultsPath).get();
+
+                if (!resultsDoc.exists) {
+                    console.log(`TONY-DEBUG: [DATA] No results document for Week ${weekNumber}`);
+                    return {};
+                }
+
+                const resultsData = resultsDoc.data();
+                console.log(`TONY-DEBUG: [DATA] Raw results data Week ${weekNumber}:`, resultsData);
+
+                // Filter out metadata
+                const gameResults = {};
+                let withWinners = 0;
+                let withoutWinners = 0;
+
+                for (const [gameId, gameData] of Object.entries(resultsData)) {
+                    if (gameId !== 'lastUpdated' && gameId !== 'timestamp' && gameId !== 'firestoreUpdateApplied' &&
+                        gameId !== 'sourceData' && gameId !== 'totalGames' && gameId !== 'gamesWithWinners' &&
+                        gameId !== 'gamesWithoutWinners' && gameId !== 'mnfTotalPoints') {
+
+                        gameResults[gameId] = gameData;
+
+                        if (gameData.winner) {
+                            withWinners++;
+                        } else {
+                            withoutWinners++;
+                        }
+                    }
+                }
+
+                console.log(`TONY-DEBUG: [DATA] Week ${weekNumber}: ${withWinners} games with winners, ${withoutWinners} without`);
+                return gameResults;
+
+            } catch (error) {
+                console.error(`TONY-DEBUG: [DATA] Error getting results for Week ${weekNumber}:`, error);
+                return {};
+            }
+        }
+
+        async function getTonyCurrentScoring() {
+            try {
+                console.log('TONY-DEBUG: [SCORE] Getting Tony current scoring');
+                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+                const scoringDoc = await firebase.firestore().doc(scoringPath).get();
+
+                if (!scoringDoc.exists) {
+                    console.log('TONY-DEBUG: [SCORE] No scoring document for Tony');
+                    return null;
+                }
+
+                const scoringData = scoringDoc.data();
+                console.log('TONY-DEBUG: [SCORE] Tony current scoring:', scoringData);
+                return scoringData;
+
+            } catch (error) {
+                console.error('TONY-DEBUG: [SCORE] Error getting Tony scoring:', error);
+                return null;
+            }
+        }
+
+        function createGameResultsGrid(gameResults, weekNumber) {
+            let html = `<div class="pipeline-section">`;
+            html += `<h3>[BALL] GAME RESULTS WEEK ${weekNumber}</h3>`;
+            html += `<div class="results-grid">`;
+
+            const gameIds = Object.keys(gameResults).sort((a, b) => parseInt(a) - parseInt(b));
+
+            for (const gameId of gameIds) {
+                const game = gameResults[gameId];
+                const hasWinner = game.winner ? true : false;
+                const cssClass = hasWinner ? 'winner' : 'no-winner';
+
+                html += `<div class="game-result ${cssClass}">`;
+                html += `<strong>Game ${gameId}</strong><br>`;
+                html += `${game.away} @ ${game.home}<br>`;
+                html += `${game.awayScore}-${game.homeScore}<br>`;
+                html += `<strong>${game.winner || 'NO WINNER'}</strong>`;
+                html += `</div>`;
+            }
+
+            html += `</div></div>`;
+            return html;
+        }
+
+        function createUserScoringGrid(scoringData) {
+            let html = `<div class="pipeline-section">`;
+            html += `<h3>[TARGET] TONY'S CURRENT SCORING</h3>`;
+
+            if (!scoringData) {
+                html += `<p style="color: #ff4444;">[ERROR] No scoring data found</p>`;
+                html += `</div>`;
+                return html;
+            }
+
+            // Season totals
+            html += `<div class="user-score">`;
+            html += `<h4>[TROPHY] SEASON TOTALS</h4>`;
+            html += `<p><strong>Total Points:</strong> ${scoringData.totalPoints || 0}</p>`;
+            html += `<p><strong>Games Won:</strong> ${scoringData.seasonStats?.gamesWon || 0}</p>`;
+            html += `<p><strong>Games Played:</strong> ${scoringData.seasonStats?.totalGames || 0}</p>`;
+            html += `<p><strong>Weeks Played:</strong> ${scoringData.seasonStats?.weeksPlayed || 0}</p>`;
+            html += `</div>`;
+
+            // Weekly breakdown
+            if (scoringData.weeklyPoints) {
+                html += `<h4>[CALENDAR] WEEKLY BREAKDOWN</h4>`;
+
+                for (let week = 1; week <= 3; week++) {
+                    const weekData = scoringData.weeklyPoints[week];
+                    if (weekData) {
+                        html += `<div class="user-score">`;
+                        html += `<strong>Week ${week}:</strong> `;
+                        html += `${weekData.totalPoints || 0} points `;
+                        html += `(${weekData.gamesWon || 0}/${weekData.gamesPlayed || 0} games won)`;
+                        html += `</div>`;
+                    } else {
+                        html += `<div class="user-score" style="color: #ff4444;">`;
+                        html += `<strong>Week ${week}:</strong> NO DATA`;
+                        html += `</div>`;
+                    }
+                }
+            }
+
+            html += `</div>`;
+            return html;
+        }
+
+        async function showGameResultsGrid() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>[BALL] CURRENT GAME RESULTS</h2>';
+
+            try {
+                await autoLogin();
+                console.log('TONY-DEBUG: [AUTH] Authenticated for game results');
+
+                let gridHTML = '<div class="grid-container">';
+
+                for (let week = 1; week <= 3; week++) {
+                    const gameResults = await getCurrentGameResults(week);
+                    gridHTML += createGameResultsGrid(gameResults, week);
+                }
+
+                gridHTML += '</div>';
+                output.innerHTML += gridHTML;
+
+            } catch (error) {
+                console.error('TONY-DEBUG: [ERROR] Error showing game results:', error);
+                output.innerHTML += `<p style="color: #ff4444;">[ERROR] Error: ${error.message}</p>`;
+            }
+        }
+
+        async function showTonyCurrentScoring() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>[TARGET] TONY\'S CURRENT SCORING</h2>';
+
+            try {
+                await autoLogin();
+                console.log('TONY-DEBUG: [AUTH] Authenticated for Tony scoring');
+
+                const scoringData = await getTonyCurrentScoring();
+                const scoringHTML = createUserScoringGrid(scoringData);
+
+                output.innerHTML += scoringHTML;
+
+            } catch (error) {
+                console.error('TONY-DEBUG: [ERROR] Error showing Tony scoring:', error);
+                output.innerHTML += `<p style="color: #ff4444;">[ERROR] Error: ${error.message}</p>`;
+            }
+        }
+
+        async function runCompletePipelineTest() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>[GO] COMPLETE PIPELINE TEST</h2>';
+
+            try {
+                await autoLogin();
+                console.log('TONY-DEBUG: [AUTH] Authenticated for complete test');
+
+                output.innerHTML += '<p>[OK] Authentication successful</p>';
+
+                // Show current state
+                output.innerHTML += '<h3>[DATA] CURRENT STATE ANALYSIS</h3>';
+
+                let analysisHTML = '<div class="grid-container">';
+
+                // Game results analysis
+                for (let week = 1; week <= 3; week++) {
+                    const gameResults = await getCurrentGameResults(week);
+                    analysisHTML += createGameResultsGrid(gameResults, week);
+                }
+
+                // Tony's scoring analysis
+                const scoringData = await getTonyCurrentScoring();
+                analysisHTML += createUserScoringGrid(scoringData);
+
+                analysisHTML += '</div>';
+                output.innerHTML += analysisHTML;
+
+                // Analysis summary
+                output.innerHTML += `
+                    <div style="background: #004400; padding: 20px; border: 2px solid #00ff00; margin: 20px 0;">
+                        <h3>[SEARCH] PIPELINE TEST ANALYSIS</h3>
+                        <p><strong>TONY-DEBUG:</strong> Check console for detailed logs</p>
+                        <h4>[TARGET] KEY FINDINGS:</h4>
+                        <ul>
+                            <li><strong>Game Results:</strong> Check if all weeks have 16 games with winners</li>
+                            <li><strong>Tony's Scoring:</strong> Check if points reflect all winning picks</li>
+                            <li><strong>Expected Fix:</strong> Users should get credit for ALL games, not just 1 per week</li>
+                        </ul>
+                        <h4>[ARROW] NEXT STEPS:</h4>
+                        <p>If results show missing winners, run the pipeline tools in sequence:</p>
+                        <ol>
+                            <li><a href="populate-complete-results.html">Populate Complete Results</a></li>
+                            <li><a href="user-scoring-recalculator.html">Recalculate User Scoring</a></li>
+                        </ol>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('TONY-DEBUG: [ERROR] Complete pipeline test error:', error);
+                output.innerHTML += `<p style="color: #ff4444;">[ERROR] Pipeline test failed: ${error.message}</p>`;
+            }
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+            console.log('TONY-DEBUG: [CLEAN] Output cleared');
+        }
+
+        // Auto-authenticate on page load
+        window.addEventListener('load', async () => {
+            try {
+                await autoLogin();
+                console.log('TONY-DEBUG: [INIT] Test harness loaded and authenticated');
+            } catch (error) {
+                console.error('TONY-DEBUG: [INIT] Auto-auth failed:', error);
+            }
+        });
+    </script>
+</body>
+</html>

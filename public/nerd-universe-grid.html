@@ -1113,11 +1113,7 @@
             const isCurrentUser = memberId === currentUserId;
 
             const game = bibleData[gameId];
-            const gameHasStarted = game && (game.status === 'IN_PROGRESS' ||
-                                           game.status === 'FINAL' ||
-                                           game.status === 'FINAL/OT' ||
-                                           game.status === 'STATUS_FINAL' ||
-                                           game.status === 'HALFTIME');
+            const gameHasStarted = hasGameStarted(game);
 
             const shouldHidePick = isCurrentWeek && !isCurrentUser && !gameHasStarted;
 
@@ -1128,8 +1124,8 @@
             }
 
             const pick = userPicks[gameId];
-            const isGameComplete = game.winner && game.winner !== 'TBD';
-            const isGameLive = game.status === 'IN_PROGRESS' || game.status === 'HALFTIME';
+            const isGameComplete = isGameCompleted(game);
+            const isGameLive = isGameInProgress(game);
             const isCorrect = isGameComplete && game.winner === pick.winner;
 
             if (shouldHidePick) {
@@ -1410,16 +1406,10 @@
                 return;
             }
 
-            // Filter games to only show FINAL, FINAL/OT, or IN_PROGRESS
+            // Filter games to only show games that have started (dynamic status checking)
             const activeGames = gameIds.filter(gameId => {
                 const game = bibleData[gameId];
-                return game && (
-                    game.status === 'FINAL' ||
-                    game.status === 'FINAL/OT' ||
-                    game.status === 'STATUS_FINAL' ||
-                    game.status === 'IN_PROGRESS' ||
-                    game.status === 'HALFTIME'
-                );
+                return hasGameStarted(game);
             });
 
             if (activeGames.length === 0) {
@@ -1591,11 +1581,11 @@
                 const clickedConf = clickedPick ? clickedPick.confidence : '-';
                 const currentConf = currentPick ? currentPick.confidence : '-';
 
-                // Game status indicator
+                // Game status indicator (dynamic)
                 let statusIcon = '⏳';
-                if (game.status === 'FINAL' || game.status === 'FINAL/OT' || game.status === 'STATUS_FINAL') {
+                if (isGameCompleted(game)) {
                     statusIcon = '✅';
-                } else if (game.status === 'IN_PROGRESS' || game.status === 'HALFTIME') {
+                } else if (isGameInProgress(game)) {
                     statusIcon = '🔴';
                 }
 
@@ -1730,19 +1720,43 @@
             document.getElementById('notstarted-count').textContent = columnGroups.notstarted.games.length;
         }
 
+        // Dynamic game status helpers - case-insensitive checks
+        function isGameCompleted(game) {
+            if (!game) return false;
+            const status = (game.status || '').toLowerCase();
+            return status === 'final' ||
+                   status === 'final/ot' ||
+                   status === 'status_final' ||
+                   (game.winner && game.winner !== 'TBD');
+        }
+
+        function isGameInProgress(game) {
+            if (!game) return false;
+            const status = (game.status || '').toLowerCase();
+            return status === 'in_progress' ||
+                   status === 'halftime';
+        }
+
+        function hasGameStarted(game) {
+            if (!game) return false;
+            // Game has started if it's completed or in progress
+            return isGameCompleted(game) || isGameInProgress(game);
+        }
+
         function getGameStatus(game) {
             if (!game) return 'notstarted';
 
-            // Check if game is completed first by status field
-            if (game.status === 'FINAL' ||
-                game.status === 'FINAL/OT' ||
-                game.status === 'STATUS_FINAL' ||
-                game.status === 'final' ||
-                (game.winner && game.winner !== 'TBD')) {
+            // Check if game is completed first
+            if (isGameCompleted(game)) {
                 return 'completed';
             }
 
-            // For games without winners, check if they've started
+            // Check if game is in progress
+            if (isGameInProgress(game)) {
+                return 'active';
+            }
+
+            // For games without status, check if they've started by time
             const now = new Date();
 
             // Try multiple possible game time fields

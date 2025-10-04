@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🩸 The Survival Chamber - 36 Degrees</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true },
+            theme: {
+                extend: {
+                    colors: {
+                        'chamber': {
+                            'bg': '#0a0000',
+                            'surface': '#1a0808',
+                            'border': '#2a1010',
+                            'blood': '#ff0000',
+                            'darkblood': '#cc0000',
+                            'bone': '#f5f5dc',
+                            'shadow': '#330000',
+                            'death': '#8b0000',
+                            'text': '#ffffff',
+                            'muted': '#999999'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(45deg, #0a0000 0%, #1a0808 30%, #330000 70%, #0d0404 100%);
+            background-attachment: fixed;
+        }
+
+        .chamber-window {
+            background: rgba(26, 8, 8, 0.95);
+            border: 1px solid #2a1010;
+            backdrop-filter: blur(10px);
+            box-shadow:
+                0 0 20px rgba(255, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05),
+                0 0 40px rgba(139, 0, 0, 0.05);
+        }
+
+        .blood-button {
+            background: linear-gradient(45deg, #1a0808, #2a1010);
+            border: 1px solid #ff0000;
+            color: #ff0000;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
+        }
+
+        .blood-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .blood-button:hover::before {
+            left: 100%;
+        }
+
+        .blood-button:hover {
+            background: linear-gradient(45deg, #2a1010, #3a1818);
+            box-shadow:
+                0 0 20px rgba(255, 0, 0, 0.4),
+                inset 0 0 20px rgba(255, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .death-button {
+            background: linear-gradient(45deg, #1a0808, #2a1010);
+            border: 1px solid #8b0000;
+            color: #8b0000;
+            text-shadow: 0 0 5px rgba(139, 0, 0, 0.5);
+        }
+
+        .death-button:hover {
+            background: linear-gradient(45deg, #2a1010, #3a1818);
+            box-shadow:
+                0 0 20px rgba(139, 0, 0, 0.3),
+                inset 0 0 20px rgba(139, 0, 0, 0.1);
+        }
+
+        .bone-button {
+            background: linear-gradient(45deg, #1a0808, #2a1010);
+            border: 1px solid #f5f5dc;
+            color: #f5f5dc;
+            text-shadow: 0 0 5px rgba(245, 245, 220, 0.3);
+        }
+
+        .bone-button:hover {
+            background: linear-gradient(45deg, #2a1010, #3a1818);
+            box-shadow:
+                0 0 20px rgba(245, 245, 220, 0.2),
+                inset 0 0 20px rgba(245, 245, 220, 0.05);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        .chamber-text { color: #ffffff; }
+        .chamber-blood { color: #ff0000; }
+        .chamber-death { color: #8b0000; }
+        .chamber-bone { color: #f5f5dc; }
+
+        .locked-pick {
+            background: linear-gradient(45deg, #2a1010, #3a1818);
+            border: 2px solid #8b0000;
+            color: #8b0000;
+        }
+        .available-pick {
+            background: linear-gradient(45deg, #0a1a0a, #1a2a1a);
+            border: 2px solid #ff0000;
+            color: #ff0000;
+        }
+        .current-pick {
+            background: linear-gradient(45deg, #1a0808, #2a1010);
+            border: 2px solid #f5f5dc;
+            color: #f5f5dc;
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+
+        .blood-drip {
+            animation: bloodDrip 3s ease-in-out infinite;
+        }
+
+        @keyframes bloodDrip {
+            0%, 100% { transform: translateY(0); opacity: 0.8; }
+            50% { transform: translateY(5px); opacity: 1; }
+        }
+    </style>
+
+    <!-- 🤖 ML PREDICTION SYSTEM - SURVIVOR POOL -->
+    <script>
+        console.log('🧠 SURVIVOR ML: Loading AI prediction system...');
+
+        // Team database for survivor analysis
+        const survivorTeamDB = {
+            'Buffalo Bills': { rating: 95, risk: 15, strength: 85, homeAdv: 3.2 },
+            'Kansas City Chiefs': { rating: 98, risk: 10, strength: 88, homeAdv: 4.1 },
+            'San Francisco 49ers': { rating: 90, risk: 18, strength: 82, homeAdv: 3.8 },
+            'Philadelphia Eagles': { rating: 87, risk: 22, strength: 79, homeAdv: 3.5 },
+            'Dallas Cowboys': { rating: 75, risk: 35, strength: 70, homeAdv: 3.7 },
+            'Miami Dolphins': { rating: 70, risk: 40, strength: 65, homeAdv: 2.8 },
+            'Green Bay Packers': { rating: 85, risk: 25, strength: 80, homeAdv: 4.0 },
+            'Baltimore Ravens': { rating: 82, risk: 28, strength: 77, homeAdv: 3.3 }
+        };
+
+        function generateSurvivorPrediction(team) {
+            const data = survivorTeamDB[team] || { rating: 70, risk: 40, strength: 65, homeAdv: 3.0 };
+            const confidence = Math.min(95, Math.max(50, data.rating - data.risk + 10));
+
+            let recommendation = 'RISKY PICK';
+            if (confidence >= 80) recommendation = 'STRONG PICK';
+            else if (confidence >= 70) recommendation = 'SOLID PICK';
+
+            return { team, recommendation, confidence: Math.round(confidence), ...data };
+        }
+
+        window.openMLPredictionModal = function(gameId, team, gameInfo, event) {
+            if (event) event.stopPropagation();
+
+            console.log(`🧠 SURVIVOR AI: Analyzing ${team}...`);
+            const prediction = generateSurvivorPrediction(team);
+
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+                    <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-t-lg">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">🧠</span>
+                                <div>
+                                    <h2 class="text-xl font-bold">Survivor AI Analysis</h2>
+                                    <p class="text-purple-100 text-sm">Diamond-Level Survivor Analytics</p>
+                                </div>
+                            </div>
+                            <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <div class="text-center mb-6">
+                            <h3 class="text-2xl font-bold text-purple-800 mb-2">${prediction.team}</h3>
+                            <div class="text-3xl font-bold mb-2 ${
+                                prediction.recommendation === 'STRONG PICK' ? 'text-green-700' :
+                                prediction.recommendation === 'SOLID PICK' ? 'text-blue-700' : 'text-orange-700'
+                            }">
+                                ${prediction.recommendation === 'STRONG PICK' ? '🏆' :
+                                  prediction.recommendation === 'SOLID PICK' ? '👍' : '⚠️'} ${prediction.recommendation}
+                            </div>
+                            <div class="text-xl text-purple-600">${prediction.confidence}% Confidence</div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-purple-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-purple-600">${prediction.rating}</div>
+                                <div class="text-sm text-purple-500">Survivor Rating</div>
+                            </div>
+                            <div class="bg-${prediction.risk <= 20 ? 'green' : prediction.risk <= 35 ? 'yellow' : 'red'}-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-${prediction.risk <= 20 ? 'green' : prediction.risk <= 35 ? 'yellow' : 'red'}-600">${prediction.risk}%</div>
+                                <div class="text-sm text-${prediction.risk <= 20 ? 'green' : prediction.risk <= 35 ? 'yellow' : 'red'}-500">Risk Factor</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 text-sm">
+                            <div class="bg-gray-50 p-3 rounded">📊 <strong>Strength Rating:</strong> ${prediction.strength}/100</div>
+                            <div class="bg-gray-50 p-3 rounded">🏠 <strong>Home Advantage:</strong> +${prediction.homeAdv} points</div>
+                            <div class="bg-gray-50 p-3 rounded">🧠 <strong>AI Analysis:</strong> ${prediction.recommendation} with ${prediction.confidence}% confidence based on survivor-specific metrics</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        };
+
+        console.log('🧠 SURVIVOR ML: AI prediction system ready');
+    </script>
+</head>
+<body class="min-h-screen chamber-text">
+    <!-- Header -->
+    <header class="bg-chamber-bg border-b border-chamber-border">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="./nerd-universe.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 w-auto">
+                    <h1 class="text-2xl font-bold chamber-blood glow-text">🩸 The Survival Chamber</h1>
+                </a>
+                <div class="flex items-center gap-4">
+                    <div id="authStatus" class="text-sm chamber-bone">💀 Authenticating...</div>
+                    <button onclick="history.back()" class="blood-button px-4 py-2 rounded-lg text-sm">
+                        ← Back
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+            <!-- Hero Section -->
+            <div class="chamber-window rounded-xl p-8 mb-8 text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4 chamber-blood glow-text blood-drip">⚰️ Survival Chamber</h1>
+                <p class="text-xl chamber-bone mb-6">Choose one team per week. One loss = Death. Only the strongest survive the 36 degrees.</p>
+            </div>
+
+            <!-- Current Status Card -->
+        <div id="statusCard" class="chamber-window rounded-xl p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center chamber-blood glow-text">
+                <span class="text-2xl mr-2">💀</span>
+                Your Survival Status
+            </h2>
+            <div id="statusContent" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Status info will be populated here -->
+            </div>
+        </div>
+
+        <!-- Current Week Pick -->
+        <div id="currentWeekCard" class="chamber-window rounded-xl p-6 mb-6 hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold flex items-center chamber-blood glow-text">
+                    <span class="text-2xl mr-2">⚰️</span>
+                    <span id="currentWeekTitle">Week X - Death Chamber Pick</span>
+                </h2>
+                <div id="lockStatus" class="text-sm font-medium px-3 py-1 rounded-full">
+                    <!-- Lock status will be displayed here -->
+                </div>
+            </div>
+
+            <div id="currentWeekContent">
+                <!-- Current week pick content -->
+            </div>
+        </div>
+
+        <!-- Team Selection (when editing) -->
+        <div id="teamSelectionCard" class="chamber-window rounded-xl p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center chamber-blood glow-text">
+                <span class="text-2xl mr-2">🗡️</span>
+                Choose Your Champion
+            </h2>
+
+            <div class="mb-4">
+                <div id="availableTeamsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Available teams will be populated here -->
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button id="savePickBtn" class="flex-1 blood-button py-3 px-6 rounded-lg font-semibold transition-colors">
+                    ⚔️ Seal Fate
+                </button>
+                <button id="cancelEditBtn" class="death-button py-3 px-6 rounded-lg font-semibold transition-colors">
+                    💀 Abandon
+                </button>
+            </div>
+        </div>
+
+        <!-- Week Navigation -->
+        <div id="weekNavigationCard" class="chamber-window rounded-xl p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center chamber-blood glow-text">
+                <span class="text-2xl mr-2">⚰️</span>
+                Death Calendar
+            </h2>
+
+            <div id="weekGrid" class="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-9 gap-3">
+                <!-- Week buttons will be populated here -->
+            </div>
+        </div>
+
+        <!-- Pick History -->
+        <div id="historyCard" class="chamber-window rounded-xl p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center chamber-blood glow-text">
+                <span class="text-2xl mr-2">💀</span>
+                Death Chronicle
+            </h2>
+
+            <div id="historyContent" class="space-y-3">
+                <!-- Pick history will be populated here -->
+            </div>
+        </div>
+
+        <!-- Game Information -->
+        <div id="gameInfoCard" class="chamber-window rounded-xl p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4 flex items-center chamber-blood glow-text">
+                <span class="text-2xl mr-2">⏰</span>
+                Chamber Battle Schedule
+            </h2>
+            <div id="gameInfoContent">
+                <!-- Game times and lock status will be shown here -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Hidden selected team -->
+    <input type="hidden" id="selectedTeam" value="">
+    <input type="hidden" id="selectedGameId" value="">
+
+        </div>
+    </main>
+
+    <!-- Load Eastern Time Parser -->
+    <script src="./easternTimeParser-v2.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // NFL Teams
+        const NFL_TEAMS = [
+            'Arizona Cardinals', 'Atlanta Falcons', 'Baltimore Ravens', 'Buffalo Bills',
+            'Carolina Panthers', 'Chicago Bears', 'Cincinnati Bengals', 'Cleveland Browns',
+            'Dallas Cowboys', 'Denver Broncos', 'Detroit Lions', 'Green Bay Packers',
+            'Houston Texans', 'Indianapolis Colts', 'Jacksonville Jaguars', 'Kansas City Chiefs',
+            'Las Vegas Raiders', 'Los Angeles Chargers', 'Los Angeles Rams', 'Miami Dolphins',
+            'Minnesota Vikings', 'New England Patriots', 'New Orleans Saints', 'New York Giants',
+            'New York Jets', 'Philadelphia Eagles', 'Pittsburgh Steelers', 'San Francisco 49ers',
+            'Seattle Seahawks', 'Tampa Bay Buccaneers', 'Tennessee Titans', 'Washington Commanders'
+        ];
+
+        // Admin user IDs who can see AI predictions
+        console.log('🚀 SURVIVOR_DEBUG: Script loading started');
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        let currentUser = null;
+        let isAuthenticated = false;
+        let userSurvivorData = null;
+        let currentWeek = 1;
+        let selectedWeek = null;
+        let isEditing = false;
+        let gameData = {};
+        let usedTeams = new Set();
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user) {
+                currentUser = user;
+                isAuthenticated = true;
+                authStatus.innerHTML = `✅ ${user.email?.split('@')[0] || 'User'}`;
+                await initializeUserInterface();
+            } else {
+                authStatus.innerHTML = `❌ Please sign in`;
+                isAuthenticated = false;
+            }
+        });
+
+        async function initializeUserInterface() {
+            try {
+                // Check if user is pool member
+                if (!(await isPoolMember())) {
+                    showError('You are not a member of the survivor pool.');
+                    return;
+                }
+
+                currentWeek = getCurrentWeek();
+                await loadUserSurvivorData();
+                await loadGameData();
+                calculateUsedTeams();
+
+                displayUserInterface();
+
+            } catch (error) {
+                console.error('Error initializing interface:', error);
+                showError(`Error loading data: ${error.message}`);
+            }
+        }
+
+        async function isPoolMember() {
+            try {
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = doc(db, poolMembersPath);
+                const membersSnap = await getDoc(membersDoc);
+
+                return membersSnap.exists() && membersSnap.data()[currentUser.uid];
+            } catch (error) {
+                console.error('Error checking pool membership:', error);
+                return false;
+            }
+        }
+
+        async function loadUserSurvivorData() {
+            try {
+                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${currentUser.uid}`;
+                const survivorDoc = doc(db, survivorPath);
+                const survivorSnap = await getDoc(survivorDoc);
+
+                if (survivorSnap.exists()) {
+                    userSurvivorData = survivorSnap.data();
+                } else {
+                    userSurvivorData = { picks: {} };
+                }
+            } catch (error) {
+                console.error('Error loading survivor data:', error);
+                userSurvivorData = { picks: {} };
+            }
+        }
+
+        async function loadGameData() {
+            try {
+                // Load game data for current week to check lock status
+                const gameDataPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gameDoc = doc(db, gameDataPath);
+                const gameSnap = await getDoc(gameDoc);
+
+                if (gameSnap.exists()) {
+                    gameData[currentWeek] = gameSnap.data();
+                }
+            } catch (error) {
+                console.error('Error loading game data:', error);
+                gameData[currentWeek] = {};
+            }
+        }
+
+        function getOpponentForTeam(team, week) {
+            const weekGames = gameData[week];
+            if (!weekGames) return null;
+
+            for (const gameId in weekGames) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+                const game = weekGames[gameId];
+
+                // Skip if game data not populated yet (TBD placeholders)
+                if (!game.a || !game.h || game.a === 'TBD' || game.h === 'TBD') {
+                    continue;
+                }
+
+                if (game.a === team) {
+                    return game.h; // Team is away, return home team
+                }
+                if (game.h === team) {
+                    return game.a; // Team is home, return away team
+                }
+            }
+            return null; // No opponent found
+        }
+
+        function calculateUsedTeams() {
+            usedTeams.clear();
+            const picks = userSurvivorData.picks || {};
+
+            Object.values(picks).forEach(pick => {
+                if (pick.team) {
+                    usedTeams.add(pick.team);
+                }
+            });
+        }
+
+        function getCurrentWeek() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04');
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        function isWeekLocked(week) {
+            // Check if any game in the week has started using Eastern Time Parser
+            const weekGames = gameData[week];
+            console.log(`🔒 LOCK_CHECK: Week ${week}, hasGameData: ${!!weekGames}, hasParser: ${!!window.easternTimeParser}`);
+
+            if (!weekGames || !window.easternTimeParser) {
+                console.log(`🔒 LOCK_CHECK: Using fallback logic - week ${week} vs current ${currentWeek}`);
+                return week < currentWeek; // Fallback: lock past weeks
+            }
+
+            // Check if any game has started
+            for (const gameId in weekGames) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+
+                const game = weekGames[gameId];
+                if (game.dt) {
+                    const hasStarted = window.easternTimeParser.hasGameStarted(game.dt);
+                    console.log(`🔒 LOCK_CHECK: Game ${gameId} (${game.dt}) hasStarted: ${hasStarted}`);
+                    if (hasStarted) {
+                        return true; // Week is locked if any game started
+                    }
+                }
+            }
+
+            console.log(`🔒 LOCK_CHECK: Week ${week} is NOT locked`);
+            return false;
+        }
+
+        function displayUserInterface() {
+            displayStatusCard();
+            displayCurrentWeekCard();
+            displayWeekNavigation();
+            displayPickHistory();
+            displayGameInfo();
+
+            // Show all cards
+            document.getElementById('statusCard').classList.remove('hidden');
+            document.getElementById('currentWeekCard').classList.remove('hidden');
+            document.getElementById('weekNavigationCard').classList.remove('hidden');
+            document.getElementById('historyCard').classList.remove('hidden');
+            document.getElementById('gameInfoCard').classList.remove('hidden');
+        }
+
+        function displayStatusCard() {
+            const picks = userSurvivorData.picks || {};
+            const totalPicks = Object.keys(picks).length;
+            const alivePicks = Object.values(picks).filter(p => p.alive !== false).length;
+            const isEliminated = Object.values(picks).some(p => p.alive === false);
+
+            const statusContent = document.getElementById('statusContent');
+            statusContent.innerHTML = `
+                <div class="text-center p-4 bg-chamber-surface rounded-lg border border-chamber-border">
+                    <div class="text-2xl font-bold chamber-blood">${totalPicks}</div>
+                    <div class="text-sm chamber-bone">Death Weeks Chosen</div>
+                </div>
+                <div class="text-center p-4 ${isEliminated ? 'bg-chamber-shadow' : 'bg-chamber-surface'} rounded-lg border border-chamber-border">
+                    <div class="text-2xl font-bold ${isEliminated ? 'chamber-blood' : 'chamber-bone'}">
+                        ${isEliminated ? '💀' : '🩸'}
+                    </div>
+                    <div class="text-sm ${isEliminated ? 'chamber-blood' : 'chamber-bone'}">
+                        ${isEliminated ? 'Soul Reaped' : 'Blood Still Flows'}
+                    </div>
+                </div>
+                <div class="text-center p-4 bg-chamber-surface rounded-lg border border-chamber-border">
+                    <div class="text-2xl font-bold chamber-death">${usedTeams.size}</div>
+                    <div class="text-sm chamber-bone">Champions Used</div>
+                </div>
+            `;
+        }
+
+        function displayCurrentWeekCard() {
+            console.log(`🎯 DISPLAY_CARD: Checking lock for currentWeek: ${currentWeek}`);
+            const weekLocked = isWeekLocked(currentWeek);
+            const picks = userSurvivorData.picks || {};
+            const currentPick = picks[currentWeek.toString()];
+
+            document.getElementById('currentWeekTitle').textContent = `Week ${currentWeek} - Current Pick`;
+
+            const lockStatus = document.getElementById('lockStatus');
+            if (weekLocked) {
+                lockStatus.innerHTML = `<span class="bg-chamber-shadow text-chamber-death border border-chamber-death px-2 py-1 rounded">💀 Sealed</span>`;
+            } else {
+                lockStatus.innerHTML = `<span class="bg-chamber-surface text-chamber-blood border border-chamber-blood px-2 py-1 rounded">🩸 Open</span>`;
+            }
+
+            const currentWeekContent = document.getElementById('currentWeekContent');
+
+            if (currentPick) {
+                const alive = currentPick.alive !== false;
+                currentWeekContent.innerHTML = `
+                    <div class="current-pick p-6 rounded-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold">${currentPick.team}</h3>
+                                <p class="text-sm text-gray-600">Game ID: ${currentPick.gameId || 'Not set'}</p>
+                                <p class="text-sm text-gray-600">Status: ${currentPick.result || 'Pending'}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl mb-1">${alive ? '✅' : '💀'}</div>
+                                <div class="text-sm font-medium ${alive ? 'text-green-600' : 'text-red-600'}">
+                                    ${alive ? 'Alive' : 'Eliminated'}
+                                </div>
+                            </div>
+                        </div>
+                        ${!weekLocked ? `
+                            <button onclick="startEditing(${currentWeek})" class="w-full blood-button py-2 px-4 rounded-lg transition-colors">
+                                ✏️ Change Pick
+                            </button>
+                        ` : `
+                            <div class="text-center text-gray-500 text-sm">
+                                🔒 Week is locked - games have started
+                            </div>
+                        `}
+                    </div>
+                `;
+            } else {
+                if (!weekLocked) {
+                    currentWeekContent.innerHTML = `
+                        <div class="available-pick p-6 rounded-lg text-center">
+                            <div class="text-4xl mb-4">🎯</div>
+                            <h3 class="text-lg font-bold mb-2">No Pick Yet</h3>
+                            <p class="text-gray-600 mb-4">Select your team for Week ${currentWeek}</p>
+                            <button onclick="startEditing(${currentWeek})" class="bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors pulse-animation">
+                                🏈 Make Your Pick
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    currentWeekContent.innerHTML = `
+                        <div class="locked-pick p-6 rounded-lg text-center">
+                            <div class="text-4xl mb-4">🔒</div>
+                            <h3 class="text-lg font-bold mb-2">No Pick Made</h3>
+                            <p class="text-gray-600">Week ${currentWeek} is locked - games have started</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function displayWeekNavigation() {
+            const weekGrid = document.getElementById('weekGrid');
+            let html = '';
+
+            for (let week = 1; week <= 18; week++) {
+                const picks = userSurvivorData.picks || {};
+                const weekPick = picks[week.toString()];
+                const weekLocked = isWeekLocked(week);
+                const isCurrent = week === currentWeek;
+
+                let buttonClass = 'p-3 rounded-lg text-center transition-all hover-lift ';
+                let content = '';
+
+                if (weekPick) {
+                    const alive = weekPick.alive !== false;
+                    buttonClass += alive ? 'bg-chamber-surface border-2 border-chamber-blood chamber-bone' : 'bg-chamber-shadow border-2 border-chamber-death chamber-blood';
+                    content = `
+                        <div class="font-bold">Week ${week}</div>
+                        <div class="text-xs">${weekPick.team.split(' ').pop()}</div>
+                        <div class="text-lg">${alive ? '🩸' : '💀'}</div>
+                    `;
+                } else if (weekLocked) {
+                    buttonClass += 'bg-chamber-surface border-2 border-chamber-border chamber-death opacity-60';
+                    content = `
+                        <div class="font-bold">Week ${week}</div>
+                        <div class="text-xs">Locked</div>
+                        <div class="text-lg">🔒</div>
+                    `;
+                } else {
+                    buttonClass += isCurrent ? 'bg-chamber-shadow border-2 border-chamber-blood chamber-blood' : 'chamber-window border-2 border-chamber-border chamber-bone';
+                    content = `
+                        <div class="font-bold">Week ${week}</div>
+                        <div class="text-xs">${isCurrent ? 'Current' : 'Future'}</div>
+                        <div class="text-lg">${isCurrent ? '🎯' : '📅'}</div>
+                    `;
+                }
+
+                const clickable = !weekLocked || weekPick;
+                html += `
+                    <button
+                        onclick="${clickable ? `selectWeek(${week})` : ''}"
+                        class="${buttonClass} ${!clickable ? 'cursor-not-allowed' : 'cursor-pointer'}"
+                        ${!clickable ? 'disabled' : ''}
+                    >
+                        ${content}
+                    </button>
+                `;
+            }
+
+            weekGrid.innerHTML = html;
+        }
+
+        function displayPickHistory() {
+            const picks = userSurvivorData.picks || {};
+            const historyContent = document.getElementById('historyContent');
+            let html = '';
+
+            for (let week = 1; week <= 18; week++) {
+                const weekKey = week.toString();
+                const weekPick = picks[weekKey];
+                const weekLocked = isWeekLocked(week);
+
+                if (weekPick || weekLocked) {
+                    if (weekPick) {
+                        const alive = weekPick.alive !== false;
+                        html += `
+                            <div class="flex items-center justify-between p-4 ${alive ? 'bg-chamber-shadow border-l-4 border-chamber-blood' : 'bg-chamber-surface border-l-4 border-chamber-death'} rounded-r-lg">
+                                <div class="flex items-center">
+                                    <div class="text-2xl mr-4">${alive ? '🩸' : '💀'}</div>
+                                    <div>
+                                        <div class="font-semibold chamber-bone">Death Week ${week}</div>
+                                        <div class="text-sm chamber-blood">${weekPick.team}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-medium chamber-bone">${weekPick.result || 'Awaiting Judgment'}</div>
+                                    <div class="text-xs chamber-muted">Battle ${weekPick.gameId || '—'}</div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (weekLocked) {
+                        html += `
+                            <div class="flex items-center justify-between p-4 bg-chamber-surface border-l-4 border-chamber-border rounded-r-lg opacity-60">
+                                <div class="flex items-center">
+                                    <div class="text-2xl mr-4">⚰️</div>
+                                    <div>
+                                        <div class="font-semibold chamber-bone">Death Week ${week}</div>
+                                        <div class="text-sm chamber-death">No soul chosen</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-medium chamber-death">Sealed</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            }
+
+            if (!html) {
+                html = `
+                    <div class="text-center p-8 bg-chamber-surface rounded-lg">
+                        <div class="text-4xl mb-4">💀</div>
+                        <p class="chamber-bone">No souls condemned yet. Begin the slaughter with Death Week ${currentWeek}!</p>
+                    </div>
+                `;
+            }
+
+            historyContent.innerHTML = html;
+        }
+
+        function displayGameInfo() {
+            const gameInfoContent = document.getElementById('gameInfoContent');
+            const weekGames = gameData[currentWeek];
+
+            if (!weekGames || !window.easternTimeParser) {
+                gameInfoContent.innerHTML = `
+                    <div class="text-center p-4 bg-gray-50 rounded-lg">
+                        <p class="text-gray-600">Game information not available</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="space-y-3">';
+            let firstGameTime = null;
+
+            for (const gameId in weekGames) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+
+                const game = weekGames[gameId];
+                if (game.dt) {
+                    const gameTime = window.easternTimeParser.formatGameTime(game.dt);
+                    const hasStarted = window.easternTimeParser.hasGameStarted(game.dt);
+
+                    if (!firstGameTime || game.dt < firstGameTime) {
+                        firstGameTime = game.dt;
+                    }
+
+                    html += `
+                        <div class="flex items-center justify-between p-3 ${hasStarted ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'} rounded-lg">
+                            <div>
+                                <div class="font-medium">${game.a} @ ${game.h}</div>
+                                <div class="text-sm text-gray-600">${gameTime}</div>
+                            </div>
+                            <div class="text-sm font-medium ${hasStarted ? 'text-red-600' : 'text-blue-600'}">
+                                ${hasStarted ? '🔴 Started' : '🟢 Upcoming'}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            html += '</div>';
+
+            if (firstGameTime && !window.easternTimeParser.hasGameStarted(firstGameTime)) {
+                const timeUntil = window.easternTimeParser.getTimeUntilGameStart(firstGameTime);
+                const hoursUntil = Math.floor(timeUntil / (1000 * 60 * 60));
+                const minutesUntil = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
+
+                html = `
+                    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+                        <div class="font-bold text-yellow-800">⏰ Picks lock in ${hoursUntil}h ${minutesUntil}m</div>
+                        <div class="text-sm text-yellow-600">First game starts ${window.easternTimeParser.formatGameTime(firstGameTime)}</div>
+                    </div>
+                ` + html;
+            }
+
+            gameInfoContent.innerHTML = html;
+        }
+
+        // Global functions
+        window.selectWeek = function(week) {
+            selectedWeek = week;
+            currentWeek = week;
+            displayCurrentWeekCard();
+            displayGameInfo();
+        };
+
+        window.startEditing = function(week) {
+            // Check if week is locked before allowing editing
+            if (isWeekLocked(week)) {
+                showError(`Week ${week} is locked - games have started`);
+                return;
+            }
+            selectedWeek = week;
+            isEditing = true;
+            showTeamSelection();
+        };
+
+        function showTeamSelection() {
+            const teamSelectionCard = document.getElementById('teamSelectionCard');
+            const availableTeamsGrid = document.getElementById('availableTeamsGrid');
+
+            let html = '';
+            NFL_TEAMS.forEach(team => {
+                const isUsed = usedTeams.has(team);
+                const isDisabled = isUsed;
+                const opponent = getOpponentForTeam(team, selectedWeek) || team;
+
+                html += `
+                    <button
+                        onclick="selectTeam('${team}')"
+                        class="team-btn p-4 rounded-lg border-2 transition-all hover-lift ${
+                            isDisabled
+                                ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed'
+                                : 'chamber-window border-chamber-border hover:border-chamber-blood hover:bg-chamber-shadow chamber-bone'
+                        }"
+                        ${isDisabled ? 'disabled' : ''}
+                    >
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="font-medium text-sm">${team}</div>
+                                ${opponent !== team ? `<div class="text-xs text-gray-500">vs ${opponent}</div>` : ''}
+                                ${isUsed ? '<div class="text-xs text-red-500">Already Used</div>' : ''}
+                            </div>
+                            ${currentUser && ADMIN_UIDS.includes(currentUser.uid) && opponent && opponent !== team ? `
+                                <!-- 🧠 AI BRAIN ICON -->
+                                <span onclick="showAIPrediction('survivor_week_${selectedWeek}_${team}', '${team}', '${opponent}', event); event.stopPropagation();"
+                                      class="w-6 h-6 hover:bg-chamber-shadow transform hover:scale-125 transition-all duration-150 flex items-center justify-center group cursor-pointer rounded chamber-blood"
+                                      title="🧠 AI Prediction: ${team} vs ${opponent}">
+                                    <span class="text-sm group-hover:animate-pulse">🧠</span>
+                                </span>
+                            ` : ''}
+                        </div>
+                    </button>
+                `;
+            });
+
+            availableTeamsGrid.innerHTML = html;
+            teamSelectionCard.classList.remove('hidden');
+
+            // Setup buttons
+            document.getElementById('savePickBtn').onclick = savePick;
+            document.getElementById('cancelEditBtn').onclick = cancelEdit;
+        }
+
+        window.selectTeam = function(team) {
+            // Check if week is locked before allowing team selection
+            if (isWeekLocked(selectedWeek)) {
+                showError(`Week ${selectedWeek} is locked - games have started`);
+                return;
+            }
+            if (usedTeams.has(team)) return;
+
+            // Clear previous selections
+            document.querySelectorAll('.team-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-200', 'border-blue-500');
+            });
+
+            // Highlight selected team
+            event.target.classList.add('bg-blue-200', 'border-blue-500');
+
+            document.getElementById('selectedTeam').value = team;
+
+            // Auto-generate game ID (week * 100 + estimated game number)
+            const gameId = selectedWeek * 100 + 1; // Simplified for now
+            document.getElementById('selectedGameId').value = gameId;
+        };
+
+        async function savePick() {
+            const team = document.getElementById('selectedTeam').value;
+            const gameId = document.getElementById('selectedGameId').value;
+
+            if (!team) {
+                alert('Please select a team first!');
+                return;
+            }
+
+            try {
+                // Update local data
+                if (!userSurvivorData.picks) userSurvivorData.picks = {};
+
+                userSurvivorData.picks[selectedWeek.toString()] = {
+                    team: team,
+                    gameId: gameId || null,
+                    result: 'Pending',
+                    alive: true,
+                    submittedAt: new Date().toISOString()
+                };
+
+                // Save to Firebase
+                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${currentUser.uid}`;
+                const survivorDoc = doc(db, survivorPath);
+                await setDoc(survivorDoc, userSurvivorData);
+
+                // Update UI
+                calculateUsedTeams();
+                cancelEdit();
+                displayUserInterface();
+
+                // Show success message
+                showSuccess(`✅ Pick saved: ${team} for Week ${selectedWeek}`);
+
+            } catch (error) {
+                console.error('Error saving pick:', error);
+                showError(`Failed to save pick: ${error.message}`);
+            }
+        }
+
+        function cancelEdit() {
+            isEditing = false;
+            document.getElementById('teamSelectionCard').classList.add('hidden');
+            document.getElementById('selectedTeam').value = '';
+            document.getElementById('selectedGameId').value = '';
+        }
+
+        function showSuccess(message) {
+            // Simple success notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg z-50';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        function showError(message) {
+            // Simple error notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+        // Make currentUser available globally for ML predictions
+        window.currentUser = currentUser;
+
+    </script>
+
+    <!-- Load Advanced AI Modal System -->
+    <script src="./nerdfootballai-modal.js"></script>
+
+    <!-- 🤖 ML PREDICTION SYSTEM - GLOBAL SCOPE -->
+    <script>
+        // Global ML Prediction Functions for Survivor Pool
+
+        // Team name to abbreviation mapping
+        const teamNameToAbbr = {
+            'Buffalo Bills': 'BUF', 'Miami Dolphins': 'MIA', 'New England Patriots': 'NE', 'New York Jets': 'NYJ',
+            'Baltimore Ravens': 'BAL', 'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Pittsburgh Steelers': 'PIT',
+            'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX', 'Tennessee Titans': 'TEN',
+            'Denver Broncos': 'DEN', 'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+            'Dallas Cowboys': 'DAL', 'New York Giants': 'NYG', 'Philadelphia Eagles': 'PHI', 'Washington Commanders': 'WAS',
+            'Chicago Bears': 'CHI', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB', 'Minnesota Vikings': 'MIN',
+            'Atlanta Falcons': 'ATL', 'Carolina Panthers': 'CAR', 'New Orleans Saints': 'NO', 'Tampa Bay Buccaneers': 'TB',
+            'Arizona Cardinals': 'ARI', 'Los Angeles Rams': 'LAR', 'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA'
+        };
+
+        // NFL Team Database for ML predictions
+        const nflTeamDatabase = {
+            'Buffalo Bills': {
+                offense: 92, defense: 88, recentForm: 85, homeAdvantage: 3.2,
+                survivorRating: 95, riskFactor: 15, upcomingStrength: 85
+            },
+            'Kansas City Chiefs': {
+                offense: 95, defense: 82, recentForm: 95, homeAdvantage: 4.1,
+                survivorRating: 98, riskFactor: 10, upcomingStrength: 88
+            },
+            'San Francisco 49ers': {
+                offense: 88, defense: 92, recentForm: 88, homeAdvantage: 3.8,
+                survivorRating: 90, riskFactor: 18, upcomingStrength: 82
+            },
+            'Philadelphia Eagles': {
+                offense: 90, defense: 85, recentForm: 82, homeAdvantage: 3.5,
+                survivorRating: 87, riskFactor: 22, upcomingStrength: 79
+            },
+            'Dallas Cowboys': {
+                offense: 82, defense: 78, recentForm: 85, homeAdvantage: 3.7,
+                survivorRating: 75, riskFactor: 35, upcomingStrength: 70
+            }
+        };
+
+        // Generate ML Prediction for Survivor Pool
+        function generateSurvivorMLPrediction(team, gameId) {
+            const teamData = nflTeamDatabase[team] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                survivorRating: 70, riskFactor: 40, upcomingStrength: 65
+            };
+
+            // Calculate survivor-specific metrics
+            const survivorScore = (teamData.survivorRating * 0.4) + (teamData.recentForm * 0.3) + ((100 - teamData.riskFactor) * 0.3);
+            const confidence = Math.min(95, Math.max(50, survivorScore));
+
+            const recommendation = survivorScore >= 80 ? 'STRONG PICK' : survivorScore >= 70 ? 'SOLID PICK' : 'RISKY PICK';
+            const riskLevel = teamData.riskFactor <= 20 ? 'LOW' : teamData.riskFactor <= 35 ? 'MEDIUM' : 'HIGH';
+
+            return {
+                team: team,
+                recommendation: recommendation,
+                confidence: Math.round(confidence),
+                survivorRating: teamData.survivorRating,
+                riskFactor: teamData.riskFactor,
+                riskLevel: riskLevel,
+                upcomingStrength: teamData.upcomingStrength,
+                factors: [
+                    `Survivor Rating: ${teamData.survivorRating}/100`,
+                    `Risk Factor: ${teamData.riskFactor}% (${riskLevel})`,
+                    `Recent Form: ${teamData.recentForm}%`,
+                    `Upcoming Schedule Strength: ${teamData.upcomingStrength}/100`
+                ],
+                reasoning: `${recommendation} for survivor pool with ${Math.round(confidence)}% confidence. ${riskLevel.toLowerCase()} risk profile.`
+            };
+        }
+
+        // Open ML Prediction Modal for Survivor - GLOBAL FUNCTION
+        window.openMLPredictionModal = function(gameId, team, gameInfo, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+
+            console.log(`🧠 BRAIN_ICON_DEBUG: Opening survivor ML prediction for ${team}`);
+
+            // Check if Firebase is loaded and user is authenticated
+            if (typeof window.currentUser === 'undefined' || !window.currentUser) {
+                console.log('🧠 BRAIN_ICON_DEBUG: User not authenticated yet, showing basic prediction');
+                // Show basic prediction without user checks
+                showBasicMLPrediction(team, gameId);
+                return;
+            }
+
+            // Check admin status
+            const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+            if (!ADMIN_UIDS.includes(window.currentUser.uid)) {
+                console.log('🧠 BRAIN_ICON_DEBUG: Non-admin user, showing message');
+                alert('AI predictions are currently in beta testing');
+                return;
+            }
+
+            showFullMLPrediction(team, gameId);
+        };
+
+        function showBasicMLPrediction(team, gameId) {
+            const mlPrediction = generateSurvivorMLPrediction(team, gameId);
+            const teamAbbr = teamNameToAbbr[team] || team;
+
+            const modalContent = `
+                <!-- Team Header -->
+                <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-6">
+                    <div class="flex items-center justify-center">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-800">${team}</div>
+                            <div class="text-sm text-purple-600">AI Survivor Analysis</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ML Survivor Prediction -->
+                <div class="bg-gradient-to-r from-purple-50 to-green-50 border border-purple-200 rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-purple-800 mb-4 flex items-center">
+                        <span class="mr-2">🤖</span>ML Survivor Analysis v1.0
+                    </h3>
+
+                    <!-- Recommendation Display -->
+                    <div class="text-center mb-6">
+                        <div class="text-3xl font-bold mb-2 ${
+                            mlPrediction.recommendation === 'STRONG PICK' ? 'text-green-700' :
+                            mlPrediction.recommendation === 'SOLID PICK' ? 'text-blue-700' : 'text-orange-700'
+                        }">
+                            ${mlPrediction.recommendation === 'STRONG PICK' ? '🏆' :
+                              mlPrediction.recommendation === 'SOLID PICK' ? '👍' : '⚠️'} ${mlPrediction.recommendation}
+                        </div>
+                        <div class="text-xl font-semibold text-purple-600">
+                            ${mlPrediction.confidence}% Confidence
+                        </div>
+                    </div>
+
+                    <!-- Key Factors -->
+                    <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
+                        <div class="text-sm font-semibold text-purple-800 mb-3">🎯 Key Factors:</div>
+                        <div class="grid grid-cols-1 gap-2">
+                            ${mlPrediction.factors.map(factor => `
+                                <div class="text-sm text-purple-700 bg-purple-50 px-3 py-2 rounded border">
+                                    ${factor}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- AI Reasoning -->
+                    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <div class="text-sm font-semibold text-slate-800 mb-2">🧠 AI Analysis:</div>
+                        <div class="text-sm text-slate-700 italic">
+                            ${mlPrediction.reasoning}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const modal = document.getElementById('ml-prediction-modal');
+            const modalContent_el = document.getElementById('ml-prediction-content');
+            if (modal && modalContent_el) {
+                modalContent_el.innerHTML = modalContent;
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function showFullMLPrediction(team, gameId) {
+            // This would show the full prediction with user-specific features
+            showBasicMLPrediction(team, gameId);
+        }
+
+        // Close ML Prediction Modal - GLOBAL FUNCTION
+        window.closeMlPredictionModal = function() {
+            const modal = document.getElementById('ml-prediction-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        };
+
+        // Setup modal event listeners when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('ml-prediction-modal');
+            const closeBtn = document.getElementById('close-ml-prediction-btn');
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', window.closeMlPredictionModal);
+            }
+
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        window.closeMlPredictionModal();
+                    }
+                });
+            }
+        });
+
+        console.log('🧠 ML PREDICTION DEBUG: Global ML prediction functions loaded');
+    </script>
+
+    <!-- ML Prediction Modal -->
+    <div id="ml-prediction-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-90vh overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🤖</span>
+                        <div>
+                            <h2 class="text-xl font-bold">NerdFootball Survivor AI</h2>
+                            <p class="text-purple-100 text-sm">Powered by Diamond-Level Survivor Analytics</p>
+                        </div>
+                    </div>
+                    <button id="close-ml-prediction-btn" class="text-white hover:text-gray-200 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 max-h-96 overflow-y-auto" id="ml-prediction-content">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

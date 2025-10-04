@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🏆 FIX WEEK 4 SCORING - ALL 16 GAMES</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; }
+        #output { margin-top: 20px; }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .info { color: #4af; }
+    </style>
+</head>
+<body>
+    <h1>🏆 FIX WEEK 4 SCORING - ALL 16 GAMES</h1>
+
+    <div style="background: #111; padding: 20px; border: 2px solid #0f0; margin: 20px 0;">
+        <h3 class="info">🎯 WHAT THIS DOES:</h3>
+        <p>• Reads all 16 games from <code>/artifacts/nerdfootball/public/data/nerdfootball_games/4</code></p>
+        <p>• Reads user picks from <code>/artifacts/nerdfootball/public/data/nerdfootball_picks/4/submissions/{userId}</code></p>
+        <p>• Calculates detailed scoring with gameResults array</p>
+        <p>• Writes to <code>/artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/{userId}</code></p>
+        <p>• Updates gamesPlayed from 13 to 16</p>
+    </div>
+
+    <button onclick="fixTonyWeek4()" style="background: #0a0; color: #000; font-weight: bold;">🎯 FIX TONY'S WEEK 4 (TEST)</button>
+    <button onclick="fixAllUsersWeek4()" style="background: #fa0; color: #000; font-weight: bold;">👥 FIX ALL USERS WEEK 4</button>
+
+    <div id="output"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc, collection, getDocs, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        async function waitForAuth() {
+            return new Promise((resolve) => {
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    unsubscribe();
+                    resolve(user);
+                });
+            });
+        }
+
+        async function getWeek4Games() {
+            console.log('🎮 LOADING WEEK 4 GAMES FROM nerdfootball_games/4');
+            const gamesRef = doc(db, 'artifacts/nerdfootball/public/data/nerdfootball_games', '4');
+            const gamesSnap = await getDoc(gamesRef);
+
+            if (!gamesSnap.exists()) {
+                throw new Error('Week 4 games document not found!');
+            }
+
+            const gamesData = gamesSnap.data();
+            const games = [];
+
+            Object.entries(gamesData).forEach(([gameId, gameData]) => {
+                if (!gameId.startsWith('_')) {  // Skip metadata
+                    const isFinal = gameData.status && gameData.status.toUpperCase().includes('FINAL');
+                    const gameObj = {
+                        gameId: gameId,
+                        status: gameData.status,
+                        winner: gameData.winner,
+                        homeTeam: gameData.h || gameData.homeTeam,
+                        awayTeam: gameData.a || gameData.awayTeam,
+                        homeScore: gameData.homeScore || 0,
+                        awayScore: gameData.awayScore || 0,
+                        isFinal: isFinal
+                    };
+
+                    if (gameId === '414') {
+                        console.log('🔍 GAME 414 DEBUG:', gameObj);
+                    }
+
+                    games.push(gameObj);
+                }
+            });
+
+            console.log(`✅ LOADED ${games.length} GAMES FROM nerdfootball_games/4`);
+            return games;
+        }
+
+        async function getUserWeek4Picks(userId) {
+            console.log(`🎯 LOADING PICKS FOR ${userId} WEEK 4`);
+            const picksRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/4/submissions/${userId}`);
+            const picksSnap = await getDoc(picksRef);
+
+            if (!picksSnap.exists()) {
+                console.log(`❌ NO PICKS FOUND FOR ${userId}`);
+                return null;
+            }
+
+            const picksData = picksSnap.data();
+            console.log(`✅ LOADED PICKS FOR ${userId}:`, Object.keys(picksData).length, 'keys');
+            return picksData;
+        }
+
+        async function calculateWeek4Score(userId, games, picks) {
+            let totalPoints = 0;
+            let correctPicks = 0;
+            let totalPicks = 0;
+            let gamesPlayed = 0;
+            const gameResults = [];
+
+            console.log(`🧮 CALCULATING WEEK 4 SCORE FOR ${userId}`);
+
+            for (const game of games) {
+                const gameId = game.gameId;
+                const pick = picks[gameId];
+
+                if (!pick || (!pick.team && !pick.winner) || !pick.confidence) {
+                    console.log(`⚠️ No valid pick for game ${gameId}`);
+                    continue;
+                }
+
+                const userPickedTeam = pick.team || pick.winner;
+                const confidence = parseInt(pick.confidence) || 0;
+
+                totalPicks++;
+
+                if (game.isFinal) {
+                    gamesPlayed++;
+
+                    // TIE GAME LOGIC: If winner is null, everyone gets their confidence points
+                    if (!game.winner) {
+                        const pointsEarned = confidence;
+                        correctPicks++;
+                        totalPoints += pointsEarned;
+
+                        gameResults.push({
+                            gameId: gameId,
+                            userPick: userPickedTeam,
+                            actualWinner: 'TIE',
+                            confidencePoints: confidence,
+                            pointsEarned: pointsEarned,
+                            correct: true,
+                            gameCompleted: true,
+                            isTie: true
+                        });
+
+                        console.log(`🤝 Game ${gameId}: TIE GAME - Everyone gets ${pointsEarned} pts`);
+                    } else {
+                        // Normal game with winner
+                        const isCorrect = userPickedTeam === game.winner;
+                        const pointsEarned = isCorrect ? confidence : 0;
+
+                        if (isCorrect) {
+                            correctPicks++;
+                            totalPoints += pointsEarned;
+                        }
+
+                        gameResults.push({
+                            gameId: gameId,
+                            userPick: userPickedTeam,
+                            actualWinner: game.winner,
+                            confidencePoints: confidence,
+                            pointsEarned: pointsEarned,
+                            correct: isCorrect,
+                            gameCompleted: true
+                        });
+
+                        console.log(`🎯 Game ${gameId}: ${userPickedTeam} vs ${game.winner} = ${isCorrect ? 'CORRECT' : 'WRONG'} (${pointsEarned} pts)`);
+                    }
+                } else {
+                    gameResults.push({
+                        gameId: gameId,
+                        userPick: userPickedTeam,
+                        actualWinner: null,
+                        confidencePoints: confidence,
+                        pointsEarned: 0,
+                        correct: false,
+                        gameCompleted: false
+                    });
+                }
+            }
+
+            const accuracy = totalPicks > 0 ? Math.round((correctPicks / totalPicks) * 10000) / 100 : 0;
+
+            return {
+                totalPoints,
+                correctPicks,
+                totalPicks,
+                gamesPlayed,
+                accuracy,
+                gameResults,
+                lastUpdated: new Date().toISOString()
+            };
+        }
+
+        async function saveWeek4Score(userId, weekScore) {
+            console.log(`💾 SAVING WEEK 4 SCORE FOR ${userId}`);
+
+            const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+            const scoringRef = doc(db, scoringPath);
+            const scoringSnap = await getDoc(scoringRef);
+
+            let scoringData = {};
+            if (scoringSnap.exists()) {
+                scoringData = scoringSnap.data();
+            }
+
+            if (!scoringData.weeklyPoints) {
+                scoringData.weeklyPoints = {};
+            }
+
+            scoringData.weeklyPoints['4'] = {
+                totalPoints: weekScore.totalPoints,
+                correctPicks: weekScore.correctPicks,
+                totalPicks: weekScore.totalPicks,
+                gamesPlayed: weekScore.gamesPlayed,
+                accuracy: weekScore.accuracy,
+                gameResults: weekScore.gameResults,
+                lastUpdated: weekScore.lastUpdated,
+                fixApplied: 'Week 4 all 16 games fix',
+                fixTimestamp: new Date().toISOString()
+            };
+
+            await setDoc(scoringRef, scoringData, { merge: true });
+            console.log(`✅ SAVED WEEK 4 SCORE FOR ${userId}: ${weekScore.totalPoints} points (${weekScore.correctPicks}/${weekScore.totalPicks})`);
+        }
+
+        window.fixTonyWeek4 = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2 class="info">🎯 FIXING TONY\'S WEEK 4 SCORING...</h2>';
+
+            try {
+                await waitForAuth();
+                output.innerHTML += '<p class="success">✅ Authenticated</p>';
+
+                const games = await getWeek4Games();
+                output.innerHTML += `<p class="success">✅ Loaded ${games.length} games from nerdfootball_games/4</p>`;
+
+                const finalGames = games.filter(g => g.isFinal).length;
+                output.innerHTML += `<p class="info">📊 ${finalGames} games are FINAL</p>`;
+
+                const picks = await getUserWeek4Picks(TONY_UID);
+                if (!picks) {
+                    output.innerHTML += '<p class="error">❌ Tony has no Week 4 picks!</p>';
+                    return;
+                }
+
+                output.innerHTML += `<p class="success">✅ Loaded Tony's picks</p>`;
+
+                const weekScore = await calculateWeek4Score(TONY_UID, games, picks);
+                output.innerHTML += `<p class="info">🧮 Calculated: ${weekScore.totalPoints} points (${weekScore.correctPicks}/${weekScore.totalPicks} correct, ${weekScore.gamesPlayed} games played)</p>`;
+
+                await saveWeek4Score(TONY_UID, weekScore);
+                output.innerHTML += `<p class="success">✅ TONY'S WEEK 4 FIXED! ${weekScore.gamesPlayed} games played (was 13, now should be 16)</p>`;
+
+            } catch (error) {
+                console.error('❌ ERROR:', error);
+                output.innerHTML += `<p class="error">❌ ERROR: ${error.message}</p>`;
+            }
+        };
+
+        window.fixAllUsersWeek4 = async function() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2 class="info">👥 FIXING ALL USERS\' WEEK 4 SCORING...</h2>';
+
+            try {
+                await waitForAuth();
+                output.innerHTML += '<p class="success">✅ Authenticated</p>';
+
+                const games = await getWeek4Games();
+                output.innerHTML += `<p class="success">✅ Loaded ${games.length} games</p>`;
+
+                const scoringCollectionPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users';
+                const usersSnapshot = await getDocs(collection(db, scoringCollectionPath));
+
+                if (usersSnapshot.empty) {
+                    output.innerHTML += '<p class="error">❌ NO USERS FOUND!</p>';
+                    return;
+                }
+
+                output.innerHTML += `<p class="info">👥 Found ${usersSnapshot.size} users</p>`;
+
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (const userDoc of usersSnapshot.docs) {
+                    const userId = userDoc.id;
+                    const userData = userDoc.data();
+                    const displayName = userData.displayName || userData.email || userId.slice(-6);
+
+                    try {
+                        const picks = await getUserWeek4Picks(userId);
+                        if (!picks) {
+                            output.innerHTML += `<p class="error">❌ ${displayName}: No picks</p>`;
+                            errorCount++;
+                            continue;
+                        }
+
+                        const weekScore = await calculateWeek4Score(userId, games, picks);
+                        await saveWeek4Score(userId, weekScore);
+
+                        output.innerHTML += `<p class="success">✅ ${displayName}: ${weekScore.totalPoints} pts (${weekScore.correctPicks}/${weekScore.totalPicks}), ${weekScore.gamesPlayed} games</p>`;
+                        successCount++;
+
+                    } catch (error) {
+                        console.error(`❌ ERROR fixing ${userId}:`, error);
+                        output.innerHTML += `<p class="error">❌ ${displayName}: ${error.message}</p>`;
+                        errorCount++;
+                    }
+                }
+
+                output.innerHTML += `<hr><h2 class="success">🏆 WEEK 4 FIX COMPLETE!</h2>`;
+                output.innerHTML += `<p><strong>Success:</strong> ${successCount} users | <strong>Errors:</strong> ${errorCount} users</p>`;
+                output.innerHTML += `<p class="info">🎯 All users now show correct gamesPlayed count (16 instead of 13)</p>`;
+
+            } catch (error) {
+                console.error('❌ ERROR:', error);
+                output.innerHTML += `<p class="error">❌ ERROR: ${error.message}</p>`;
+            }
+        };
+    </script>
+</body>
+</html>

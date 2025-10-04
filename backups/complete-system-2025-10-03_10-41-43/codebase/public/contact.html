@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Us - NerdfootballAI v3.0</title>
+
+    <!-- Web App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+
+    <!-- Use the same Firebase initialization as main site -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+
+        // Use exact same config as main site
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac",
+            measurementId: "G-8RVRHE3HRC"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const functions = getFunctions(app);
+
+        // Make available globally for the form
+        window.functions = functions;
+        window.httpsCallable = httpsCallable;
+
+        console.log('Firebase initialized for contact form');
+
+        // Dispatch ready event
+        window.dispatchEvent(new CustomEvent('firebaseReady'));
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Animated background pattern */
+        .bg-pattern {
+            background-image:
+                radial-gradient(circle at 25px 25px, rgba(255,255,255,0.15) 2px, transparent 2px),
+                radial-gradient(circle at 75px 75px, rgba(255,255,255,0.1) 2px, transparent 2px);
+            background-size: 100px 100px;
+            animation: backgroundMove 20s ease-in-out infinite;
+        }
+
+        @keyframes backgroundMove {
+            0%, 100% { background-position: 0 0, 50px 50px; }
+            50% { background-position: 100px 100px, 150px 150px; }
+        }
+
+        /* Success message animations */
+        @keyframes successSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes successPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes checkmarkDraw {
+            0% { stroke-dasharray: 0 50; }
+            100% { stroke-dasharray: 50 0; }
+        }
+
+        @keyframes confettiFloat {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+        }
+
+        .success-overlay {
+            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .success-card {
+            animation: successSlideIn 0.4s ease-out;
+        }
+
+        .success-icon {
+            animation: successPulse 2s ease-in-out infinite;
+        }
+
+        .checkmark {
+            stroke-dasharray: 50;
+            stroke-dashoffset: 50;
+            animation: checkmarkDraw 0.8s ease-out 0.3s forwards;
+        }
+
+        .confetti-piece {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            animation: confettiFloat 3s ease-out infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 bg-pattern">
+    <!-- Navigation Header -->
+    <nav class="bg-white shadow-sm border-b border-slate-200 backdrop-blur-sm bg-white/95">
+        <div class="max-w-4xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <a href="/" class="flex items-center space-x-2 text-slate-600 hover:text-slate-800 transition-colors duration-200 group">
+                        <svg class="w-5 h-5 group-hover:transform group-hover:-translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        <span class="font-semibold">Back to NerdFootball</span>
+                    </a>
+                </div>
+                <h1 class="text-xl font-bold text-slate-800 flex items-center space-x-2">
+                    <span>Contact Us</span>
+                    <span class="text-base">💬</span>
+                </h1>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-2xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <!-- Header with Nerd Character -->
+            <div class="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-8 relative overflow-hidden">
+                <!-- Background Pattern -->
+                <div class="absolute inset-0 opacity-10">
+                    <div class="absolute top-0 left-0 w-20 h-20 bg-white rounded-full opacity-20 transform -translate-x-10 -translate-y-10"></div>
+                    <div class="absolute top-10 right-0 w-32 h-32 bg-white rounded-full opacity-10 transform translate-x-16 -translate-y-16"></div>
+                    <div class="absolute bottom-0 left-1/3 w-16 h-16 bg-white rounded-full opacity-15 transform translate-y-8"></div>
+                </div>
+
+                <!-- Content -->
+                <div class="relative z-10 text-center">
+                    <div class="mb-4">
+                        <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e"
+                             alt="NerdFootball Nerd"
+                             class="w-24 h-24 nerd-image mx-auto mb-4 rounded-full bg-white/10 p-2 backdrop-blur-sm">
+                    </div>
+                    <h2 class="text-3xl hero-title font-bold text-white mb-3">Get in Touch</h2>
+                    <p class="text-slate-200 text-lg">We'd love to hear from you, fellow nerd!</p>
+                    <p class="text-slate-300 text-sm mt-2">Send us a message and we'll respond as soon as possible.</p>
+                </div>
+            </div>
+
+            <!-- Contact Form -->
+            <div class="p-6">
+                <form id="contact-form" class="space-y-6">
+                    <div>
+                        <label for="contact-name" class="block text-sm font-semibold text-slate-700 mb-2">Name *</label>
+                        <input type="text" id="contact-name" name="name" required maxlength="100"
+                            class="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all duration-200 ease-in-out"
+                            placeholder="Your full name">
+                    </div>
+
+                    <div>
+                        <label for="contact-email" class="block text-sm font-semibold text-slate-700 mb-2">Email *</label>
+                        <input type="email" id="contact-email" name="email" required maxlength="254"
+                            class="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all duration-200 ease-in-out"
+                            placeholder="your@email.com">
+                    </div>
+
+                    <div>
+                        <label for="contact-subject" class="block text-sm font-semibold text-slate-700 mb-2">Subject *</label>
+                        <input type="text" id="contact-subject" name="subject" required maxlength="200"
+                            class="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all duration-200 ease-in-out"
+                            placeholder="What is this regarding?">
+                    </div>
+
+                    <div>
+                        <label for="contact-message" class="block text-sm font-semibold text-slate-700 mb-2">Message *</label>
+                        <textarea id="contact-message" name="message" required maxlength="2000" rows="6"
+                            class="w-full px-4 py-3 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all duration-200 ease-in-out resize-none"
+                            placeholder="Tell us how we can help..."></textarea>
+                        <div class="text-right mt-2">
+                            <span id="message-counter" class="text-sm text-gray-500">0/2000</span>
+                        </div>
+                    </div>
+
+                    <div id="contact-form-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-4"></div>
+
+                    <div class="flex space-x-4 pt-2">
+                        <button type="button" id="contact-cancel-btn"
+                            class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-3 px-6 rounded-lg transition-all duration-200 border border-slate-300 focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transform hover:scale-105 active:scale-95">
+                            Cancel
+                        </button>
+                        <button type="submit" id="contact-submit-btn"
+                            class="flex-1 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span id="contact-submit-text">Send Message</span>
+                            <div id="contact-submit-spinner" class="hidden inline-flex items-center">
+                                <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Sending...
+                            </div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Additional Information -->
+        <div class="mt-8 grid md:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow-md p-6 info-card border border-slate-200 hover:shadow-lg transition-all duration-200 hover:transform hover:scale-105">
+                <div class="flex items-center mb-4">
+                    <div class="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center mr-3 shadow-sm">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="font-bold text-slate-800 text-lg">Response Time</h3>
+                </div>
+                <p class="text-slate-600 text-sm leading-relaxed">We typically respond to all messages within <span class="font-semibold text-slate-700">24-48 hours</span>. For urgent matters, please include <span class="bg-slate-100 px-2 py-1 rounded text-slate-800 font-mono text-xs">"URGENT"</span> in your subject line.</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 info-card border border-slate-200 hover:shadow-lg transition-all duration-200 hover:transform hover:scale-105">
+                <div class="flex items-center mb-4">
+                    <div class="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center mr-3 shadow-sm">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="font-bold text-slate-800 text-lg">Technical Support</h3>
+                </div>
+                <p class="text-slate-600 text-sm leading-relaxed">For technical issues, please include your <span class="font-semibold text-slate-700">browser type</span>, <span class="font-semibold text-slate-700">device information</span>, and <span class="font-semibold text-slate-700">steps to reproduce</span> the problem.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Success Message Modal -->
+    <div id="success-overlay" class="hidden fixed inset-0 success-overlay z-50 flex items-center justify-center p-4">
+        <div class="success-card bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden relative">
+            <!-- Confetti Animation Container -->
+            <div class="absolute inset-0 pointer-events-none overflow-hidden">
+                <div class="confetti-piece bg-green-400 rounded-full" style="left: 20%; animation-delay: 0.1s;"></div>
+                <div class="confetti-piece bg-blue-400 rounded-full" style="left: 40%; animation-delay: 0.3s;"></div>
+                <div class="confetti-piece bg-yellow-400 rounded-full" style="left: 60%; animation-delay: 0.5s;"></div>
+                <div class="confetti-piece bg-red-400 rounded-full" style="left: 80%; animation-delay: 0.7s;"></div>
+                <div class="confetti-piece bg-purple-400 rounded-full" style="left: 30%; animation-delay: 0.9s;"></div>
+                <div class="confetti-piece bg-pink-400 rounded-full" style="left: 70%; animation-delay: 1.1s;"></div>
+            </div>
+
+            <!-- Success Header -->
+            <div class="bg-gradient-to-r from-green-500 to-green-600 p-6 text-center relative">
+                <div class="success-icon inline-flex items-center justify-center w-16 h-16 bg-white rounded-full mb-4 shadow-lg">
+                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path class="checkmark" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-white mb-2">Message Sent Successfully! 🎉</h3>
+                <p class="text-green-100 text-sm">Your message has been delivered to our team</p>
+            </div>
+
+            <!-- Success Body -->
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <div class="flex items-center justify-center mb-4">
+                        <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e"
+                             alt="NerdFootball Nerd"
+                             class="w-16 h-16 rounded-full border-4 border-green-200 shadow-md">
+                    </div>
+                    <p class="text-slate-700 mb-4">
+                        Thanks for reaching out! We'll get back to you as soon as possible.
+                    </p>
+                </div>
+
+                <!-- Confirmation Details -->
+                <div class="bg-slate-50 rounded-lg p-4 mb-6 border border-slate-200">
+                    <div class="grid grid-cols-1 gap-3 text-sm">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-slate-600">Confirmation ID:</span>
+                            <span id="success-confirmation-id" class="font-mono text-slate-800 bg-white px-2 py-1 rounded border">---</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-slate-600">Submitted:</span>
+                            <span id="success-timestamp" class="text-slate-800">---</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-slate-600">Response Time:</span>
+                            <span id="success-response-time" class="text-green-600 font-medium">---</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Auto-redirect Notice -->
+                <div class="text-center">
+                    <div class="inline-flex items-center bg-blue-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-200">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="text-sm">
+                            Redirecting to homepage in <span id="success-countdown" class="font-bold">3</span> seconds
+                        </span>
+                    </div>
+                    <div class="mt-4">
+                        <button id="success-close-btn" class="text-slate-600 hover:text-slate-800 text-sm underline transition-colors duration-200">
+                            Return to homepage now
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Form JavaScript -->
+    <script>
+        class ContactFormPage {
+            constructor() {
+                this.isSubmitting = false;
+                this.formElement = document.getElementById('contact-form');
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.waitForFirebase();
+            }
+
+            waitForFirebase() {
+                if (window.functions && window.httpsCallable) {
+                    console.log('Firebase ready for contact form');
+                    return;
+                }
+                setTimeout(() => this.waitForFirebase(), 100);
+            }
+
+            setupEventListeners() {
+                const messageTextarea = document.getElementById('contact-message');
+                const messageCounter = document.getElementById('message-counter');
+                const cancelBtn = document.getElementById('contact-cancel-btn');
+
+                if (messageTextarea && messageCounter) {
+                    messageTextarea.addEventListener('input', () => {
+                        const length = messageTextarea.value.length;
+                        messageCounter.textContent = `${length}/2000`;
+                        messageCounter.className = length > 1900 ? 'text-sm text-red-500' : 'text-sm text-gray-500';
+                    });
+                }
+
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', () => {
+                        window.location.href = '/';
+                    });
+                }
+
+                if (this.formElement) {
+                    this.formElement.addEventListener('submit', (e) => this.handleSubmit(e));
+                }
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        const successOverlay = document.getElementById('success-overlay');
+                        if (successOverlay && !successOverlay.classList.contains('hidden')) {
+                            this.redirectToHome();
+                        } else {
+                            window.location.href = '/';
+                        }
+                    }
+                });
+
+                // Success modal close button
+                const successCloseBtn = document.getElementById('success-close-btn');
+                if (successCloseBtn) {
+                    successCloseBtn.addEventListener('click', () => {
+                        this.redirectToHome();
+                    });
+                }
+
+                // Success modal overlay click to close
+                const successOverlay = document.getElementById('success-overlay');
+                if (successOverlay) {
+                    successOverlay.addEventListener('click', (e) => {
+                        if (e.target === successOverlay) {
+                            this.redirectToHome();
+                        }
+                    });
+                }
+            }
+
+            resetForm() {
+                if (this.formElement) {
+                    this.formElement.reset();
+                    this.hideError();
+                    this.setSubmittingState(false);
+                    const messageCounter = document.getElementById('message-counter');
+                    if (messageCounter) {
+                        messageCounter.textContent = '0/2000';
+                        messageCounter.className = 'text-sm text-gray-500';
+                    }
+                }
+            }
+
+            showError(message) {
+                const errorElement = document.getElementById('contact-form-error');
+                if (errorElement) {
+                    errorElement.textContent = message;
+                    errorElement.classList.remove('hidden');
+                    errorElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+
+            hideError() {
+                const errorElement = document.getElementById('contact-form-error');
+                if (errorElement) {
+                    errorElement.classList.add('hidden');
+                }
+            }
+
+            setSubmittingState(isSubmitting) {
+                this.isSubmitting = isSubmitting;
+                const submitBtn = document.getElementById('contact-submit-btn');
+                const submitText = document.getElementById('contact-submit-text');
+                const submitSpinner = document.getElementById('contact-submit-spinner');
+
+                if (submitBtn) {
+                    submitBtn.disabled = isSubmitting;
+                }
+
+                if (submitText) {
+                    submitText.classList.toggle('hidden', isSubmitting);
+                }
+
+                if (submitSpinner) {
+                    submitSpinner.classList.toggle('hidden', !isSubmitting);
+                }
+            }
+
+            validateForm(formData) {
+                const name = formData.get('name')?.trim();
+                const email = formData.get('email')?.trim();
+                const subject = formData.get('subject')?.trim();
+                const message = formData.get('message')?.trim();
+
+                if (!name || !email || !subject || !message) {
+                    throw new Error('All fields are required');
+                }
+
+                if (name.length > 100) {
+                    throw new Error('Name must be 100 characters or less');
+                }
+
+                if (email.length > 254) {
+                    throw new Error('Email must be 254 characters or less');
+                }
+
+                if (subject.length > 200) {
+                    throw new Error('Subject must be 200 characters or less');
+                }
+
+                if (message.length > 2000) {
+                    throw new Error('Message must be 2000 characters or less');
+                }
+
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    throw new Error('Please enter a valid email address');
+                }
+
+                return { name, email, subject, message };
+            }
+
+            async handleSubmit(event) {
+                event.preventDefault();
+
+                if (this.isSubmitting) {
+                    return;
+                }
+
+                const startTime = performance.now();
+
+                try {
+                    this.setSubmittingState(true);
+                    this.hideError();
+
+                    const formData = new FormData(this.formElement);
+                    const validatedData = this.validateForm(formData);
+
+                    if (!window.functions || !window.httpsCallable) {
+                        throw new Error('Firebase Functions not available. Please refresh the page and try again.');
+                    }
+
+                    const submitContactForm = window.httpsCallable(window.functions, 'submitContactForm');
+
+                    const submissionData = {
+                        ...validatedData,
+                        userAgent: navigator.userAgent,
+                        timestamp: Date.now()
+                    };
+
+                    const result = await submitContactForm(submissionData);
+
+                    const endTime = performance.now();
+                    const responseTime = endTime - startTime;
+
+                    if (result.data.success) {
+                        this.showSuccessMessage(result.data.message, responseTime, result.data);
+                        this.resetForm();
+                    } else {
+                        throw new Error(result.data.message || 'Failed to send message');
+                    }
+
+                } catch (error) {
+                    console.error('Contact form submission error:', error);
+
+                    let errorMessage = 'An error occurred while sending your message. Please try again.';
+
+                    if (error.message.includes('unauthenticated')) {
+                        errorMessage = 'Please sign in to send a message.';
+                    } else if (error.message.includes('invalid-argument')) {
+                        errorMessage = error.message;
+                    } else if (error.message.includes('resource-exhausted')) {
+                        errorMessage = 'You have reached the daily limit for contact form submissions. Please wait 24 hours.';
+                    } else if (error.message) {
+                        errorMessage = error.message;
+                    }
+
+                    this.showError(errorMessage);
+                } finally {
+                    this.setSubmittingState(false);
+                }
+            }
+
+            showSuccessMessage(message, responseTime = null, result = null) {
+                // Generate confirmation details
+                const confirmationId = this.generateConfirmationId();
+                const timestamp = new Date().toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                const responseTimeDisplay = responseTime ? `${Math.round(responseTime)}ms` : 'N/A';
+
+                // Update success message content
+                this.updateSuccessContent(confirmationId, timestamp, responseTimeDisplay);
+
+                // Show success modal
+                this.showSuccessModal();
+
+                // Start countdown
+                this.startSuccessCountdown();
+
+                if (responseTime && responseTime < 500) {
+                    console.log(`Contact form submitted in ${Math.round(responseTime)}ms - Diamond Level performance maintained`);
+                }
+            }
+
+            generateConfirmationId() {
+                const timestamp = Date.now().toString(36);
+                const random = Math.random().toString(36).substring(2, 8);
+                return `NF-${timestamp}-${random}`.toUpperCase();
+            }
+
+            updateSuccessContent(confirmationId, timestamp, responseTime) {
+                const confirmationElement = document.getElementById('success-confirmation-id');
+                const timestampElement = document.getElementById('success-timestamp');
+                const responseTimeElement = document.getElementById('success-response-time');
+
+                if (confirmationElement) {
+                    confirmationElement.textContent = confirmationId;
+                }
+                if (timestampElement) {
+                    timestampElement.textContent = timestamp;
+                }
+                if (responseTimeElement) {
+                    responseTimeElement.textContent = responseTime;
+                }
+            }
+
+            showSuccessModal() {
+                const successOverlay = document.getElementById('success-overlay');
+                if (successOverlay) {
+                    successOverlay.classList.remove('hidden');
+
+                    // Add body scroll lock
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+
+            hideSuccessModal() {
+                const successOverlay = document.getElementById('success-overlay');
+                if (successOverlay) {
+                    successOverlay.classList.add('hidden');
+
+                    // Remove body scroll lock
+                    document.body.style.overflow = '';
+                }
+            }
+
+            startSuccessCountdown() {
+                let countdown = 3;
+                const countdownElement = document.getElementById('success-countdown');
+
+                const updateCountdown = () => {
+                    if (countdownElement) {
+                        countdownElement.textContent = countdown;
+                    }
+
+                    if (countdown <= 0) {
+                        this.redirectToHome();
+                        return;
+                    }
+
+                    countdown--;
+                    setTimeout(updateCountdown, 1000);
+                };
+
+                updateCountdown();
+            }
+
+            redirectToHome() {
+                this.hideSuccessModal();
+                window.location.href = '/';
+            }
+        }
+
+        // Wait for both DOM and Firebase to be ready
+        let domReady = false;
+        let firebaseReady = false;
+
+        function initializeForm() {
+            if (domReady && firebaseReady) {
+                console.log('Firebase ready for contact form');
+                window.contactFormPage = new ContactFormPage();
+            }
+        }
+
+        // Check DOM ready state
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                domReady = true;
+                initializeForm();
+            });
+        } else {
+            domReady = true;
+            initializeForm();
+        }
+
+        // Listen for Firebase ready event
+        window.addEventListener('firebaseReady', () => {
+            firebaseReady = true;
+            initializeForm();
+        });
+    </script>
+</body>
+</html>
