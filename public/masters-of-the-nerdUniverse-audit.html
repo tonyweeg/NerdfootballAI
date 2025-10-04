@@ -1114,7 +1114,72 @@
                 const survivorData = result.data;
                 const survivorList = [];
 
+                // Always use current week
+                const currentWeek = getCurrentWeekNumber();
+                console.log(`🏈 Loading current week (${currentWeek}) survivor picks for alive players...`);
+
+                // Check if current week has started by loading bible data
+                const bibleData = await loadBibleData(currentWeek);
+                let weekHasStarted = false;
+
+                if (bibleData) {
+                    const games = Object.values(bibleData).filter(g => g && typeof g === 'object');
+                    weekHasStarted = games.some(game => game.status === 'in_progress' || game.status === 'final' || game.status === 'FINAL' || game.started === true);
+                    console.log(`🏈 Current week ${currentWeek} has ${weekHasStarted ? 'STARTED ✅' : 'NOT STARTED 🔒'}`);
+                } else {
+                    console.warn(`⚠️ No bible data for Week ${currentWeek}`);
+                }
+
+                const currentWeekPicks = {};
+
+                // Only load picks if week has started
+                console.log(`🎯 weekHasStarted = ${weekHasStarted}, currentWeek = ${currentWeek}`);
+                if (weekHasStarted) {
+                    console.log(`🎯 Loading currentWeek picks for alive survivors...`);
+
+                    // Load picks for each alive survivor
+                    const pickLoadPromises = survivorData.alive.map(async (survivor) => {
+                        const userId = survivor.userId || survivor.uid || survivor.id;
+                        if (!userId) return;
+
+                        try {
+                            const userPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
+                            console.log(`  🔍 Loading picks for ${survivor.displayName || survivor.name} from: ${userPicksPath}`);
+                            const userPicksRef = db.doc(userPicksPath);
+                            const userPicksSnap = await userPicksRef.get();
+
+                            if (userPicksSnap.exists) {
+                                const userData = userPicksSnap.data();
+
+                                // Debug: show picks structure
+                                console.log(`  📋 ${survivor.displayName || survivor.name} picks object:`, userData.picks);
+
+                                // Picks are stored under userData.picks object, field is "team"
+                                const weekKey = currentWeek.toString();
+                                if (userData.picks && userData.picks[weekKey] && userData.picks[weekKey].team) {
+                                    currentWeekPicks[userId] = userData.picks[weekKey].team;
+                                    console.log(`  ✅ ${survivor.displayName || survivor.name}: Week ${currentWeek} pick = ${userData.picks[weekKey].team}`);
+                                } else {
+                                    console.log(`  ⚠️ ${survivor.displayName || survivor.name}: No pick found`);
+                                }
+                            } else {
+                                console.log(`  ⚠️ ${survivor.displayName || survivor.name}: No survivor picks document found`);
+                            }
+                        } catch (error) {
+                            console.warn(`  ❌ Error loading picks for ${userId}:`, error);
+                        }
+                    });
+
+                    await Promise.all(pickLoadPromises);
+                    console.log(`✅ Loaded ${Object.keys(currentWeekPicks).length} current week survivor picks`);
+                } else {
+                    console.log(`🔒 Week ${currentWeek} hasn't started - not showing picks yet`);
+                }
+
                 // Process alive survivors
+                console.log(`🔍 Processing ${survivorData.alive.length} alive survivors...`);
+                console.log(`🔍 First alive survivor object:`, survivorData.alive[0]);
+                console.log(`🔍 currentWeekPicks object:`, currentWeekPicks);
                 survivorData.alive.forEach(survivor => {
                     const allWinningPicks = survivor.allWinningPicks || [];
                     let lastPickDisplay = '🚫 No Picks';
@@ -1124,10 +1189,21 @@
                         lastPickDisplay = `Week ${lastPick.week}: ${lastPick.team}`;
                     }
 
+                    // Add current week pick if available and week has started
+                    let weekPickDisplay = '';
+                    const userId = survivor.userId || survivor.uid || survivor.id;
+
+                    if (weekHasStarted && userId && currentWeekPicks[userId]) {
+                        weekPickDisplay = ` • Current Week Pick: ${currentWeekPicks[userId]}`;
+                        console.log(`  ✅ ${survivor.displayName || survivor.name}: Showing current week pick: ${currentWeekPicks[userId]}`);
+                    } else if (weekHasStarted) {
+                        console.log(`  ⚠️ ${survivor.displayName || survivor.name} (userId: ${userId}): No pick found in currentWeekPicks`);
+                    }
+
                     survivorList.push({
                         name: survivor.displayName || survivor.name || 'Unknown',
                         status: 'alive',
-                        details: `Still alive • Last pick: ${lastPickDisplay}`,
+                        details: `Still alive • Last pick: ${lastPickDisplay}${weekPickDisplay}`,
                         icon: '✅'
                     });
                 });
