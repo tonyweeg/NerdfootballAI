@@ -206,7 +206,7 @@
                 }
 
                 const bibleData = gamesSnap.data();
-                console.log(`✅ Loaded Week ${currentWeek} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
+                console.log(`✅ Loaded Week ${currentWeek} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata' && k !== '000').length, 'games');
 
                 // Debug bible data structure
                 console.log('🔍 Bible data keys:', Object.keys(bibleData));
@@ -567,10 +567,10 @@
 
         function analyzePicks(picks, bibleData) {
             const issues = [];
-            const gameIds = Object.keys(picks).filter(key => !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints', 'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated', 'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key));
+            const gameIds = Object.keys(picks).filter(key => !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints', 'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated', 'poolId', 'survivorPick', 'createdAt', 'week', 'games', 'totalValidPicks', 'lastScored', 'correctPicks'].includes(key));
 
             // All weeks now use consistent Firestore structure
-            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata') : [];
+            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata' && k !== '000') : [];
             const expectedGameCount = expectedGameIds.length;
 
             // Check for expected game IDs
@@ -685,7 +685,7 @@
 
         function generatePicksGrid(picks, analysis, bibleData) {
             // Use expected game IDs from bible data, or fallback to current week calculation
-            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata').sort() :
+            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata' && k !== '000').sort() :
                                    Array.from({length: 16}, (_, i) => (currentWeek * 100 + 1 + i).toString());
 
             return expectedGameIds.map(gameId => {
@@ -792,7 +792,7 @@
 
                 // Step 4: Load Week 3 bible data for home teams
                 const bibleData = await loadBibleData();
-                const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata').sort();
+                const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata' && k !== '000').sort();
 
                 if (gameIds.length !== 16) {
                     throw new Error(`Expected 16 games, found ${gameIds.length}`);

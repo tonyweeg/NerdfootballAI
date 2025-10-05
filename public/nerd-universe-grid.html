@@ -547,7 +547,7 @@
                 <button id="week-prev" class="nav-button">◄ PREV</button>
                 <div class="nav-button" id="week-display">WEEK 4 • 2025</div>
                 <button id="week-next" class="nav-button">NEXT ►</button>
-                <button id="refresh-grid" class="nav-button bg-nerd-purple hover:bg-opacity-80" title="Force refresh - bypass cache">🔄 REFRESH</button>
+                <button id="refresh-grid" onclick="location.reload()" class="nav-button bg-red-600 hover:bg-red-700" title="Reload page with fresh data">🔄 REFRESH</button>
             </div>
             <div class="text-right">
                 <div class="text-lg text-nerd-grey font-bold" id="last-updated">LOADING...</div>
@@ -717,31 +717,13 @@
 
                 await loadPoolMembers();
 
-                // 🔥 CACHE-FIRST LOADING - STRAIGHT CACHE GRIDDY
-                console.log('🎯 GRID_CACHE: Starting cache-first loading for week', currentWeek);
+                // ALWAYS LOAD FRESH DATA - NO CACHE
+                console.log('🔥 Loading fresh grid data from Firestore (cache disabled)');
+                await loadBibleData();
+                await loadAllPicks();
 
-                // Check for force refresh flag
-                const forceRefresh = sessionStorage.getItem('forceGridRefresh') === 'true';
-                if (forceRefresh) {
-                    console.log('🔄 FORCE REFRESH: Bypassing cache and loading fresh data');
-                    sessionStorage.removeItem('forceGridRefresh');
-                }
-
-                const cacheLoaded = forceRefresh ? false : await loadFirebaseCachedGrid();
-
-                if (!cacheLoaded) {
-                    console.log('🔥 GRID_CACHE: Cache miss - generating fresh grid data');
-                    await loadBibleData();
-                    await loadAllPicks();
-
-                    renderGrid();
-                    updateStats();
-
-                    // Save fresh data to cache for next visitor
-                    await saveFirebaseCachedGrid();
-                } else {
-                    console.log('⚡ GRID_CACHE: Cache hit - instant grid load!');
-                }
+                renderGrid();
+                updateStats();
 
                 document.getElementById('week-display').textContent = `WEEK ${currentWeek} • 2025`;
                 setupWeekNavigation();
@@ -756,20 +738,50 @@
         function setupWeekNavigation() {
             const prevButton = document.getElementById('week-prev');
             const nextButton = document.getElementById('week-next');
-            const refreshButton = document.getElementById('refresh-grid');
 
-            prevButton.addEventListener('click', () => changeWeek(currentWeek - 1));
-            nextButton.addEventListener('click', () => changeWeek(currentWeek + 1));
-            refreshButton.addEventListener('click', forceRefreshGrid);
+            if (prevButton) {
+                prevButton.addEventListener('click', () => changeWeek(currentWeek - 1));
+            }
+            if (nextButton) {
+                nextButton.addEventListener('click', () => changeWeek(currentWeek + 1));
+            }
 
             updateWeekButtons();
         }
 
-        // Force refresh grid - bypass cache
-        async function forceRefreshGrid() {
-            console.log('🔄 FORCE_REFRESH: User requested fresh data');
-            sessionStorage.setItem('forceGridRefresh', 'true');
-            location.reload();
+        // Force refresh grid - delete cache and reload data
+        window.forceRefreshGrid = async function() {
+            console.log('🔄 FORCE_REFRESH: User clicked refresh button');
+
+            try {
+                // Delete the cache for current week
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                console.log('🗑️ FORCE_REFRESH: Deleting cache at', cachePath);
+                await deleteDoc(doc(db, cachePath));
+                console.log('✅ FORCE_REFRESH: Cache deleted');
+
+                // Show loading state
+                document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="text-center p-4 text-nerd-grey">🔄 REFRESHING DATA...</td></tr>';
+
+                // Reload fresh data (bypass cache)
+                console.log('🔥 FORCE_REFRESH: Loading fresh data from Firestore');
+                await loadBibleData();
+                await loadAllPicks();
+
+                // Render fresh data
+                renderGrid();
+                updateStats();
+
+                // Save new cache
+                await saveFirebaseCachedGrid();
+
+                console.log('✅ FORCE_REFRESH: Complete! Fresh data loaded and cached');
+                alert('✅ Grid refreshed with latest data!');
+
+            } catch (error) {
+                console.error('❌ FORCE_REFRESH: Error:', error);
+                alert('❌ Refresh failed: ' + error.message);
+            }
         }
 
         // Change to a different week
@@ -784,22 +796,12 @@
             document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="text-center p-4 text-nerd-grey">LOADING WEEK ' + currentWeek + '...</td></tr>';
 
             try {
-                // 🔥 CACHE-FIRST LOADING FOR WEEK CHANGE - STRAIGHT CACHE GRIDDY
-                console.log('🎯 GRID_CACHE: Week change to', currentWeek, '- checking cache');
-                const cacheLoaded = await loadFirebaseCachedGrid();
-
-                if (!cacheLoaded) {
-                    console.log('🔥 GRID_CACHE: Cache miss for week', currentWeek, '- generating fresh data');
-                    await loadBibleData();
-                    await loadAllPicks();
-                    renderGrid();
-                    updateStats();
-
-                    // Save fresh data to cache
-                    await saveFirebaseCachedGrid();
-                } else {
-                    console.log('⚡ GRID_CACHE: Cache hit for week', currentWeek, '- instant load!');
-                }
+                // ALWAYS LOAD FRESH DATA - NO CACHE
+                console.log('🔥 Loading fresh data for week', currentWeek);
+                await loadBibleData();
+                await loadAllPicks();
+                renderGrid();
+                updateStats();
 
                 updateWeekButtons();
             } catch (error) {
@@ -882,7 +884,7 @@
 
 
                 gameIds = Object.keys(bibleData)
-                    .filter(k => !k.startsWith('_') && !k.includes('401772'))
+                    .filter(k => !k.startsWith('_') && k !== '000')
                     .filter(k => {
                         const gameNum = parseInt(k);
                         const weekStart = currentWeek * 100 + 1;
@@ -913,10 +915,16 @@
                 try {
                     const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`;
                     const userPicksDoc = await getDoc(doc(db, picksPath));
+
+                    const memberName = poolMembers[memberId]?.name || poolMembers[memberId]?.displayName || poolMembers[memberId]?.email || 'Unknown';
+
                     if (userPicksDoc.exists()) {
                         allPicks[memberId] = userPicksDoc.data();
+                        const gameCount = Object.keys(allPicks[memberId]).filter(k => k.match(/^\d+$/)).length;
+                        console.log(`✅ ${memberName}: ${gameCount} picks loaded`);
                     } else {
                         allPicks[memberId] = null;
+                        console.log(`❌ ${memberName}: NO PICKS FOUND at ${picksPath}`);
                     }
                 } catch (error) {
                     console.error(`❌ Error loading picks for ${memberId}:`, error);
@@ -926,6 +934,17 @@
 
             await Promise.all(pickPromises);
             console.log('✅ Picks loaded for', Object.keys(allPicks).length, 'users');
+
+            // DEBUG: Check Andrea's picks specifically
+            const andreaId = 'bEVzcZtSExT8cIjamWnGbWZ3J5s1';
+            if (allPicks[andreaId]) {
+                const andreaPicks = allPicks[andreaId];
+                const andreaGamePicks = Object.keys(andreaPicks).filter(k => k.match(/^\d+$/));
+                console.log('🔍 ANDREA DEBUG: Has', andreaGamePicks.length, 'game picks in allPicks');
+                console.log('🔍 ANDREA DEBUG: Game 501 pick:', andreaPicks['501']);
+            } else {
+                console.log('❌ ANDREA DEBUG: NOT FOUND in allPicks object!');
+            }
         }
 
         // 🔥 FIREBASE CACHE SYSTEM - STRAIGHT CACHE GRIDDY
@@ -1034,6 +1053,17 @@
             const tbody = document.getElementById('table-body');
             const memberIds = Object.keys(poolMembers);
             const currentUserId = auth.currentUser?.uid;
+
+            // DEBUG: Check for duplicate Andreas
+            const andreaMembers = memberIds.filter(id => {
+                const name = (poolMembers[id].name || poolMembers[id].displayName || '').toLowerCase();
+                return name.includes('andrea') || name.includes('nerdmamma');
+            });
+            console.log('🔍 RENDERING DEBUG: Andrea-related members in poolMembers:', andreaMembers.map(id => ({
+                id,
+                name: poolMembers[id].name || poolMembers[id].displayName,
+                hasPicks: allPicks[id] ? Object.keys(allPicks[id]).filter(k => k.match(/^\d+$/)).length : 0
+            })));
 
             const sortedMemberIds = memberIds.sort((a, b) => {
                 if (sortByScore) {
