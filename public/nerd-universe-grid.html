@@ -547,6 +547,7 @@
                 <button id="week-prev" class="nav-button">◄ PREV</button>
                 <div class="nav-button" id="week-display">WEEK 4 • 2025</div>
                 <button id="week-next" class="nav-button">NEXT ►</button>
+                <button id="refresh-grid" class="nav-button bg-nerd-purple hover:bg-opacity-80" title="Force refresh - bypass cache">🔄 REFRESH</button>
             </div>
             <div class="text-right">
                 <div class="text-lg text-nerd-grey font-bold" id="last-updated">LOADING...</div>
@@ -718,7 +719,15 @@
 
                 // 🔥 CACHE-FIRST LOADING - STRAIGHT CACHE GRIDDY
                 console.log('🎯 GRID_CACHE: Starting cache-first loading for week', currentWeek);
-                const cacheLoaded = await loadFirebaseCachedGrid();
+
+                // Check for force refresh flag
+                const forceRefresh = sessionStorage.getItem('forceGridRefresh') === 'true';
+                if (forceRefresh) {
+                    console.log('🔄 FORCE REFRESH: Bypassing cache and loading fresh data');
+                    sessionStorage.removeItem('forceGridRefresh');
+                }
+
+                const cacheLoaded = forceRefresh ? false : await loadFirebaseCachedGrid();
 
                 if (!cacheLoaded) {
                     console.log('🔥 GRID_CACHE: Cache miss - generating fresh grid data');
@@ -747,11 +756,20 @@
         function setupWeekNavigation() {
             const prevButton = document.getElementById('week-prev');
             const nextButton = document.getElementById('week-next');
+            const refreshButton = document.getElementById('refresh-grid');
 
             prevButton.addEventListener('click', () => changeWeek(currentWeek - 1));
             nextButton.addEventListener('click', () => changeWeek(currentWeek + 1));
+            refreshButton.addEventListener('click', forceRefreshGrid);
 
             updateWeekButtons();
+        }
+
+        // Force refresh grid - bypass cache
+        async function forceRefreshGrid() {
+            console.log('🔄 FORCE_REFRESH: User requested fresh data');
+            sessionStorage.setItem('forceGridRefresh', 'true');
+            location.reload();
         }
 
         // Change to a different week
