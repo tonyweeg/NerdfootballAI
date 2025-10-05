@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏈 DIAMOND Modal Test - Live Game Stats & AI Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ocean': {
+                            50: '#f0f9ff',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b border-slate-200">
+        <div class="max-w-4xl mx-auto px-4 py-6">
+            <h1 class="text-3xl font-bold text-slate-800">🏈 Live Game Modal Test</h1>
+            <p class="text-slate-600 mt-2">Demo of the enhanced game modal with AI analysis and win predictions</p>
+        </div>
+    </div>
+
+    <!-- Game Cards -->
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <div class="grid gap-6 md:grid-cols-2">
+            <!-- Sample Game 1 -->
+            <div class="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                 onclick="openLiveGameModal('401772725', 'JAX', 'CIN')">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-sm font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">FINAL</span>
+                        <span class="text-xs text-slate-500">ESPN ID: 401772725</span>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-lg font-semibold text-slate-700 mb-2">Week 2 • Monday</div>
+                        <div class="flex justify-between items-center">
+                            <div class="text-center">
+                                <div class="text-sm text-slate-600">JAX</div>
+                                <div class="text-2xl font-bold text-slate-800">27</div>
+                            </div>
+                            <div class="text-slate-400 mx-4">@</div>
+                            <div class="text-center">
+                                <div class="text-sm text-slate-600">CIN</div>
+                                <div class="text-2xl font-bold text-slate-800">31</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                            Click for AI Analysis & Stats →
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sample Game 2 -->
+            <div class="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                 onclick="openLiveGameModal('401772919', 'ATL', 'MIN')">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-sm font-semibold text-red-600 bg-red-50 px-2 py-1 rounded">LIVE</span>
+                        <span class="text-xs text-slate-500">ESPN ID: 401772919</span>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-lg font-semibold text-slate-700 mb-2">Week 2 • Sunday</div>
+                        <div class="flex justify-between items-center">
+                            <div class="text-center">
+                                <div class="text-sm text-slate-600">ATL</div>
+                                <div class="text-2xl font-bold text-slate-800">14</div>
+                            </div>
+                            <div class="text-slate-400 mx-4">@</div>
+                            <div class="text-center">
+                                <div class="text-sm text-slate-600">MIN</div>
+                                <div class="text-2xl font-bold text-slate-800">21</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                            Click for Live Analysis & Predictions →
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-blue-800 mb-3">🎯 Modal Features Demo</h3>
+            <ul class="text-blue-700 space-y-2 text-sm">
+                <li>• <strong>User Pick Display:</strong> Shows your team pick and confidence value</li>
+                <li>• <strong>AI Statistical Analysis:</strong> Detailed breakdown of offensive efficiency, red zone performance, turnover differential</li>
+                <li>• <strong>Win Prediction:</strong> AI-calculated win probability with confidence percentage</li>
+                <li>• <strong>Real-time Stats:</strong> Live game data from ESPN API</li>
+                <li>• <strong>Team Colors:</strong> Dynamic styling based on actual NFL team colors</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Live Game Modal -->
+    <div id="live-game-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-6 border-b border-slate-200">
+                <h2 class="text-2xl font-bold text-slate-800">🏈 Live Game Analysis</h2>
+                <button onclick="closeLiveGameModal()" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="modal-loading" class="flex items-center justify-center p-12">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p class="text-slate-600 mt-4">Loading game data...</p>
+                </div>
+            </div>
+
+            <!-- Modal Content -->
+            <div id="modal-game-content" class="hidden">
+                <div id="game-data-display" class="p-6">
+                    <!-- Game data will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock game data that matches your JSON structure
+        const SAMPLE_GAME_DATA = {
+            "401772725": {
+                "id": "401772725",
+                "espnId": "401772725",
+                "status": "STATUS_FINAL",
+                "statusDisplay": "Final",
+                "teams": {
+                    "home": {
+                        "name": "Cincinnati Bengals",
+                        "abbreviation": "CIN",
+                        "logo": null,
+                        "color": "fb4f14",
+                        "score": 31,
+                        "record": "0-0"
+                    },
+                    "away": {
+                        "name": "Jacksonville Jaguars",
+                        "abbreviation": "JAX",
+                        "logo": null,
+                        "color": "007487",
+                        "score": 27,
+                        "record": "0-0"
+                    }
+                },
+                "teamStats": {
+                    "home": {
+                        "1st_downs": "24",
+                        "passing_1st_downs": "17",
+                        "rushing_1st_downs": "5",
+                        "total_plays": "65",
+                        "total_yards": "350",
+                        "yards_per_play": "5.4",
+                        "passing": "302",
+                        "comp/att": "28/45",
+                        "yards_per_pass": "6.3",
+                        "interceptions_thrown": "3",
+                        "rushing": "48",
+                        "rushing_attempts": "17",
+                        "yards_per_rush": "2.8",
+                        "red_zone_(made-att)": "3-4",
+                        "penalties": "3-29",
+                        "turnovers": "3",
+                        "possession": "26:49"
+                    },
+                    "away": {
+                        "1st_downs": "21",
+                        "passing_1st_downs": "15",
+                        "rushing_1st_downs": "5",
+                        "total_plays": "70",
+                        "total_yards": "400",
+                        "yards_per_play": "5.7",
+                        "passing": "261",
+                        "comp/att": "24/42",
+                        "yards_per_pass": "6.1",
+                        "interceptions_thrown": "2",
+                        "rushing": "139",
+                        "rushing_attempts": "27",
+                        "yards_per_rush": "5.1",
+                        "red_zone_(made-att)": "3-6",
+                        "penalties": "6-55",
+                        "turnovers": "2",
+                        "possession": "33:11"
+                    }
+                }
+            },
+            "401772919": {
+                "id": "401772919",
+                "espnId": "401772919",
+                "status": "STATUS_IN_PROGRESS",
+                "statusDisplay": "3rd Quarter - 8:42",
+                "teams": {
+                    "home": {
+                        "name": "Minnesota Vikings",
+                        "abbreviation": "MIN",
+                        "logo": null,
+                        "color": "4f2683",
+                        "score": 21,
+                        "record": "1-0"
+                    },
+                    "away": {
+                        "name": "Atlanta Falcons",
+                        "abbreviation": "ATL",
+                        "logo": null,
+                        "color": "a71930",
+                        "score": 14,
+                        "record": "1-0"
+                    }
+                },
+                "teamStats": {
+                    "home": {
+                        "1st_downs": "18",
+                        "total_plays": "52",
+                        "total_yards": "312",
+                        "yards_per_play": "6.0",
+                        "passing": "245",
+                        "rushing": "67",
+                        "turnovers": "1",
+                        "possession": "28:30"
+                    },
+                    "away": {
+                        "1st_downs": "15",
+                        "total_plays": "48",
+                        "total_yards": "289",
+                        "yards_per_play": "6.0",
+                        "passing": "198",
+                        "rushing": "91",
+                        "turnovers": "2",
+                        "possession": "31:30"
+                    }
+                }
+            }
+        };
+
+        // Sample user picks
+        const USER_PICKS = {
+            "401772725": { team: "CIN", confidence: 8 },
+            "401772919": { team: "MIN", confidence: 12 }
+        };
+
+        function openLiveGameModal(espnId, awayTeam, homeTeam) {
+            console.log(`🚀 Opening modal for ${awayTeam} @ ${homeTeam} (ESPN: ${espnId})`);
+
+            const modal = document.getElementById('live-game-modal');
+            const loading = document.getElementById('modal-loading');
+            const content = document.getElementById('modal-game-content');
+            const gameDisplay = document.getElementById('game-data-display');
+
+            modal.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            content.classList.add('hidden');
+
+            // Simulate API call delay
+            setTimeout(() => {
+                const gameData = SAMPLE_GAME_DATA[espnId];
+                const userPick = USER_PICKS[espnId];
+
+                if (gameData) {
+                    gameDisplay.innerHTML = createEnhancedGameDisplay(gameData, userPick);
+                } else {
+                    gameDisplay.innerHTML = `<div class="text-red-600 p-4">Game data not available for ESPN ID: ${espnId}</div>`;
+                }
+
+                loading.classList.add('hidden');
+                content.classList.remove('hidden');
+            }, 1000);
+        }
+
+        function closeLiveGameModal() {
+            document.getElementById('live-game-modal').classList.add('hidden');
+        }
+
+        function createEnhancedGameDisplay(gameData, userPick) {
+            const { teams, teamStats, status, statusDisplay } = gameData;
+            const homeTeam = teams.home;
+            const awayTeam = teams.away;
+            const homeStats = teamStats.home;
+            const awayStats = teamStats.away;
+
+            // Calculate AI analysis
+            const analysis = calculateAIAnalysis(homeStats, awayStats);
+            const prediction = calculateWinPrediction(homeStats, awayStats, homeTeam, awayTeam);
+
+            return `
+                <div class="space-y-6">
+                    <!-- Game Header -->
+                    <div class="text-center bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg p-6">
+                        <div class="text-sm font-medium text-slate-600 mb-2">${statusDisplay}</div>
+                        <div class="flex justify-center items-center space-x-8">
+                            <div class="text-center">
+                                <div class="text-lg font-semibold" style="color: #${awayTeam.color}">${awayTeam.abbreviation}</div>
+                                <div class="text-3xl font-bold text-slate-800">${awayTeam.score}</div>
+                                <div class="text-sm text-slate-500">${awayTeam.record}</div>
+                            </div>
+                            <div class="text-slate-400">vs</div>
+                            <div class="text-center">
+                                <div class="text-lg font-semibold" style="color: #${homeTeam.color}">${homeTeam.abbreviation}</div>
+                                <div class="text-3xl font-bold text-slate-800">${homeTeam.score}</div>
+                                <div class="text-sm text-slate-500">${homeTeam.record}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${userPick ? `
+                    <!-- User Pick Display -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-3">🎯 Your Pick</h3>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                                    ${userPick.confidence}
+                                </div>
+                                <span class="font-medium text-blue-800">${userPick.team}</span>
+                            </div>
+                            <span class="text-blue-600 text-sm">Active Pick</span>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- AI Statistical Analysis -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4">🤖 AI Statistical Analysis</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${analysis.map(stat => `
+                                <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                    <div class="text-sm font-medium text-slate-700 mb-2">${stat.category}</div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm">${awayTeam.abbreviation}: ${stat.away}</span>
+                                        <span class="text-sm">${homeTeam.abbreviation}: ${stat.home}</span>
+                                    </div>
+                                    ${stat.advantage ? `
+                                        <div class="mt-2 text-xs text-green-600 font-medium">
+                                            ${stat.advantage}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- AI Win Prediction -->
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-green-800 mb-4">🏆 AI Win Prediction</h3>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold mb-2" style="color: #${prediction.winnerTeam.color}">
+                                ${prediction.winnerTeam.name}
+                            </div>
+                            <div class="text-lg font-semibold text-green-700 mb-4">
+                                ${prediction.confidence}% Confidence
+                            </div>
+                            <div class="text-sm text-green-600">
+                                <strong>Key Factors:</strong> ${prediction.factors.join(', ')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function calculateAIAnalysis(homeStats, awayStats) {
+            const analysis = [];
+
+            // Offensive Efficiency
+            const homeYPP = parseFloat(homeStats.yards_per_play || '0');
+            const awayYPP = parseFloat(awayStats.yards_per_play || '0');
+            analysis.push({
+                category: "Offensive Efficiency",
+                home: `${homeYPP} YPP`,
+                away: `${awayYPP} YPP`,
+                advantage: Math.abs(homeYPP - awayYPP) > 0.5 ?
+                    `${homeYPP > awayYPP ? 'Home' : 'Away'} +${Math.abs(homeYPP - awayYPP).toFixed(1)} advantage` : null
+            });
+
+            // Total Yards
+            const homeYards = parseInt(homeStats.total_yards || '0');
+            const awayYards = parseInt(awayStats.total_yards || '0');
+            analysis.push({
+                category: "Total Yards",
+                home: homeYards.toString(),
+                away: awayYards.toString(),
+                advantage: Math.abs(homeYards - awayYards) > 50 ?
+                    `${homeYards > awayYards ? 'Home' : 'Away'} +${Math.abs(homeYards - awayYards)} yards` : null
+            });
+
+            // Turnover Differential
+            const homeTurnovers = parseInt(homeStats.turnovers || '0');
+            const awayTurnovers = parseInt(awayStats.turnovers || '0');
+            analysis.push({
+                category: "Turnovers",
+                home: homeTurnovers.toString(),
+                away: awayTurnovers.toString(),
+                advantage: homeTurnovers !== awayTurnovers ?
+                    `${homeTurnovers < awayTurnovers ? 'Home' : 'Away'} ball security advantage` : null
+            });
+
+            // Time of Possession
+            if (homeStats.possession && awayStats.possession) {
+                analysis.push({
+                    category: "Time of Possession",
+                    home: homeStats.possession,
+                    away: awayStats.possession,
+                    advantage: null
+                });
+            }
+
+            return analysis;
+        }
+
+        function calculateWinPrediction(homeStats, awayStats, homeTeam, awayTeam) {
+            let homeScore = 0;
+            let awayScore = 0;
+
+            // Yards per play (15 points)
+            const homeYPP = parseFloat(homeStats.yards_per_play || '0');
+            const awayYPP = parseFloat(awayStats.yards_per_play || '0');
+            if (homeYPP > awayYPP) homeScore += 15;
+            else if (awayYPP > homeYPP) awayScore += 15;
+
+            // Total yards (10 points)
+            const homeYards = parseInt(homeStats.total_yards || '0');
+            const awayYards = parseInt(awayStats.total_yards || '0');
+            if (homeYards > awayYards) homeScore += 10;
+            else if (awayYards > homeYards) awayScore += 10;
+
+            // Turnovers (25 points - most important)
+            const homeTurnovers = parseInt(homeStats.turnovers || '0');
+            const awayTurnovers = parseInt(awayStats.turnovers || '0');
+            if (homeTurnovers < awayTurnovers) homeScore += 25;
+            else if (awayTurnovers < homeTurnovers) awayScore += 25;
+
+            // Calculate winner and confidence
+            const totalScore = homeScore + awayScore;
+            const winnerIsHome = homeScore > awayScore;
+            const confidence = totalScore > 0 ? Math.round((Math.max(homeScore, awayScore) / 50) * 100) : 50;
+
+            const factors = [];
+            if (Math.abs(homeYPP - awayYPP) > 0.5) factors.push("Offensive efficiency");
+            if (Math.abs(homeYards - awayYards) > 50) factors.push("Total yards");
+            if (homeTurnovers !== awayTurnovers) factors.push("Turnover differential");
+
+            return {
+                winnerTeam: winnerIsHome ? homeTeam : awayTeam,
+                confidence: Math.max(55, Math.min(95, confidence)),
+                factors: factors.length > 0 ? factors : ["Statistical analysis"]
+            };
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('live-game-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeLiveGameModal();
+            }
+        });
+    </script>
+</body>
+</html>

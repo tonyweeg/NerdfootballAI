@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Week 4 Games</title>
+    <style>
+        body { font-family: monospace; background: #000; color: #0f0; padding: 20px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #333; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .warning { color: #ff0; }
+        button { padding: 10px 20px; margin: 10px; }
+        pre { background: #111; padding: 10px; white-space: pre-wrap; }
+        .game { margin: 10px 0; padding: 10px; border: 1px solid #333; }
+        .final { border-color: #0f0; }
+        .progress { border-color: #ff0; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Week 4 Games</h1>
+
+    <div class="section">
+        <div id="authStatus">Loading...</div>
+        <button onclick="checkGames()">Check Week 4 Games</button>
+        <button onclick="checkTonyPicks()">Check Tony's Week 4 Picks</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        window.db = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+
+        // Auto-auth for admin
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        async function checkAdminAccess() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const adminUID = urlParams.get('admin');
+            if (adminUID && ADMIN_UIDS.includes(adminUID)) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            }
+
+            return new Promise((resolve) => {
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    unsubscribe();
+                    resolve(user && ADMIN_UIDS.includes(user.uid));
+                });
+            });
+        }
+
+        // Auto-authenticate
+        (async () => {
+            const isAdmin = await checkAdminAccess();
+            if (isAdmin) {
+                document.getElementById('authStatus').innerHTML = '<span class="success">✅ Admin authenticated</span>';
+            } else {
+                document.getElementById('authStatus').innerHTML = '<span class="error">❌ Admin access required</span>';
+            }
+        })();
+
+        window.checkGames = async function() {
+            try {
+                const gamesRef = doc(db, 'artifacts/nerdfootball/public/data/nerdfootball_games/4');
+                const gamesSnap = await getDoc(gamesRef);
+
+                if (!gamesSnap.exists) {
+                    document.getElementById('results').innerHTML = '<div class="error">❌ No Week 4 games found</div>';
+                    return;
+                }
+
+                const games = gamesSnap.data();
+                let html = '<div class="success">📊 Week 4 Games Analysis:</div>';
+
+                let finalCount = 0;
+                let progressCount = 0;
+                let scheduledCount = 0;
+
+                Object.entries(games).forEach(([gameId, game]) => {
+                    if (gameId.startsWith('_')) return;
+
+                    const status = game.status || 'scheduled';
+                    const statusUpper = status.toUpperCase();
+                    const isFinal = statusUpper.includes('FINAL');
+                    const isProgress = statusUpper.includes('PROGRESS') || statusUpper === 'IN_PROGRESS';
+
+                    if (isFinal) finalCount++;
+                    else if (isProgress) progressCount++;
+                    else scheduledCount++;
+
+                    const classType = isFinal ? 'final' : isProgress ? 'progress' : '';
+
+                    html += `
+                        <div class="game ${classType}">
+                            <strong>Game ${gameId}</strong>: ${game.a} @ ${game.h}<br>
+                            Status: "${status}" (${statusUpper.includes('FINAL') ? 'FINAL DETECTED' : 'NOT FINAL'})<br>
+                            Winner: ${game.winner || 'None'}<br>
+                            Score: ${game.awayScore || 0} - ${game.homeScore || 0}
+                        </div>
+                    `;
+                });
+
+                html += `
+                    <div class="success">
+                        📈 Summary:<br>
+                        • FINAL games: ${finalCount}<br>
+                        • IN PROGRESS: ${progressCount}<br>
+                        • SCHEDULED: ${scheduledCount}<br>
+                        • Total: ${Object.keys(games).filter(k => !k.startsWith('_')).length}
+                    </div>
+                `;
+
+                document.getElementById('results').innerHTML = html;
+
+            } catch (error) {
+                document.getElementById('results').innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        };
+
+        window.checkTonyPicks = async function() {
+            try {
+                const tonyUID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+                const picksRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_picks/4/submissions/${tonyUID}`);
+                const picksSnap = await getDoc(picksRef);
+
+                if (!picksSnap.exists) {
+                    document.getElementById('results').innerHTML += '<div class="error">❌ Tony has no Week 4 picks</div>';
+                    return;
+                }
+
+                const picks = picksSnap.data();
+                let html = '<div class="success">📊 Tony\'s Week 4 Picks:</div>';
+
+                Object.entries(picks).forEach(([gameId, pick]) => {
+                    html += `
+                        <div class="game">
+                            Game ${gameId}: ${pick.team || 'No team'} (Confidence: ${pick.confidence || 'None'})
+                        </div>
+                    `;
+                });
+
+                html += `<div class="success">Total picks: ${Object.keys(picks).length}</div>`;
+                document.getElementById('results').innerHTML += html;
+
+            } catch (error) {
+                document.getElementById('results').innerHTML += `<div class="error">❌ Error checking picks: ${error.message}</div>`;
+            }
+        };
+    </script>
+</body>
+</html>

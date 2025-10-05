@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 Week 3 Ultimate Recovery Tool - Fix All 29 Users</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-4xl font-bold mb-6 text-center">🚀 WEEK 3 ULTIMATE RECOVERY TOOL</h1>
+        <div class="text-center mb-8">
+            <p class="text-xl text-gray-700">Fixing all 29 corrupted Week 3 users</p>
+            <p class="text-lg text-blue-600">Ready to enjoy this season! 🏈</p>
+        </div>
+
+        <!-- Auth Status -->
+        <div id="authStatus" class="mb-6 p-4 bg-yellow-100 border border-yellow-300 rounded">
+            <p class="text-yellow-800">🔐 Checking authentication...</p>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">Recovery Control Panel</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <button id="loadCorruptedUsers" class="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700">
+                    📊 Load Corrupted Users
+                </button>
+                <button id="generateAllPicks" class="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 disabled:opacity-50" disabled>
+                    🛠️ Generate All Missing Picks
+                </button>
+                <button id="validateAllFixes" class="bg-purple-600 text-white px-6 py-3 rounded hover:bg-purple-700 disabled:opacity-50" disabled>
+                    ✅ Validate All Fixes
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-red-50 p-4 rounded border">
+                    <h3 class="font-bold text-red-800">Total Disasters</h3>
+                    <p id="totalDisasters" class="text-2xl font-bold text-red-600">0</p>
+                    <p class="text-sm text-red-600">0 games picked</p>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded border">
+                    <h3 class="font-bold text-yellow-800">Partial Corruption</h3>
+                    <p id="partialCorruption" class="text-2xl font-bold text-yellow-600">0</p>
+                    <p class="text-sm text-yellow-600">1-15 games picked</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded border">
+                    <h3 class="font-bold text-blue-800">Total Users to Fix</h3>
+                    <p id="totalToFix" class="text-2xl font-bold text-blue-600">0</p>
+                    <p class="text-sm text-blue-600">Will be auto-generated</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded border">
+                    <h3 class="font-bold text-green-800">Fixed Users</h3>
+                    <p id="fixedUsers" class="text-2xl font-bold text-green-600">0</p>
+                    <p class="text-sm text-green-600">Complete 16 games</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div id="progressContainer" class="bg-white rounded-lg shadow p-6 mb-6 hidden">
+            <h3 class="text-xl font-bold mb-4">Recovery Progress</h3>
+            <div class="w-full bg-gray-200 rounded-full h-4 mb-4">
+                <div id="progressBar" class="bg-green-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="progressText" class="text-center text-gray-700">Preparing recovery...</p>
+        </div>
+
+        <!-- Recovery Status -->
+        <div id="recoveryStatus" class="space-y-4"></div>
+
+        <!-- User Details -->
+        <div id="userDetails" class="mt-8"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, getDoc, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Admin UIDs
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2', // tonyweeg@gmail.com
+            'CX0etIyJbGg33nmHCo4eezPWrsr2',
+            'sm17z8ovI8NAGmyQvogD86lIurr1',
+            'dN91P1yGG4YBttxeGWmpAM2xhl22'
+        ];
+
+        // Dynamic corruption analysis - will be populated by loadCorruptedUsers()
+
+        let poolMembers = {};
+        let week3Bible = {};
+        let corruptedData = [];
+        let isAuthenticated = false;
+
+        // Authentication check
+        onAuthStateChanged(auth, (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user && ADMIN_UIDS.includes(user.uid)) {
+                authStatus.innerHTML = `<p class="text-green-800">✅ Authenticated as: ${user.email}</p>`;
+                isAuthenticated = true;
+                initializeRecovery();
+            } else {
+                authStatus.innerHTML = `<p class="text-red-800">❌ Admin access required. Please sign in.</p>`;
+                isAuthenticated = false;
+            }
+        });
+
+        async function initializeRecovery() {
+            try {
+                await loadPoolMembers();
+                await loadWeek3Bible();
+                document.getElementById('loadCorruptedUsers').disabled = false;
+            } catch (error) {
+                console.error('Initialization failed:', error);
+            }
+        }
+
+        async function loadPoolMembers() {
+            const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+            const membersSnap = await getDoc(doc(db, membersPath));
+            if (membersSnap.exists()) {
+                poolMembers = membersSnap.data();
+                console.log(`✅ Loaded ${Object.keys(poolMembers).length} pool members`);
+            }
+        }
+
+        async function loadWeek3Bible() {
+            try {
+                const response = await fetch('/game-data/nfl_2025_week_3.json');
+                week3Bible = await response.json();
+                console.log('✅ Week 3 bible loaded:', Object.keys(week3Bible).filter(k => k.startsWith('3')).length, 'games');
+            } catch (error) {
+                console.error('Failed to load Week 3 bible:', error);
+            }
+        }
+
+        document.getElementById('loadCorruptedUsers').addEventListener('click', loadCorruptedUsers);
+        document.getElementById('generateAllPicks').addEventListener('click', generateAllPicks);
+        document.getElementById('validateAllFixes').addEventListener('click', validateAllFixes);
+
+        async function loadCorruptedUsers() {
+            if (!isAuthenticated) return;
+
+            updateStatus('Loading corrupted users from actual Firebase data...', 'blue');
+
+            try {
+                // Load users data for names/emails
+                updateStatus('Loading user data...', 'blue');
+                const usersSnap = await getDocs(collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users'));
+                const usersMap = {};
+                usersSnap.forEach(doc => {
+                    usersMap[doc.id] = doc.data();
+                });
+
+                // Load Week 3 picks - EXACTLY like recovery list
+                updateStatus('Loading Week 3 picks data...', 'blue');
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const picksSnap = await getDocs(collection(db, picksPath));
+
+                corruptedData = [];
+                let totalDisasters = 0;
+                let partialCorruption = 0;
+
+                // Analyze each user's picks - EXACTLY like recovery list logic
+                picksSnap.forEach(doc => {
+                    const data = doc.data();
+                    const userId = doc.id;
+                    const userInfo = usersMap[userId];
+
+                    // Count game keys (301-316) - EXACTLY like recovery list
+                    const keys = Object.keys(data);
+                    const gameKeys = keys.filter(k => k.match(/^3\d{2}$/));
+
+                    // Only include users with missing picks - EXACTLY like recovery list
+                    if (gameKeys.length < 16) {
+                        let severity = '';
+                        let severityCode = '';
+
+                        if (gameKeys.length === 0) {
+                            severity = 'TOTAL DISASTER';
+                            severityCode = 'total';
+                            totalDisasters++;
+                        } else if (gameKeys.length <= 5) {
+                            severity = 'SEVERE';
+                            severityCode = 'partial';
+                            partialCorruption++;
+                        } else if (gameKeys.length <= 13) {
+                            severity = 'MODERATE';
+                            severityCode = 'partial';
+                            partialCorruption++;
+                        } else {
+                            severity = 'MINOR';
+                            severityCode = 'partial';
+                            partialCorruption++;
+                        }
+
+                        const missingGames = [];
+                        for (let i = 301; i <= 316; i++) {
+                            if (!data[i.toString()]) {
+                                missingGames.push(i);
+                            }
+                        }
+
+                        const corruption = {
+                            userId,
+                            name: data.userName || userInfo?.name || 'Unknown',
+                            email: userInfo?.email || 'Not found',
+                            gameCount: gameKeys.length,
+                            picks: data,
+                            severity: severityCode,
+                            severityText: severity,
+                            missingGames,
+                            mnfPoints: data.mnfTotalPoints || 'Missing'
+                        };
+
+                        corruptedData.push(corruption);
+                    }
+                });
+
+                // Sort by severity (worst first) - EXACTLY like recovery list
+                corruptedData.sort((a, b) => a.gameCount - b.gameCount);
+
+                console.log('🚀 RECOVERY TOOL - AFFECTED USERS:', corruptedData);
+
+                // Update stats
+                document.getElementById('totalDisasters').textContent = totalDisasters;
+                document.getElementById('partialCorruption').textContent = partialCorruption;
+                document.getElementById('totalToFix').textContent = totalDisasters + partialCorruption;
+                document.getElementById('fixedUsers').textContent = '0';
+
+                displayCorruptedUsers();
+                document.getElementById('generateAllPicks').disabled = false;
+                updateStatus(`✅ Found ${totalDisasters + partialCorruption} users needing fixes (${totalDisasters} disasters, ${partialCorruption} partial)`, 'green');
+
+            } catch (error) {
+                console.error('Error loading corrupted users:', error);
+                updateStatus(`Error: ${error.message}`, 'red');
+            }
+        }
+
+        function displayCorruptedUsers() {
+            const container = document.getElementById('userDetails');
+            container.innerHTML = '<h2 class="text-2xl font-bold mb-4">Corrupted Users Analysis</h2>';
+
+            corruptedData.forEach(user => {
+                if (user.severity === 'clean') return;
+
+                const userDiv = document.createElement('div');
+                userDiv.className = `mb-4 p-4 rounded border ${
+                    user.severity === 'total' ? 'bg-red-50 border-red-300' : 'bg-yellow-50 border-yellow-300'
+                }`;
+
+                userDiv.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-bold">${user.name}</h3>
+                            <p class="text-sm text-gray-600">${user.email}</p>
+                            <p class="text-sm text-gray-600">User ID: ${user.userId}</p>
+                            <p class="text-xs text-purple-600">MNF: ${user.mnfPoints}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="${user.severity === 'total' ? 'text-red-600' : 'text-yellow-600'} font-bold">
+                                ${user.gameCount}/16 games
+                            </p>
+                            <p class="text-sm">
+                                ${user.severityText}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                Missing: ${user.missingGames.slice(0, 3).join(', ')}${user.missingGames.length > 3 ? '...' : ''}
+                            </p>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(userDiv);
+            });
+        }
+
+        async function generateAllPicks() {
+            if (!isAuthenticated) return;
+
+            const usersToFix = corruptedData.filter(user => user.severity !== 'clean');
+            if (usersToFix.length === 0) {
+                updateStatus('No users need fixing!', 'green');
+                return;
+            }
+
+            document.getElementById('progressContainer').classList.remove('hidden');
+            updateStatus(`Starting auto-generation for ${usersToFix.length} users...`, 'blue');
+
+            for (let i = 0; i < usersToFix.length; i++) {
+                const user = usersToFix[i];
+                const progress = ((i + 1) / usersToFix.length) * 100;
+
+                document.getElementById('progressBar').style.width = `${progress}%`;
+                document.getElementById('progressText').textContent = `Fixing ${user.name} (${i + 1}/${usersToFix.length})`;
+
+                try {
+                    await generateUserPicks(user);
+                    updateUserStatus(user.userId, 'fixed');
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Brief pause
+                } catch (error) {
+                    console.error(`Failed to fix ${user.name}:`, error);
+                    updateUserStatus(user.userId, 'error');
+                }
+            }
+
+            updateStatus(`🎉 RECOVERY COMPLETE! Fixed ${usersToFix.length} users`, 'green');
+            document.getElementById('validateAllFixes').disabled = false;
+        }
+
+        async function generateUserPicks(user) {
+            const week3GameIds = ['301', '302', '303', '304', '305', '306', '307', '308', '309', '310', '311', '312', '313', '314', '315', '316'];
+            const existingGameIds = Object.keys(user.picks).filter(key => week3GameIds.includes(key));
+            const missingGameIds = week3GameIds.filter(id => !existingGameIds.includes(id));
+
+            if (missingGameIds.length === 0) {
+                console.log(`${user.name} already has all games`);
+                return;
+            }
+
+            // Generate smart picks for missing games
+            const existingConfidenceValues = [];
+            existingGameIds.forEach(gameId => {
+                const pick = user.picks[gameId];
+                if (pick && typeof pick.confidence === 'number' && pick.confidence >= 1 && pick.confidence <= 16) {
+                    existingConfidenceValues.push(pick.confidence);
+                }
+            });
+
+            const availableConfidenceValues = [];
+            for (let i = 1; i <= 16; i++) {
+                if (!existingConfidenceValues.includes(i)) {
+                    availableConfidenceValues.push(i);
+                }
+            }
+
+            // Shuffle for randomness
+            availableConfidenceValues.sort(() => Math.random() - 0.5);
+
+            const newPicks = { ...user.picks };
+
+            missingGameIds.forEach((gameId, index) => {
+                const game = week3Bible[gameId];
+                if (game && availableConfidenceValues[index]) {
+                    // Simple algorithm: pick home team for higher confidence, away team for lower
+                    const confidence = availableConfidenceValues[index];
+                    const winner = confidence > 8 ? game.h : game.a;
+
+                    newPicks[gameId] = {
+                        winner: winner,
+                        confidence: confidence
+                    };
+                }
+            });
+
+            // Add metadata
+            newPicks.userName = user.name;
+            newPicks.weekNumber = 3;
+            newPicks.submittedAt = new Date().toISOString();
+            newPicks.timestamp = Date.now();
+
+            // Save to Firebase
+            const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+            await setDoc(doc(db, picksPath, user.userId), newPicks);
+
+            console.log(`✅ Generated ${missingGameIds.length} picks for ${user.name}`);
+        }
+
+        function updateUserStatus(userId, status) {
+            const statusEmoji = {
+                'fixed': '✅',
+                'error': '❌',
+                'processing': '⏳'
+            };
+
+            updateStatus(`${statusEmoji[status]} ${poolMembers[userId]?.name || userId}`, status === 'fixed' ? 'green' : status === 'error' ? 'red' : 'blue');
+        }
+
+        async function validateAllFixes() {
+            updateStatus('Validating all fixes...', 'blue');
+
+            try {
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const picksCollection = collection(db, picksPath);
+                const picksSnap = await getDocs(picksCollection);
+
+                let fixedCount = 0;
+                let totalValidated = 0;
+
+                for (const user of corruptedData) {
+                    if (user.severity === 'clean') continue;
+
+                    const userDoc = picksSnap.docs.find(doc => doc.id === user.userId);
+                    if (userDoc) {
+                        const picks = userDoc.data();
+                        const gameIds = Object.keys(picks).filter(key =>
+                            !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints', 'mnfTotalPoints', 'tiebreaker', 'totalPoints'].includes(key)
+                        );
+
+                        if (gameIds.length === 16) {
+                            fixedCount++;
+                        }
+                    }
+                    totalValidated++;
+                }
+
+                document.getElementById('fixedUsers').textContent = fixedCount;
+                updateStatus(`✅ Validation complete: ${fixedCount}/${totalValidated} users have complete picks`, 'green');
+
+            } catch (error) {
+                updateStatus(`Validation error: ${error.message}`, 'red');
+            }
+        }
+
+        function updateStatus(message, type) {
+            const container = document.getElementById('recoveryStatus');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `p-3 rounded border ${
+                type === 'green' ? 'bg-green-50 border-green-300 text-green-800' :
+                type === 'red' ? 'bg-red-50 border-red-300 text-red-800' :
+                'bg-blue-50 border-blue-300 text-blue-800'
+            }`;
+            statusDiv.innerHTML = `<p>${new Date().toLocaleTimeString()}: ${message}</p>`;
+            container.insertBefore(statusDiv, container.firstChild);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌌 BATTLESTAR GALACTICA - Max Potential Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+            background: #000000;
+            color: #00d4ff;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        @keyframes stars {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-2000px); }
+        }
+
+        .star-field {
+            position: fixed;
+            width: 100%;
+            height: 200%;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            background:
+                radial-gradient(2px 2px at 20% 30%, white, transparent),
+                radial-gradient(2px 2px at 60% 70%, white, transparent),
+                radial-gradient(1px 1px at 50% 50%, white, transparent),
+                radial-gradient(1px 1px at 80% 10%, white, transparent),
+                radial-gradient(2px 2px at 90% 60%, white, transparent);
+            background-size: 200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px;
+            animation: stars 60s linear infinite;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .neon-text {
+            text-shadow:
+                0 0 5px #00d4ff,
+                0 0 10px #00d4ff,
+                0 0 20px #00d4ff,
+                0 0 40px #0095ff;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .seive-card {
+            background: linear-gradient(135deg, rgba(15, 15, 45, 0.9) 0%, rgba(25, 15, 50, 0.9) 100%);
+            border: 2px solid #8a2be2;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .btn-asteroid {
+            background: linear-gradient(135deg, #6a0dad 0%, #4b0082 100%);
+            border: 2px solid #8a2be2;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+        }
+
+        .btn-asteroid:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #8a2be2;
+        }
+
+        .seive-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .seive-table th {
+            background: linear-gradient(135deg, #6a0dad 0%, #4b0082 100%);
+            color: #00ff41;
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #8a2be2;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .seive-table td {
+            padding: 10px 12px;
+            border: 1px solid #8a2be2;
+            background: rgba(15, 15, 45, 0.5);
+            color: #00d4ff;
+            font-size: 13px;
+        }
+
+        .seive-table tr:hover td {
+            background: rgba(138, 43, 226, 0.3);
+        }
+
+        .rank-1 { color: #FFD700; font-weight: 900; }
+        .rank-2 { color: #C0C0C0; font-weight: 900; }
+        .rank-3 { color: #CD7F32; font-weight: 900; }
+
+        .points-current { color: #00ff41; }
+        .points-left { color: #ff9800; }
+        .points-max { color: #ff1744; font-weight: 900; font-size: 16px; }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 20px;
+            color: #8a2be2;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(138, 43, 226, 0.3);
+            border-top: 4px solid #8a2be2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .stat-box {
+            display: inline-block;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, rgba(138, 43, 226, 0.2) 0%, rgba(75, 0, 130, 0.2) 100%);
+            border: 2px solid #8a2be2;
+            border-radius: 5px;
+            margin: 5px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #8a2be2;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            color: #00ff41;
+            font-weight: 900;
+        }
+    </style>
+</head>
+<body>
+    <div class="star-field"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-black neon-text mb-4">🌌 BATTLESTAR GALACTICA</h1>
+            <p class="text-xl text-purple-400">WHO HAS THE MOST UPSIDE LEFT?</p>
+            <p class="text-sm text-gray-400 mt-2">Tracking Points Left to Score & Maximum Potential</p>
+        </div>
+
+        <!-- Week Selector & Stats -->
+        <div class="seive-card mb-6">
+            <div class="flex justify-between items-center flex-wrap">
+                <div>
+                    <button onclick="changeWeek(-1)" class="btn-asteroid mr-2">◄ PREV WEEK</button>
+                    <span class="text-2xl font-bold text-yellow-400" id="current-week">WEEK 5</span>
+                    <button onclick="changeWeek(1)" class="btn-asteroid ml-2">NEXT WEEK ►</button>
+                </div>
+                <div>
+                    <button onclick="loadData()" class="btn-asteroid">🔄 REFRESH DATA</button>
+                    <button onclick="window.location.href='nerd-universe.html'" class="btn-asteroid ml-2">← BACK TO UNIVERSE</button>
+                </div>
+            </div>
+
+            <div class="mt-4 text-center">
+                <div class="stat-box">
+                    <div class="stat-label">Games Complete</div>
+                    <div class="stat-value" id="games-complete">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Games Remaining</div>
+                    <div class="stat-value" id="games-remaining">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Total Players</div>
+                    <div class="stat-value" id="total-players">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p class="mt-4">SCANNING THE NERD UNIVERSE...</p>
+        </div>
+
+        <!-- Leaderboard -->
+        <div id="leaderboard-container" class="seive-card" style="display: none;">
+            <h2 class="text-2xl font-bold text-center mb-4 text-purple-400">📊 MAXIMUM POTENTIAL LEADERBOARD</h2>
+            <p class="text-center text-sm text-gray-400 mb-4">Sorted by Max Possible Total (Current + Points Left)</p>
+
+            <table class="seive-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">RANK</th>
+                        <th>PLAYER</th>
+                        <th style="width: 110px; text-align: center;">TOTAL SO FAR</th>
+                        <th style="width: 110px; text-align: center;">PTS LEFT</th>
+                        <th style="width: 120px; text-align: center;">MAX POSSIBLE</th>
+                        <th style="width: 90px; text-align: center;">GAMES LEFT</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    <!-- Populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentWeek = getCurrentNFLWeek();
+        let poolMembers = {};
+        let bibleData = {};
+        let allPicks = {};
+
+        function getCurrentNFLWeek() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04');
+            const diff = now - seasonStart;
+            const weeksPassed = Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
+            return Math.min(Math.max(weeksPassed + 1, 1), 18);
+        }
+
+        window.changeWeek = function(delta) {
+            currentWeek = Math.min(Math.max(currentWeek + delta, 1), 18);
+            document.getElementById('current-week').textContent = `WEEK ${currentWeek}`;
+            loadData();
+        };
+
+        window.loadData = async function() {
+            console.log('🌌 THE SEIVE: Loading data for Week', currentWeek);
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('leaderboard-container').style.display = 'none';
+
+            try {
+                // Load pool members
+                const poolPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const poolDoc = await getDoc(doc(db, poolPath));
+                poolMembers = poolDoc.data() || {};
+                console.log('✅ Pool members loaded:', Object.keys(poolMembers).length);
+
+                // Load bible data (games)
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesDoc = await getDoc(doc(db, gamesPath));
+                bibleData = gamesDoc.data() || {};
+                console.log('✅ Bible data loaded:', Object.keys(bibleData).length, 'games');
+
+                // Load picks for all users
+                allPicks = {};
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                for (const userId in poolMembers) {
+                    const picksDoc = await getDoc(doc(db, picksPath, userId));
+                    if (picksDoc.exists()) {
+                        allPicks[userId] = picksDoc.data();
+                    }
+                }
+                console.log('✅ Picks loaded for', Object.keys(allPicks).length, 'users');
+
+                // Calculate and display
+                calculateAndDisplay();
+
+            } catch (error) {
+                console.error('❌ Error loading data:', error);
+                document.getElementById('loading').innerHTML = `
+                    <p class="text-red-500">ERROR LOADING DATA</p>
+                    <p class="text-sm mt-2">${error.message}</p>
+                `;
+            }
+        };
+
+        function calculateAndDisplay() {
+            console.log('📊 Calculating points for all players...');
+
+            const gameIds = Object.keys(bibleData).filter(k => !k.startsWith('_') && k !== '000');
+            let gamesComplete = 0;
+            let gamesRemaining = 0;
+
+            // Count completed/remaining games
+            gameIds.forEach(gameId => {
+                const game = bibleData[gameId];
+                const status = (game.status || '').toLowerCase();
+                if (status === 'final') {
+                    gamesComplete++;
+                } else {
+                    gamesRemaining++;
+                }
+            });
+
+            // Calculate for each player
+            const playerStats = [];
+            for (const userId in allPicks) {
+                const picks = allPicks[userId];
+                const member = poolMembers[userId];
+                if (!member) continue;
+
+                let currentPoints = 0;
+                let pointsLeft = 0;
+                let gamesLeft = 0;
+
+                gameIds.forEach(gameId => {
+                    const game = bibleData[gameId];
+                    const pick = picks[gameId];
+                    if (!pick || !game) return;
+
+                    const confidence = parseInt(pick.confidence) || 0;
+                    const status = (game.status || '').toLowerCase();
+
+                    if (status === 'final') {
+                        // Game is complete - check if they won (using same logic as Grid)
+                        const isCorrect = game.winner && pick.winner && game.winner === pick.winner;
+                        if (isCorrect) {
+                            currentPoints += confidence;
+                        }
+                    } else {
+                        // Game not complete - add to points left
+                        pointsLeft += confidence;
+                        gamesLeft++;
+                    }
+                });
+
+                playerStats.push({
+                    userId,
+                    name: member.name || member.email || 'Unknown',
+                    currentPoints,
+                    pointsLeft,
+                    maxPossible: currentPoints + pointsLeft,
+                    gamesLeft
+                });
+            }
+
+            // Find Andy Anderson
+            const andy = playerStats.find(p => p.name.includes('andy.anderson') || p.name.includes('andy anderson'));
+            if (andy) {
+                console.log('🔍 ANDY ANDERSON STATS:', andy);
+            }
+
+            console.log(`✅ Calculated stats for ${playerStats.length} players`);
+
+            // Sort by max possible (highest first)
+            playerStats.sort((a, b) => b.maxPossible - a.maxPossible);
+
+            // Display stats
+            document.getElementById('games-complete').textContent = gamesComplete;
+            document.getElementById('games-remaining').textContent = gamesRemaining;
+            document.getElementById('total-players').textContent = playerStats.length;
+
+            // Build leaderboard
+            const tbody = document.getElementById('leaderboard-body');
+            tbody.innerHTML = '';
+
+            console.log('🏆 Top 3 players:', playerStats.slice(0, 3).map(p => ({
+                name: p.name,
+                current: p.currentPoints,
+                left: p.pointsLeft,
+                max: p.maxPossible
+            })));
+
+            playerStats.forEach((player, index) => {
+                const rank = index + 1;
+                const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : '';
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="text-center ${rankClass}">${rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank}</td>
+                    <td><strong>${player.name}</strong></td>
+                    <td class="text-center points-current">${player.currentPoints}</td>
+                    <td class="text-center points-left">${player.pointsLeft}</td>
+                    <td class="text-center points-max">${player.maxPossible}</td>
+                    <td class="text-center">${player.gamesLeft}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            console.log('✅ Leaderboard rendered with', playerStats.length, 'players');
+
+            // Show leaderboard
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('leaderboard-container').style.display = 'block';
+        }
+
+        // Initialize
+        document.getElementById('current-week').textContent = `WEEK ${currentWeek}`;
+
+        onAuthStateChanged(auth, (user) => {
+            console.log('🔐 Auth state:', user ? user.uid : 'Not authenticated');
+            loadData();
+        });
+    </script>
+</body>
+</html>

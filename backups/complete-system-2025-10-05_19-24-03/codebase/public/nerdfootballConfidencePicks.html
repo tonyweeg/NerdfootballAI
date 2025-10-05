@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐝 Wu-Tang Confidence Picks - Killer Bees</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true },
+            // Suppress production warning for confidence picks page
+            suppressWarnings: true,
+            theme: {
+                extend: {
+                    colors: {
+                        'wutang': {
+                            'void': '#0a0a0a',
+                            'surface': '#1a1a1a',
+                            'border': '#2a2a2a',
+                            'accent': '#00ff41',
+                            'secondary': '#00d4ff',
+                            'danger': '#ff4757',
+                            'warning': '#ffa502',
+                            'text': '#ffffff',
+                            'muted': '#888888'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(45deg, #0a0a0a 0%, #1a1a1a 50%, #0d1117 100%);
+            background-attachment: fixed;
+        }
+
+        .wutang-window {
+            background: rgba(26, 26, 26, 0.95);
+            border: 1px solid #2a2a2a;
+            backdrop-filter: blur(10px);
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .neon-button {
+            background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+        }
+
+        .neon-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .neon-button:hover::before {
+            left: 100%;
+        }
+
+        .neon-button:hover {
+            background: linear-gradient(45deg, #2a2a2a, #3a3a3a);
+            box-shadow:
+                0 0 20px rgba(0, 255, 65, 0.3),
+                inset 0 0 20px rgba(0, 255, 65, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .confidence-button {
+            background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            text-shadow: 0 0 5px rgba(0, 212, 255, 0.5);
+        }
+
+        .confidence-button:hover {
+            background: linear-gradient(45deg, #1a2a2a, #2a3a3a);
+            box-shadow:
+                0 0 20px rgba(0, 212, 255, 0.3),
+                inset 0 0 20px rgba(0, 212, 255, 0.1);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        .wutang-text { color: #ffffff; }
+        .wutang-accent { color: #00ff41; }
+        .wutang-secondary { color: #00d4ff; }
+        .wutang-warning { color: #ffa502; }
+        .wutang-danger { color: #ff4757; }
+        .wutang-muted { color: #888888; }
+        .wutang-void { background: #0a0a0a; }
+        .wutang-surface { background: #1a1a1a; }
+        .wutang-border { background: #2a2a2a; color: #2a2a2a; }
+
+        .locked-row {
+            background: rgba(26, 26, 26, 0.6);
+            opacity: 0.7;
+            pointer-events: none;
+            border: 1px solid #2a2a2a;
+        }
+        .locked-row input, .locked-row select {
+            background: rgba(26, 26, 26, 0.8);
+            color: #888888;
+            cursor: not-allowed;
+            border: 1px solid #2a2a2a;
+        }
+        .auto-save-indicator {
+            transition: all 0.3s ease;
+        }
+        .saving {
+            background: linear-gradient(45deg, #ffa502, #ff4757) !important;
+            color: white !important;
+            box-shadow: 0 0 10px rgba(255, 165, 2, 0.5);
+        }
+        .saved {
+            background: linear-gradient(45deg, #00ff41, #00d4ff) !important;
+            color: #0a0a0a !important;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+        }
+        .game-row {
+            transition: all 0.3s ease;
+            background: rgba(26, 26, 26, 0.3);
+            border: 1px solid transparent;
+        }
+        .game-row:hover:not(.locked-row) {
+            background: rgba(26, 26, 26, 0.6);
+            border: 1px solid #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+        }
+        .confidence-input, .confidence-select {
+            width: 80px;
+            text-align: center;
+            background: rgba(26, 26, 26, 0.8) !important;
+            color: #00ff41 !important;
+            border: 1px solid #2a2a2a !important;
+        }
+        .confidence-input:focus, .confidence-select:focus {
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.5) !important;
+            border-color: #00ff41 !important;
+        }
+        .team-select {
+            min-width: 200px;
+            background: rgba(26, 26, 26, 0.8) !important;
+            color: #00ff41 !important;
+            border: 1px solid #2a2a2a !important;
+        }
+        .team-select:focus {
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.5) !important;
+            border-color: #00ff41 !important;
+        }
+        .time-display {
+            font-size: 0.75rem;
+            color: #00d4ff;
+            text-shadow: 0 0 5px rgba(0, 212, 255, 0.5);
+        }
+
+        .bee-buzz {
+            animation: beeBuzz 2s ease-in-out infinite;
+        }
+
+        @keyframes beeBuzz {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-3px); }
+        }
+
+        /* Starry Background Animation */
+        @keyframes stars {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-2000px); }
+        }
+
+        .star-field {
+            position: fixed;
+            width: 100%;
+            height: 200%;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            pointer-events: none;
+            background:
+                radial-gradient(2px 2px at 20% 30%, white, transparent),
+                radial-gradient(2px 2px at 60% 70%, white, transparent),
+                radial-gradient(1px 1px at 50% 50%, white, transparent),
+                radial-gradient(1px 1px at 80% 10%, white, transparent),
+                radial-gradient(2px 2px at 90% 60%, white, transparent);
+            background-size: 200px 200px, 300px 300px, 150px 150px, 250px 250px, 180px 180px;
+            animation: stars 60s linear infinite;
+        }
+    </style>
+
+    <!-- 🤖 ML PREDICTION SYSTEM - CONFIDENCE POOL -->
+    <script>
+        console.log('🧠 CONFIDENCE ML: Loading AI prediction system...');
+
+        // Team database for confidence analysis
+        const confidenceTeamDB = {
+            'Buffalo Bills': { offense: 92, defense: 88, form: 85 },
+            'Kansas City Chiefs': { offense: 95, defense: 82, form: 95 },
+            'San Francisco 49ers': { offense: 88, defense: 92, form: 88 },
+            'Philadelphia Eagles': { offense: 90, defense: 85, form: 82 },
+            'Dallas Cowboys': { offense: 82, defense: 78, form: 85 },
+            'Miami Dolphins': { offense: 85, defense: 75, form: 70 },
+            'Green Bay Packers': { offense: 88, defense: 85, form: 80 },
+            'Baltimore Ravens': { offense: 86, defense: 90, form: 80 }
+        };
+
+        function generateConfidencePrediction(awayTeam, homeTeam, gameId) {
+            const away = confidenceTeamDB[awayTeam] || { offense: 75, defense: 75, form: 75 };
+            const home = confidenceTeamDB[homeTeam] || { offense: 75, defense: 75, form: 75 };
+
+            // Calculate win probability
+            let homeWinProb = 50;
+            homeWinProb += ((home.offense - away.defense) * 0.3);
+            homeWinProb += ((home.defense - away.offense) * 0.3);
+            homeWinProb += ((home.form - away.form) * 0.2);
+            homeWinProb += 3; // Home field advantage
+
+            homeWinProb = Math.max(15, Math.min(95, homeWinProb));
+            const awayWinProb = 100 - homeWinProb;
+            const winner = homeWinProb > 50 ? homeTeam : awayTeam;
+            const confidence = Math.max(homeWinProb, awayWinProb);
+
+            return {
+                gameId, awayTeam, homeTeam, winner,
+                confidence: Math.round(confidence),
+                homeWinProb: Math.round(homeWinProb),
+                awayWinProb: Math.round(awayWinProb),
+                homeData: home, awayData: away
+            };
+        }
+
+        window.openMLPredictionModal = function(gameId, awayTeam, homeTeam, event) {
+            if (event) event.stopPropagation();
+
+            console.log(`🧠 CONFIDENCE AI: Analyzing Game ${gameId}: ${awayTeam} @ ${homeTeam}...`);
+            const prediction = generateConfidencePrediction(awayTeam, homeTeam, gameId);
+
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+            modal.innerHTML = `
+                <div class="bg-wutang-surface rounded-lg shadow-xl max-w-3xl w-full">
+                    <div class="bg-gradient-to-r from-wutang-border to-wutang-accent text-white p-6 rounded-t-lg">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl">🧠</span>
+                                <div>
+                                    <h2 class="text-xl font-bold">Confidence AI Prediction</h2>
+                                    <p class="text-green-100 text-sm">Diamond-Level Game Analytics</p>
+                                </div>
+                            </div>
+                            <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-wutang-muted">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <div class="text-center mb-6">
+                            <h3 class="text-lg font-bold text-wutang-text mb-2">Game ${prediction.gameId}</h3>
+                            <div class="flex items-center justify-center gap-4 mb-4">
+                                <span class="text-xl font-bold text-blue-700">${prediction.awayTeam}</span>
+                                <span class="text-wutang-muted">@</span>
+                                <span class="text-xl font-bold text-green-700">${prediction.homeTeam}</span>
+                            </div>
+                            <div class="text-2xl font-bold text-green-700 mb-2">
+                                🏆 Predicted Winner: ${prediction.winner}
+                            </div>
+                            <div class="text-xl text-green-600">${prediction.confidence}% Confidence</div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-blue-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-blue-600">${prediction.awayWinProb}%</div>
+                                <div class="text-sm text-blue-500">${prediction.awayTeam} Win Probability</div>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl font-bold text-green-600">${prediction.homeWinProb}%</div>
+                                <div class="text-sm text-green-500">${prediction.homeTeam} Win Probability</div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 text-sm">
+                            <div class="bg-wutang-surface p-3 rounded">⚡ <strong>Offensive Power:</strong> ${prediction.homeTeam} ${prediction.homeData.offense} vs ${prediction.awayTeam} ${prediction.awayData.offense}</div>
+                            <div class="bg-wutang-surface p-3 rounded">🛡️ <strong>Defensive Strength:</strong> ${prediction.homeTeam} ${prediction.homeData.defense} vs ${prediction.awayTeam} ${prediction.awayData.defense}</div>
+                            <div class="bg-wutang-surface p-3 rounded">📈 <strong>Recent Form:</strong> ${prediction.homeTeam} ${prediction.homeData.form}% vs ${prediction.awayTeam} ${prediction.awayData.form}%</div>
+                            <div class="bg-wutang-surface p-3 rounded">🧠 <strong>AI Analysis:</strong> ${prediction.winner} predicted with ${prediction.confidence}% confidence based on offensive/defensive matchups and recent form</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        };
+
+        console.log('🧠 CONFIDENCE ML: AI prediction system ready');
+    </script>
+</head>
+<body class="min-h-screen wutang-text">
+    <!-- Starry Background -->
+    <div class="star-field"></div>
+
+    <!-- Header -->
+    <header class="bg-wutang-void border-b border-wutang-border">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="./nerd-universe.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 w-auto">
+                    <h1 class="text-2xl font-bold wutang-accent glow-text">🐝 Wu-Tang Confidence - Killer Bees</h1>
+                </a>
+                <button onclick="history.back()" class="neon-button px-4 py-2 rounded-lg text-sm">
+                    ← Back
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="max-w-6xl mx-auto">
+            <!-- Hero Section -->
+            <div class="wutang-window rounded-xl p-8 mb-8 text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4 wutang-accent glow-text bee-buzz">🐝 Killer Bees Swarm</h1>
+                <p class="text-xl wutang-secondary mb-6">Assign confidence values 1-N to each game. Higher values = more deadly bee stings!</p>
+                <!-- Auth Status -->
+                <div id="authStatus" class="mt-4 p-3 wutang-window rounded">
+                    <p class="wutang-accent">🐝 Connecting to the Wu-Tang hive...</p>
+                </div>
+            </div>
+
+            <!-- Navigation & Controls -->
+            <div class="wutang-window rounded-xl p-6 mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <!-- Week Navigation -->
+                <div class="flex items-center gap-4">
+                    <button id="prevWeek" class="neon-button px-4 py-2 rounded disabled:opacity-50" disabled>
+                        ← Previous Hive
+                    </button>
+                    <select id="weekSelector" class="px-4 py-2 bg-wutang-surface border border-wutang-border rounded-md text-wutang-text focus:outline-none focus:ring-2 focus:ring-wutang-accent">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                    <button id="nextWeek" class="neon-button px-4 py-2 rounded disabled:opacity-50">
+                        Next Hive →
+                    </button>
+                </div>
+
+                <!-- Status & Actions -->
+                <div class="flex items-center gap-4">
+                    <div id="autoSaveStatus" class="px-3 py-1 rounded text-sm wutang-window">
+                        <span class="wutang-secondary">Bees Ready</span>
+                    </div>
+                    <div id="statusIndicator" class="px-3 py-1 rounded text-sm wutang-window">
+                        <span class="wutang-accent">Loading the hive...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Week Info -->
+            <div id="weekInfo" class="mt-4 p-3 wutang-window rounded hidden">
+                <!-- Populated when week loads -->
+            </div>
+            </div>
+
+            <!-- Picks Editor -->
+            <div id="picksEditor" class="hidden">
+                <!-- MNF Points -->
+                <div class="wutang-window rounded-xl p-4 mb-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-semibold wutang-accent glow-text">🐝 Monday Night Killer Bees Tiebreaker</h3>
+                            <p class="text-sm wutang-secondary">Total points scored in the Monday Night hive</p>
+                        </div>
+                        <div>
+                            <input type="number" id="mnfPointsInput" class="confidence-input px-3 py-2 rounded-md text-center"
+                                   placeholder="Bee Points" min="0" max="100" step="1">
+                            <label class="block text-xs wutang-muted mt-1 text-center">Total Bee Points</label>
+                        </div>
+                </div>
+            </div>
+
+            <!-- Games List -->
+            <div class="wutang-window rounded-xl overflow-hidden">
+                <div class="bg-wutang-border px-6 py-4 border-b border-wutang-accent">
+                    <h2 class="text-xl font-bold wutang-accent glow-text">🐝 Hive <span id="weekTitle">1</span> Battles</h2>
+                    <p class="text-sm wutang-secondary mt-1">Choose champions and assign bee venom levels (1-16, each used once in the hive)</p>
+                </div>
+
+                <div id="gamesList" class="divide-y divide-wutang-border">
+                    <!-- Games populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Validation Summary -->
+            <div id="validationSummary" class="mt-6 wutang-window rounded-xl p-6">
+                <h3 class="text-lg font-semibold wutang-accent glow-text mb-3">🐝 Killer Bees Validation Hive</h3>
+                <div id="validationDetails" class="text-sm wutang-secondary">
+                    <!-- Populated by validation logic -->
+                </div>
+            </div>
+            </div>
+
+            <!-- No Picks Message -->
+            <div id="noPicksMessage" class="hidden wutang-window rounded-xl p-8 text-center">
+                <h3 class="text-xl font-semibold wutang-accent glow-text mb-2">🐝 No Bee Picks Yet</h3>
+                <p class="wutang-secondary mb-4">You haven't made picks for this hive week yet.</p>
+                <button id="createPicksBtn" class="neon-button px-6 py-3 rounded-lg">
+                    🐝 Create My Bee Picks
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- ML Prediction Modal -->
+    <div id="ml-prediction-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden flex items-center justify-center p-4">
+        <div class="wutang-window rounded-xl shadow-xl max-w-4xl w-full max-h-90vh overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-wutang-border to-wutang-accent text-white p-6">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl bee-buzz">🐝</span>
+                        <div>
+                            <h2 class="text-xl font-bold">Killer Bees AI Prediction</h2>
+                            <p class="wutang-muted text-sm">Powered by Wu-Tang Bee Analytics v∞</p>
+                        </div>
+                    </div>
+                    <button id="close-ml-prediction-btn" class="text-white hover:text-wutang-muted transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 max-h-96 overflow-y-auto" id="ml-prediction-content">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Eastern Time Parser -->
+    <script src="./easternTimeParser-v2.js"></script>
+
+    <!-- Load Advanced AI Modal System -->
+    <script src="./nerdfootballai-modal.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Admin user IDs who can see AI predictions
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+
+        let currentUser = null;
+        let currentWeek = 1;
+        let weekBible = {};
+        let userPicks = {};
+        let poolMemberInfo = null;
+        let autoSaveTimeout = null;
+
+        // Get current NFL week (Week 1 started Sept 4, 2025)
+        function getCurrentWeek() {
+            const week1Start = new Date('2025-09-04');
+            const today = new Date();
+            const diffTime = today - week1Start;
+            const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
+            return Math.max(1, Math.min(18, diffWeeks));
+        }
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user) {
+                currentUser = user;
+                authStatus.innerHTML = `<p class="wutang-accent">✅ Signed in as: ${user.email}</p>`;
+
+                // Check if user is a pool member
+                await checkPoolMembership();
+                if (poolMemberInfo) {
+                    await initializeUserApp();
+                } else {
+                    authStatus.innerHTML = `<p class="wutang-danger">❌ You are not a pool member. Contact admin to join.</p>`;
+                }
+            } else {
+                authStatus.innerHTML = `<p class="wutang-danger">❌ Please sign in to view your picks.</p>`;
+            }
+        });
+
+        async function checkPoolMembership() {
+            try {
+                const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersSnap = await getDoc(doc(db, membersPath));
+
+                if (membersSnap.exists()) {
+                    const members = membersSnap.data();
+                    poolMemberInfo = members[currentUser.uid];
+                }
+            } catch (error) {
+                console.error('Error checking pool membership:', error);
+            }
+        }
+
+        async function initializeUserApp() {
+            currentWeek = getCurrentWeek();
+            initializeWeekSelector();
+            setupEventListeners();
+            await loadWeekData();
+            updateStatus('Ready', 'success');
+        }
+
+        function initializeWeekSelector() {
+            const selector = document.getElementById('weekSelector');
+            selector.innerHTML = '';
+
+            for (let i = 1; i <= 18; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Week ${i}`;
+                if (i === currentWeek) option.selected = true;
+                selector.appendChild(option);
+            }
+
+            updateNavigationButtons();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('weekSelector').addEventListener('change', onWeekChange);
+            document.getElementById('prevWeek').addEventListener('click', () => changeWeek(-1));
+            document.getElementById('nextWeek').addEventListener('click', () => changeWeek(1));
+            document.getElementById('createPicksBtn').addEventListener('click', createBlankPicks);
+            document.getElementById('mnfPointsInput').addEventListener('blur', savePicksData);
+        }
+
+        function updateNavigationButtons() {
+            document.getElementById('prevWeek').disabled = currentWeek <= 1;
+            document.getElementById('nextWeek').disabled = currentWeek >= 18;
+        }
+
+        async function onWeekChange() {
+            const selectedWeek = parseInt(document.getElementById('weekSelector').value);
+            currentWeek = selectedWeek;
+            updateNavigationButtons();
+            await loadWeekData();
+        }
+
+        function changeWeek(direction) {
+            const newWeek = currentWeek + direction;
+            if (newWeek >= 1 && newWeek <= 18) {
+                currentWeek = newWeek;
+                document.getElementById('weekSelector').value = currentWeek;
+                updateNavigationButtons();
+                loadWeekData();
+            }
+        }
+
+        async function loadWeekData() {
+            updateStatus('Loading week data...', 'info');
+
+            try {
+                // Load bible data
+                await loadWeekBible();
+
+                // Load user picks
+                await loadUserPicks();
+
+                // Update UI
+                updateWeekInfo();
+                populatePicksEditor();
+
+            } catch (error) {
+                console.error('Error loading week data:', error);
+                updateStatus(`Error loading Week ${currentWeek}`, 'error');
+            }
+        }
+
+        async function loadWeekBible() {
+            try {
+                const response = await fetch(`/game-data/nfl_2025_week_${currentWeek}.json?v=${Date.now()}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                weekBible = await response.json();
+                console.log(`✅ Loaded Week ${currentWeek} bible`);
+            } catch (error) {
+                console.error(`Failed to load Week ${currentWeek} bible:`, error);
+                weekBible = {};
+            }
+        }
+
+        async function loadUserPicks() {
+            try {
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksDoc = doc(db, picksPath, currentUser.uid);
+                const picksSnap = await getDoc(picksDoc);
+
+                if (picksSnap.exists()) {
+                    userPicks = picksSnap.data();
+
+                    // 🛡️ VALIDATION: Verify loaded picks are complete
+                    const expectedGames = Object.keys(weekBible).filter(k => k !== '_metadata');
+                    const loadedGamePicks = Object.keys(userPicks).filter(k => /^\d+$/.test(k));
+                    console.log(`✅ Loaded user picks for Week ${currentWeek}: ${loadedGamePicks.length}/${expectedGames.length} games`);
+
+                    if (loadedGamePicks.length < expectedGames.length) {
+                        console.warn(`⚠️ INCOMPLETE PICKS LOADED: Missing ${expectedGames.length - loadedGamePicks.length} games`);
+                        console.warn('Missing games:', expectedGames.filter(g => !loadedGamePicks.includes(g)));
+                    }
+                } else {
+                    userPicks = {};
+                    console.log(`📝 No picks found for Week ${currentWeek}`);
+                }
+            } catch (error) {
+                console.error('❌ Error loading user picks:', error);
+                console.error('Setting userPicks to empty object - DO NOT SAVE until user creates picks!');
+                userPicks = {};
+            }
+        }
+
+        function getAvailableConfidenceValues(currentGameId, totalGames) {
+            // Get all confidence values from 1 to totalGames
+            const allValues = Array.from({length: totalGames}, (_, i) => i + 1);
+
+            // Find confidence values already used by locked games
+            const usedByLockedGames = new Set();
+
+            console.log(`🔍 DEBUG: Checking available confidence for ${currentGameId}, total games: ${totalGames}`);
+            console.log(`🔍 DEBUG: Current userPicks:`, userPicks);
+
+            // Check all locked rows for used confidence values
+            document.querySelectorAll('.locked-row').forEach(row => {
+                const gameElement = row.querySelector('[data-game-id]');
+                if (gameElement) {
+                    const gameId = gameElement.getAttribute('data-game-id');
+                    const pick = userPicks[gameId];
+
+                    console.log(`🔒 DEBUG: Found locked row for game ${gameId}, pick:`, pick);
+
+                    if (pick && pick.confidence) {
+                        usedByLockedGames.add(parseInt(pick.confidence));
+                        console.log(`🔒 CONFIDENCE_FILTER: Game ${gameId} is locked with confidence ${pick.confidence}`);
+                    }
+                }
+            });
+
+            // Also check for games with locked time status
+            Object.keys(userPicks).forEach(gameId => {
+                // Skip the current game we're populating
+                if (gameId === currentGameId) return;
+
+                // Skip non-game data (userId, userName, etc.)
+                if (!gameId.includes('game_')) return;
+
+                const pick = userPicks[gameId];
+                if (pick && pick.confidence) {
+                    // Check if this game's time has passed (making it locked)
+                    const gameData = window.weekGames?.find(g => g.id === gameId);
+                    if (gameData) {
+                        const gameTime = new Date(gameData.date);
+                        const now = new Date();
+                        const isTimeLocked = now >= gameTime;
+
+                        if (isTimeLocked) {
+                            usedByLockedGames.add(parseInt(pick.confidence));
+                            console.log(`⏰ CONFIDENCE_FILTER: Game ${gameId} is time-locked with confidence ${pick.confidence}`);
+                        }
+                    }
+                }
+            });
+
+            // Filter out confidence values used by locked games
+            const availableValues = allValues.filter(value => !usedByLockedGames.has(value));
+
+            console.log(`🎯 CONFIDENCE_FILTER: Available values for ${currentGameId}: [${availableValues.join(', ')}] (excluded locked: [${Array.from(usedByLockedGames).join(', ')}])`);
+
+            return availableValues;
+        }
+
+        function refreshConfidenceDropdowns() {
+            // Refresh all confidence dropdowns to reflect current locked game restrictions
+            document.querySelectorAll('.confidence-select:not([disabled])').forEach(select => {
+                const gameId = select.getAttribute('data-game-id');
+                const currentValue = select.value;
+                const totalGames = document.querySelectorAll('.game-row').length;
+
+                // Get available values for this game
+                const availableValues = getAvailableConfidenceValues(gameId, totalGames);
+
+                // Clear existing options except "Select..."
+                select.innerHTML = '<option value="">Select...</option>';
+
+                // Add available options
+                availableValues.forEach(confValue => {
+                    const option = document.createElement('option');
+                    option.value = confValue;
+                    option.textContent = confValue;
+                    if (confValue == currentValue) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+
+                console.log(`🔄 CONFIDENCE_REFRESH: Updated dropdown for ${gameId} with ${availableValues.length} available values`);
+            });
+        }
+
+        function updateWeekInfo() {
+            const weekInfo = document.getElementById('weekInfo');
+            const currentNFLWeek = getCurrentWeek();
+            const isCurrentWeek = currentWeek === currentNFLWeek;
+            const isPastWeek = currentWeek < currentNFLWeek;
+            const isFutureWeek = currentWeek > currentNFLWeek;
+
+            let statusText = '';
+            let statusClass = '';
+
+            if (isPastWeek) {
+                statusText = `📊 Past Week - View Only (Current NFL Week: ${currentNFLWeek})`;
+                statusClass = 'bg-wutang-surface border-wutang-border text-wutang-muted';
+            } else if (isCurrentWeek) {
+                statusText = `🔥 Current Week - Live Picks! (Games lock when they start)`;
+                statusClass = 'bg-green-50 border-green-200 text-green-700';
+            } else {
+                statusText = `📅 Future Week - Full Editing Available (Current NFL Week: ${currentNFLWeek})`;
+                statusClass = 'bg-blue-50 border-blue-200 text-blue-700';
+            }
+
+            weekInfo.className = `mt-4 p-3 border rounded ${statusClass}`;
+            weekInfo.innerHTML = `<p class="font-medium">${statusText}</p>`;
+            weekInfo.classList.remove('hidden');
+        }
+
+        function populatePicksEditor() {
+            const hasPicksData = Object.keys(userPicks).length > 0;
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+
+            if (!hasPicksData && gameIds.length === 0) {
+                showNoPicksMessage();
+                return;
+            }
+
+            if (!hasPicksData) {
+                showNoPicksMessage();
+                return;
+            }
+
+            showPicksEditor();
+            populateGamesList();
+            populateMNFPoints();
+            validatePicks();
+        }
+
+        function showPicksEditor() {
+            document.getElementById('picksEditor').classList.remove('hidden');
+            document.getElementById('noPicksMessage').classList.add('hidden');
+            document.getElementById('weekTitle').textContent = currentWeek;
+        }
+
+        function showNoPicksMessage() {
+            document.getElementById('picksEditor').classList.add('hidden');
+            document.getElementById('noPicksMessage').classList.remove('hidden');
+        }
+
+        function populateGamesList() {
+            const gamesList = document.getElementById('gamesList');
+            gamesList.innerHTML = '';
+
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+            const currentNFLWeek = getCurrentWeek();
+            const canEdit = currentWeek >= currentNFLWeek;
+
+            gameIds.forEach(gameId => {
+                const game = weekBible[gameId];
+                const pick = userPicks[gameId] || { winner: '', confidence: '' };
+
+                // Check if game has started using Eastern Time Parser
+                const gameStarted = window.easternTimeParser ?
+                    window.easternTimeParser.hasGameStarted(game.dt) : false;
+
+                // Determine if this row should be locked
+                const isLocked = canEdit ? gameStarted : true; // Lock if past week OR game started
+
+                const gameRow = document.createElement('div');
+                gameRow.className = `game-row px-6 py-4 ${isLocked ? 'locked-row' : ''}`;
+
+                // Format game time
+                let gameTimeDisplay = game.dt;
+                if (window.easternTimeParser) {
+                    gameTimeDisplay = window.easternTimeParser.formatGameTime(game.dt);
+                }
+
+                // Game status indicator
+                let statusIndicator = '';
+                if (game.status === 'final') {
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-wutang-surface text-wutang-accent">✅ FINAL</span>`;
+                } else if (gameStarted) {
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-wutang-surface text-wutang-danger">🔒 LOCKED</span>`;
+                } else {
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-wutang-surface text-wutang-secondary">📝 OPEN</span>`;
+                }
+
+                gameRow.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <!-- Game Info -->
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="flex items-center gap-2">
+                                    <h4 class="font-semibold text-wutang-text">Game ${gameId}</h4>
+                                    ${currentUser && ADMIN_UIDS.includes(currentUser.uid) ? `
+                                        <!-- 🧠 AI BRAIN ICON -->
+                                        <span onclick="showAIPrediction('${gameId}', '${game.a}', '${game.h}', event)"
+                                              class="w-5 h-5 hover:bg-wutang-surface transform hover:scale-125 transition-all duration-150 flex items-center justify-center group cursor-pointer rounded"
+                                              title="AI Prediction for ${game.a} @ ${game.h}">
+                                            <span class="text-xs group-hover:animate-pulse">🧠</span>
+                                        </span>
+                                    ` : ''}
+                                </div>
+                                ${statusIndicator}
+                            </div>
+                            <div class="text-sm text-wutang-muted mb-1">
+                                <span class="font-medium">${game.a}</span> @ <span class="font-medium">${game.h}</span>
+                            </div>
+                            <div class="time-display">${gameTimeDisplay}</div>
+                            ${game.winner ? `<div class="text-xs text-green-600 mt-1">🏆 Winner: ${game.winner}</div>` : ''}
+                        </div>
+
+                        <!-- Pick Controls -->
+                        <div class="flex items-center gap-4">
+                            <!-- Team Selection -->
+                            <div>
+                                <label class="block text-xs font-medium text-wutang-text mb-1">Pick</label>
+                                <select class="team-select px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        data-game-id="${gameId}" data-field="winner" ${isLocked ? 'disabled' : ''}>
+                                    <option value="">Select team...</option>
+                                    <option value="${game.a}" ${pick.winner === game.a ? 'selected' : ''}>${game.a}</option>
+                                    <option value="${game.h}" ${pick.winner === game.h ? 'selected' : ''}>${game.h}</option>
+                                </select>
+                            </div>
+
+                            <!-- Confidence -->
+                            <div>
+                                <label class="block text-xs font-medium text-wutang-text mb-1">Confidence</label>
+                                <select class="confidence-select px-3 py-2 border border-gray-300 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        data-game-id="${gameId}" data-field="confidence" ${isLocked ? 'disabled' : ''}>
+                                    <option value="">Select...</option>
+                                    ${getAvailableConfidenceValues(gameId, gameIds.length).map(confValue => `
+                                        <option value="${confValue}" ${pick.confidence == confValue ? 'selected' : ''}>${confValue}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                gamesList.appendChild(gameRow);
+            });
+
+            // Setup auto-save for editable fields
+            if (canEdit) {
+                document.querySelectorAll('[data-game-id]:not([disabled])').forEach(input => {
+                    setupAutoSave(input);
+                });
+            }
+
+            updateStatus(`Week ${currentWeek} loaded - ${canEdit ? 'Editable' : 'View Only'}`, 'success');
+
+            // Refresh confidence dropdowns after page load to apply locked game filtering
+            setTimeout(() => {
+                refreshConfidenceDropdowns();
+                console.log('🔄 INITIAL_LOAD: Refreshed confidence dropdowns after page load');
+            }, 100);
+        }
+
+        function populateMNFPoints() {
+            const mnfInput = document.getElementById('mnfPointsInput');
+            mnfInput.value = userPicks.mnfTotalPoints || '';
+
+            const currentNFLWeek = getCurrentWeek();
+            const canEdit = currentWeek >= currentNFLWeek;
+            mnfInput.disabled = !canEdit;
+        }
+
+        function setupAutoSave(input) {
+            if (input.getAttribute('data-field') === 'confidence') {
+                // Special handling for confidence dropdowns with swap logic
+                input.addEventListener('change', async () => {
+                    await handleConfidenceChange(input);
+                });
+            } else {
+                // Regular auto-save for team selection
+                input.addEventListener('blur', async () => {
+                    const gameId = input.getAttribute('data-game-id');
+                    const field = input.getAttribute('data-field');
+                    const value = input.value;
+
+                    if (!userPicks[gameId]) {
+                        userPicks[gameId] = {};
+                    }
+
+                    userPicks[gameId][field] = value;
+                    await savePicksData();
+                    validatePicks();
+                });
+            }
+        }
+
+        async function handleConfidenceChange(changedSelect) {
+            const gameId = changedSelect.getAttribute('data-game-id');
+            const newConfidence = parseInt(changedSelect.value);
+
+            if (!newConfidence) {
+                // If empty value selected, just clear this game's confidence
+                if (userPicks[gameId]) {
+                    userPicks[gameId].confidence = null;
+                }
+                await savePicksData();
+                validatePicks();
+                return;
+            }
+
+            // Find if another game already has this confidence value
+            let gameToSwap = null;
+            let oldConfidence = null;
+
+            // Get current confidence before change
+            if (userPicks[gameId] && userPicks[gameId].confidence) {
+                oldConfidence = userPicks[gameId].confidence;
+            }
+
+            // Find game that currently has the new confidence value
+            for (const [otherGameId, picks] of Object.entries(userPicks)) {
+                if (otherGameId !== gameId && picks.confidence === newConfidence) {
+                    gameToSwap = otherGameId;
+                    break;
+                }
+            }
+
+            // Update the picks data
+            if (!userPicks[gameId]) {
+                userPicks[gameId] = {};
+            }
+            userPicks[gameId].confidence = newConfidence;
+
+            // Swap if needed
+            if (gameToSwap) {
+                if (oldConfidence) {
+                    // Swap the values
+                    userPicks[gameToSwap].confidence = oldConfidence;
+                } else {
+                    // Just clear the other game's confidence
+                    userPicks[gameToSwap].confidence = null;
+                }
+
+                // Update the UI for the swapped game
+                const otherSelect = document.querySelector(`[data-game-id="${gameToSwap}"][data-field="confidence"]`);
+                if (otherSelect) {
+                    otherSelect.value = oldConfidence || '';
+                }
+            }
+
+            await savePicksData();
+            validatePicks();
+
+            // Refresh all confidence dropdowns to update available options
+            refreshConfidenceDropdowns();
+        }
+
+        async function savePicksData() {
+            if (!currentUser) return;
+
+            showAutoSaveStatus('saving');
+
+            try {
+                // Clear any previous timeout
+                if (autoSaveTimeout) {
+                    clearTimeout(autoSaveTimeout);
+                }
+
+                // Update metadata
+                userPicks.userId = currentUser.uid;
+                userPicks.userName = (poolMemberInfo && poolMemberInfo.name) ? poolMemberInfo.name : (currentUser.email || 'Unknown User');
+                userPicks.weekNumber = currentWeek;
+                userPicks.timestamp = Date.now();
+                userPicks.submittedAt = new Date().toISOString();
+
+                // Get MNF points
+                const mnfInput = document.getElementById('mnfPointsInput');
+                if (mnfInput.value) {
+                    userPicks.mnfTotalPoints = parseInt(mnfInput.value);
+                }
+
+                // 🛡️ VALIDATION: Check if we have all expected game picks
+                const expectedGames = Object.keys(weekBible).filter(k => k !== '_metadata');
+                const actualGamePicks = Object.keys(userPicks).filter(k => /^\d+$/.test(k));
+                if (actualGamePicks.length < expectedGames.length) {
+                    console.warn(`⚠️ INCOMPLETE PICKS: Saving ${actualGamePicks.length}/${expectedGames.length} games`);
+                    console.warn('Missing games:', expectedGames.filter(g => !actualGamePicks.includes(g)));
+                }
+
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksDoc = doc(db, picksPath, currentUser.uid);
+                await setDoc(picksDoc, userPicks, { merge: true });
+
+                showAutoSaveStatus('saved');
+
+                // Set timeout to return to ready state
+                autoSaveTimeout = setTimeout(() => {
+                    showAutoSaveStatus('ready');
+                }, 2000);
+
+            } catch (error) {
+                console.error('Auto-save failed:', error);
+                showAutoSaveStatus('error');
+            }
+        }
+
+        async function createBlankPicks() {
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+
+            userPicks = {
+                userId: currentUser.uid,
+                userName: (poolMemberInfo && poolMemberInfo.name) ? poolMemberInfo.name : (currentUser.email || 'Unknown User'),
+                weekNumber: currentWeek,
+                submittedAt: new Date().toISOString(),
+                mnfTotalPoints: 21,
+                timestamp: Date.now()
+            };
+
+            // Create blank picks
+            gameIds.forEach((gameId, index) => {
+                userPicks[gameId] = {
+                    winner: '',
+                    confidence: index + 1
+                };
+            });
+
+            await savePicksData();
+            populatePicksEditor();
+            updateStatus('Blank picks created', 'success');
+        }
+
+        function validatePicks() {
+            const gameIds = Object.keys(weekBible).filter(k => k !== '_metadata');
+            const confidenceValues = [];
+            const issues = [];
+            let completePicks = 0;
+
+            gameIds.forEach(gameId => {
+                const pick = userPicks[gameId];
+                if (pick) {
+                    if (pick.winner) completePicks++;
+
+                    if (!pick.winner) {
+                        issues.push(`Game ${gameId}: No team selected`);
+                    }
+                    if (pick.confidence) {
+                        if (pick.confidence < 1 || pick.confidence > gameIds.length) {
+                            issues.push(`Game ${gameId}: Invalid confidence ${pick.confidence}`);
+                        } else {
+                            confidenceValues.push(pick.confidence);
+                        }
+                    } else {
+                        issues.push(`Game ${gameId}: No confidence value`);
+                    }
+                }
+            });
+
+            // Check for duplicates
+            const uniqueConfidence = [...new Set(confidenceValues)];
+            if (confidenceValues.length !== uniqueConfidence.length) {
+                issues.push('⚠️ Duplicate confidence values detected');
+            }
+
+            // Check for complete set
+            const expectedTotal = gameIds.length * (gameIds.length + 1) / 2;
+            const actualTotal = confidenceValues.reduce((sum, val) => sum + val, 0);
+
+            // Update validation display
+            const validationDetails = document.getElementById('validationDetails');
+            const progressPercent = Math.round((completePicks / gameIds.length) * 100);
+
+            let validationHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-lg font-medium">Progress: ${completePicks}/${gameIds.length} picks (${progressPercent}%)</span>
+                    <span class="text-sm">Confidence sum: ${actualTotal}/${expectedTotal}</span>
+                </div>
+                <div class="w-full bg-wutang-border rounded-full h-2 mb-4">
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: ${progressPercent}%"></div>
+                </div>
+            `;
+
+            if (issues.length === 0 && completePicks === gameIds.length) {
+                validationHTML += `<p class="wutang-accent font-medium">✅ All bee picks complete and valid!</p>`;
+                document.getElementById('validationSummary').className = 'mt-6 wutang-window rounded-xl p-6 border-l-4 border-wutang-accent';
+            } else {
+                if (issues.length > 0) {
+                    validationHTML += `
+                        <div class="wutang-secondary">
+                            <p class="font-medium mb-2">⚠️ Bee hive anomalies to fix:</p>
+                            <ul class="list-disc list-inside space-y-1 text-sm">
+                                ${issues.slice(0, 5).map(issue => `<li>${issue}</li>`).join('')}
+                                ${issues.length > 5 ? `<li>...and ${issues.length - 5} more hive disturbances</li>` : ''}
+                            </ul>
+                        </div>
+                    `;
+                }
+                document.getElementById('validationSummary').className = 'mt-6 wutang-window rounded-xl p-6 border-l-4 border-wutang-secondary';
+            }
+
+            validationDetails.innerHTML = validationHTML;
+        }
+
+        function showAutoSaveStatus(status) {
+            const statusEl = document.getElementById('autoSaveStatus');
+            statusEl.className = 'px-3 py-1 rounded text-sm auto-save-indicator';
+
+            switch (status) {
+                case 'saving':
+                    statusEl.textContent = '💾 Saving...';
+                    statusEl.classList.add('saving');
+                    break;
+                case 'saved':
+                    statusEl.textContent = '✅ Saved';
+                    statusEl.classList.add('saved');
+                    break;
+                case 'error':
+                    statusEl.textContent = '❌ Save failed';
+                    statusEl.classList.add('error');
+                    break;
+                default:
+                    statusEl.textContent = '🔄 Ready';
+                    statusEl.className = 'px-3 py-1 rounded text-sm bg-wutang-surface';
+            }
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('statusIndicator');
+            statusEl.textContent = message;
+
+            statusEl.className = 'px-3 py-1 rounded text-sm';
+
+            switch (type) {
+                case 'success':
+                    statusEl.classList.add('bg-wutang-surface', 'text-wutang-accent');
+                    break;
+                case 'error':
+                    statusEl.classList.add('bg-wutang-surface', 'text-wutang-danger');
+                    break;
+                case 'info':
+                    statusEl.classList.add('bg-wutang-surface', 'text-wutang-secondary');
+                    break;
+                default:
+                    statusEl.classList.add('bg-wutang-surface', 'text-wutang-text');
+            }
+        }
+
+        // 🤖 ML PREDICTION SYSTEM - INTEGRATION
+
+        // ML Modal Elements
+        const mlPredictionModal = document.getElementById('ml-prediction-modal');
+        const closeMlPredictionBtn = document.getElementById('close-ml-prediction-btn');
+        const mlPredictionContent = document.getElementById('ml-prediction-content');
+
+        // ML Modal Event Listeners
+        if (closeMlPredictionBtn) {
+            closeMlPredictionBtn.addEventListener('click', closeMlPredictionModal);
+        }
+
+        if (mlPredictionModal) {
+            mlPredictionModal.addEventListener('click', (e) => {
+                if (e.target === mlPredictionModal) {
+                    closeMlPredictionModal();
+                }
+            });
+        }
+
+        // Team name to abbreviation mapping
+        const teamNameToAbbr = {
+            'Buffalo Bills': 'BUF', 'Miami Dolphins': 'MIA', 'New England Patriots': 'NE', 'New York Jets': 'NYJ',
+            'Baltimore Ravens': 'BAL', 'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Pittsburgh Steelers': 'PIT',
+            'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX', 'Tennessee Titans': 'TEN',
+            'Denver Broncos': 'DEN', 'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+            'Dallas Cowboys': 'DAL', 'New York Giants': 'NYG', 'Philadelphia Eagles': 'PHI', 'Washington Commanders': 'WAS',
+            'Chicago Bears': 'CHI', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB', 'Minnesota Vikings': 'MIN',
+            'Atlanta Falcons': 'ATL', 'Carolina Panthers': 'CAR', 'New Orleans Saints': 'NO', 'Tampa Bay Buccaneers': 'TB',
+            'Arizona Cardinals': 'ARI', 'Los Angeles Rams': 'LAR', 'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA'
+        };
+
+        // NFL Team Database for ML predictions
+        const nflTeamDatabase = {
+            'Buffalo Bills': {
+                offense: 92, defense: 88, recentForm: 85, homeAdvantage: 3.2,
+                passingOffense: 91, rushingOffense: 78, passingDefense: 85, rushingDefense: 90,
+                turnoverDiff: 8, injuryImpact: 2, coachingRating: 88, clutchFactor: 92
+            },
+            'Kansas City Chiefs': {
+                offense: 95, defense: 82, recentForm: 95, homeAdvantage: 4.1,
+                passingOffense: 98, rushingOffense: 76, passingDefense: 80, rushingDefense: 84,
+                turnoverDiff: 12, injuryImpact: 1, coachingRating: 98, clutchFactor: 99
+            },
+            'San Francisco 49ers': {
+                offense: 88, defense: 92, recentForm: 88, homeAdvantage: 3.8,
+                passingOffense: 86, rushingOffense: 91, passingDefense: 93, rushingDefense: 90,
+                turnoverDiff: 6, injuryImpact: 4, coachingRating: 94, clutchFactor: 87
+            },
+            'Philadelphia Eagles': {
+                offense: 90, defense: 85, recentForm: 82, homeAdvantage: 3.5,
+                passingOffense: 89, rushingOffense: 92, passingDefense: 83, rushingDefense: 87,
+                turnoverDiff: 4, injuryImpact: 3, coachingRating: 86, clutchFactor: 84
+            }
+        };
+
+        // Generate ML Prediction
+        function generateMLPrediction(awayTeam, homeTeam, gameId) {
+            const awayData = nflTeamDatabase[awayTeam] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+
+            const homeData = nflTeamDatabase[homeTeam] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+
+            // Calculate advantage scores
+            const offenseAdvantage = homeData.offense - awayData.offense;
+            const defenseAdvantage = homeData.defense - awayData.defense;
+            const formAdvantage = homeData.recentForm - awayData.recentForm;
+            const homeFieldAdvantage = homeData.homeAdvantage;
+
+            // Calculate win probability
+            let homeWinProb = 50;
+            homeWinProb += (offenseAdvantage * 0.25);
+            homeWinProb += (defenseAdvantage * 0.25);
+            homeWinProb += (formAdvantage * 0.15);
+            homeWinProb += (homeFieldAdvantage * 3);
+
+            homeWinProb = Math.max(15, Math.min(95, homeWinProb));
+            const awayWinProb = 100 - homeWinProb;
+
+            return {
+                winner: homeWinProb > 50 ? homeTeam : awayTeam,
+                confidence: Math.round(Math.max(homeWinProb, awayWinProb)),
+                homeWinProbability: Math.round(homeWinProb * 10) / 10,
+                awayWinProbability: Math.round(awayWinProb * 10) / 10,
+                factors: [
+                    `Offensive Power: ${teamNameToAbbr[homeTeam]} ${homeData.offense} vs ${teamNameToAbbr[awayTeam]} ${awayData.offense}`,
+                    `Defensive Strength: ${teamNameToAbbr[homeTeam]} ${homeData.defense} vs ${teamNameToAbbr[awayTeam]} ${awayData.defense}`,
+                    `Recent Form: ${teamNameToAbbr[homeTeam]} ${homeData.recentForm}% vs ${teamNameToAbbr[awayTeam]} ${awayData.recentForm}%`,
+                    `Home Field Advantage: +${homeData.homeAdvantage} points for ${teamNameToAbbr[homeTeam]}`
+                ],
+                reasoning: `${homeWinProb > 50 ? teamNameToAbbr[homeTeam] : teamNameToAbbr[awayTeam]} prediction based on key statistical advantages`
+            };
+        }
+
+        // Open ML Prediction Modal
+        window.openMLPredictionModal = function(gameId, awayTeam, homeTeam, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+
+            if (!currentUser) {
+                updateStatus('Please sign in to view AI predictions', 'error');
+                return;
+            }
+
+            // Admin-only AI features
+            if (!ADMIN_UIDS.includes(currentUser.uid)) {
+                updateStatus('AI predictions are currently in beta testing', 'info');
+                return;
+            }
+
+            console.log(`🧠 BRAIN_ICON_DEBUG: Opening ML prediction for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
+
+            const mlPrediction = generateMLPrediction(awayTeam, homeTeam, gameId);
+
+            const awayAbbr = teamNameToAbbr[awayTeam] || awayTeam;
+            const homeAbbr = teamNameToAbbr[homeTeam] || homeTeam;
+
+            const modalContent = `
+                <!-- Game Header -->
+                <div class="bg-gradient-to-r from-slate-50 to-blue-50 rounded-lg p-6 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="text-center">
+                                <div class="text-lg font-bold text-slate-800">${awayTeam}</div>
+                                <div class="text-sm text-slate-600">@</div>
+                            </div>
+                            <div>
+                                <div class="text-lg font-bold text-slate-800">${homeTeam}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-slate-600">Game ${gameId}</div>
+                            <div class="text-sm text-slate-600">Week ${currentWeek}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ML Win Prediction -->
+                <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                        <span class="mr-2">🤖</span>ML Win Prediction v1.0
+                    </h3>
+
+                    <!-- Win Probability Display -->
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-secondary text-center">
+                            <div class="text-lg font-bold text-blue-700">${awayAbbr}</div>
+                            <div class="text-3xl font-bold text-blue-600 mb-2">
+                                ${mlPrediction.awayWinProbability}%
+                            </div>
+                            <div class="text-sm text-blue-500">Win Probability</div>
+                        </div>
+                        <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-accent text-center">
+                            <div class="text-lg font-bold text-green-700">${homeAbbr}</div>
+                            <div class="text-3xl font-bold text-green-600 mb-2">
+                                ${mlPrediction.homeWinProbability}%
+                            </div>
+                            <div class="text-sm text-green-500">Win Probability</div>
+                        </div>
+                    </div>
+
+                    <!-- Predicted Winner -->
+                    <div class="text-center mb-4">
+                        <div class="text-2xl font-bold mb-2 text-green-700">
+                            🏆 Predicted Winner: ${mlPrediction.winner}
+                        </div>
+                        <div class="text-lg font-semibold text-green-600">
+                            ${mlPrediction.confidence}% Confidence
+                        </div>
+                    </div>
+
+                    <!-- Key Factors -->
+                    <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-accent mb-4">
+                        <div class="text-sm font-semibold text-green-800 mb-3">🎯 Key Factors Analyzed:</div>
+                        <div class="grid grid-cols-1 gap-2">
+                            ${mlPrediction.factors.map(factor => `
+                                <div class="text-sm text-green-700 bg-green-50 px-3 py-2 rounded border">
+                                    ${factor}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- AI Reasoning -->
+                    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <div class="text-sm font-semibold text-slate-800 mb-2">🧠 AI Analysis:</div>
+                        <div class="text-sm text-slate-700 italic">
+                            ${mlPrediction.reasoning}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            mlPredictionContent.innerHTML = modalContent;
+            mlPredictionModal.classList.remove('hidden');
+        };
+
+        // Make currentUser available globally for ML predictions
+        window.currentUser = currentUser;
+
+        // Close ML Prediction Modal
+        window.closeMlPredictionModal = function() {
+            if (mlPredictionModal) {
+                mlPredictionModal.classList.add('hidden');
+            }
+        };
+    </script>
+
+    <!-- 🤖 ML PREDICTION SYSTEM - GLOBAL SCOPE -->
+    <script>
+        // Global ML Prediction Functions for Confidence Pool
+
+        // Team name to abbreviation mapping
+        const confidenceTeamNameToAbbr = {
+            'Buffalo Bills': 'BUF', 'Miami Dolphins': 'MIA', 'New England Patriots': 'NE', 'New York Jets': 'NYJ',
+            'Baltimore Ravens': 'BAL', 'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE', 'Pittsburgh Steelers': 'PIT',
+            'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX', 'Tennessee Titans': 'TEN',
+            'Denver Broncos': 'DEN', 'Kansas City Chiefs': 'KC', 'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC',
+            'Dallas Cowboys': 'DAL', 'New York Giants': 'NYG', 'Philadelphia Eagles': 'PHI', 'Washington Commanders': 'WAS',
+            'Chicago Bears': 'CHI', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB', 'Minnesota Vikings': 'MIN',
+            'Atlanta Falcons': 'ATL', 'Carolina Panthers': 'CAR', 'New Orleans Saints': 'NO', 'Tampa Bay Buccaneers': 'TB',
+            'Arizona Cardinals': 'ARI', 'Los Angeles Rams': 'LAR', 'San Francisco 49ers': 'SF', 'Seattle Seahawks': 'SEA'
+        };
+
+        // NFL Team Database for confidence predictions
+        const confidenceNflTeamDatabase = {
+            'Buffalo Bills': {
+                offense: 92, defense: 88, recentForm: 85, homeAdvantage: 3.2,
+                turnoverDiff: 8, injuryImpact: 2, coachingRating: 88, clutchFactor: 92
+            },
+            'Kansas City Chiefs': {
+                offense: 95, defense: 82, recentForm: 95, homeAdvantage: 4.1,
+                turnoverDiff: 12, injuryImpact: 1, coachingRating: 98, clutchFactor: 99
+            },
+            'San Francisco 49ers': {
+                offense: 88, defense: 92, recentForm: 88, homeAdvantage: 3.8,
+                turnoverDiff: 6, injuryImpact: 4, coachingRating: 94, clutchFactor: 87
+            },
+            'Philadelphia Eagles': {
+                offense: 90, defense: 85, recentForm: 82, homeAdvantage: 3.5,
+                turnoverDiff: 4, injuryImpact: 3, coachingRating: 86, clutchFactor: 84
+            }
+        };
+
+        // Generate ML Prediction for Confidence Pool
+        function generateConfidenceMLPrediction(awayTeam, homeTeam, gameId) {
+            const awayData = confidenceNflTeamDatabase[awayTeam] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+
+            const homeData = confidenceNflTeamDatabase[homeTeam] || {
+                offense: 75, defense: 75, recentForm: 75, homeAdvantage: 3.0,
+                turnoverDiff: 0, injuryImpact: 5, coachingRating: 75, clutchFactor: 75
+            };
+
+            // Calculate advantage scores
+            const offenseAdvantage = homeData.offense - awayData.offense;
+            const defenseAdvantage = homeData.defense - awayData.defense;
+            const formAdvantage = homeData.recentForm - awayData.recentForm;
+            const homeFieldAdvantage = homeData.homeAdvantage;
+
+            // Calculate win probability
+            let homeWinProb = 50;
+            homeWinProb += (offenseAdvantage * 0.25);
+            homeWinProb += (defenseAdvantage * 0.25);
+            homeWinProb += (formAdvantage * 0.15);
+            homeWinProb += (homeFieldAdvantage * 3);
+
+            homeWinProb = Math.max(15, Math.min(95, homeWinProb));
+            const awayWinProb = 100 - homeWinProb;
+
+            return {
+                winner: homeWinProb > 50 ? homeTeam : awayTeam,
+                confidence: Math.round(Math.max(homeWinProb, awayWinProb)),
+                homeWinProbability: Math.round(homeWinProb * 10) / 10,
+                awayWinProbability: Math.round(awayWinProb * 10) / 10,
+                factors: [
+                    `Offensive Power: ${confidenceTeamNameToAbbr[homeTeam]} ${homeData.offense} vs ${confidenceTeamNameToAbbr[awayTeam]} ${awayData.offense}`,
+                    `Defensive Strength: ${confidenceTeamNameToAbbr[homeTeam]} ${homeData.defense} vs ${confidenceTeamNameToAbbr[awayTeam]} ${awayData.defense}`,
+                    `Recent Form: ${confidenceTeamNameToAbbr[homeTeam]} ${homeData.recentForm}% vs ${confidenceTeamNameToAbbr[awayTeam]} ${awayData.recentForm}%`,
+                    `Home Field Advantage: +${homeData.homeAdvantage} points for ${confidenceTeamNameToAbbr[homeTeam]}`
+                ],
+                reasoning: `${homeWinProb > 50 ? confidenceTeamNameToAbbr[homeTeam] : confidenceTeamNameToAbbr[awayTeam]} prediction based on key statistical advantages`
+            };
+        }
+
+        // Global function to override module-scoped one
+        window.openMLPredictionModal = function(gameId, awayTeam, homeTeam, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+
+            console.log(`🧠 BRAIN_ICON_DEBUG: Opening confidence ML prediction for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
+
+            // Check if Firebase is loaded and user is authenticated
+            if (typeof window.currentUser === 'undefined' || !window.currentUser) {
+                console.log('🧠 BRAIN_ICON_DEBUG: User not authenticated yet, showing basic prediction');
+                showBasicConfidencePrediction(gameId, awayTeam, homeTeam);
+                return;
+            }
+
+            // Check admin status
+            const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
+            if (!ADMIN_UIDS.includes(window.currentUser.uid)) {
+                console.log('🧠 BRAIN_ICON_DEBUG: Non-admin user, showing message');
+                alert('AI predictions are currently in beta testing');
+                return;
+            }
+
+            showBasicConfidencePrediction(gameId, awayTeam, homeTeam);
+        };
+
+        function showBasicConfidencePrediction(gameId, awayTeam, homeTeam) {
+            const mlPrediction = generateConfidenceMLPrediction(awayTeam, homeTeam, gameId);
+
+            const awayAbbr = confidenceTeamNameToAbbr[awayTeam] || awayTeam;
+            const homeAbbr = confidenceTeamNameToAbbr[homeTeam] || homeTeam;
+
+            const modalContent = `
+                <!-- Game Header -->
+                <div class="bg-gradient-to-r from-slate-50 to-blue-50 rounded-lg p-6 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="text-center">
+                                <div class="text-lg font-bold text-slate-800">${awayTeam}</div>
+                                <div class="text-sm text-slate-600">@</div>
+                            </div>
+                            <div>
+                                <div class="text-lg font-bold text-slate-800">${homeTeam}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-slate-600">Game ${gameId}</div>
+                            <div class="text-sm text-slate-600">Confidence Pick</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ML Win Prediction -->
+                <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-green-800 mb-4 flex items-center">
+                        <span class="mr-2">🤖</span>ML Win Prediction v1.0
+                    </h3>
+
+                    <!-- Win Probability Display -->
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-secondary text-center">
+                            <div class="text-lg font-bold text-blue-700">${awayAbbr}</div>
+                            <div class="text-3xl font-bold text-blue-600 mb-2">
+                                ${mlPrediction.awayWinProbability}%
+                            </div>
+                            <div class="text-sm text-blue-500">Win Probability</div>
+                        </div>
+                        <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-accent text-center">
+                            <div class="text-lg font-bold text-green-700">${homeAbbr}</div>
+                            <div class="text-3xl font-bold text-green-600 mb-2">
+                                ${mlPrediction.homeWinProbability}%
+                            </div>
+                            <div class="text-sm text-green-500">Win Probability</div>
+                        </div>
+                    </div>
+
+                    <!-- Predicted Winner -->
+                    <div class="text-center mb-4">
+                        <div class="text-2xl font-bold mb-2 text-green-700">
+                            🏆 Predicted Winner: ${mlPrediction.winner}
+                        </div>
+                        <div class="text-lg font-semibold text-green-600">
+                            ${mlPrediction.confidence}% Confidence
+                        </div>
+                    </div>
+
+                    <!-- Key Factors -->
+                    <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-accent mb-4">
+                        <div class="text-sm font-semibold text-green-800 mb-3">🎯 Key Factors Analyzed:</div>
+                        <div class="grid grid-cols-1 gap-2">
+                            ${mlPrediction.factors.map(factor => `
+                                <div class="text-sm text-green-700 bg-green-50 px-3 py-2 rounded border">
+                                    ${factor}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- AI Reasoning -->
+                    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <div class="text-sm font-semibold text-slate-800 mb-2">🧠 AI Analysis:</div>
+                        <div class="text-sm text-slate-700 italic">
+                            ${mlPrediction.reasoning}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const modal = document.getElementById('ml-prediction-modal');
+            const modalContent_el = document.getElementById('ml-prediction-content');
+            if (modal && modalContent_el) {
+                modalContent_el.innerHTML = modalContent;
+                modal.classList.remove('hidden');
+            }
+        }
+
+        // Override the close function too
+        window.closeMlPredictionModal = function() {
+            const modal = document.getElementById('ml-prediction-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        };
+
+        // Setup modal event listeners when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('ml-prediction-modal');
+            const closeBtn = document.getElementById('close-ml-prediction-btn');
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', window.closeMlPredictionModal);
+            }
+
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        window.closeMlPredictionModal();
+                    }
+                });
+            }
+        });
+
+        console.log('🧠 ML PREDICTION DEBUG: Global confidence ML prediction functions loaded');
+    </script>
+</body>
+</html>

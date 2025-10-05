@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Andrea's Picks</title>
+</head>
+<body>
+    <h1>Debugging Andrea Weeg's Week 3 Picks</h1>
+    <div id="auth-status">Loading...</div>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+
+        // Authentication handler
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            const authStatus = document.getElementById('auth-status');
+            if (user) {
+                authStatus.innerHTML = `<p style="color: green;">✅ Signed in as: ${user.email}</p>`;
+                debugAndrea();
+            } else {
+                authStatus.innerHTML = `<button onclick="signIn()" style="background: blue; color: white; padding: 10px;">Sign In with Google</button>`;
+            }
+        });
+
+        window.signIn = async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error('Sign in failed:', error);
+            }
+        };
+
+        async function debugAndrea() {
+            if (!currentUser) return;
+            const results = document.getElementById('results');
+
+            try {
+                // Get Andrea's picks
+                const andreaId = 'bEVzcZtSExT8cIjamWnGbWZ3J5s1';
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const docRef = doc(db, picksPath, andreaId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const picks = docSnap.data();
+                    console.log('🔥DEBUGKEY🔥 Andrea Raw Picks:', picks);
+
+                    let html = '<h2>Andrea\'s Raw Week 3 Picks Data:</h2>';
+                    html += '<pre>' + JSON.stringify(picks, null, 2) + '</pre>';
+
+                    html += '<h2>Game by Game Analysis:</h2>';
+                    html += '<table border="1"><tr><th>Game</th><th>Andrea Pick</th><th>Confidence</th><th>Actual Winner</th><th>Correct?</th></tr>';
+
+                    // Bible data
+                    const bibleData = {
+                        "301": { winner: "Buffalo Bills" },
+                        "302": { winner: "Cleveland Browns" },
+                        "303": { winner: "Indianapolis Colts" },
+                        "304": { winner: "Minnesota Vikings" },
+                        "305": { winner: "Pittsburgh Steelers" },
+                        "306": { winner: "Philadelphia Eagles" },
+                        "307": { winner: "Tampa Bay Buccaneers" },
+                        "308": { winner: "Washington Commanders" },
+                        "309": { winner: "Carolina Panthers" },
+                        "310": { winner: "Jacksonville Jaguars" },
+                        "311": { winner: "Los Angeles Chargers" },
+                        "312": { winner: "Seattle Seahawks" },
+                        "313": { winner: "Chicago Bears" },
+                        "314": { winner: "San Francisco 49ers" },
+                        "315": { winner: "Kansas City Chiefs" },
+                        "316": { winner: "Detroit Lions" }
+                    };
+
+                    let correctCount = 0;
+                    let pointsEarned = 0;
+
+                    for (let gameId = 301; gameId <= 316; gameId++) {
+                        const gameKey = gameId.toString();
+                        const pick = picks[gameKey];
+                        const actualWinner = bibleData[gameKey].winner;
+
+                        if (pick) {
+                            const isCorrect = pick.winner === actualWinner;
+                            if (isCorrect) {
+                                correctCount++;
+                                pointsEarned += pick.confidence || 0;
+                            }
+                            html += `<tr>
+                                <td>${gameKey}</td>
+                                <td>${pick.winner || 'N/A'}</td>
+                                <td>${pick.confidence || 'N/A'}</td>
+                                <td>${actualWinner}</td>
+                                <td style="color: ${isCorrect ? 'green' : 'red'}">${isCorrect ? '✅ WIN' : '❌ LOSS'}</td>
+                            </tr>`;
+                        } else {
+                            html += `<tr>
+                                <td>${gameKey}</td>
+                                <td colspan="4" style="color: red">MISSING PICK</td>
+                            </tr>`;
+                        }
+                    }
+
+                    console.log(`🔥DEBUGKEY🔥 Andrea MANUAL CALCULATION: ${correctCount} wins, ${pointsEarned} points`);
+
+                    html += '</table>';
+                    results.innerHTML = html;
+
+                } else {
+                    results.innerHTML = '<p style="color: red;">No picks found for Andrea!</p>';
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                results.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        debugAndrea();
+    </script>
+</body>
+</html>

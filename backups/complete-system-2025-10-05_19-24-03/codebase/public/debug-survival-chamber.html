@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Survival Chamber</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>🔍 SURVIVAL CHAMBER DEBUG</h1>
+    <div id="results"></div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // Make Firebase available globally
+        window.firebase = firebase;
+        window.db = db;
+        window.auth = auth;
+        window.doc = (path) => db.doc(path);
+        window.getDoc = (docRef) => docRef.get();
+
+        // Test loading a specific user's Week 4 pick
+        async function testUserPick() {
+            try {
+                const userId = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+                const picksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
+                const userPicksDoc = await window.getDoc(window.doc(window.db, picksPath));
+
+                if (userPicksDoc.exists()) {
+                    const pickData = userPicksDoc.data();
+                    log(`📋 User ${userId.slice(0,8)}... has picks:`, Object.keys(pickData));
+
+                    const week4Pick = pickData['4'];
+                    if (week4Pick) {
+                        log(`🎯 Week 4 pick found: ${JSON.stringify(week4Pick)}`);
+                    } else {
+                        log(`❌ No Week 4 pick found for user`);
+                    }
+                } else {
+                    log(`❌ No pick document found for user ${userId}`);
+                }
+            } catch (error) {
+                log(`❌ Error testing user pick: ${error.message}`);
+            }
+        }
+
+        function log(message) {
+            console.log(message);
+            document.getElementById('results').innerHTML += message + '<br>';
+        }
+
+        function getCurrentWeekNumber() {
+            const seasonStart = new Date('2025-09-04'); // 2025 season, not 2024!
+            const now = new Date();
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        async function debugGameStatus() {
+            const currentWeek = getCurrentWeekNumber();
+            log(`🔍 Checking current week ${currentWeek} for started games in Firestore...`);
+
+            try {
+                // Check live game status from Firestore (where nerd-game-updater updates)
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesRef = window.doc(window.db, gamesPath);
+                const gamesSnap = await window.getDoc(gamesRef);
+
+                if (!gamesSnap.exists()) {
+                    log(`❌ No game data found in Firestore for week ${currentWeek}`);
+                    return;
+                }
+
+                const gamesData = gamesSnap.data();
+                const games = Object.entries(gamesData)
+                    .filter(([key]) => !key.startsWith('_'))
+                    .map(([id, game]) => ({ id, ...game }));
+
+                log(`📊 Found ${games.length} games in Firestore for week ${currentWeek}`);
+
+                // Check each game status
+                games.forEach(game => {
+                    const status = game.status || 'scheduled';
+                    log(`Game ${game.id}: ${game.a || game.awayTeam} @ ${game.h || game.homeTeam} - Status: ${status}`);
+                });
+
+                // Check if any games have started
+                const hasStartedGames = games.some(game => {
+                    const status = game.status || 'scheduled';
+                    const started = status === 'IN_PROGRESS' ||
+                                   status === 'STATUS_FINAL' ||
+                                   status === 'FINAL' ||
+                                   status === 'FINAL/OT' ||
+                                   status === 'HALFTIME';
+
+                    if (started) {
+                        log(`🎯 Game ${game.id} has started: ${status}`);
+                    }
+                    return started;
+                });
+
+                if (!hasStartedGames) {
+                    log(`⏸️ No games started yet for week ${currentWeek}`);
+                    return;
+                }
+
+                log(`🎯 Games have started! Should show current week ${currentWeek} picks...`);
+
+            } catch (error) {
+                log(`❌ Error checking games: ${error.message}`);
+            }
+        }
+
+        // Auto-login for testing
+        async function loginForTesting() {
+            try {
+                log('🔐 Waiting for Firebase Auth...');
+
+                // Wait for auth to be ready
+                await new Promise((resolve) => {
+                    const unsubscribe = auth.onAuthStateChanged((user) => {
+                        unsubscribe();
+                        if (user) {
+                            log(`✅ Already logged in as: ${user.email}`);
+                        } else {
+                            log('❌ Not logged in - please login first');
+                        }
+                        resolve();
+                    });
+                });
+
+                // Wait for auth state to settle
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (error) {
+                log(`❌ Auth check failed: ${error.message}`);
+            }
+        }
+
+        // Run debug when page loads
+        window.addEventListener('load', async () => {
+            await loginForTesting();
+            await debugGameStatus();
+            log('---');
+            await testUserPick();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor Pool Admin CRUD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: { preflight: true }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-7xl mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-6">🏈 Survivor Pool Admin CRUD</h1>
+
+        <!-- Auth Status -->
+        <div id="authStatus" class="mb-6 p-4 bg-yellow-100 border border-yellow-300 rounded">
+            <p class="text-yellow-800">🔐 Checking admin authentication...</p>
+        </div>
+
+        <!-- Admin Controls -->
+        <div id="adminControls" class="hidden">
+            <!-- User Selection -->
+            <div class="mb-6 bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">👤 User Selection</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="userSelect" class="block text-sm font-medium text-gray-700 mb-2">Select User:</label>
+                        <select id="userSelect" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Loading users...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="weekSelect" class="block text-sm font-medium text-gray-700 mb-2">Select Week:</label>
+                        <select id="weekSelect" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <!-- Weeks 1-18 will be populated -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Pick Display -->
+            <div id="currentPickSection" class="mb-6 bg-white rounded-lg shadow p-6 hidden">
+                <h2 class="text-xl font-bold mb-4">📊 Current Pick</h2>
+                <div id="currentPickDisplay"></div>
+            </div>
+
+            <!-- Pick Editor -->
+            <div id="pickEditorSection" class="mb-6 bg-white rounded-lg shadow p-6 hidden">
+                <h2 class="text-xl font-bold mb-4">✏️ Edit Pick</h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="teamSelect" class="block text-sm font-medium text-gray-700 mb-2">Team:</label>
+                        <select id="teamSelect" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Team...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="gameIdInput" class="block text-sm font-medium text-gray-700 mb-2">Game ID:</label>
+                        <input type="text" id="gameIdInput" placeholder="e.g., 111" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="resultSelect" class="block text-sm font-medium text-gray-700 mb-2">Result:</label>
+                        <select id="resultSelect" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="Pending">Pending</option>
+                            <option value="Win">Win</option>
+                            <option value="Loss">Loss</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="aliveSelect" class="block text-sm font-medium text-gray-700 mb-2">Alive Status:</label>
+                        <select id="aliveSelect" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="true">✅ Alive</option>
+                            <option value="false">💀 Eliminated</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button id="savePickBtn" class="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition-colors">
+                        💾 Save Pick
+                    </button>
+                    <button id="deletePickBtn" class="bg-red-600 text-white px-6 py-3 rounded-md hover:bg-red-700 transition-colors">
+                        🗑️ Delete Pick
+                    </button>
+                    <button id="clearFormBtn" class="bg-gray-600 text-white px-6 py-3 rounded-md hover:bg-gray-700 transition-colors">
+                        🧹 Clear Form
+                    </button>
+                </div>
+            </div>
+
+            <!-- User's Full Survivor History -->
+            <div id="survivorHistorySection" class="mb-6 bg-white rounded-lg shadow p-6 hidden">
+                <h2 class="text-xl font-bold mb-4">📈 Full Survivor History</h2>
+                <div id="survivorHistoryContent"></div>
+            </div>
+
+            <!-- Status and Auto-save Messages -->
+            <div id="statusArea" class="mb-6">
+                <!-- Status messages will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Admin UIDs
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2',
+            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2',
+            'bEVzcZtSExT8cIjamWnGbWZ3J5s1'
+        ];
+
+        // NFL Teams
+        const NFL_TEAMS = [
+            'Arizona Cardinals', 'Atlanta Falcons', 'Baltimore Ravens', 'Buffalo Bills',
+            'Carolina Panthers', 'Chicago Bears', 'Cincinnati Bengals', 'Cleveland Browns',
+            'Dallas Cowboys', 'Denver Broncos', 'Detroit Lions', 'Green Bay Packers',
+            'Houston Texans', 'Indianapolis Colts', 'Jacksonville Jaguars', 'Kansas City Chiefs',
+            'Las Vegas Raiders', 'Los Angeles Chargers', 'Los Angeles Rams', 'Miami Dolphins',
+            'Minnesota Vikings', 'New England Patriots', 'New Orleans Saints', 'New York Giants',
+            'New York Jets', 'Philadelphia Eagles', 'Pittsburgh Steelers', 'San Francisco 49ers',
+            'Seattle Seahawks', 'Tampa Bay Buccaneers', 'Tennessee Titans', 'Washington Commanders'
+        ];
+
+        let currentUser = null;
+        let isAuthenticated = false;
+        let poolMembers = {};
+        let currentUserData = null;
+        let selectedUserId = null;
+        let selectedWeek = null;
+
+        // Authentication
+        onAuthStateChanged(auth, async (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user && ADMIN_UIDS.includes(user.uid)) {
+                currentUser = user;
+                isAuthenticated = true;
+                authStatus.innerHTML = `<p class="text-green-800">✅ Admin authenticated: ${user.email}</p>`;
+                document.getElementById('adminControls').classList.remove('hidden');
+                await initializeAdminInterface();
+            } else {
+                authStatus.innerHTML = `<p class="text-red-800">❌ Admin access required. Please sign in with admin account.</p>`;
+                isAuthenticated = false;
+            }
+        });
+
+        async function initializeAdminInterface() {
+            try {
+                await loadPoolMembers();
+                populateWeekSelect();
+                populateTeamSelect();
+                setupEventListeners();
+                addStatusMessage('🎯 Admin interface ready', 'success');
+            } catch (error) {
+                console.error('Error initializing admin interface:', error);
+                addStatusMessage(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadPoolMembers() {
+            try {
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = doc(db, poolMembersPath);
+                const membersSnap = await getDoc(membersDoc);
+
+                if (membersSnap.exists()) {
+                    poolMembers = membersSnap.data();
+                    populateUserSelect();
+                    addStatusMessage(`✅ Loaded ${Object.keys(poolMembers).length} pool members`, 'success');
+                } else {
+                    addStatusMessage('❌ Pool members not found', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading pool members:', error);
+                addStatusMessage(`❌ Error loading members: ${error.message}`, 'error');
+            }
+        }
+
+        function populateUserSelect() {
+            const userSelect = document.getElementById('userSelect');
+            userSelect.innerHTML = '<option value="">Select a user...</option>';
+
+            Object.entries(poolMembers).forEach(([uid, memberInfo]) => {
+                const option = document.createElement('option');
+                option.value = uid;
+                option.textContent = `${memberInfo.name || memberInfo.email || 'Unknown'} (${uid.substring(0, 8)}...)`;
+                userSelect.appendChild(option);
+            });
+        }
+
+        function populateWeekSelect() {
+            const weekSelect = document.getElementById('weekSelect');
+            weekSelect.innerHTML = '<option value="">Select a week...</option>';
+
+            // Determine current week for highlighting
+            const currentWeek = getCurrentWeek();
+
+            for (let week = 1; week <= 18; week++) {
+                const option = document.createElement('option');
+                option.value = week.toString();
+                option.textContent = week === currentWeek ? `Week ${week} (Current)` : `Week ${week}`;
+                weekSelect.appendChild(option);
+            }
+        }
+
+        function populateTeamSelect() {
+            const teamSelect = document.getElementById('teamSelect');
+            teamSelect.innerHTML = '<option value="">Select a team...</option>';
+
+            NFL_TEAMS.forEach(team => {
+                const option = document.createElement('option');
+                option.value = team;
+                option.textContent = team;
+                teamSelect.appendChild(option);
+            });
+        }
+
+        function getCurrentWeek() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04');
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        function setupEventListeners() {
+            document.getElementById('userSelect').addEventListener('change', handleUserChange);
+            document.getElementById('weekSelect').addEventListener('change', handleWeekChange);
+            document.getElementById('savePickBtn').addEventListener('click', savePick);
+            document.getElementById('deletePickBtn').addEventListener('click', deletePick);
+            document.getElementById('clearFormBtn').addEventListener('click', clearForm);
+
+            // Auto-save on field changes
+            document.getElementById('teamSelect').addEventListener('change', autoSave);
+            document.getElementById('gameIdInput').addEventListener('blur', autoSave);
+            document.getElementById('resultSelect').addEventListener('change', autoSave);
+            document.getElementById('aliveSelect').addEventListener('change', autoSave);
+        }
+
+        async function handleUserChange() {
+            selectedUserId = document.getElementById('userSelect').value;
+            if (selectedUserId) {
+                await loadUserSurvivorData();
+                await displayFullSurvivorHistory();
+                if (selectedWeek) {
+                    displayCurrentPick();
+                }
+            } else {
+                hidePickSections();
+            }
+        }
+
+        async function handleWeekChange() {
+            selectedWeek = document.getElementById('weekSelect').value;
+            if (selectedUserId && selectedWeek) {
+                displayCurrentPick();
+                showPickEditor();
+            }
+        }
+
+        async function loadUserSurvivorData() {
+            try {
+                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${selectedUserId}`;
+                const survivorDoc = doc(db, survivorPath);
+                const survivorSnap = await getDoc(survivorDoc);
+
+                if (survivorSnap.exists()) {
+                    currentUserData = survivorSnap.data();
+                    addStatusMessage('✅ User survivor data loaded', 'success');
+                } else {
+                    currentUserData = { picks: {} };
+                    addStatusMessage('⚠️ No survivor data found - will create new document', 'info');
+                }
+            } catch (error) {
+                console.error('Error loading user survivor data:', error);
+                addStatusMessage(`❌ Error loading data: ${error.message}`, 'error');
+                currentUserData = { picks: {} };
+            }
+        }
+
+        function displayCurrentPick() {
+            if (!currentUserData || !selectedWeek) return;
+
+            const picks = currentUserData.picks || {};
+            const weekPick = picks[selectedWeek];
+            const currentPickDisplay = document.getElementById('currentPickDisplay');
+
+            if (weekPick) {
+                currentPickDisplay.innerHTML = `
+                    <div class="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                        <h3 class="font-bold mb-2">Week ${selectedWeek} Current Pick:</h3>
+                        <p><strong>Team:</strong> ${weekPick.team || 'Not set'}</p>
+                        <p><strong>Game ID:</strong> ${weekPick.gameId || 'Not set'}</p>
+                        <p><strong>Result:</strong> ${weekPick.result || 'Pending'}</p>
+                        <p><strong>Alive:</strong> ${weekPick.alive !== false ? '✅ Yes' : '💀 No'}</p>
+                        ${weekPick.submittedAt ? `<p><strong>Submitted:</strong> ${new Date(weekPick.submittedAt).toLocaleString()}</p>` : ''}
+                    </div>
+                `;
+
+                // Populate form with current data
+                document.getElementById('teamSelect').value = weekPick.team || '';
+                document.getElementById('gameIdInput').value = weekPick.gameId || '';
+                document.getElementById('resultSelect').value = weekPick.result || 'Pending';
+                document.getElementById('aliveSelect').value = weekPick.alive !== false ? 'true' : 'false';
+            } else {
+                currentPickDisplay.innerHTML = `
+                    <div class="p-4 bg-gray-50 border border-gray-200 rounded-md">
+                        <p class="text-gray-600">No pick found for Week ${selectedWeek}</p>
+                    </div>
+                `;
+
+                // Clear form
+                clearForm();
+            }
+
+            document.getElementById('currentPickSection').classList.remove('hidden');
+        }
+
+        function showPickEditor() {
+            document.getElementById('pickEditorSection').classList.remove('hidden');
+        }
+
+        function hidePickSections() {
+            document.getElementById('currentPickSection').classList.add('hidden');
+            document.getElementById('pickEditorSection').classList.add('hidden');
+            document.getElementById('survivorHistorySection').classList.add('hidden');
+        }
+
+        async function displayFullSurvivorHistory() {
+            if (!currentUserData) return;
+
+            const picks = currentUserData.picks || {};
+            const historyContent = document.getElementById('survivorHistoryContent');
+            let historyHTML = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
+
+            for (let week = 1; week <= 18; week++) {
+                const weekKey = week.toString();
+                const weekPick = picks[weekKey];
+
+                if (weekPick) {
+                    const alive = weekPick.alive !== false;
+                    historyHTML += `
+                        <div class="p-3 border rounded-md ${alive ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">Week ${week}</span>
+                                <span class="${alive ? 'text-green-600' : 'text-red-600'}">${alive ? '✅' : '💀'}</span>
+                            </div>
+                            <p class="text-sm"><strong>Team:</strong> ${weekPick.team}</p>
+                            <p class="text-sm"><strong>Game:</strong> ${weekPick.gameId}</p>
+                            <p class="text-sm"><strong>Result:</strong> ${weekPick.result || 'Pending'}</p>
+                        </div>
+                    `;
+                } else {
+                    historyHTML += `
+                        <div class="p-3 border rounded-md bg-gray-50 border-gray-200">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">Week ${week}</span>
+                                <span class="text-gray-400">—</span>
+                            </div>
+                            <p class="text-sm text-gray-500">No pick</p>
+                        </div>
+                    `;
+                }
+            }
+
+            historyHTML += '</div>';
+            historyContent.innerHTML = historyHTML;
+            document.getElementById('survivorHistorySection').classList.remove('hidden');
+        }
+
+        async function savePick() {
+            if (!selectedUserId || !selectedWeek) {
+                addStatusMessage('❌ Please select user and week first', 'error');
+                return;
+            }
+
+            try {
+                const team = document.getElementById('teamSelect').value;
+                const gameId = document.getElementById('gameIdInput').value;
+                const result = document.getElementById('resultSelect').value;
+                const alive = document.getElementById('aliveSelect').value === 'true';
+
+                if (!team) {
+                    addStatusMessage('❌ Please select a team', 'error');
+                    return;
+                }
+
+                // Update the picks data
+                if (!currentUserData.picks) currentUserData.picks = {};
+
+                currentUserData.picks[selectedWeek] = {
+                    team: team,
+                    gameId: gameId || null,
+                    result: result,
+                    alive: alive,
+                    submittedAt: new Date().toISOString(),
+                    submittedBy: currentUser.email
+                };
+
+                // Save to Firebase
+                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${selectedUserId}`;
+                const survivorDoc = doc(db, survivorPath);
+                await setDoc(survivorDoc, currentUserData);
+
+                addStatusMessage(`✅ Pick saved for Week ${selectedWeek}`, 'success');
+
+                // Refresh displays
+                displayCurrentPick();
+                await displayFullSurvivorHistory();
+
+            } catch (error) {
+                console.error('Error saving pick:', error);
+                addStatusMessage(`❌ Error saving: ${error.message}`, 'error');
+            }
+        }
+
+        async function deletePick() {
+            if (!selectedUserId || !selectedWeek) {
+                addStatusMessage('❌ Please select user and week first', 'error');
+                return;
+            }
+
+            if (!confirm(`Delete Week ${selectedWeek} pick for this user?`)) {
+                return;
+            }
+
+            try {
+                // Remove the pick
+                if (currentUserData.picks && currentUserData.picks[selectedWeek]) {
+                    delete currentUserData.picks[selectedWeek];
+                }
+
+                // Save to Firebase
+                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${selectedUserId}`;
+                const survivorDoc = doc(db, survivorPath);
+                await setDoc(survivorDoc, currentUserData);
+
+                addStatusMessage(`✅ Pick deleted for Week ${selectedWeek}`, 'success');
+
+                // Refresh displays
+                displayCurrentPick();
+                await displayFullSurvivorHistory();
+
+            } catch (error) {
+                console.error('Error deleting pick:', error);
+                addStatusMessage(`❌ Error deleting: ${error.message}`, 'error');
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('teamSelect').value = '';
+            document.getElementById('gameIdInput').value = '';
+            document.getElementById('resultSelect').value = 'Pending';
+            document.getElementById('aliveSelect').value = 'true';
+        }
+
+        async function autoSave() {
+            if (!selectedUserId || !selectedWeek) return;
+
+            const team = document.getElementById('teamSelect').value;
+            if (!team) return; // Don't auto-save without a team
+
+            // Small delay to debounce rapid changes
+            setTimeout(async () => {
+                await savePick();
+            }, 500);
+        }
+
+        function addStatusMessage(message, type) {
+            const statusArea = document.getElementById('statusArea');
+            const messageDiv = document.createElement('div');
+
+            let bgClass, textClass;
+            switch (type) {
+                case 'success':
+                    bgClass = 'bg-green-50 border-green-300';
+                    textClass = 'text-green-800';
+                    break;
+                case 'error':
+                    bgClass = 'bg-red-50 border-red-300';
+                    textClass = 'text-red-800';
+                    break;
+                case 'info':
+                    bgClass = 'bg-blue-50 border-blue-300';
+                    textClass = 'text-blue-800';
+                    break;
+                default:
+                    bgClass = 'bg-gray-50 border-gray-300';
+                    textClass = 'text-gray-800';
+            }
+
+            messageDiv.className = `p-3 border rounded-md mb-2 ${bgClass}`;
+            messageDiv.innerHTML = `<p class="${textClass}"><span class="text-xs text-gray-500">${new Date().toLocaleTimeString()}</span> ${message}</p>`;
+
+            statusArea.appendChild(messageDiv);
+            messageDiv.scrollIntoView({ behavior: 'smooth' });
+
+            // Remove after 5 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

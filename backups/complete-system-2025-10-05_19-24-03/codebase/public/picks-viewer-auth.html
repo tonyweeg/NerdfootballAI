@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Picks Viewer - All Users (Authenticated)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">🚀 <span id="weekTitle">Week 1</span> Picks - All Users (Dynamic Viewer)</h1>
+
+        <div class="mb-4 flex flex-wrap items-center gap-4">
+            <div class="flex items-center gap-2">
+                <button id="signIn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    Sign In with Google
+                </button>
+                <button id="loadPicks" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400" disabled>
+                    Load Week Picks
+                </button>
+                <button id="generateMissing" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:bg-gray-400 ml-2" disabled>
+                    Generate Missing Week 3 Picks
+                </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button id="prevWeek" class="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600 disabled:bg-gray-300" disabled>
+                    ← Previous
+                </button>
+                <select id="weekSelector" class="px-3 py-2 border rounded bg-white">
+                    <!-- Options will be populated by JavaScript -->
+                </select>
+                <button id="nextWeek" class="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600 disabled:bg-gray-300">
+                    Next →
+                </button>
+            </div>
+
+            <span id="status" class="text-gray-600"></span>
+        </div>
+
+        <div id="authInfo" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded hidden">
+            <p id="userInfo" class="text-blue-800"></p>
+        </div>
+
+        <div id="picksContainer" class="space-y-6"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, getDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+
+        let currentUser = null;
+        let currentWeek = 1;
+
+        // Admin UIDs (add your UID here)
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2',
+            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2',
+            'bEVzcZtSExT8cIjamWnGbWZ3J5s1'
+        ];
+
+        // Auth state listener
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('userInfo').textContent = `Signed in as: ${user.email} (${user.uid})`;
+                document.getElementById('authInfo').classList.remove('hidden');
+                document.getElementById('signIn').textContent = 'Signed In';
+                document.getElementById('signIn').disabled = true;
+
+                // Check if user is registered in NerdFootball system
+                document.getElementById('status').textContent = 'Checking user registration...';
+                const isRegistered = await checkUserRegistration(user.uid);
+
+                if (isRegistered) {
+                    document.getElementById('loadPicks').disabled = false;
+                    document.getElementById('generateMissing').disabled = false;
+                    document.getElementById('status').textContent = 'Ready to load picks';
+                } else {
+                    document.getElementById('loadPicks').disabled = true;
+                    document.getElementById('status').textContent = 'Access denied: Not a registered NerdFootball user';
+                }
+            } else {
+                currentUser = null;
+                document.getElementById('authInfo').classList.add('hidden');
+                document.getElementById('signIn').textContent = 'Sign In with Google';
+                document.getElementById('signIn').disabled = false;
+                document.getElementById('loadPicks').disabled = true;
+                document.getElementById('generateMissing').disabled = true;
+                document.getElementById('status').textContent = 'Please sign in';
+            }
+        });
+
+        document.getElementById('signIn').addEventListener('click', async () => {
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                document.getElementById('status').textContent = `Sign in error: ${error.message}`;
+            }
+        });
+
+        // Initialize page
+        initializeWeekSelector();
+        updateNavigationButtons();
+
+        // Event listeners
+        document.getElementById('loadPicks').addEventListener('click', loadWeekPicks);
+        document.getElementById('generateMissing').addEventListener('click', generateMissingPicks);
+        document.getElementById('prevWeek').addEventListener('click', () => {
+            if (currentWeek > 1) {
+                currentWeek--;
+                updateWeekDisplay();
+                updateNavigationButtons();
+            }
+        });
+        document.getElementById('nextWeek').addEventListener('click', () => {
+            if (currentWeek < 18) {
+                currentWeek++;
+                updateWeekDisplay();
+                updateNavigationButtons();
+            }
+        });
+        document.getElementById('weekSelector').addEventListener('change', (e) => {
+            currentWeek = parseInt(e.target.value);
+            updateWeekDisplay();
+            updateNavigationButtons();
+        });
+
+        function initializeWeekSelector() {
+            const selector = document.getElementById('weekSelector');
+            for (let i = 1; i <= 18; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Week ${i}`;
+                if (i === currentWeek) option.selected = true;
+                selector.appendChild(option);
+            }
+        }
+
+        function updateWeekDisplay() {
+            document.getElementById('weekTitle').textContent = `Week ${currentWeek}`;
+            document.getElementById('weekSelector').value = currentWeek;
+        }
+
+        function updateNavigationButtons() {
+            document.getElementById('prevWeek').disabled = currentWeek <= 1;
+            document.getElementById('nextWeek').disabled = currentWeek >= 18;
+        }
+
+        function getCurrentWeekNumber() {
+            // Week 1 started Sept 4, 2025 - calculate current week based on date
+            const week1Start = new Date('2025-09-04');
+            const today = new Date();
+            const diffTime = today - week1Start;
+            const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
+            return Math.max(1, Math.min(18, diffWeeks));
+        }
+
+        async function checkUserRegistration(uid) {
+            try {
+                // Check if user exists in the NerdFootball users collection
+                const userPath = `artifacts/nerdfootball/public/data/nerdfootball_users/${uid}`;
+                const userSnap = await getDoc(doc(db, userPath));
+
+                if (userSnap.exists()) {
+                    console.log(`✅ User ${uid} is registered in NerdFootball`);
+                    return true;
+                } else {
+                    console.log(`❌ User ${uid} not found in NerdFootball users`);
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking user registration:', error);
+                return false;
+            }
+        }
+
+        async function loadBibleData() {
+            console.log(`🔍 Loading Week ${currentWeek} bible data from Firestore...`);
+
+            try {
+                // Load from Firestore (single source of truth)
+                const gamesRef = doc(db, `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`);
+                const gamesSnap = await getDoc(gamesRef);
+
+                if (!gamesSnap.exists()) {
+                    throw new Error(`No games found for Week ${currentWeek} in Firestore`);
+                }
+
+                const bibleData = gamesSnap.data();
+                console.log(`✅ Loaded Week ${currentWeek} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata' && k !== '000').length, 'games');
+
+                // Debug bible data structure
+                console.log('🔍 Bible data keys:', Object.keys(bibleData));
+                console.log('🔍 First 3 bible entries:', Object.entries(bibleData).slice(0, 3));
+
+                return bibleData;
+            } catch (error) {
+                console.error(`❌ Error loading Week ${currentWeek} bible data from Firestore:`, error);
+                throw error;
+            }
+        }
+
+        async function loadWeekPicks() {
+            if (!currentUser) {
+                document.getElementById('status').textContent = 'Please sign in first';
+                return;
+            }
+
+            // Double-check user registration
+            const isRegistered = await checkUserRegistration(currentUser.uid);
+            if (!isRegistered) {
+                document.getElementById('status').textContent = 'Access denied: Not a registered NerdFootball user';
+                return;
+            }
+
+            const status = document.getElementById('status');
+            const container = document.getElementById('picksContainer');
+
+            status.textContent = `Loading Week ${currentWeek} picks...`;
+            container.innerHTML = '';
+
+            try {
+                // Load bible data for winner comparison
+                status.textContent = `Loading Week ${currentWeek} bible results...`;
+                const bibleData = await loadBibleData();
+
+                // Load picks for current week
+                status.textContent = 'Loading picks...';
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksCollection = collection(db, picksPath);
+                const picksSnap = await getDocs(picksCollection);
+
+                // Determine if this week is in the past
+                const actualCurrentWeek = getCurrentWeekNumber();
+                const isWeekInPast = currentWeek < actualCurrentWeek;
+
+                if (picksSnap.size === 0) {
+                    status.textContent = `No picks yet for Week ${currentWeek}`;
+                    container.innerHTML = `<div class="bg-yellow-100 border border-yellow-300 rounded p-4 text-center">
+                        <h3 class="text-lg font-semibold text-yellow-800">📅 No Picks Found</h3>
+                        <p class="text-yellow-700">No users have submitted picks for Week ${currentWeek} yet.</p>
+                    </div>`;
+                    return;
+                }
+
+                status.textContent = `Found ${picksSnap.size} users with Week ${currentWeek} picks`;
+
+                // Batch load all user names in one query (MUCH FASTER!)
+                status.textContent = 'Batch loading all user data...';
+                const userNames = {};
+                const userEmails = {};
+
+                try {
+                    const usersCollection = collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users');
+                    const usersSnap = await getDocs(usersCollection);
+
+                    usersSnap.forEach(userDoc => {
+                        const userData = userDoc.data();
+                        userNames[userDoc.id] = userData.userName || userData.displayName || userData.name || 'Unknown User';
+                        userEmails[userDoc.id] = userData.email || userData.emailAddress || 'No Email';
+                    });
+
+                    console.log(`✅ Loaded ${usersSnap.size} total users in batch`);
+                } catch (e) {
+                    console.warn('Could not batch load users:', e);
+                    // Fallback to individual reads if batch fails
+                    status.textContent = 'Fallback: Loading user names individually...';
+                    const userIds = [];
+                    picksSnap.forEach(userDoc => userIds.push(userDoc.id));
+
+                    for (const userId of userIds) {
+                        try {
+                            const userPath = `artifacts/nerdfootball/public/data/nerdfootball_users/${userId}`;
+                            const userSnap = await getDoc(doc(db, userPath));
+                            if (userSnap.exists()) {
+                                const userData = userSnap.data();
+                                userNames[userId] = userData.userName || userData.displayName || userData.name || 'Unknown';
+                                userEmails[userId] = userData.email || userData.emailAddress || 'No Email';
+                            } else {
+                                userNames[userId] = 'Unknown User';
+                                userEmails[userId] = 'No Email';
+                            }
+                        } catch (e2) {
+                            console.warn(`Could not load user ${userId}:`, e2);
+                            userNames[userId] = 'Unknown User';
+                            userEmails[userId] = 'No Email';
+                        }
+                    }
+                }
+
+                // Load pool members for validation
+                let poolMembers = {};
+                try {
+                    const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                    const membersSnap = await getDoc(doc(db, membersPath));
+                    if (membersSnap.exists()) {
+                        poolMembers = membersSnap.data();
+                    }
+                } catch (e) {
+                    console.warn('Could not load pool members:', e);
+                }
+
+                const allPicks = [];
+                let totalPoolMembers = Object.keys(poolMembers).length;
+
+                picksSnap.forEach(userDoc => {
+                    const userId = userDoc.id;
+                    const picks = userDoc.data();
+                    const isPoolMember = !!poolMembers[userId];
+
+                    allPicks.push({
+                        userId,
+                        userName: userNames[userId] || 'Unknown',
+                        userEmail: userEmails[userId] || 'No Email',
+                        picks,
+                        isPoolMember
+                    });
+                });
+
+                // Sort by username
+                allPicks.sort((a, b) => a.userName.localeCompare(b.userName));
+
+                // Check for partial picks if week is in the past
+                const poolMemberPicks = allPicks.filter(p => p.isPoolMember).length;
+                const isPartialPicks = poolMemberPicks < totalPoolMembers;
+
+                // Display all picks with bible results and timing context
+                status.textContent = `✅ Loaded ${allPicks.length} users with picks - Ready!`;
+                displayAllPicks(allPicks, bibleData, {
+                    isWeekInPast,
+                    isPartialPicks,
+                    poolMemberPicks,
+                    totalPoolMembers,
+                    currentWeek,
+                    actualCurrentWeek
+                });
+
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+                console.error('Error loading picks:', error);
+            }
+        }
+
+        function displayAllPicks(allPicks, bibleData, timingContext) {
+            const container = document.getElementById('picksContainer');
+
+            // Generate leaderboard data
+            const leaderboardData = allPicks.map(user => {
+                const analysis = analyzePicks(user.picks, bibleData);
+
+                // Format winning picks with validation
+                let winningPicksText = '';
+                if (analysis.winningPicks && analysis.winningPicks.length > 0) {
+                    const validWinningPicks = analysis.winningPicks.filter(pick =>
+                        pick.team &&
+                        typeof pick.team === 'string' &&
+                        pick.team.length > 0 &&
+                        pick.team !== '[object Object]' &&
+                        typeof pick.points === 'number' &&
+                        pick.points >= 1 &&
+                        pick.points <= 18
+                    );
+
+                    winningPicksText = validWinningPicks
+                        .map(pick => `${pick.team} (${pick.points})`)
+                        .join(', ');
+                }
+
+                return {
+                    userId: user.userId,
+                    userName: user.userName,
+                    userEmail: user.userEmail,
+                    isPoolMember: user.isPoolMember,
+                    totalPointsEarned: analysis.totalPointsEarned,
+                    correctPicks: analysis.correctPicks,
+                    totalValidPicks: analysis.totalValidPicks,
+                    hasIssues: analysis.issues.length > 0,
+                    isSumValid: analysis.isSumValid,
+                    winningPicksText: winningPicksText
+                };
+            }).sort((a, b) => b.totalPointsEarned - a.totalPointsEarned); // Sort by points descending
+
+            // Create and display leaderboard
+            const leaderboardDiv = document.createElement('div');
+            leaderboardDiv.className = 'bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg shadow-lg p-6 mb-6';
+
+            const leaderboardHTML = `
+                <h2 class="text-2xl font-bold text-center mb-4 text-purple-800">🏆 Week ${currentWeek} Leaderboard</h2>
+                <div class="grid gap-2">
+                    ${leaderboardData.map((user, index) => {
+                        const isTopThree = index < 3;
+                        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+                        const bgClass = isTopThree ? 'bg-white border-2 border-yellow-300' : 'bg-white border border-gray-200';
+
+                        return `
+                            <div class="${bgClass} rounded-lg p-3 flex justify-between items-center">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg font-bold ${isTopThree ? 'text-purple-600' : 'text-gray-600'}">${medal || (index + 1)}</span>
+                                    <div>
+                                        <div class="font-semibold ${user.isPoolMember ? 'text-green-700' : 'text-red-500'}">${user.userName}</div>
+                                        <div class="text-xs text-gray-500 font-mono">${user.userId}</div>
+                                        <div class="text-xs text-blue-600">${user.userEmail}</div>
+                                    </div>
+                                    ${!user.isPoolMember ? '<span class="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">Not Pool Member</span>' : ''}
+                                    ${!user.isSumValid ? '<span class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded">⚠️ Invalid Sum</span>' : ''}
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-lg font-bold text-purple-600">${user.totalPointsEarned} pts</div>
+                                    <div class="text-xs text-gray-600">${user.correctPicks}/${user.totalValidPicks} correct</div>
+                                    ${user.winningPicksText ? `<div class="text-xs text-green-700 mt-1 max-w-xs text-right">${user.winningPicksText}</div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <p class="text-center text-sm text-gray-600 mt-3">Showing all ${leaderboardData.length} users</p>
+            `;
+
+            leaderboardDiv.innerHTML = leaderboardHTML;
+            container.appendChild(leaderboardDiv);
+
+            // Show partial picks warning if applicable
+            if (timingContext && timingContext.isPartialPicks) {
+                const warningDiv = document.createElement('div');
+                const isProblematic = timingContext.isWeekInPast;
+                const warningClass = isProblematic ? 'bg-red-100 border-red-300 text-red-800' : 'bg-yellow-100 border-yellow-300 text-yellow-800';
+                const warningIcon = isProblematic ? '🚨' : '⚠️';
+                const warningTitle = isProblematic ? 'CRITICAL: Missing Picks for Past Week' : 'Partial Picks (Normal for Future Week)';
+
+                warningDiv.className = `${warningClass} border rounded p-4 mb-4`;
+                warningDiv.innerHTML = `
+                    <h3 class="font-semibold text-lg">${warningIcon} ${warningTitle}</h3>
+                    <p>Week ${timingContext.currentWeek}: ${timingContext.poolMemberPicks}/${timingContext.totalPoolMembers} pool members have submitted picks</p>
+                    <p class="text-sm mt-1">Current NFL Week: ${timingContext.actualCurrentWeek}</p>
+                    ${isProblematic ? '<p class="font-medium mt-2">⚠️ This week has already passed - missing picks need to be investigated!</p>' :
+                      '<p class="text-sm mt-2">✅ This is normal for future weeks where not all users have picked yet.</p>'}
+                `;
+                container.appendChild(warningDiv);
+            }
+
+            allPicks.forEach((user, index) => {
+                const userDiv = document.createElement('div');
+                userDiv.className = `bg-white rounded-lg shadow p-6 ${user.isPoolMember ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'}`;
+
+                // Analyze picks for anomalies and calculate accuracy
+                const analysis = analyzePicks(user.picks, bibleData);
+
+                userDiv.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold">${index + 1}. ${user.userName}</h3>
+                            <p class="text-xs text-gray-500 font-mono mb-1">${user.userId}</p>
+                            <p class="text-xs text-blue-600 mb-1">${user.userEmail}</p>
+                            <p class="text-sm ${user.isPoolMember ? 'text-green-600' : 'text-red-600'}">
+                                ${user.isPoolMember ? '✅ Pool Member' : '❌ Not Pool Member'}
+                            </p>
+                            <p class="text-sm text-blue-600 font-medium">
+                                🏈 MNF Points: ${user.picks.mnfTotalPoints || user.picks.mondayNightPoints || user.picks.tiebreaker || 'Not Set'}
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-600">Games: ${analysis.totalGames}</p>
+                            <p class="text-sm text-blue-600">✅ Correct: ${analysis.correctPicks}/${analysis.totalValidPicks}</p>
+                            ${(() => {
+                                // VERIFICATION: Manual calculation check
+                                let manualCorrect = 0;
+                                let manualPoints = 0;
+                                Object.keys(analysis.pickResults).forEach(gameId => {
+                                    const result = analysis.pickResults[gameId];
+                                    const pick = user.picks[gameId];
+                                    if (result.isValid && result.isCorrect && pick && pick.confidence) {
+                                        manualCorrect++;
+                                        manualPoints += pick.confidence;
+                                    }
+                                });
+                                const hasCalcError = (manualCorrect !== analysis.correctPicks) || (manualPoints !== analysis.totalPointsEarned);
+                                return hasCalcError ? `<p class="text-sm text-red-600 font-bold">🚨 CALC ERROR: Manual=${manualCorrect}/${manualPoints}, System=${analysis.correctPicks}/${analysis.totalPointsEarned}</p>` : '';
+                            })()}
+                            <p class="text-sm text-purple-600">🏆 Points Earned: ${analysis.totalPointsEarned}</p>
+                            <p class="text-xs ${analysis.isSumValid ? 'text-green-600' : 'text-red-600'}">
+                                📊 Confidence Sum: ${analysis.actualTotal}/${analysis.expectedTotal} ${analysis.isSumValid ? '✅' : '❌'}
+                            </p>
+                            <p class="text-sm ${analysis.issues.length > 0 ? 'text-red-600' : 'text-green-600'}">
+                                ${analysis.issues.length > 0 ? `⚠️ ${analysis.issues.length} Issues` : '✅ Clean'}
+                            </p>
+                        </div>
+                    </div>
+
+                    ${analysis.winningPicks && analysis.winningPicks.length > 0 ? `
+                        <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded">
+                            <h4 class="text-sm font-semibold text-green-800 mb-2">✅ Winning Picks (${analysis.winningPicks.length}) - ${analysis.totalPointsEarned} points</h4>
+                            <p class="text-xs text-green-700">
+                                ${analysis.winningPicks.map(pick => `${pick.team} (${pick.points})`).join(', ')}
+                            </p>
+                        </div>
+                    ` : ''}
+
+                    ${(() => {
+                        // Show losing picks
+                        const losingPicks = [];
+                        Object.keys(analysis.pickResults).forEach(gameId => {
+                            const result = analysis.pickResults[gameId];
+                            const pick = user.picks[gameId];
+                            if (result.isValid && !result.isCorrect && pick && pick.confidence) {
+                                losingPicks.push({
+                                    team: pick.winner,
+                                    points: pick.confidence,
+                                    actualWinner: result.actualWinner
+                                });
+                            }
+                        });
+                        losingPicks.sort((a, b) => b.points - a.points);
+
+                        return losingPicks.length > 0 ? `
+                            <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+                                <h4 class="text-sm font-semibold text-red-800 mb-2">❌ Losing Picks (${losingPicks.length}) - ${analysis.totalLosingPoints} points</h4>
+                                <p class="text-xs text-red-700">
+                                    ${losingPicks.map(pick => `${pick.team} (${pick.points}) → ${pick.actualWinner}`).join(', ')}
+                                </p>
+                            </div>
+                        ` : '';
+                    })()}
+                        </div>
+                    </div>
+
+                    ${analysis.issues.length > 0 ? `
+                        <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+                            <h4 class="font-semibold text-red-800 mb-2">🚨 Issues Found:</h4>
+                            <ul class="text-sm text-red-700 list-disc list-inside space-y-1">
+                                ${analysis.issues.map(issue => `<li>${issue}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-4 md:grid-cols-8 gap-2 text-xs">
+                        ${generatePicksGrid(user.picks, analysis, bibleData)}
+                    </div>
+
+                    <details class="mt-4">
+                        <summary class="cursor-pointer text-sm text-blue-600 hover:text-blue-800">View Raw Data</summary>
+                        <pre class="mt-2 p-3 bg-gray-100 rounded text-xs overflow-x-auto">${JSON.stringify(user.picks, null, 2)}</pre>
+                    </details>
+                `;
+
+                container.appendChild(userDiv);
+            });
+        }
+
+        function analyzePicks(picks, bibleData) {
+            const issues = [];
+            const gameIds = Object.keys(picks).filter(key => !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints', 'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated', 'poolId', 'survivorPick', 'createdAt', 'week', 'games', 'totalValidPicks', 'lastScored', 'correctPicks'].includes(key));
+
+            // All weeks now use consistent Firestore structure
+            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata' && k !== '000') : [];
+            const expectedGameCount = expectedGameIds.length;
+
+            // Check for expected game IDs
+            const missingGames = expectedGameIds.filter(id => !gameIds.includes(id));
+            const extraGames = gameIds.filter(id => !expectedGameIds.includes(id));
+
+            if (missingGames.length > 0) {
+                issues.push(`Missing games: ${missingGames.join(', ')}`);
+            }
+            if (extraGames.length > 0) {
+                issues.push(`Extra games: ${extraGames.join(', ')}`);
+            }
+
+            // Check confidence values and calculate accuracy
+            const confidenceValues = [];
+            let correctPicks = 0;
+            let totalValidPicks = 0;
+            let totalPointsEarned = 0;
+            const pickResults = {};
+            const winningPicks = []; // Track winning picks with team names and points
+
+            gameIds.forEach(gameId => {
+                const pick = picks[gameId];
+                if (pick && typeof pick === 'object') {
+                    if (pick.winner === '[object Object]' || typeof pick.winner === 'object') {
+                        issues.push(`Game ${gameId}: Winner corrupted`);
+                        pickResults[gameId] = { isValid: false, isCorrect: false };
+                    } else if (pick.winner && bibleData && bibleData[gameId]) {
+                        // Compare user pick with bible result
+                        const actualWinner = bibleData[gameId].winner;
+                        const userPick = pick.winner;
+                        const isCorrect = actualWinner === userPick;
+
+                        pickResults[gameId] = {
+                            isValid: true,
+                            isCorrect: isCorrect,
+                            userPick: userPick,
+                            actualWinner: actualWinner
+                        };
+
+                        totalValidPicks++;
+                        if (isCorrect) {
+                            correctPicks++;
+                            // Add confidence points for correct picks
+                            if (typeof pick.confidence === 'number' && pick.confidence >= 1 && pick.confidence <= expectedGameCount) {
+                                totalPointsEarned += pick.confidence;
+
+                                // Store winning pick with validation
+                                if (typeof userPick === 'string' && userPick.length > 0 && userPick !== '[object Object]') {
+                                    winningPicks.push({
+                                        team: userPick,
+                                        points: pick.confidence,
+                                        gameId: gameId
+                                    });
+                                }
+                            }
+                        }
+                    } else {
+                        pickResults[gameId] = { isValid: false, isCorrect: false };
+                    }
+
+                    if (pick.confidence !== undefined) {
+                        if (typeof pick.confidence !== 'number' || pick.confidence < 1 || pick.confidence > expectedGameCount) {
+                            issues.push(`Game ${gameId}: Invalid confidence ${pick.confidence} (should be 1-${expectedGameCount})`);
+                        } else {
+                            confidenceValues.push(pick.confidence);
+                        }
+                    } else {
+                        issues.push(`Game ${gameId}: Missing confidence`);
+                    }
+                }
+            });
+
+            // Check for duplicate confidence values
+            const uniqueConfidence = [...new Set(confidenceValues)];
+            if (confidenceValues.length !== uniqueConfidence.length) {
+                const duplicates = confidenceValues.filter((val, idx) => confidenceValues.indexOf(val) !== idx);
+                issues.push(`Duplicate confidence: ${[...new Set(duplicates)].join(', ')}`);
+            }
+
+            // Calculate losing points total and validate sum
+            let totalLosingPoints = 0;
+            Object.keys(pickResults).forEach(gameId => {
+                const result = pickResults[gameId];
+                const pick = picks[gameId];
+                if (result.isValid && !result.isCorrect && pick && typeof pick.confidence === 'number') {
+                    totalLosingPoints += pick.confidence;
+                }
+            });
+
+            // Expected total confidence points: 1+2+3+...+n = n×(n+1)/2
+            const expectedTotal = expectedGameCount * (expectedGameCount + 1) / 2;
+            const actualTotal = totalPointsEarned + totalLosingPoints;
+            const isSumValid = actualTotal === expectedTotal;
+
+            return {
+                totalGames: gameIds.length,
+                issues,
+                confidenceValues: confidenceValues.sort((a, b) => a - b),
+                gameIds,
+                correctPicks,
+                totalValidPicks,
+                totalPointsEarned,
+                totalLosingPoints,
+                expectedTotal,
+                actualTotal,
+                isSumValid,
+                pickResults,
+                winningPicks: winningPicks.sort((a, b) => b.points - a.points) // Sort by points descending
+            };
+        }
+
+        function generatePicksGrid(picks, analysis, bibleData) {
+            // Use expected game IDs from bible data, or fallback to current week calculation
+            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata' && k !== '000').sort() :
+                                   Array.from({length: 16}, (_, i) => (currentWeek * 100 + 1 + i).toString());
+
+            return expectedGameIds.map(gameId => {
+                const pick = picks[gameId];
+                if (!pick) {
+                    return `<div class="p-2 bg-red-100 border border-red-300 rounded">
+                        <div class="font-semibold text-red-800">${gameId}</div>
+                        <div class="text-red-600">MISSING</div>
+                    </div>`;
+                }
+
+                const isCorrupted = pick.winner === '[object Object]' || typeof pick.winner === 'object';
+                const isInvalidConfidence = typeof pick.confidence !== 'number' || pick.confidence < 1 || pick.confidence > 16;
+                const pickResult = analysis.pickResults[gameId];
+
+                let bgColor, textColor, resultIcon = '';
+
+                if (isCorrupted || isInvalidConfidence) {
+                    bgColor = 'bg-red-100 border-red-300';
+                    textColor = 'text-red-800';
+                } else if (pickResult && pickResult.isValid) {
+                    if (pickResult.isCorrect) {
+                        bgColor = 'bg-green-200 border-green-400';
+                        textColor = 'text-green-900';
+                        resultIcon = '✅';
+                    } else {
+                        bgColor = 'bg-orange-100 border-orange-300';
+                        textColor = 'text-orange-800';
+                        resultIcon = '❌';
+                    }
+                } else {
+                    bgColor = 'bg-gray-100 border-gray-300';
+                    textColor = 'text-gray-800';
+                }
+
+                return `<div class="p-2 ${bgColor} border rounded">
+                    <div class="font-semibold ${textColor}">${gameId} ${resultIcon}</div>
+                    <div class="text-xs ${textColor}">C: ${pick.confidence || 'N/A'}</div>
+                    <div class="text-xs ${textColor} truncate" title="${pick.winner || 'N/A'}">
+                        ${isCorrupted ? '[CORRUPT]' : (pick.winner || 'N/A').substring(0, 8)}
+                    </div>
+                    ${pickResult && pickResult.isValid && !pickResult.isCorrect ?
+                        `<div class="text-xs ${textColor} opacity-75" title="Actual winner">→ ${(pickResult.actualWinner || '').substring(0, 8)}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        async function generateMissingPicks() {
+            // SAFETY CHECK 1: Only works for Week 3
+            if (currentWeek !== 3) {
+                alert('🚨 SAFETY: This function only works for Week 3');
+                return;
+            }
+
+            // SAFETY CHECK 2: Must be authenticated
+            if (!currentUser) {
+                alert('🚨 SAFETY: Please sign in first');
+                return;
+            }
+
+            // SAFETY CHECK 3: Confirm action
+            const confirmed = confirm('⚠️ GENERATE MISSING WEEK 3 PICKS?\n\nThis will ONLY create picks for users who have NO Week 3 picks document.\nExisting picks will NEVER be touched.\n\nContinue?');
+            if (!confirmed) return;
+
+            const status = document.getElementById('status');
+            status.textContent = '🔍 Analyzing missing Week 3 picks...';
+
+            try {
+                // Step 1: Get pool members
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const poolMembersSnap = await getDoc(doc(db, poolMembersPath));
+                const poolMembers = poolMembersSnap.exists() ? poolMembersSnap.data() : {};
+                const poolMemberIds = Object.keys(poolMembers);
+
+                // Step 2: Get existing Week 3 picks documents
+                const picksPath = 'artifacts/nerdfootball/public/data/nerdfootball_picks/3/submissions';
+                const picksSnap = await getDocs(collection(db, picksPath));
+                const existingPickIds = [];
+                picksSnap.forEach(doc => existingPickIds.push(doc.id));
+
+                // Step 3: Find users with NO picks document (SAFE FILTER)
+                const missingUsers = poolMemberIds.filter(uid => !existingPickIds.includes(uid));
+
+                console.log('🔍 SAFETY ANALYSIS:');
+                console.log('Pool members total:', poolMemberIds.length);
+                console.log('Existing picks documents:', existingPickIds.length);
+                console.log('Missing users (NO document):', missingUsers.length);
+                console.log('Missing user IDs:', missingUsers);
+
+                // SAFETY CHECK 4: No missing users
+                if (missingUsers.length === 0) {
+                    status.textContent = '✅ SAFE: No missing users found - all have picks documents!';
+                    return;
+                }
+
+                // SAFETY CHECK 5: Final confirmation with exact numbers
+                const finalConfirm = confirm(`🔍 FINAL SAFETY CHECK:\n\n• Pool Members: ${poolMemberIds.length}\n• Have Picks: ${existingPickIds.length}\n• Missing: ${missingUsers.length}\n\nGenerate DEFAULT picks for ${missingUsers.length} missing users?\n(All home teams, confidence 1-16)\n\nEXISTING PICKS WILL NOT BE TOUCHED!`);
+                if (!finalConfirm) {
+                    status.textContent = 'Cancelled by user';
+                    return;
+                }
+
+                status.textContent = '📚 Loading Week 3 bible data...';
+
+                // Step 4: Load Week 3 bible data for home teams
+                const bibleData = await loadBibleData();
+                const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata' && k !== '000').sort();
+
+                if (gameIds.length !== 16) {
+                    throw new Error(`Expected 16 games, found ${gameIds.length}`);
+                }
+
+                status.textContent = `🏗️ Creating ${missingUsers.length} missing pick documents...`;
+
+                // Step 5: Generate default picks (ONLY for missing users)
+                const batch = writeBatch(db);
+                let generatedCount = 0;
+
+                for (const userId of missingUsers) {
+                    // SAFETY: Double-check this user has no document
+                    const userPicksRef = doc(db, picksPath, userId);
+                    const existingDoc = await getDoc(userPicksRef);
+
+                    if (existingDoc.exists()) {
+                        console.warn(`⚠️ SAFETY SKIP: User ${userId} already has picks!`);
+                        continue;
+                    }
+
+                    // Create default picks structure
+                    const defaultPicks = {
+                        userId: userId,
+                        weekNumber: 3,
+                        submittedAt: new Date().toISOString(),
+                        userName: 'Auto-Generated Default',
+                        mnfTotalPoints: 21 // Default MNF points
+                    };
+
+                    // Add picks: home teams with confidence 1-16 in order
+                    gameIds.forEach((gameId, index) => {
+                        const game = bibleData[gameId];
+                        defaultPicks[gameId] = {
+                            winner: game.h, // Home team
+                            confidence: index + 1 // 1-16 in order
+                        };
+                    });
+
+                    // SAFE OPERATION: Only set() for confirmed missing users
+                    batch.set(userPicksRef, defaultPicks);
+                    generatedCount++;
+                    console.log(`✅ Queued default picks for user: ${userId}`);
+                }
+
+                if (generatedCount === 0) {
+                    status.textContent = '✅ SAFE: No picks needed to be generated';
+                    return;
+                }
+
+                status.textContent = `💾 Committing ${generatedCount} new pick documents...`;
+
+                // Step 6: Commit batch (SAFE - only creates new documents)
+                await batch.commit();
+
+                status.textContent = `✅ SUCCESS: Generated ${generatedCount} missing Week 3 pick documents!`;
+                console.log(`✅ Successfully created ${generatedCount} default picks documents`);
+
+                // Reload picks to show new data
+                setTimeout(() => {
+                    loadWeekPicks();
+                }, 2000);
+
+            } catch (error) {
+                console.error('❌ Error generating missing picks:', error);
+                status.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

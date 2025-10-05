@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CLEAR LEADERBOARD CACHE</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            background: #000;
+            color: #00ff00;
+            padding: 20px;
+        }
+        button {
+            background: #004400;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>CLEAR LEADERBOARD CACHE</h1>
+    <p>This will force the leaderboard to regenerate with the corrected scoring data.</p>
+
+    <button onclick="clearCache()">CLEAR CACHE AND REGENERATE</button>
+    <button onclick="testLeaderboard()">TEST LEADERBOARD</button>
+
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function log(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += '<p>' + new Date().toLocaleTimeString() + ': ' + message + '</p>';
+            console.log('TONY-DEBUG: ' + message);
+        }
+
+        async function clearCache() {
+            log('Forcing fresh leaderboard generation...');
+
+            try {
+                // Call the function with cache-busting parameter to force fresh data
+                log('🔄 Calling generateSeasonLeaderboardCache with cache bypass...');
+                const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/generateSeasonLeaderboardCache?forceFresh=true');
+
+                if (!response.ok) {
+                    throw new Error(`Function call failed: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    log('✅ Cache regenerated successfully!');
+                    log(`Generated ${result.data?.standings?.length || 0} user standings`);
+                    log(`Response time: ${result.responseTime}ms`);
+
+                    // Show top 5 users
+                    if (result.data?.standings) {
+                        const top5 = result.data.standings.slice(0, 5);
+                        log('🏆 TOP 5 USERS WITH CORRECTED SCORING:');
+                        top5.forEach((user, idx) => {
+                            log(`${idx + 1}. ${user.name}: ${user.totalPoints} points (${user.totalCorrectPicks}/${user.totalPicks} picks)`);
+                        });
+                    }
+
+                    log('');
+                    log('🎉 SUCCESS! The leaderboard now uses corrected scoring data!');
+                    log('📊 Go check: https://nerdfootball.web.app/leaderboard.html');
+                } else {
+                    log('❌ Function returned error: ' + result.error);
+                }
+
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                log('🔄 Trying alternative approach...');
+
+                // Try calling the getSeasonLeaderboard function which might trigger regeneration
+                try {
+                    const altResponse = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/getSeasonLeaderboard');
+                    const altResult = await altResponse.json();
+
+                    if (altResult.success) {
+                        log('✅ Alternative approach worked!');
+                        log(`Users loaded: ${altResult.data?.standings?.length || 0}`);
+                    }
+                } catch (altError) {
+                    log('❌ Alternative approach also failed: ' + altError.message);
+                }
+            }
+        }
+
+        async function testLeaderboard() {
+            log('Testing leaderboard endpoint...');
+
+            try {
+                const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/getSeasonLeaderboard');
+
+                if (!response.ok) {
+                    throw new Error(`Leaderboard call failed: ${response.status}`);
+                }
+
+                const result = await response.json();
+                log('✅ Leaderboard loaded successfully!');
+                log(`Cached: ${result.cached}, Users: ${result.data?.standings?.length || 0}`);
+
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+            }
+        }
+
+        window.onload = () => {
+            log('Cache clearing tool loaded');
+        };
+    </script>
+</body>
+</html>

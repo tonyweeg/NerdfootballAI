@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Week 2 Leaderboard Diagnostic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6 text-center">🔍 Week 2 Leaderboard Diagnostic</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <button onclick="checkWeek1Data()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                ✅ Check Week 1 (Working)
+            </button>
+            <button onclick="checkWeek2Data()" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+                ❌ Check Week 2 (Broken)
+            </button>
+        </div>
+
+        <div id="diagnostic-results" class="bg-white p-6 rounded-lg shadow-lg">
+            <p class="text-gray-500">Click buttons above to start diagnostic...</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Auto-authenticate user for test harness
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                console.log('🔓 Not authenticated, redirecting to login...');
+                window.location.href = './login.html';
+            } else {
+                console.log('🐉 User authenticated:', user.uid);
+                document.querySelector('h1').innerHTML += ` <span class="text-sm text-green-600">(Authenticated: ${user.email})</span>`;
+            }
+        });
+
+        window.checkWeek1Data = async function() {
+            await checkWeekData(1, 'Week 1 (Working Reference)');
+        }
+
+        window.checkWeek2Data = async function() {
+            await checkWeekData(2, 'Week 2 (Missing Leaderboard)');
+        }
+
+        async function checkWeekData(weekNum, title) {
+            const resultsDiv = document.getElementById('diagnostic-results');
+            resultsDiv.innerHTML = `<h2 class="text-xl font-bold mb-4">${title}</h2><div class="animate-pulse">Loading...</div>`;
+
+            let report = `<h2 class="text-xl font-bold mb-4">${title}</h2>`;
+
+            try {
+                // 1. Check game results
+                report += `<h3 class="text-lg font-semibold mt-4 mb-2">🎮 Game Results Check</h3>`;
+                const gameResultsPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNum}`;
+                const gameResultsRef = doc(db, gameResultsPath);
+                const gameResultsSnap = await getDoc(gameResultsRef);
+
+                if (gameResultsSnap.exists()) {
+                    const gameData = gameResultsSnap.data();
+                    const gameCount = Object.keys(gameData).filter(key => key !== '_metadata').length;
+                    report += `<div class="text-green-600">✅ Game results found: ${gameCount} games</div>`;
+
+                    // Show sample game data
+                    const sampleGameId = Object.keys(gameData).find(key => key !== '_metadata');
+                    if (sampleGameId) {
+                        const sampleGame = gameData[sampleGameId];
+                        report += `<div class="text-sm text-gray-600 ml-4">Sample: ${sampleGame.winner || 'No winner'} vs ${sampleGame.loser || 'No loser'}</div>`;
+                    }
+                } else {
+                    report += `<div class="text-red-600">❌ No game results found</div>`;
+                }
+
+                // 2. Check picks data
+                report += `<h3 class="text-lg font-semibold mt-4 mb-2">🎯 Picks Data Check</h3>`;
+                const picksCollectionPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNum}/submissions`;
+                const picksRef = collection(db, picksCollectionPath);
+                const picksSnap = await getDocs(picksRef);
+
+                if (!picksSnap.empty) {
+                    report += `<div class="text-green-600">✅ User picks found: ${picksSnap.docs.length} users</div>`;
+
+                    // Show sample pick
+                    const samplePick = picksSnap.docs[0].data();
+                    const pickCount = Object.keys(samplePick).filter(key => key !== 'mnfTotalPoints').length;
+                    report += `<div class="text-sm text-gray-600 ml-4">Sample user has ${pickCount} picks</div>`;
+                } else {
+                    report += `<div class="text-red-600">❌ No user picks found</div>`;
+                }
+
+                // 3. Check rollup/scoring documents - using correct paths from working system
+                report += `<h3 class="text-lg font-semibold mt-4 mb-2">📊 Rollup Documents Check</h3>`;
+
+                // Check scoring users collection (where user weekly data is stored)
+                try {
+                    const scoringUsersPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users`;
+                    const scoringUsersRef = collection(db, scoringUsersPath);
+                    const scoringUsersSnap = await getDocs(scoringUsersRef);
+
+                    if (!scoringUsersSnap.empty) {
+                        let weekDataFound = 0;
+                        scoringUsersSnap.docs.forEach(userDoc => {
+                            const userData = userDoc.data();
+                            if (userData.weeklyPoints && userData.weeklyPoints[weekNum]) {
+                                weekDataFound++;
+                            }
+                        });
+                        report += `<div class="text-green-600">✅ Scoring users found: ${scoringUsersSnap.docs.length} total, ${weekDataFound} have Week ${weekNum} data</div>`;
+                    } else {
+                        report += `<div class="text-red-600">❌ No scoring users found</div>`;
+                    }
+                } catch (error) {
+                    report += `<div class="text-yellow-600">⚠️ Error checking scoring-users: ${error.message}</div>`;
+                }
+
+                // Check leaderboard cache document (where weekly leaderboards are stored)
+                try {
+                    const leaderboardPath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/leaderboards`;
+                    const leaderboardRef = doc(db, leaderboardPath);
+                    const leaderboardSnap = await getDoc(leaderboardRef);
+
+                    if (leaderboardSnap.exists()) {
+                        const data = leaderboardSnap.data();
+                        const weekData = data[`week${weekNum}`];
+                        if (weekData) {
+                            const userCount = weekData.length || 0;
+                            report += `<div class="text-green-600">✅ Week ${weekNum} leaderboard cached: ${userCount} users</div>`;
+                        } else {
+                            report += `<div class="text-red-600">❌ Week ${weekNum} leaderboard not cached</div>`;
+                        }
+                    } else {
+                        report += `<div class="text-red-600">❌ No leaderboard cache found</div>`;
+                    }
+                } catch (error) {
+                    report += `<div class="text-yellow-600">⚠️ Error checking leaderboard cache: ${error.message}</div>`;
+                }
+
+                // 4. Check pool members
+                report += `<h3 class="text-lg font-semibold mt-4 mb-2">👥 Pool Members Check</h3>`;
+                const membersRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+                const membersSnap = await getDoc(membersRef);
+
+                if (membersSnap.exists()) {
+                    const members = membersSnap.data();
+                    const memberCount = Object.keys(members).length;
+                    report += `<div class="text-green-600">✅ Pool members found: ${memberCount}</div>`;
+                } else {
+                    report += `<div class="text-red-600">❌ No pool members found</div>`;
+                }
+
+            } catch (error) {
+                report += `<div class="text-red-600">💥 CRITICAL ERROR: ${error.message}</div>`;
+                console.error('Diagnostic error:', error);
+            }
+
+            resultsDiv.innerHTML = report;
+        }
+    </script>
+</body>
+</html>

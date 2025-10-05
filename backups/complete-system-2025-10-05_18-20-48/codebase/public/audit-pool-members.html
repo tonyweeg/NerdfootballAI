@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pool Members Audit</title>
+</head>
+<body>
+    <h1>Pool Members Audit</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function auditPoolMembers() {
+            try {
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = '<p>Loading pool members...</p>';
+
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const docRef = doc(db, poolMembersPath);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const allMembers = Object.values(data);
+                    const memberKeys = Object.keys(data);
+
+                    console.log('Total members found:', allMembers.length);
+                    console.log('All member keys:', memberKeys);
+
+                    const invalidMembers = [];
+                    const validMembers = [];
+
+                    allMembers.forEach((member, index) => {
+                        if (!member || !member.uid || member.uid === 'undefined') {
+                            console.log(`❌ Invalid member ${index}:`, member);
+                            invalidMembers.push({
+                                index,
+                                key: memberKeys[index],
+                                data: member
+                            });
+                        } else {
+                            validMembers.push(member);
+                        }
+                    });
+
+                    let html = `<h2>Audit Results</h2>`;
+                    html += `<p>Total members: ${allMembers.length}</p>`;
+                    html += `<p>Valid members: ${validMembers.length}</p>`;
+                    html += `<p>Invalid members: ${invalidMembers.length}</p>`;
+
+                    if (invalidMembers.length > 0) {
+                        html += `<h3>Invalid Members (${invalidMembers.length}):</h3>`;
+                        invalidMembers.forEach((item, i) => {
+                            html += `<div style="border: 1px solid red; padding: 10px; margin: 5px;">`;
+                            html += `<strong>Invalid Member ${i + 1}:</strong><br>`;
+                            html += `Key: ${item.key}<br>`;
+                            html += `Data: <pre>${JSON.stringify(item.data, null, 2)}</pre>`;
+                            html += `</div>`;
+                        });
+
+                        html += `<h3>Removal Script:</h3>`;
+                        html += `<p>To remove these invalid members, you would need to delete these keys:</p>`;
+                        html += `<pre>${invalidMembers.map(item => item.key).join('\n')}</pre>`;
+                    }
+
+                    resultsDiv.innerHTML = html;
+
+                } else {
+                    resultsDiv.innerHTML = '<p>Pool members document not found</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('results').innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+
+        // Run audit when page loads
+        auditPoolMembers();
+    </script>
+</body>
+</html>

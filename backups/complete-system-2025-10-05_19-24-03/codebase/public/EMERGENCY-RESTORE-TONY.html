@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🚨 EMERGENCY RESTORE TONY'S SCORING</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>🚨 EMERGENCY RESTORE - TONY'S SCORING</h1>
+    <div style="background: #ffeeee; padding: 20px; border: 2px solid red; margin: 20px 0;">
+        <h3>🚨 EMERGENCY SITUATION</h3>
+        <p>Tony's scoring rollups were accidentally removed instead of fixed!</p>
+        <p><strong>This tool will RECREATE his correct scoring data from scratch!</strong></p>
+    </div>
+
+    <button onclick="emergencyRestore()" style="background: red; color: white; padding: 20px; font-size: 18px;">🚨 EMERGENCY RESTORE TONY'S SCORING</button>
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        const TONY_UID = 'WxSPmEildJdqs6T5hIpBUZrscwt2';
+        const TONY_SCORING_PATH = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${TONY_UID}`;
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function getBibleData(weekNumber) {
+            try {
+                const response = await fetch(`./game-data/nfl_2025_week_${weekNumber}_bible.json`);
+                if (!response.ok) return null;
+                return await response.json();
+            } catch (error) {
+                console.log(`No bible data for week ${weekNumber}`);
+                return null;
+            }
+        }
+
+        async function getTonyPicks(weekNumber) {
+            try {
+                const picksDocPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/${TONY_UID}`;
+                const picksDoc = await firebase.firestore().doc(picksDocPath).get();
+                return picksDoc.exists ? picksDoc.data() : null;
+            } catch (error) {
+                console.error(`Error loading picks for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        function calculateWeekPoints(picks, bibleData, weekNumber) {
+            if (!picks || !bibleData) {
+                return {
+                    totalPoints: 0,
+                    gamesPlayed: 0,
+                    gamesWon: 0,
+                    gameResults: {},
+                    details: `No picks or bible data for week ${weekNumber}`
+                };
+            }
+
+            let totalPoints = 0;
+            let gamesWon = 0;
+            let gamesPlayed = 0;
+            const gameResults = {};
+            const details = [];
+
+            console.log(`🧮 CALCULATING WEEK ${weekNumber} WITH PICKS:`, picks);
+
+            for (const [gameId, pickData] of Object.entries(picks)) {
+                if (gameId === 'mnfTotalPoints') continue;
+
+                const confidence = pickData.confidence;
+                const pickedTeam = pickData.team || pickData.winner; // Handle both formats!
+
+                if (!pickedTeam || !confidence) {
+                    console.log(`⚠️ INVALID PICK DATA FOR GAME ${gameId}:`, pickData);
+                    continue;
+                }
+
+                const bibleGame = bibleData.find(game => game.gameId === gameId);
+                if (!bibleGame) {
+                    console.log(`⚠️ NO BIBLE DATA FOR GAME ${gameId}`);
+                    details.push(`No bible data for game ${gameId}`);
+                    continue;
+                }
+
+                gamesPlayed++;
+
+                if (bibleGame.status === 'Final' && bibleGame.winner) {
+                    const isWin = bibleGame.winner === pickedTeam;
+                    const points = isWin ? confidence : 0;
+
+                    if (isWin) {
+                        gamesWon++;
+                        totalPoints += points;
+                    }
+
+                    gameResults[gameId] = {
+                        pickedTeam: pickedTeam,
+                        actualWinner: bibleGame.winner,
+                        confidence: confidence,
+                        points: points,
+                        result: isWin ? 'win' : 'loss',
+                        gameStatus: 'Final'
+                    };
+
+                    details.push(`Game ${gameId}: ${pickedTeam} vs ${bibleGame.winner} = ${isWin ? 'WIN' : 'LOSS'} (${points} pts)`);
+                    console.log(`🎯 GAME ${gameId}: ${pickedTeam} vs ${bibleGame.winner} = ${isWin ? 'WIN' : 'LOSS'} (${points} points)`);
+                } else {
+                    details.push(`Game ${gameId}: ${pickedTeam} vs ${bibleGame.winner || 'TBD'} = PENDING/INCOMPLETE`);
+                }
+            }
+
+            return {
+                totalPoints,
+                gamesPlayed,
+                gamesWon,
+                gameResults,
+                details: details.join('; ')
+            };
+        }
+
+        async function emergencyRestore() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🚨 EMERGENCY RESTORE IN PROGRESS...</h2>';
+
+            try {
+                await autoLogin();
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                output.innerHTML += '<h3>📋 RECREATING TONY\'S SCORING FROM SCRATCH</h3>';
+
+                const userWeeklyData = {};
+                let seasonTotalPoints = 0;
+                let seasonTotalGames = 0;
+                let seasonTotalWins = 0;
+                let weeksPlayed = 0;
+
+                // Process weeks 1-3 with detailed logging
+                for (let week = 1; week <= 3; week++) {
+                    output.innerHTML += `<h4>📅 WEEK ${week} PROCESSING...</h4>`;
+
+                    const bibleData = await getBibleData(week);
+                    if (!bibleData) {
+                        output.innerHTML += `<p style="color: red;">❌ No bible data for Week ${week}</p>`;
+                        continue;
+                    }
+
+                    output.innerHTML += `<p style="color: green;">✅ Bible data loaded for Week ${week}</p>`;
+
+                    const picks = await getTonyPicks(week);
+                    if (!picks) {
+                        output.innerHTML += `<p style="color: red;">❌ No picks for Week ${week}</p>`;
+                        continue;
+                    }
+
+                    output.innerHTML += `<p style="color: green;">✅ Picks loaded for Week ${week} (${Object.keys(picks).length} entries)</p>`;
+
+                    const weekResults = calculateWeekPoints(picks, bibleData, week);
+
+                    output.innerHTML += `
+                        <div style="background: #eeffee; padding: 15px; margin: 10px 0; border: 1px solid green;">
+                            <h5>✅ WEEK ${week} CALCULATED RESULTS:</h5>
+                            <p><strong>Points:</strong> ${weekResults.totalPoints}</p>
+                            <p><strong>Games Played:</strong> ${weekResults.gamesPlayed}</p>
+                            <p><strong>Games Won:</strong> ${weekResults.gamesWon}</p>
+                            <p><strong>Details:</strong> ${weekResults.details}</p>
+                        </div>
+                    `;
+
+                    userWeeklyData[week] = weekResults;
+                    seasonTotalPoints += weekResults.totalPoints;
+                    seasonTotalGames += weekResults.gamesPlayed;
+                    seasonTotalWins += weekResults.gamesWon;
+
+                    if (weekResults.gamesPlayed > 0) {
+                        weeksPlayed++;
+                    }
+                }
+
+                // Create the COMPLETE restored scoring document
+                const restoredScoringData = {
+                    userId: TONY_UID,
+                    displayName: 'Ållfåther',
+                    email: 'tony@tonyweeg.com', // Add email if known
+                    totalPoints: seasonTotalPoints,
+                    weeklyPoints: userWeeklyData,
+                    seasonStats: {
+                        totalGames: seasonTotalGames,
+                        gamesWon: seasonTotalWins,
+                        weeksPlayed: weeksPlayed,
+                        averagePointsPerWeek: weeksPlayed > 0 ? Math.round((seasonTotalPoints / weeksPlayed) * 100) / 100 : 0,
+                        winPercentage: seasonTotalGames > 0 ? Math.round((seasonTotalWins / seasonTotalGames) * 10000) / 100 : 0
+                    },
+                    lastUpdatedWeek: 3,
+                    lastUpdated: new Date().toISOString(),
+                    emergencyRestoreApplied: true,
+                    emergencyRestoreTimestamp: new Date().toISOString(),
+                    restoredFromPicksData: true,
+                    calculationMethod: 'picks + bible data',
+                    weeksProcessed: [1, 2, 3].slice(0, weeksPlayed)
+                };
+
+                output.innerHTML += `
+                    <div style="background: #ffffee; padding: 20px; border: 2px solid orange; margin: 20px 0;">
+                        <h3>📊 COMPLETE RESTORED SCORING DATA PREVIEW:</h3>
+                        <p><strong>Total Season Points:</strong> ${seasonTotalPoints}</p>
+                        <p><strong>Total Games Won:</strong> ${seasonTotalWins} out of ${seasonTotalGames}</p>
+                        <p><strong>Weeks Played:</strong> ${weeksPlayed}</p>
+                        <p><strong>Average Points/Week:</strong> ${restoredScoringData.seasonStats.averagePointsPerWeek}</p>
+                        <p><strong>Win Percentage:</strong> ${restoredScoringData.seasonStats.winPercentage}%</p>
+                    </div>
+                `;
+
+                console.log('🚨 EMERGENCY RESTORE - SAVING DATA:', restoredScoringData);
+
+                // Save the restored data to Firestore
+                await firebase.firestore().doc(TONY_SCORING_PATH).set(restoredScoringData);
+
+                output.innerHTML += `
+                    <div style="background: #eeffee; padding: 20px; border: 3px solid green; margin: 20px 0;">
+                        <h2>✅ EMERGENCY RESTORE COMPLETE!</h2>
+                        <p><strong>Tony's scoring data has been RECREATED from scratch!</strong></p>
+                        <p><strong>Document Path:</strong> <code>${TONY_SCORING_PATH}</code></p>
+                        <p><strong>Restoration Time:</strong> ${new Date().toLocaleString()}</p>
+                        <p><strong>Total Points Restored:</strong> ${seasonTotalPoints}</p>
+                        <p><strong>Games Won Restored:</strong> ${seasonTotalWins}</p>
+                    </div>
+                `;
+
+                output.innerHTML += `
+                    <p><strong>Now check your scoring document to verify the restoration worked!</strong></p>
+                    <button onclick="window.open('working-scoring-check.html', '_blank')" style="background: blue; color: white; padding: 15px;">
+                        📊 VERIFY RESTORED DATA
+                    </button>
+                `;
+
+            } catch (error) {
+                console.error('❌ EMERGENCY RESTORE ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ EMERGENCY RESTORE FAILED</h2><p>Error: ${error.message}</p><p>Stack: ${error.stack}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🏆 COMPREHENSIVE SCORING FIX - ALL USERS ALL WEEKS</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>🏆 COMPREHENSIVE SCORING FIX</h1>
+    <button onclick="runComprehensiveFix()" style="background: red; color: white; padding: 20px; font-size: 18px;">🚨 FIX ALL SCORING FOR ALL USERS</button>
+    <div id="output"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 NOT AUTHENTICATED - Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                            console.log('✅ SIGNED IN SUCCESSFULLY');
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function getBibleData(weekNumber) {
+            console.log(`📖 LOADING BIBLE DATA FOR WEEK ${weekNumber}`);
+            try {
+                const response = await fetch(`./game-data/nfl_2025_week_${weekNumber}_bible.json`);
+                if (!response.ok) {
+                    console.log(`⚠️ No bible data found for week ${weekNumber}`);
+                    return null;
+                }
+                const bibleData = await response.json();
+                console.log(`✅ BIBLE DATA WEEK ${weekNumber}:`, bibleData);
+                return bibleData;
+            } catch (error) {
+                console.log(`❌ ERROR loading bible data for week ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        async function getUserPicks(userId, weekNumber) {
+            console.log(`🔍 LOADING PICKS FOR ${userId} WEEK ${weekNumber}`);
+            try {
+                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions`;
+                const picksDoc = await firebase.firestore().doc(picksPath, userId).get();
+
+                if (!picksDoc.exists) {
+                    console.log(`⚠️ NO PICKS FOUND FOR ${userId} WEEK ${weekNumber}`);
+                    return null;
+                }
+
+                const picks = picksDoc.data();
+                console.log(`✅ PICKS FOR ${userId} WEEK ${weekNumber}:`, picks);
+                return picks;
+            } catch (error) {
+                console.error(`❌ ERROR LOADING PICKS FOR ${userId} WEEK ${weekNumber}:`, error);
+                return null;
+            }
+        }
+
+        function calculateWeekPoints(picks, bibleData) {
+            if (!picks || !bibleData) {
+                return { totalPoints: 0, gamesPlayed: 0, gamesWon: 0, gameResults: {} };
+            }
+
+            let totalPoints = 0;
+            let gamesWon = 0;
+            let gamesPlayed = 0;
+            const gameResults = {};
+
+            console.log('🧮 CALCULATING POINTS WITH PICKS:', picks);
+
+            for (const [gameId, pickData] of Object.entries(picks)) {
+                if (gameId === 'mnfTotalPoints') continue; // Skip MNF total points
+
+                const confidence = pickData.confidence;
+                const pickedTeam = pickData.team || pickData.winner; // Handle both formats!
+
+                // Find the game in bible data
+                const bibleGame = bibleData.find(game => game.gameId === gameId);
+                if (!bibleGame) {
+                    console.log(`⚠️ NO BIBLE DATA FOR GAME ${gameId}`);
+                    continue;
+                }
+
+                gamesPlayed++;
+
+                if (bibleGame.status === 'Final' && bibleGame.winner) {
+                    const isWin = bibleGame.winner === pickedTeam;
+                    const points = isWin ? confidence : 0;
+
+                    if (isWin) {
+                        gamesWon++;
+                        totalPoints += points;
+                    }
+
+                    gameResults[gameId] = {
+                        pickedTeam: pickedTeam,
+                        actualWinner: bibleGame.winner,
+                        confidence: confidence,
+                        points: points,
+                        result: isWin ? 'win' : 'loss',
+                        gameStatus: 'Final'
+                    };
+
+                    console.log(`🎯 GAME ${gameId}: ${pickedTeam} vs ${bibleGame.winner} = ${isWin ? 'WIN' : 'LOSS'} (${points} points)`);
+                }
+            }
+
+            return {
+                totalPoints,
+                gamesPlayed,
+                gamesWon,
+                gameResults
+            };
+        }
+
+        async function fixUserScoring(userId, displayName) {
+            console.log(`🔧 FIXING SCORING FOR ${displayName} (${userId})`);
+
+            const userWeeklyData = {};
+            let seasonTotalPoints = 0;
+            let seasonTotalGames = 0;
+            let seasonTotalWins = 0;
+            let weeksPlayed = 0;
+
+            // Process weeks 1-3 (where we have bible data)
+            for (let week = 1; week <= 3; week++) {
+                console.log(`📅 PROCESSING WEEK ${week} FOR ${displayName}`);
+
+                const bibleData = await getBibleData(week);
+                if (!bibleData) {
+                    console.log(`❌ NO BIBLE DATA FOR WEEK ${week} - SKIPPING`);
+                    continue;
+                }
+
+                const picks = await getUserPicks(userId, week);
+                if (!picks) {
+                    console.log(`❌ NO PICKS FOR ${displayName} WEEK ${week} - SKIPPING`);
+                    continue;
+                }
+
+                const weekResults = calculateWeekPoints(picks, bibleData);
+                console.log(`📊 WEEK ${week} RESULTS FOR ${displayName}:`, weekResults);
+
+                userWeeklyData[week] = weekResults;
+                seasonTotalPoints += weekResults.totalPoints;
+                seasonTotalGames += weekResults.gamesPlayed;
+                seasonTotalWins += weekResults.gamesWon;
+
+                if (weekResults.gamesPlayed > 0) {
+                    weeksPlayed++;
+                }
+            }
+
+            // Create the corrected scoring document
+            const correctedScoringData = {
+                userId: userId,
+                displayName: displayName,
+                totalPoints: seasonTotalPoints,
+                weeklyPoints: userWeeklyData,
+                seasonStats: {
+                    totalGames: seasonTotalGames,
+                    gamesWon: seasonTotalWins,
+                    weeksPlayed: weeksPlayed,
+                    averagePointsPerWeek: weeksPlayed > 0 ? (seasonTotalPoints / weeksPlayed) : 0
+                },
+                lastUpdatedWeek: 3,
+                lastUpdated: new Date().toISOString(),
+                correctionApplied: true,
+                correctionTimestamp: new Date().toISOString()
+            };
+
+            console.log(`💾 SAVING CORRECTED DATA FOR ${displayName}:`, correctedScoringData);
+
+            // Save to Firestore
+            const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+            await firebase.firestore().doc(scoringPath).set(correctedScoringData);
+
+            return correctedScoringData;
+        }
+
+        async function runComprehensiveFix() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<h2>🚨 STARTING COMPREHENSIVE SCORING FIX...</h2>';
+
+            try {
+                await autoLogin();
+
+                output.innerHTML += '<p>✅ Authenticated successfully</p>';
+
+                // Get all users from scoring collection instead of pool members
+                const scoringCollectionPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users';
+                const membersSnapshot = await firebase.firestore().collection(scoringCollectionPath).get();
+
+                if (membersSnapshot.empty) {
+                    output.innerHTML += '<p>❌ NO POOL MEMBERS FOUND!</p>';
+                    return;
+                }
+
+                output.innerHTML += `<h3>🎯 FIXING SCORING FOR ${membersSnapshot.size} USERS</h3>`;
+
+                let fixedCount = 0;
+                let errorCount = 0;
+                const results = [];
+
+                for (const memberDoc of membersSnapshot.docs) {
+                    const userId = memberDoc.id;
+                    const memberData = memberDoc.data();
+                    const displayName = memberData.displayName || memberData.email || `User ${userId.slice(-6)}`;
+
+                    try {
+                        output.innerHTML += `<p>🔧 Fixing ${displayName}...</p>`;
+
+                        const correctedData = await fixUserScoring(userId, displayName);
+
+                        results.push({
+                            userId,
+                            displayName,
+                            totalPoints: correctedData.totalPoints,
+                            weeksPlayed: correctedData.seasonStats.weeksPlayed,
+                            gamesWon: correctedData.seasonStats.gamesWon,
+                            status: 'FIXED'
+                        });
+
+                        fixedCount++;
+
+                        output.innerHTML += `<p style="color: green;">✅ ${displayName}: ${correctedData.totalPoints} points (${correctedData.seasonStats.gamesWon} wins)</p>`;
+
+                    } catch (error) {
+                        console.error(`❌ ERROR FIXING ${displayName}:`, error);
+                        errorCount++;
+
+                        results.push({
+                            userId,
+                            displayName,
+                            status: 'ERROR',
+                            error: error.message
+                        });
+
+                        output.innerHTML += `<p style="color: red;">❌ ERROR fixing ${displayName}: ${error.message}</p>`;
+                    }
+                }
+
+                // Show summary
+                output.innerHTML += `
+                    <hr>
+                    <h2>🏆 COMPREHENSIVE FIX COMPLETE!</h2>
+                    <p><strong>Users Fixed:</strong> ${fixedCount}</p>
+                    <p><strong>Errors:</strong> ${errorCount}</p>
+                    <h3>📊 Results Summary:</h3>
+                    <table border="1" style="border-collapse: collapse; width: 100%;">
+                        <tr><th>User</th><th>Total Points</th><th>Weeks Played</th><th>Games Won</th><th>Status</th></tr>
+                `;
+
+                results.forEach(result => {
+                    const statusColor = result.status === 'FIXED' ? 'green' : 'red';
+                    output.innerHTML += `
+                        <tr>
+                            <td><strong>${result.displayName}</strong></td>
+                            <td>${result.totalPoints || 'N/A'}</td>
+                            <td>${result.weeksPlayed || 'N/A'}</td>
+                            <td>${result.gamesWon || 'N/A'}</td>
+                            <td style="color: ${statusColor};">${result.status}</td>
+                        </tr>
+                    `;
+                });
+
+                output.innerHTML += '</table>';
+                output.innerHTML += '<p><strong>🚀 All users should now have correct scoring data!</strong></p>';
+
+            } catch (error) {
+                console.error('❌ COMPREHENSIVE FIX ERROR:', error);
+                output.innerHTML += `<h2 style="color: red;">❌ FIX FAILED</h2><p>Error: ${error.message}</p><p>Stack: ${error.stack}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
