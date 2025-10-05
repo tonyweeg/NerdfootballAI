@@ -629,13 +629,23 @@
 
                 if (picksSnap.exists()) {
                     userPicks = picksSnap.data();
-                    console.log(`✅ Loaded user picks for Week ${currentWeek}`);
+
+                    // 🛡️ VALIDATION: Verify loaded picks are complete
+                    const expectedGames = Object.keys(weekBible).filter(k => k !== '_metadata');
+                    const loadedGamePicks = Object.keys(userPicks).filter(k => /^\d+$/.test(k));
+                    console.log(`✅ Loaded user picks for Week ${currentWeek}: ${loadedGamePicks.length}/${expectedGames.length} games`);
+
+                    if (loadedGamePicks.length < expectedGames.length) {
+                        console.warn(`⚠️ INCOMPLETE PICKS LOADED: Missing ${expectedGames.length - loadedGamePicks.length} games`);
+                        console.warn('Missing games:', expectedGames.filter(g => !loadedGamePicks.includes(g)));
+                    }
                 } else {
                     userPicks = {};
                     console.log(`📝 No picks found for Week ${currentWeek}`);
                 }
             } catch (error) {
-                console.error('Error loading user picks:', error);
+                console.error('❌ Error loading user picks:', error);
+                console.error('Setting userPicks to empty object - DO NOT SAVE until user creates picks!');
                 userPicks = {};
             }
         }
@@ -1012,9 +1022,17 @@
                     userPicks.mnfTotalPoints = parseInt(mnfInput.value);
                 }
 
+                // 🛡️ VALIDATION: Check if we have all expected game picks
+                const expectedGames = Object.keys(weekBible).filter(k => k !== '_metadata');
+                const actualGamePicks = Object.keys(userPicks).filter(k => /^\d+$/.test(k));
+                if (actualGamePicks.length < expectedGames.length) {
+                    console.warn(`⚠️ INCOMPLETE PICKS: Saving ${actualGamePicks.length}/${expectedGames.length} games`);
+                    console.warn('Missing games:', expectedGames.filter(g => !actualGamePicks.includes(g)));
+                }
+
                 const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
                 const picksDoc = doc(db, picksPath, currentUser.uid);
-                await setDoc(picksDoc, userPicks);
+                await setDoc(picksDoc, userPicks, { merge: true });
 
                 showAutoSaveStatus('saved');
 
