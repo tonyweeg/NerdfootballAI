@@ -6,6 +6,7 @@
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const nodemailer = require('nodemailer');
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -14,6 +15,76 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 const rtdb = admin.database();
+
+// Email transporter setup
+let transporter = null;
+const setupEmailTransport = () => {
+    try {
+        const gmailEmail = process.env.GMAIL_EMAIL;
+        const gmailPassword = process.env.GMAIL_PASSWORD;
+
+        if (gmailEmail && gmailPassword) {
+            transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: gmailEmail,
+                    pass: gmailPassword
+                }
+            });
+            console.log('Email transport configured for ESPN updates');
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Email transport setup failed:', error);
+        return false;
+    }
+};
+
+// Send ESPN update notification email
+async function sendESPNUpdateEmail(gameUpdates, week) {
+    if (!transporter) {
+        setupEmailTransport();
+    }
+
+    const updateCount = Object.keys(gameUpdates).length;
+    if (updateCount === 0) return;
+
+    // Build email content
+    let emailBody = `ESPN Game Updates - Week ${week}\n`;
+    emailBody += `=`.repeat(50) + '\n\n';
+    emailBody += `${updateCount} game(s) updated:\n\n`;
+
+    Object.values(gameUpdates).forEach((game, index) => {
+        emailBody += `${index + 1}. ${game.awayTeam} @ ${game.homeTeam}\n`;
+        emailBody += `   Score: ${game.awayTeam} ${game.awayScore} - ${game.homeScore} ${game.homeTeam}\n`;
+        emailBody += `   Status: ${game.status}\n`;
+        emailBody += `   Game ID: ${game.gameId}\n\n`;
+    });
+
+    emailBody += `Timestamp: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} ET\n`;
+
+    const mailOptions = {
+        from: `NerdFootball ESPN Monitor <${process.env.GMAIL_EMAIL}>`,
+        to: 'tonyweeg@gmail.com',
+        subject: `🏈 ESPN Update: ${updateCount} Game${updateCount > 1 ? 's' : ''} Updated - Week ${week}`,
+        text: emailBody,
+        replyTo: 'tonyweeg@gmail.com'
+    };
+
+    try {
+        if (transporter) {
+            await transporter.sendMail(mailOptions);
+            console.log(`✅ ESPN update email sent to tonyweeg@gmail.com (${updateCount} updates)`);
+        } else {
+            console.log('=== ESPN UPDATE EMAIL LOG ===');
+            console.log(emailBody);
+            console.log('==============================');
+        }
+    } catch (error) {
+        console.error('❌ Failed to send ESPN update email:', error);
+    }
+}
 
 /**
  * Sync game scores from ESPN to Realtime Database
@@ -104,8 +175,11 @@ exports.syncGameScores = functions.https.onRequest(async (req, res) => {
             if (Object.keys(gameUpdates).length > 0) {
                 console.log(`🚀 Triggering leaderboard update for ${Object.keys(gameUpdates).length} game changes`);
                 await syncLeaderboardToRTDB(currentWeek);
+
+                // Send email notification for ESPN updates
+                await sendESPNUpdateEmail(gameUpdates, currentWeek);
             }
-            
+
             console.log(`✅ Synced ${Object.keys(liveScores).length} games to RTDB`);
             res.status(200).json({
                 success: true,
