@@ -425,6 +425,35 @@
                         <button onclick="deleteCache('survivor')" class="btn-asteroid btn-danger flex-1">DELETE</button>
                     </div>
                 </div>
+
+                <div class="cache-card" style="border-color: #ffd700;" id="gridCacheCard">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold text-yellow-400">⚔️ THE GRID</h2>
+                        <span class="status-online" id="gridStatus"></span>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-400">Cache Path</p>
+                        <p class="text-xs text-purple-300 break-all">artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-*</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <p class="text-xs text-gray-400">EXPIRY</p>
+                            <p class="metric-value text-lg">15 MIN</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400">CURRENT WEEK</p>
+                            <p class="metric-value text-lg" id="gridWeek">--</p>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-xs text-gray-400">STATUS</p>
+                        <p class="text-sm" id="gridCacheStatus">Checking current week cache...</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="deleteGridCache()" class="btn-asteroid btn-danger flex-1">DELETE CURRENT WEEK</button>
+                        <button onclick="deleteAllGridCaches()" class="btn-asteroid btn-danger flex-1">DELETE ALL WEEKS</button>
+                    </div>
+                </div>
             </div>
 
             <div class="endpoint-test">
@@ -524,7 +553,8 @@
                 loadESPNCache(),
                 loadSeasonCache(),
                 loadWeeklyCache(),
-                loadSurvivorCache()
+                loadSurvivorCache(),
+                loadGridCache()
             ]);
         }
 
@@ -641,6 +671,41 @@
             } catch (error) {
                 console.error('❌ CACHE_LOAD: Survivor cache error:', error);
                 updateCacheUI('survivor', null, null, 10, true);
+            }
+        }
+
+        async function loadGridCache() {
+            try {
+                const currentWeek = getCurrentNFLWeek();
+                document.getElementById('gridWeek').textContent = currentWeek;
+
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cacheRef = doc(db, cachePath);
+                const cacheSnap = await getDoc(cacheRef);
+
+                if (cacheSnap.exists()) {
+                    const data = cacheSnap.data();
+                    const created = data.createdDate ? new Date(data.createdDate) : null;
+                    const age = created ? Math.floor((Date.now() - created.getTime()) / 1000) : null;
+                    const expiry = 15 * 60;
+
+                    const statusEl = document.getElementById('gridStatus');
+                    const statusText = document.getElementById('gridCacheStatus');
+
+                    const isStale = age > expiry;
+                    statusEl.className = isStale ? 'status-stale' : 'status-online';
+                    statusText.textContent = `Week ${currentWeek} cache: ${created.toLocaleString()} (${formatAge(age)} old)`;
+
+                    console.log('✅ CACHE_LOAD: Grid cache loaded for week', currentWeek, { age, expiry });
+                } else {
+                    document.getElementById('gridStatus').className = 'status-error';
+                    document.getElementById('gridCacheStatus').textContent = `No cache found for week ${currentWeek}`;
+                    console.log('⚠️ CACHE_LOAD: Grid cache not found for week', currentWeek);
+                }
+            } catch (error) {
+                console.error('❌ CACHE_LOAD: Grid cache error:', error);
+                document.getElementById('gridStatus').className = 'status-error';
+                document.getElementById('gridCacheStatus').textContent = 'Error loading cache';
             }
         }
 
@@ -781,6 +846,45 @@
                 await loadAllCaches();
             } catch (error) {
                 logTest(`❌ CACHE_DELETE: ${cacheType} cache deletion failed - ${error.message}`);
+            }
+        };
+
+        window.deleteGridCache = async () => {
+            const currentWeek = getCurrentNFLWeek();
+            if (!confirm(`⚠️ DELETE GRID CACHE FOR WEEK ${currentWeek}?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+
+            logTest(`🗑️ GRID_CACHE_DELETE: Deleting grid cache for week ${currentWeek}...`);
+
+            try {
+                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                await deleteDoc(doc(db, cachePath));
+                logTest(`✅ GRID_CACHE_DELETE: Week ${currentWeek} cache deleted successfully`);
+                await loadGridCache();
+            } catch (error) {
+                logTest(`❌ GRID_CACHE_DELETE: Failed - ${error.message}`);
+            }
+        };
+
+        window.deleteAllGridCaches = async () => {
+            if (!confirm(`⚠️ DELETE ALL GRID CACHES FOR ALL WEEKS?\n\nThis will delete grid caches for weeks 1-18.\nThis action cannot be undone.`)) {
+                return;
+            }
+
+            logTest(`🗑️ GRID_CACHE_DELETE_ALL: Deleting all grid caches...`);
+
+            try {
+                const deletePromises = [];
+                for (let week = 1; week <= 18; week++) {
+                    const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${week}`;
+                    deletePromises.push(deleteDoc(doc(db, cachePath)).catch(() => null));
+                }
+                await Promise.all(deletePromises);
+                logTest(`✅ GRID_CACHE_DELETE_ALL: All grid caches deleted successfully`);
+                await loadGridCache();
+            } catch (error) {
+                logTest(`❌ GRID_CACHE_DELETE_ALL: Failed - ${error.message}`);
             }
         };
 
