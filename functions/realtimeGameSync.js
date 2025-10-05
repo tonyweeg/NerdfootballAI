@@ -138,8 +138,8 @@ exports.syncGameScores = functions.https.onRequest(async (req, res) => {
                 
                 const gameData = {
                     gameId: gameId,
-                    homeTeam: normalizeTeamName(homeTeam.team.displayName),
-                    awayTeam: normalizeTeamName(awayTeam.team.displayName),
+                    homeTeam: homeTeam.team.displayName,  // Use raw ESPN name for Firestore matching
+                    awayTeam: awayTeam.team.displayName,  // Use raw ESPN name for Firestore matching
                     homeScore: parseInt(homeTeam.score) || 0,
                     awayScore: parseInt(awayTeam.score) || 0,
                     status: getGameStatus(competition.status),
@@ -168,9 +168,56 @@ exports.syncGameScores = functions.https.onRequest(async (req, res) => {
             const updates = {};
             updates[`nfl/games/${year}/week-${currentWeek}/live`] = liveScores;
             updates[`nfl/games/${year}/week-${currentWeek}/lastSync`] = admin.database.ServerValue.TIMESTAMP;
-            
+
             await rtdb.ref().update(updates);
-            
+
+            // 🔥 CRITICAL FIX: Also update Firestore bible data (Grid reads from here!)
+            // Update ALL live scores in Firestore, not just "significant updates"
+            if (Object.keys(liveScores).length > 0) {
+                console.log(`📝 Updating Firestore bible data for ${Object.keys(liveScores).length} games`);
+
+                const biblePath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const bibleRef = db.doc(biblePath);
+                const bibleSnap = await bibleRef.get();
+
+                if (bibleSnap.exists) {
+                    const bibleData = bibleSnap.data();
+                    const bibleUpdates = {};
+
+                    // Map ESPN game IDs to bible game IDs and update status/scores
+                    Object.entries(liveScores).forEach(([espnId, gameData]) => {
+                        // Find matching game in bible by team names
+                        const matchingGameId = Object.keys(bibleData).find(id => {
+                            const game = bibleData[id];
+                            return game.h === gameData.homeTeam && game.a === gameData.awayTeam;
+                        });
+
+                        if (matchingGameId) {
+                            bibleUpdates[`${matchingGameId}.status`] = gameData.status;
+                            bibleUpdates[`${matchingGameId}.homeScore`] = gameData.homeScore;
+                            bibleUpdates[`${matchingGameId}.awayScore`] = gameData.awayScore;
+                            bibleUpdates[`${matchingGameId}.lastUpdated`] = new Date().toISOString();
+
+                            // Set winner if game is final
+                            if (gameData.status === 'final') {
+                                const winner = gameData.homeScore > gameData.awayScore ?
+                                    gameData.homeTeam : gameData.awayTeam;
+                                bibleUpdates[`${matchingGameId}.winner`] = winner;
+                            }
+
+                            console.log(`✅ Updating bible game ${matchingGameId}: ${gameData.status}`);
+                        } else {
+                            console.log(`❌ No matching bible game found for ${gameData.awayTeam} @ ${gameData.homeTeam}`);
+                        }
+                    });
+
+                    if (Object.keys(bibleUpdates).length > 0) {
+                        await bibleRef.update(bibleUpdates);
+                        console.log(`✅ Updated ${Object.keys(bibleUpdates).length} fields in Firestore bible data`);
+                    }
+                }
+            }
+
             // If there are significant updates, trigger leaderboard recalculation
             if (Object.keys(gameUpdates).length > 0) {
                 console.log(`🚀 Triggering leaderboard update for ${Object.keys(gameUpdates).length} game changes`);
@@ -439,20 +486,18 @@ function normalizeTeamName(teamName) {
 }
 
 function getGameStatus(espnStatus) {
-    if (!espnStatus) return 'Not Started';
-    
+    if (!espnStatus) return 'scheduled';
+
     const statusType = espnStatus.type;
-    
+
     if (statusType.name === 'STATUS_FINAL') {
-        return 'Final';
+        return 'final';
     } else if (statusType.name === 'STATUS_IN_PROGRESS') {
-        const period = espnStatus.period;
-        const clock = espnStatus.displayClock;
-        return `Q${period} ${clock}`;
+        return 'in_progress';
     } else if (statusType.name === 'STATUS_HALFTIME') {
-        return 'Halftime';
+        return 'in_progress';
     } else if (statusType.name === 'STATUS_END_OF_PERIOD') {
-        return `End Q${espnStatus.period}`;
+        return 'in_progress';
     } else {
         return espnStatus.type.description || 'Not Started';
     }
