@@ -407,6 +407,7 @@
         let currentUser = null;
         let isAuthenticated = false;
         let userSurvivorData = null;
+        let userSurvivorStatus = null; // NEW: Centralized survivor status from Cloud Function
         let currentWeek = 1;
         let selectedWeek = null;
         let isEditing = false;
@@ -435,6 +436,26 @@
                     return;
                 }
 
+                // PHASE 1: Load centralized survivor status FIRST
+                console.log('💀 SURVIVOR_INIT: Step 1 - Loading survivor status...');
+                userSurvivorStatus = await loadUserSurvivorStatus();
+
+                // PHASE 2: Route based on survivor status
+                if (userSurvivorStatus.isEliminated) {
+                    console.log('💀 SURVIVOR_INIT: User is ELIMINATED - showing death screen');
+                    await loadUserSurvivorData(); // Load picks for history display
+                    showEliminationScreen();
+                    return; // STOP - no more functionality for dead users
+                }
+
+                if (userSurvivorStatus.notParticipating) {
+                    console.log('⚠️ SURVIVOR_INIT: User NOT PARTICIPATING - showing not participating screen');
+                    showNotParticipatingScreen();
+                    return; // STOP
+                }
+
+                // User is ALIVE - proceed with normal interface
+                console.log('✅ SURVIVOR_INIT: User is ALIVE - loading full interface');
                 currentWeek = getCurrentWeek();
                 await loadUserSurvivorData();
                 await loadGameData();
@@ -475,6 +496,58 @@
             } catch (error) {
                 console.error('Error loading survivor data:', error);
                 userSurvivorData = { picks: {} };
+            }
+        }
+
+        // PHASE 1: Load centralized survivor status from Cloud Function
+        async function loadUserSurvivorStatus() {
+            try {
+                console.log('💀 SURVIVOR_STATUS: Loading centralized survivor status...');
+                const response = await fetch('https://getsurvivorpooldata-np7uealtnq-uc.a.run.app');
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error('Failed to load survivor data from Cloud Function');
+                }
+
+                const survivorData = result.data;
+                console.log('💀 SURVIVOR_STATUS: Cloud Function data loaded', survivorData);
+
+                // Find current user in alive array
+                const aliveUser = survivorData.alive.find(s => s.userId === currentUser.uid);
+                if (aliveUser) {
+                    console.log('✅ SURVIVOR_STATUS: User is ALIVE');
+                    return {
+                        isAlive: true,
+                        isEliminated: false,
+                        allWinningPicks: aliveUser.allWinningPicks || []
+                    };
+                }
+
+                // Find current user in eliminated array
+                const deadUser = survivorData.eliminated.find(s => s.userId === currentUser.uid);
+                if (deadUser) {
+                    console.log('💀 SURVIVOR_STATUS: User is ELIMINATED');
+                    return {
+                        isAlive: false,
+                        isEliminated: true,
+                        eliminatedWeek: deadUser.eliminatedWeek,
+                        eliminatedBy: deadUser.eliminatedBy,
+                        allWinningPicks: deadUser.allWinningPicks || []
+                    };
+                }
+
+                // User not participating
+                console.log('⚠️ SURVIVOR_STATUS: User is NOT PARTICIPATING');
+                return {
+                    isAlive: false,
+                    isEliminated: false,
+                    notParticipating: true
+                };
+
+            } catch (error) {
+                console.error('Error loading survivor status:', error);
+                throw error;
             }
         }
 
@@ -565,18 +638,22 @@
         }
 
         function displayUserInterface() {
+            // PHASE 3: Alive users see CURRENT WEEK ONLY (no navigation)
+            console.log('✅ ALIVE_UI: Displaying current week only interface');
+
             displayStatusCard();
             displayCurrentWeekCard();
-            displayWeekNavigation();
-            displayPickHistory();
+            displayPreviousWinsSidebar(); // NEW: Show previous winning picks
             displayGameInfo();
 
-            // Show all cards
+            // Show cards for alive users (NO WEEK NAVIGATION)
             document.getElementById('statusCard').classList.remove('hidden');
             document.getElementById('currentWeekCard').classList.remove('hidden');
-            document.getElementById('weekNavigationCard').classList.remove('hidden');
             document.getElementById('historyCard').classList.remove('hidden');
             document.getElementById('gameInfoCard').classList.remove('hidden');
+
+            // HIDE week navigation for alive users - they can only pick current week
+            document.getElementById('weekNavigationCard').classList.add('hidden');
         }
 
         function displayStatusCard() {
@@ -602,6 +679,52 @@
                 <div class="text-center p-4 bg-chamber-surface rounded-lg border border-chamber-border">
                     <div class="text-2xl font-bold chamber-death">${usedTeams.size}</div>
                     <div class="text-sm chamber-bone">Champions Used</div>
+                </div>
+            `;
+        }
+
+        // PHASE 3: Display previous winning picks for alive users
+        function displayPreviousWinsSidebar() {
+            console.log('✅ PREVIOUS_WINS: Displaying winning picks sidebar');
+            const historyContent = document.getElementById('historyContent');
+
+            // Use centralized survivor status data for winning picks
+            const winningPicks = userSurvivorStatus.allWinningPicks || [];
+
+            if (winningPicks.length === 0) {
+                historyContent.innerHTML = `
+                    <div class="chamber-window rounded-xl p-6 text-center">
+                        <div class="text-4xl mb-4">🩸</div>
+                        <h3 class="text-lg font-bold chamber-blood mb-2">No Victories Yet</h3>
+                        <p class="text-sm chamber-bone">Your winning picks will appear here as weeks complete.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const winsHtml = winningPicks.map(pick => `
+                <div class="flex items-center gap-3 p-4 bg-chamber-shadow rounded-lg border border-chamber-blood hover:bg-chamber-surface transition-colors">
+                    <div class="text-2xl">✅</div>
+                    <div class="flex-1">
+                        <div class="font-semibold chamber-bone">Week ${pick.week}</div>
+                        <div class="text-sm chamber-blood">${pick.team}</div>
+                    </div>
+                    <div class="text-lg">🩸</div>
+                </div>
+            `).join('');
+
+            historyContent.innerHTML = `
+                <div class="chamber-window rounded-xl p-6">
+                    <h3 class="text-lg font-bold chamber-blood glow-text mb-4 flex items-center">
+                        <span class="text-2xl mr-2">🏆</span>
+                        Your Winning Picks
+                    </h3>
+                    <div class="space-y-3">
+                        ${winsHtml}
+                    </div>
+                    <div class="mt-4 text-center text-sm chamber-muted">
+                        <p>💀 ${winningPicks.length} week${winningPicks.length !== 1 ? 's' : ''} survived</p>
+                    </div>
                 </div>
             `;
         }
@@ -1005,6 +1128,116 @@
                 notification.remove();
             }, 5000);
         }
+
+        // PHASE 2: Elimination Screen - Block eliminated users from making picks
+        function showEliminationScreen() {
+            console.log('💀 ELIMINATION_SCREEN: Showing death screen');
+
+            // Hide all cards
+            document.getElementById('statusCard').classList.add('hidden');
+            document.getElementById('currentWeekCard').classList.add('hidden');
+            document.getElementById('teamSelectionCard').classList.add('hidden');
+            document.getElementById('weekNavigationCard').classList.add('hidden');
+            document.getElementById('gameInfoCard').classList.add('hidden');
+
+            // Show elimination screen
+            const historyCard = document.getElementById('historyCard');
+            historyCard.classList.remove('hidden');
+
+            const historyContent = document.getElementById('historyContent');
+            const picks = userSurvivorData.picks || {};
+
+            // Build winning picks display
+            let winningPicksHtml = '';
+            if (userSurvivorStatus.allWinningPicks && userSurvivorStatus.allWinningPicks.length > 0) {
+                winningPicksHtml = userSurvivorStatus.allWinningPicks.map(pick => `
+                    <div class="flex items-center gap-3 p-3 bg-chamber-shadow rounded-lg border border-chamber-blood">
+                        <div class="text-2xl">✅</div>
+                        <div class="flex-1">
+                            <div class="font-semibold chamber-bone">Week ${pick.week}</div>
+                            <div class="text-sm chamber-blood">${pick.team}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                winningPicksHtml = '<div class="text-center chamber-muted p-4">No winning picks recorded</div>';
+            }
+
+            historyContent.innerHTML = `
+                <div class="chamber-window rounded-xl p-8 text-center mb-6">
+                    <div class="text-6xl mb-6 blood-drip">💀</div>
+                    <h1 class="text-4xl font-bold chamber-blood glow-text mb-4">SOUL REAPED - WEEK ${userSurvivorStatus.eliminatedWeek}</h1>
+                    <div class="text-xl chamber-bone mb-6">Your journey in the Survival Chamber has ended.</div>
+
+                    <div class="bg-chamber-shadow rounded-lg p-6 mb-6 border border-chamber-death">
+                        <div class="text-lg font-semibold chamber-death mb-4">Eliminated By:</div>
+                        <div class="text-2xl font-bold chamber-blood glow-text">${userSurvivorStatus.eliminatedBy}</div>
+                    </div>
+
+                    <div class="bg-chamber-surface rounded-lg p-6 border border-chamber-border">
+                        <div class="text-lg font-semibold chamber-bone mb-4">Your Journey:</div>
+                        <div class="grid grid-cols-1 gap-3">
+                            ${winningPicksHtml}
+                            <div class="flex items-center gap-3 p-3 bg-chamber-surface rounded-lg border-2 border-chamber-death">
+                                <div class="text-2xl">❌</div>
+                                <div class="flex-1">
+                                    <div class="font-semibold chamber-blood">Week ${userSurvivorStatus.eliminatedWeek}</div>
+                                    <div class="text-sm chamber-death">${userSurvivorStatus.eliminatedBy} [DEATH]</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex gap-4 justify-center">
+                        <a href="./nerd-universe.html" class="bone-button px-6 py-3 rounded-lg font-semibold">
+                            ← Return to Nerd Universe
+                        </a>
+                        <a href="./masters-of-the-nerdUniverse-audit.html" class="death-button px-6 py-3 rounded-lg font-semibold">
+                            View Survivor Leaderboard
+                        </a>
+                    </div>
+                </div>
+
+                <div class="text-center text-sm chamber-muted mt-6">
+                    <p>💀 Your soul has been reaped. Better luck in the next season!</p>
+                </div>
+            `;
+        }
+
+        // PHASE 2: Not Participating Screen
+        function showNotParticipatingScreen() {
+            console.log('⚠️ NOT_PARTICIPATING_SCREEN: Showing not participating screen');
+
+            // Hide all cards
+            document.getElementById('statusCard').classList.add('hidden');
+            document.getElementById('currentWeekCard').classList.add('hidden');
+            document.getElementById('teamSelectionCard').classList.add('hidden');
+            document.getElementById('weekNavigationCard').classList.add('hidden');
+            document.getElementById('gameInfoCard').classList.add('hidden');
+
+            const historyCard = document.getElementById('historyCard');
+            historyCard.classList.remove('hidden');
+
+            const historyContent = document.getElementById('historyContent');
+            historyContent.innerHTML = `
+                <div class="chamber-window rounded-xl p-8 text-center">
+                    <div class="text-6xl mb-6">⚰️</div>
+                    <h1 class="text-3xl font-bold chamber-blood glow-text mb-4">Not Participating</h1>
+                    <p class="text-lg chamber-bone mb-6">You are not currently registered for the Survivor Pool.</p>
+
+                    <div class="bg-chamber-shadow rounded-lg p-6 mb-6 border border-chamber-border">
+                        <div class="text-sm chamber-muted">
+                            Contact the pool administrator to join the Survival Chamber.
+                        </div>
+                    </div>
+
+                    <a href="./nerd-universe.html" class="bone-button px-6 py-3 rounded-lg font-semibold inline-block">
+                        ← Return to Nerd Universe
+                    </a>
+                </div>
+            `;
+        }
+
         // Make currentUser available globally for ML predictions
         window.currentUser = currentUser;
 

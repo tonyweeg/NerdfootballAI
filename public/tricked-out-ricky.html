@@ -1,0 +1,2800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRICKED OUT RICKY - Week 1 Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Chart.js - Simple and reliable -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
+            onload="console.log('✅ Chart.js loaded successfully')"
+            onerror="console.error('❌ Chart.js failed to load')"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+            background: #0a0a1f;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated Starfield Canvas */
+        #starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Tufte-inspired Header */
+        .header {
+            margin-bottom: 60px;
+            border-bottom: 1px solid #3a3a5c;
+            padding-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 56px;
+            font-weight: 700;
+            color: #8a7cff;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            color: #8a8a9f;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* Team Selection */
+        .team-selection {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(20, 20, 40, 0.8);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .team-selection h3 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #ffffff;
+        }
+
+        .team-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .team-btn {
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border: 2px solid;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(0, 0, 0, 0.5);
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+        }
+
+        .team-btn.red {
+            color: #ff4444;
+            border-color: #ff4444;
+        }
+
+        .team-btn.red:hover {
+            background: rgba(255, 68, 68, 0.2);
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+        }
+
+        .team-btn.red.selected {
+            background: rgba(255, 68, 68, 0.4);
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.8);
+        }
+
+        .team-btn.blue {
+            color: #4444ff;
+            border-color: #4444ff;
+        }
+
+        .team-btn.blue:hover {
+            background: rgba(68, 68, 255, 0.2);
+            box-shadow: 0 0 20px rgba(68, 68, 255, 0.5);
+        }
+
+        .team-btn.blue.selected {
+            background: rgba(68, 68, 255, 0.4);
+            box-shadow: 0 0 30px rgba(68, 68, 255, 0.8);
+        }
+
+        .team-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .prediction-status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #aaaaaa;
+        }
+
+        /* Victory Glow Overlay */
+        #victory-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 0, 0);
+            pointer-events: none;
+            z-index: 9999;
+            transition: background 0.5s ease;
+        }
+
+        #victory-glow.active {
+            background: rgba(255, 255, 0, 0.3);
+        }
+
+        /* Clean Navigation */
+        .nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding: 20px 0;
+            border-bottom: 1px solid #2a2a3c;
+        }
+
+        .week-nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .btn-clean {
+            background: transparent;
+            border: 1px solid #4a4a6c;
+            color: #c0c0d0;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+            font-weight: 400;
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-clean:hover {
+            border-color: #8a7cff;
+            color: #8a7cff;
+            background: rgba(138, 124, 255, 0.05);
+        }
+
+        .current-week {
+            font-size: 42px;
+            color: #ffd93d;
+            font-weight: 900;
+            min-width: 200px;
+            text-align: center;
+            text-shadow: 0 0 20px rgba(255, 217, 61, 0.6), 0 0 40px rgba(255, 217, 61, 0.4);
+            letter-spacing: 3px;
+            background: linear-gradient(135deg, #ffd93d, #8a7cff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Minimal Stats Grid */
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1px;
+            background: #1a1a2f;
+            border: 1px solid #2a2a3c;
+            margin-bottom: 60px;
+        }
+
+        .stat-item {
+            background: #0a0a1f;
+            padding: 28px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #8a8a9f;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 12px;
+            font-weight: 400;
+        }
+
+        .stat-value {
+            font-size: 48px;
+            color: #e0e0e0;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        /* Chart Sections - Tufte Style */
+        .chart-section {
+            margin-bottom: 80px;
+        }
+
+        .chart-title {
+            font-size: 22px;
+            color: #e0e0e0;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .chart-subtitle {
+            font-size: 15px;
+            color: #8a8a9f;
+            margin-bottom: 32px;
+            font-weight: 400;
+        }
+
+        .chart-container {
+            background: rgba(26, 26, 47, 0.3);
+            padding: 32px;
+            border-radius: 4px;
+            border: 1px solid #2a2a3c;
+        }
+
+        /* Minimal Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 15px;
+            margin-top: 20px;
+        }
+
+        .data-table thead {
+            border-bottom: 2px solid #3a3a5c;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 16px 12px;
+            color: #8a8a9f;
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .data-table td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #1a1a2f;
+            color: #c0c0d0;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(138, 124, 255, 0.03);
+        }
+
+        .rank-1 { color: #ffd93d !important; font-weight: 700; }
+        .rank-2 { color: #c8c8c8 !important; font-weight: 700; }
+        .rank-3 { color: #cd7f32 !important; font-weight: 700; }
+
+        /* Grid Layout for Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 60px;
+            margin-bottom: 60px;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 120px 20px;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #1a1a2f;
+            border-top-color: #8a7cff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 24px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 16px;
+            color: #8a8a9f;
+            font-weight: 400;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 36px;
+            }
+
+            .nav-bar {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .week-nav {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn-clean {
+                width: 100%;
+            }
+
+            .stats-overview {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .stat-value {
+                font-size: 36px;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .chart-container {
+                padding: 20px;
+                overflow-x: auto;
+            }
+
+            .data-table {
+                font-size: 13px;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 10px 8px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-overview {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Weekly Leaderboard - Compact */
+        .weekly-leaderboard-compact {
+            background: rgba(26, 26, 47, 0.6);
+            border: 1px solid #3a3a5c;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+
+        .weekly-leaderboard-compact h3 {
+            color: #8a7cff;
+            font-size: 16px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .leaderboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: rgba(58, 58, 92, 0.3);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .leaderboard-rank {
+            font-weight: bold;
+            color: #ffd93d;
+            min-width: 20px;
+        }
+
+        .leaderboard-rank.first { color: #ffd700; }
+        .leaderboard-rank.second { color: #c0c0c0; }
+        .leaderboard-rank.third { color: #cd7f32; }
+
+        .leaderboard-name {
+            flex: 1;
+            color: #e0e0e0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .leaderboard-points {
+            color: #8a7cff;
+            font-weight: bold;
+        }
+
+        /* Recharts Custom Styles */
+        .recharts-text {
+            fill: #8a8a9f !important;
+            font-family: 'Atkinson Hyperlegible', sans-serif !important;
+            font-size: 13px !important;
+        }
+
+        .recharts-cartesian-axis-tick-value {
+            fill: #8a8a9f !important;
+        }
+
+        .recharts-legend-item-text {
+            color: #c0c0d0 !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Starfield Background -->
+    <canvas id="starfield"></canvas>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>TRICKED OUT RICKY</h1>
+            <div class="subtitle">Confidence Pool Analytics Dashboard</div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-bar">
+            <div class="week-nav">
+                <button class="btn-clean" onclick="changeWeek(-1)">← Previous Week</button>
+                <span class="current-week" id="current-week">WEEK 1</span>
+                <button class="btn-clean" onclick="changeWeek(1)">Next Week →</button>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-clean" onclick="loadWeekData()">↻ Refresh</button>
+                <button class="btn-clean" onclick="window.location.href='nerd-universe.html'">← Universe</button>
+            </div>
+        </div>
+
+        <!-- Team Selection -->
+        <div class="team-selection" id="team-selection">
+            <h3>🚀 Which team will win the space battle? (First to 10 kills)</h3>
+            <div class="team-buttons">
+                <button class="team-btn red" id="red-btn" onclick="selectTeam('red')">RED TEAM</button>
+                <button class="team-btn blue" id="blue-btn" onclick="selectTeam('blue')">BLUE TEAM</button>
+            </div>
+            <div class="prediction-status" id="prediction-status">Make your prediction!</div>
+        </div>
+
+        <!-- Victory Glow Overlay -->
+        <div id="victory-glow"></div>
+
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Analyzing confidence pool data...</div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" style="display: none;">
+            <!-- Weekly Leaderboard - Compact -->
+            <div class="weekly-leaderboard-compact">
+                <h3>Week <span id="leaderboard-week">1</span> Standings</h3>
+                <div class="leaderboard-grid" id="weekly-leaderboard-grid"></div>
+            </div>
+
+            <!-- Week Overview Stats -->
+            <div class="stats-overview">
+                <div class="stat-item">
+                    <div class="stat-label">Players</div>
+                    <div class="stat-value" id="total-players">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Games</div>
+                    <div class="stat-value" id="total-games">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Pool Accuracy</div>
+                    <div class="stat-value" id="pool-accuracy">0%</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Avg Points</div>
+                    <div class="stat-value" id="avg-points">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">High Score</div>
+                    <div class="stat-value" id="high-score">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Perfect Picks</div>
+                    <div class="stat-value" id="perfect-picks">0</div>
+                </div>
+            </div>
+
+            <!-- Player Performance Chart -->
+            <div class="chart-section">
+                <div class="chart-title">Player Performance</div>
+                <div class="chart-subtitle">Points scored by top performers</div>
+                <div class="chart-container">
+                    <canvas id="performance-chart" style="width: 100%; height: 500px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Points Distribution -->
+            <div class="chart-section">
+                <div class="chart-title">Points Distribution</div>
+                <div class="chart-subtitle">Score progression across all players</div>
+                <div class="chart-container">
+                    <canvas id="distribution-chart" style="width: 100%; height: 400px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Dual Charts Grid -->
+            <div class="charts-grid">
+                <!-- Accuracy Distribution -->
+                <div class="chart-section">
+                    <div class="chart-title">Accuracy Distribution</div>
+                    <div class="chart-subtitle">Player accuracy ranges</div>
+                    <div class="chart-container">
+                        <canvas id="accuracy-chart" style="width: 100%; height: 350px;"></canvas>
+                    </div>
+                </div>
+
+                <!-- Confidence Accuracy Curve -->
+                <div class="chart-section">
+                    <div class="chart-title">Confidence Accuracy Curve</div>
+                    <div class="chart-subtitle">Do high-confidence picks actually win more?</div>
+                    <div class="chart-container">
+                        <canvas id="confidence-accuracy-chart" style="width: 100%; height: 350px;"></canvas>
+                    </div>
+                </div>
+
+                <!-- High vs Low Confidence Comparison -->
+                <div class="chart-section">
+                    <div class="chart-title">High vs Low Confidence Performance</div>
+                    <div class="chart-subtitle">Comparing accuracy of high-confidence (12-16) vs low-confidence (1-5) picks</div>
+                    <div class="chart-container">
+                        <canvas id="confidence-comparison-chart" style="width: 100%; height: 350px;"></canvas>
+                    </div>
+                </div>
+
+                <!-- Confidence Heatmap -->
+                <div class="chart-section">
+                    <div class="chart-title">Confidence Success Rate Heatmap</div>
+                    <div class="chart-subtitle">Color intensity shows win percentage at each confidence level</div>
+                    <div class="chart-container">
+                        <canvas id="confidence-heatmap-chart" style="width: 100%; height: 200px;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Leaderboard -->
+            <div class="chart-section">
+                <div class="chart-title">Player Leaderboard</div>
+                <div class="chart-subtitle">Top 20 performers this week</div>
+                <table class="data-table" id="player-leaderboard">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Rank</th>
+                            <th>Player</th>
+                            <th style="width: 120px; text-align: right;">Points</th>
+                            <th style="width: 120px; text-align: right;">Accuracy</th>
+                            <th style="width: 100px; text-align: right;">Correct</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Game Analysis -->
+            <div class="chart-section">
+                <div class="chart-title">Game Analysis</div>
+                <div class="chart-subtitle">Pick distribution and consensus by game</div>
+                <table class="data-table" id="game-analysis-table">
+                    <thead>
+                        <tr>
+                            <th>Game</th>
+                            <th>Matchup</th>
+                            <th>Winner</th>
+                            <th style="width: 140px; text-align: right;">Popular Pick</th>
+                            <th style="width: 100px; text-align: right;">Upset?</th>
+                            <th style="width: 140px; text-align: right;">Avg Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
+            authDomain: "nerdfootball.firebaseapp.com",
+            databaseURL: "https://nerdfootball-default-rtdb.firebaseio.com",
+            projectId: "nerdfootball",
+            storageBucket: "nerdfootball.appspot.com",
+            messagingSenderId: "969304790725",
+            appId: "1:969304790725:web:892df38db0b0e62bde02ac"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        let currentUser = null;
+        let currentWeek = getCurrentWeek();
+
+        // Get current NFL week based on date
+        function getCurrentWeek() {
+            const now = new Date();
+            const seasonStart = new Date('2025-09-04'); // Week 1 starts Sept 4, 2025
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
+        // Tufte-inspired Color Palette
+        const COLORS = {
+            primary: '#8a7cff',
+            secondary: '#6ac4ff',
+            accent: '#ffd93d',
+            success: '#5edf89',
+            danger: '#ff6b6b',
+            neutral: '#8a8a9f',
+            background: '#0a0a1f'
+        };
+
+        // NFL Team Helmets
+        const TEAM_HELMETS = {
+            "Arizona Cardinals": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fari_Arizona_Cardinals.png?alt=media&token=38143dcd-6075-4fa3-9f3c-98518a6ec3f3",
+            "Atlanta Falcons": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fatl_Atlanta_Falcons.png?alt=media",
+            "Baltimore Ravens": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fbal_Baltimore_Ravens.png?alt=media",
+            "Buffalo Bills": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fbuf_Buffalo_Bills.png?alt=media",
+            "Carolina Panthers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcar_Carolina_Panthers.png?alt=media",
+            "Chicago Bears": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fchi_Chicago_Bears.png?alt=media",
+            "Cincinnati Bengals": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcin_Cincinnati_Bengals.png?alt=media",
+            "Cleveland Browns": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fcle_Cleveland_Browns.png?alt=media",
+            "Dallas Cowboys": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fdal_Dallas_Cowboys.png?alt=media",
+            "Denver Broncos": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fden_Denver_Broncos.png?alt=media",
+            "Detroit Lions": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fdet_Detroit_Lions.png?alt=media",
+            "Green Bay Packers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fgb_Green_Bay_Packers.png?alt=media",
+            "Houston Texans": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fhou_Houston_Texans.png?alt=media",
+            "Indianapolis Colts": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Find_Indianapolis_Colts.png?alt=media",
+            "Jacksonville Jaguars": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fjax_Jacksonville_Jaguars.png?alt=media",
+            "Kansas City Chiefs": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fkc_Kansas_City_Chiefs.png?alt=media",
+            "Las Vegas Raiders": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flv_Las_Vegas_Raiders.png?alt=media",
+            "Los Angeles Chargers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flac_Los_Angeles_Chargers.png?alt=media",
+            "Los Angeles Rams": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Flar_Los_Angeles_Rams.png?alt=media",
+            "Miami Dolphins": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fmia_Miami_Dolphins.png?alt=media",
+            "Minnesota Vikings": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fmin_Minnesota_Vikings.png?alt=media",
+            "New England Patriots": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fne_New_England_Patriots.png?alt=media",
+            "New Orleans Saints": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fno_New_Orleans_Saints.png?alt=media",
+            "New York Giants": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fnyg_New_York_Giants.png?alt=media",
+            "New York Jets": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fnyj_New_York_Jets.png?alt=media",
+            "Philadelphia Eagles": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fphi_Philadelphia_Eagles.png?alt=media",
+            "Pittsburgh Steelers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fpit_Pittsburgh_Steelers.png?alt=media",
+            "San Francisco 49ers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fsf_San_Francisco_49ers.png?alt=media",
+            "Seattle Seahawks": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fsea_Seattle_Seahawks.png?alt=media",
+            "Tampa Bay Buccaneers": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ftb_Tampa_Bay_Buccaneers.png?alt=media",
+            "Tennessee Titans": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Ften_Tennessee_Titans.png?alt=media",
+            "Washington Commanders": "https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nfl-logos%2Fwas_Washington_Commanders.png?alt=media"
+        };
+
+        // Starfield Animation
+        (function() {
+            const canvas = document.getElementById('starfield');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+
+            // Star class
+            class Star {
+                constructor() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    this.size = Math.random() * 2.5 + 0.5;
+                    this.brightness = Math.random() * 0.7 + 0.3;
+                    this.twinkleSpeed = Math.random() * 0.02 + 0.01;
+                    this.twinklePhase = Math.random() * Math.PI * 2;
+                }
+
+                draw() {
+                    this.twinklePhase += this.twinkleSpeed;
+                    const brightness = this.brightness + Math.sin(this.twinklePhase) * 0.3;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+                    ctx.fill();
+                }
+            }
+
+            // Meteor class
+            class Meteor {
+                constructor() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = -50;
+                    this.length = Math.random() * 80 + 40;
+                    this.speed = Math.random() * 6 + 4;
+                    this.angle = Math.random() * 0.5 + 0.3;
+                    this.life = 1;
+                }
+
+                update() {
+                    this.x += Math.cos(this.angle) * this.speed;
+                    this.y += Math.sin(this.angle) * this.speed;
+                    this.life -= 0.01;
+                    return this.life > 0 && this.y < canvas.height + 50;
+                }
+
+                draw() {
+                    ctx.beginPath();
+                    const gradient = ctx.createLinearGradient(
+                        this.x, this.y,
+                        this.x - Math.cos(this.angle) * this.length,
+                        this.y - Math.sin(this.angle) * this.length
+                    );
+                    gradient.addColorStop(0, `rgba(255, 255, 255, ${this.life * 0.9})`);
+                    gradient.addColorStop(0.5, `rgba(138, 124, 255, ${this.life * 0.5})`);
+                    gradient.addColorStop(1, 'rgba(138, 124, 255, 0)');
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(
+                        this.x - Math.cos(this.angle) * this.length,
+                        this.y - Math.sin(this.angle) * this.length
+                    );
+                    ctx.stroke();
+                }
+            }
+
+            // Laser class
+            class Laser {
+                constructor(x, y, targetX, targetY, color, shooter = null) {
+                    this.x = x;
+                    this.y = y;
+                    this.targetX = targetX;
+                    this.targetY = targetY;
+                    this.color = color;
+                    this.shooter = shooter; // Reference to ship that fired this laser
+                    this.speed = 8;
+
+                    // Calculate direction
+                    const dx = targetX - x;
+                    const dy = targetY - y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    this.vx = (dx / distance) * this.speed;
+                    this.vy = (dy / distance) * this.speed;
+
+                    this.life = 100; // Laser duration
+                }
+
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.life--;
+                    return this.life > 0 &&
+                           this.x > -50 && this.x < canvas.width + 50 &&
+                           this.y > -50 && this.y < canvas.height + 50;
+                }
+
+                draw() {
+                    ctx.save();
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = this.color;
+
+                    // Draw laser bolt
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - this.vx * 3, this.y - this.vy * 3);
+                    ctx.lineTo(this.x, this.y);
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+            }
+
+            // Base locations for teams
+            let redBaseX = 100;
+            let redBaseY = 50;
+            let blueBaseX = canvas.width - 100;
+            let blueBaseY = 50;
+
+            // Team kill counters
+            let redTeamKills = 0;
+            let blueTeamKills = 0;
+
+            // User prediction tracking
+            let userPrediction = null; // 'red' or 'blue'
+            let gameWinner = null;
+            const WIN_THRESHOLD = 10; // First to 10 kills wins
+
+            // Team selection function (make globally accessible)
+            window.selectTeam = function(team) {
+                if (gameWinner) return; // Game already over
+
+                userPrediction = team;
+
+                // Update UI
+                document.getElementById('red-btn').classList.remove('selected');
+                document.getElementById('blue-btn').classList.remove('selected');
+
+                if (team === 'red') {
+                    document.getElementById('red-btn').classList.add('selected');
+                    document.getElementById('prediction-status').textContent = 'You predicted RED TEAM will win!';
+                } else {
+                    document.getElementById('blue-btn').classList.add('selected');
+                    document.getElementById('prediction-status').textContent = 'You predicted BLUE TEAM will win!';
+                }
+            }
+
+            // Check for game winner
+            function checkGameWinner() {
+                if (gameWinner) return; // Already determined
+
+                if (redTeamKills >= WIN_THRESHOLD) {
+                    gameWinner = 'red';
+                    announceWinner('red');
+                } else if (blueTeamKills >= WIN_THRESHOLD) {
+                    gameWinner = 'blue';
+                    announceWinner('blue');
+                }
+            }
+
+            // Announce winner and check user prediction
+            function announceWinner(winner) {
+                // Disable buttons
+                document.getElementById('red-btn').disabled = true;
+                document.getElementById('blue-btn').disabled = true;
+
+                const winnerTeamName = winner.toUpperCase();
+
+                if (userPrediction === winner) {
+                    // USER WAS CORRECT! HIGH FIVE!
+                    document.getElementById('prediction-status').innerHTML =
+                        `🎉 ${winnerTeamName} TEAM WON! YOU PREDICTED CORRECTLY! 🎉<br>✋ HIGH FIVE! ✋`;
+                    triggerVictoryGlow();
+                } else if (userPrediction) {
+                    // User predicted but was wrong
+                    document.getElementById('prediction-status').textContent =
+                        `${winnerTeamName} TEAM WON! Better luck next time!`;
+                } else {
+                    // User didn't predict
+                    document.getElementById('prediction-status').textContent =
+                        `${winnerTeamName} TEAM WON! You didn't make a prediction.`;
+                }
+            }
+
+            // Trigger yellow glow effect
+            function triggerVictoryGlow() {
+                const glowOverlay = document.getElementById('victory-glow');
+                glowOverlay.classList.add('active');
+
+                // Fade out after 3 seconds
+                setTimeout(() => {
+                    glowOverlay.classList.remove('active');
+                }, 3000);
+            }
+
+            // Update base positions from button locations
+            function updateBasePositions() {
+                const prevWeekBtn = document.querySelector('.week-nav button:nth-child(1)');
+                const nextWeekBtn = document.querySelector('.week-nav button:nth-child(3)');
+
+                if (prevWeekBtn) {
+                    const rect = prevWeekBtn.getBoundingClientRect();
+                    redBaseX = rect.left + rect.width / 2;
+                    redBaseY = rect.top - 50; // Above the button
+                }
+
+                if (nextWeekBtn) {
+                    const rect = nextWeekBtn.getBoundingClientRect();
+                    blueBaseX = rect.left + rect.width / 2;
+                    blueBaseY = rect.top - 50;
+                }
+            }
+
+            // Spaceship class with landing and recharge
+            class Spaceship {
+                constructor(team) {
+                    this.team = team; // 'red' or 'blue'
+                    this.baseX = team === 'red' ? redBaseX : blueBaseX;
+                    this.baseY = team === 'red' ? redBaseY : blueBaseY;
+
+                    // Start at base - VERTICAL
+                    this.x = this.baseX;
+                    this.y = this.baseY;
+                    this.startY = Math.random() * (canvas.height * 0.6) + canvas.height * 0.2;
+                    this.size = Math.random() * 15 + 10;
+                    this.speed = team === 'red' ? 2 : -2;
+                    this.blink = 0;
+                    this.shootCooldown = 0;
+                    this.kills = 0;
+                    this.upgradeLevel = 0;
+
+                    // State machine - START STANDING VERTICAL
+                    this.state = 'standing'; // standing, boarding, ignition, taking_off, flying, landing, landed, recharging
+                    this.stateTimer = 0;
+
+                    // Rotation for takeoff/landing
+                    this.rotation = Math.PI / 2; // Start vertical (90 degrees)
+                    this.targetRotation = 0; // Horizontal for flight
+
+                    // Boost mechanic
+                    this.boosted = false;
+                    this.boostTimer = 0;
+                    this.boostDuration = 3600; // 60 seconds at 60fps
+
+                    // Movement
+                    this.movementPattern = Math.random();
+                    this.patternPhase = 0;
+                    this.pursuing = null;
+
+                    // Spacemen
+                    this.spacemen = [];
+
+                    // Engine particles
+                    this.engineParticles = [];
+                }
+
+                update(aliens, lasers, spacemen) {
+                    this.blink += 0.1;
+                    this.patternPhase += 0.02;
+                    this.shootCooldown--;
+                    this.stateTimer++;
+
+                    // Handle boost timer
+                    if (this.boosted) {
+                        this.boostTimer--;
+                        if (this.boostTimer <= 0) {
+                            this.boosted = false;
+                        }
+                    }
+
+                    // Update engine particles
+                    for (let i = this.engineParticles.length - 1; i >= 0; i--) {
+                        this.engineParticles[i].life--;
+                        this.engineParticles[i].y += this.engineParticles[i].vy;
+                        this.engineParticles[i].x += this.engineParticles[i].vx;
+                        if (this.engineParticles[i].life <= 0) {
+                            this.engineParticles.splice(i, 1);
+                        }
+                    }
+
+                    // State machine
+                    if (this.state === 'standing') {
+                        // Ship stands vertical at base, waiting for spacemen
+                        if (this.stateTimer > 60) { // 1 second
+                            this.state = 'boarding';
+                            this.stateTimer = 0;
+                            // Spawn spacemen walking to ship
+                            for (let i = 0; i < 2; i++) {
+                                spacemen.push(new Spaceman(this.baseX + (i - 0.5) * 50, this.baseY + 40, this.team, this));
+                            }
+                        }
+                        return true;
+                    }
+
+                    if (this.state === 'boarding') {
+                        // Spacemen walk to ship and board
+                        if (this.stateTimer > 120) { // 2 seconds
+                            this.state = 'ignition';
+                            this.stateTimer = 0;
+                            // Remove spacemen (they're inside now)
+                            for (let i = spacemen.length - 1; i >= 0; i--) {
+                                if (spacemen[i].ship === this) {
+                                    spacemen.splice(i, 1);
+                                }
+                            }
+                        }
+                        return true;
+                    }
+
+                    if (this.state === 'ignition') {
+                        // Fire up engines - create particles
+                        if (this.stateTimer % 3 === 0) {
+                            this.engineParticles.push({
+                                x: this.x,
+                                y: this.y + this.size * 0.8,
+                                vx: (Math.random() - 0.5) * 1,
+                                vy: Math.random() * 2 + 1,
+                                life: 30,
+                                color: this.team === 'red' ? '#ff6600' : '#0066ff'
+                            });
+                        }
+                        if (this.stateTimer > 60) { // 1 second
+                            this.state = 'taking_off';
+                            this.stateTimer = 0;
+                        }
+                        return true;
+                    }
+
+                    if (this.state === 'taking_off') {
+                        // Rotate to horizontal and rise
+                        this.rotation -= 0.05;
+                        if (this.rotation < 0) this.rotation = 0;
+
+                        this.y -= 2;
+
+                        // Create engine thrust
+                        if (this.stateTimer % 2 === 0) {
+                            this.engineParticles.push({
+                                x: this.x,
+                                y: this.y + this.size * 0.4,
+                                vx: (Math.random() - 0.5) * 2,
+                                vy: Math.random() * 3 + 2,
+                                life: 20,
+                                color: this.team === 'red' ? '#ff6600' : '#0066ff'
+                            });
+                        }
+
+                        if (this.y < this.startY && this.rotation === 0) {
+                            this.state = 'flying';
+                            this.stateTimer = 0;
+                        }
+                        return true;
+                    }
+
+                    if (this.state === 'flying') {
+                        // Normal combat flying
+                        this.x += this.speed;
+
+                        // Movement patterns
+                        if (this.movementPattern < 0.33) {
+                            this.y = this.startY + Math.sin(this.patternPhase) * 40;
+                        } else if (this.movementPattern < 0.66) {
+                            if (this.pursuing && this.pursuing.health > 0) {
+                                const dy = this.pursuing.y - this.y;
+                                this.y += dy * 0.015;
+                            }
+                        } else {
+                            this.y = this.startY + Math.cos(this.patternPhase) * 35;
+                        }
+
+                        // Shooting with boost
+                        if (this.shootCooldown <= 0 && aliens.length > 0) {
+                            let nearestAlien = null;
+                            let nearestDistance = Infinity;
+
+                            aliens.forEach(alien => {
+                                const dx = alien.x - this.x;
+                                const dy = alien.y - this.y;
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+                                if (distance < nearestDistance && distance < 600) {
+                                    nearestDistance = distance;
+                                    nearestAlien = alien;
+                                }
+                            });
+
+                            if (nearestAlien) {
+                                if (Math.random() < 0.3) {
+                                    this.pursuing = nearestAlien;
+                                }
+
+                                const color = this.team === 'red' ? '#ff4444' : '#4444ff';
+                                lasers.push(new Laser(this.x, this.y, nearestAlien.x, nearestAlien.y, color, this));
+
+                                // Boosted ships shoot 10% faster
+                                const cooldownReduction = this.upgradeLevel * 5;
+                                const boostReduction = this.boosted ? 5 : 0;
+                                this.shootCooldown = (20 + Math.random() * 15) - cooldownReduction - boostReduction;
+                            }
+                        }
+
+                        // Decide to land after some kills
+                        if (this.kills > 0 && this.kills % 3 === 0 && this.stateTimer > 600 && Math.random() < 0.01) {
+                            this.state = 'landing';
+                            this.stateTimer = 0;
+                        }
+
+                        // Check if out of bounds
+                        if ((this.speed > 0 && this.x > canvas.width + 100) || (this.speed < 0 && this.x < -100)) {
+                            return false; // Remove ship
+                        }
+
+                        return true;
+                    }
+
+                    if (this.state === 'landing') {
+                        // Navigate back to base and rotate to vertical
+                        const dx = this.baseX - this.x;
+                        const dy = this.baseY - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        // Rotate back to vertical
+                        if (this.rotation < Math.PI / 2) {
+                            this.rotation += 0.05;
+                        }
+
+                        if (distance < 5) {
+                            this.state = 'landed';
+                            this.stateTimer = 0;
+                            this.x = this.baseX;
+                            this.y = this.baseY;
+                            this.rotation = Math.PI / 2; // Fully vertical
+
+                            // Deploy spacemen
+                            for (let i = 0; i < 2; i++) {
+                                spacemen.push(new Spaceman(this.baseX + (i - 0.5) * 30, this.baseY + 40, this.team, this));
+                            }
+                        } else {
+                            this.x += (dx / distance) * 2;
+                            this.y += (dy / distance) * 2;
+                        }
+                        return true;
+                    }
+
+                    if (this.state === 'landed') {
+                        // Wait for recharge to complete - ship stands vertical
+                        if (this.stateTimer > 120) { // 2 seconds
+                            this.state = 'ignition';
+                            this.stateTimer = 0;
+                            // Apply boost
+                            this.boosted = true;
+                            this.boostTimer = this.boostDuration;
+                            // Despawn spacemen (they board the ship)
+                            for (let i = spacemen.length - 1; i >= 0; i--) {
+                                if (spacemen[i].ship === this) {
+                                    spacemen.splice(i, 1);
+                                }
+                            }
+                        }
+                        return true;
+                    }
+
+                    return true;
+                }
+
+                registerKill() {
+                    this.kills++;
+                    // Upgrade every 2 kills, max level 3
+                    if (this.kills % 2 === 0 && this.upgradeLevel < 3) {
+                        this.upgradeLevel++;
+                        this.size = Math.min(this.size * 1.15, 40); // Grow slightly, cap at 40
+                    }
+                }
+
+                draw() {
+                    // Draw engine particles first (behind ship)
+                    this.engineParticles.forEach(p => {
+                        ctx.save();
+                        ctx.fillStyle = p.color;
+                        ctx.globalAlpha = p.life / 30;
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = p.color;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    });
+
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.rotation); // Apply rotation for vertical/horizontal
+                    if (this.speed < 0 && this.rotation === 0) ctx.scale(-1, 1); // Mirror for left-facing
+
+                    // Boost glow
+                    if (this.boosted) {
+                        ctx.shadowBlur = 25;
+                        ctx.shadowColor = this.team === 'red' ? '#ff0000' : '#0000ff';
+                    }
+
+                    // Body - team colored
+                    const baseColor = this.team === 'red' ? [150, 50, 50] : [50, 50, 150];
+                    const brightness = 1 + (this.upgradeLevel * 0.2);
+                    ctx.fillStyle = `rgb(${baseColor[0] * brightness}, ${baseColor[1] * brightness}, ${baseColor[2] * brightness})`;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-this.size * 0.8, -this.size * 0.3);
+                    ctx.lineTo(-this.size * 0.8, this.size * 0.3);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Cockpit - team accent color
+                    ctx.fillStyle = this.team === 'red' ? '#ff6666' : '#6666ff';
+                    ctx.beginPath();
+                    ctx.arc(-this.size * 0.3, 0, this.size * 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Lights
+                    const lightBrightness = Math.abs(Math.sin(this.blink));
+                    ctx.fillStyle = `rgba(255, 255, 100, ${lightBrightness})`;
+                    ctx.beginPath();
+                    ctx.arc(-this.size * 0.7, 0, this.size * 0.1, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Additional lights for upgraded ships
+                    if (this.upgradeLevel >= 1) {
+                        ctx.fillStyle = `rgba(100, 255, 255, ${lightBrightness})`;
+                        ctx.beginPath();
+                        ctx.arc(-this.size * 0.7, -this.size * 0.15, this.size * 0.08, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    if (this.upgradeLevel >= 2) {
+                        ctx.fillStyle = `rgba(255, 100, 255, ${lightBrightness})`;
+                        ctx.beginPath();
+                        ctx.arc(-this.size * 0.7, this.size * 0.15, this.size * 0.08, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    ctx.restore();
+
+                    // Boost indicator (outside rotation)
+                    if (this.boosted) {
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '8px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`BOOST ${Math.ceil(this.boostTimer / 60)}s`, 0, -this.size - 15);
+                        ctx.restore();
+                    }
+                }
+            }
+
+            // Spaceman class
+            class Spaceman {
+                constructor(x, y, team, ship) {
+                    this.x = x;
+                    this.y = y;
+                    this.team = team;
+                    this.ship = ship;
+                    this.size = 8;
+                    this.walkPhase = Math.random() * Math.PI * 2;
+                    this.targetX = x + (Math.random() - 0.5) * 50;
+                    this.celebrating = false;
+                    this.celebrateTimer = 0;
+                    this.partner = null; // For hi-fiving
+                }
+
+                update(spacemen) {
+                    // Check if ship got a kill - trigger celebration
+                    if (this.ship && this.ship.kills > 0 && !this.celebrating && Math.random() < 0.05) {
+                        // Find partner for hi-five
+                        const teammates = spacemen.filter(s => s.team === this.team && s !== this && !s.celebrating);
+                        if (teammates.length > 0) {
+                            this.partner = teammates[0];
+                            this.celebrating = true;
+                            this.celebrateTimer = 60; // 1 second
+                            if (this.partner) {
+                                this.partner.celebrating = true;
+                                this.partner.celebrateTimer = 60;
+                                this.partner.partner = this;
+                            }
+                        }
+                    }
+
+                    // Celebration behavior
+                    if (this.celebrating) {
+                        this.celebrateTimer--;
+                        if (this.celebrateTimer <= 0) {
+                            this.celebrating = false;
+                            this.partner = null;
+                        } else if (this.partner) {
+                            // Move toward partner for hi-five
+                            const dx = this.partner.x - this.x;
+                            if (Math.abs(dx) > 5) {
+                                this.x += dx * 0.1;
+                            }
+                        }
+                        return true;
+                    }
+
+                    // Normal walking behavior
+                    this.walkPhase += 0.1;
+                    const dx = this.targetX - this.x;
+                    if (Math.abs(dx) < 2) {
+                        // Pick new target
+                        this.targetX = this.ship.baseX + (Math.random() - 0.5) * 50;
+                    } else {
+                        this.x += dx * 0.05;
+                    }
+
+                    return true;
+                }
+
+                draw() {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+
+                    // Team colored spacesuit
+                    ctx.fillStyle = this.team === 'red' ? '#ff4444' : '#4444ff';
+
+                    // Body
+                    ctx.fillRect(-this.size * 0.3, -this.size * 0.5, this.size * 0.6, this.size * 0.8);
+
+                    // Helmet
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(0, -this.size * 0.7, this.size * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Visor
+                    ctx.fillStyle = '#333333';
+                    ctx.beginPath();
+                    ctx.arc(0, -this.size * 0.7, this.size * 0.25, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Legs (walking animation)
+                    ctx.fillStyle = this.team === 'red' ? '#ff4444' : '#4444ff';
+                    const legOffset = Math.sin(this.walkPhase) * 3;
+                    ctx.fillRect(-this.size * 0.25, this.size * 0.3, this.size * 0.2, this.size * 0.4 + legOffset);
+                    ctx.fillRect(this.size * 0.05, this.size * 0.3, this.size * 0.2, this.size * 0.4 - legOffset);
+
+                    // Hi-five animation
+                    if (this.celebrating && this.celebrateTimer > 30) {
+                        ctx.fillStyle = '#ffff00';
+                        ctx.font = '12px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('✋', 0, -this.size * 1.5);
+                    }
+
+                    ctx.restore();
+                }
+            }
+
+            // Alien class (UFO)
+            class Alien {
+                constructor() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * (canvas.height * 0.4);
+                    this.size = Math.random() * 20 + 15;
+                    this.wobbleSpeed = Math.random() * 0.03 + 0.02;
+                    this.wobblePhase = Math.random() * Math.PI * 2;
+                    this.moveX = (Math.random() - 0.5) * 0.5;
+                    this.moveY = (Math.random() - 0.5) * 0.3;
+                    this.life = Math.random() * 300 + 200;
+                    this.health = 50;
+                    this.maxHealth = 50;
+                    this.timewarpCooldown = 100 + Math.random() * 100; // Random cooldown for teleport
+                    this.teleporting = false;
+                    this.teleportPhase = 0;
+
+                    // Random ship type for variety
+                    const types = ['saucer', 'triangular', 'organic', 'cylindrical'];
+                    this.shipType = types[Math.floor(Math.random() * types.length)];
+
+                    // Random alien pilot color
+                    const alienColors = ['#9933ff', '#33ff99', '#ff9933', '#3399ff', '#ff3399'];
+                    this.pilotColor = alienColors[Math.floor(Math.random() * alienColors.length)];
+                }
+
+                update() {
+                    this.wobblePhase += this.wobbleSpeed;
+                    this.timewarpCooldown--;
+
+                    // Teleport effect
+                    if (this.teleporting) {
+                        this.teleportPhase++;
+                        if (this.teleportPhase > 30) {
+                            // Finish teleport
+                            this.teleporting = false;
+                            this.teleportPhase = 0;
+                            this.timewarpCooldown = 150 + Math.random() * 150; // Reset cooldown
+                        }
+                        return true; // Stay alive during teleport
+                    }
+
+                    // Random timewarp (2% chance when cooldown ready)
+                    if (this.timewarpCooldown <= 0 && Math.random() < 0.02) {
+                        this.initiateTeleport();
+                    }
+
+                    this.x += this.moveX + Math.sin(this.wobblePhase) * 0.5;
+                    this.y += this.moveY + Math.cos(this.wobblePhase * 0.7) * 0.3;
+                    this.life--;
+                    return this.health > 0 && this.life > 0 && this.x > -100 && this.x < canvas.width + 100;
+                }
+
+                initiateTeleport() {
+                    this.teleporting = true;
+                    this.teleportPhase = 0;
+
+                    // After half the teleport animation, move to new location
+                    setTimeout(() => {
+                        if (this.teleporting) {
+                            this.x = Math.random() * canvas.width;
+                            this.y = Math.random() * (canvas.height * 0.4);
+                            // Sometimes change direction after teleport
+                            if (Math.random() < 0.5) {
+                                this.moveX = (Math.random() - 0.5) * 0.6;
+                                this.moveY = (Math.random() - 0.5) * 0.4;
+                            }
+                        }
+                    }, 15 * 16.67); // 15 frames at 60fps
+                }
+
+                checkHit(laser) {
+                    const dx = laser.x - this.x;
+                    const dy = laser.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    return distance < this.size;
+                }
+
+                onHit() {
+                    // Decrement health by 1
+                    this.health--;
+
+                    if (this.health <= 0) {
+                        return true; // Was destroyed after 50 hits
+                    } else {
+                        return false; // Still alive
+                    }
+                }
+
+                draw() {
+                    ctx.save();
+                    ctx.translate(this.x, this.y + Math.sin(this.wobblePhase) * 3);
+
+                    // Teleport effect - phasing in/out
+                    if (this.teleporting) {
+                        const phase = this.teleportPhase / 30;
+                        const opacity = phase < 0.5 ? (1 - phase * 2) : ((phase - 0.5) * 2);
+                        ctx.globalAlpha = opacity;
+                        ctx.shadowBlur = 20 * (1 - Math.abs(phase - 0.5) * 2);
+                        ctx.shadowColor = '#00ffff';
+                        if (phase > 0.4 && phase < 0.6) {
+                            ctx.scale(1 + Math.sin(phase * Math.PI * 10) * 0.2, 1 + Math.cos(phase * Math.PI * 10) * 0.2);
+                        }
+                    }
+
+                    // Health bar above alien
+                    const barWidth = this.size * 2;
+                    const barHeight = 4;
+                    const barY = -this.size - 15;
+                    const healthPercent = this.health / this.maxHealth;
+
+                    ctx.fillStyle = 'rgba(50, 50, 50, 0.7)';
+                    ctx.fillRect(-barWidth / 2, barY, barWidth, barHeight);
+
+                    let healthColor = healthPercent > 0.6 ? '#5edf89' : healthPercent > 0.3 ? '#ffaa00' : '#ff4444';
+                    ctx.fillStyle = healthColor;
+                    ctx.fillRect(-barWidth / 2, barY, barWidth * healthPercent, barHeight);
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${this.health}/${this.maxHealth}`, 0, barY - 2);
+
+                    // Draw ship based on type
+                    switch (this.shipType) {
+                        case 'saucer':
+                            this.drawSaucer();
+                            break;
+                        case 'triangular':
+                            this.drawTriangular();
+                            break;
+                        case 'organic':
+                            this.drawOrganic();
+                            break;
+                        case 'cylindrical':
+                            this.drawCylindrical();
+                            break;
+                    }
+
+                    ctx.restore();
+                }
+
+                drawSaucer() {
+                    // Main saucer body
+                    ctx.fillStyle = '#8a8a9f';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, this.size, this.size * 0.3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Glass dome cockpit (transparent)
+                    ctx.fillStyle = 'rgba(150, 200, 255, 0.3)';
+                    ctx.strokeStyle = 'rgba(150, 200, 255, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(0, -this.size * 0.2, this.size * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Alien pilot visible through glass
+                    ctx.fillStyle = this.pilotColor;
+                    ctx.beginPath();
+                    ctx.arc(0, -this.size * 0.15, this.size * 0.15, 0, Math.PI * 2); // Head
+                    ctx.fill();
+
+                    // Alien eyes
+                    ctx.fillStyle = '#000000';
+                    ctx.beginPath();
+                    ctx.arc(-this.size * 0.08, -this.size * 0.15, this.size * 0.05, 0, Math.PI * 2);
+                    ctx.arc(this.size * 0.08, -this.size * 0.15, this.size * 0.05, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Light beam (sometimes, not when teleporting)
+                    if (!this.teleporting && Math.random() > 0.95) {
+                        const gradient = ctx.createLinearGradient(0, 0, 0, this.size * 3);
+                        gradient.addColorStop(0, 'rgba(94, 223, 137, 0.3)');
+                        gradient.addColorStop(1, 'rgba(94, 223, 137, 0)');
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.moveTo(-this.size * 0.3, this.size * 0.3);
+                        ctx.lineTo(-this.size * 0.8, this.size * 3);
+                        ctx.lineTo(this.size * 0.8, this.size * 3);
+                        ctx.lineTo(this.size * 0.3, this.size * 0.3);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+
+                drawTriangular() {
+                    // Delta-wing ship body
+                    ctx.fillStyle = '#6b7a8f';
+                    ctx.beginPath();
+                    ctx.moveTo(-this.size * 0.8, this.size * 0.5);
+                    ctx.lineTo(this.size, 0);
+                    ctx.lineTo(-this.size * 0.8, -this.size * 0.5);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Front cockpit glass (transparent)
+                    ctx.fillStyle = 'rgba(100, 255, 200, 0.3)';
+                    ctx.strokeStyle = 'rgba(100, 255, 200, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.5, 0, this.size * 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Alien pilot visible through glass
+                    ctx.fillStyle = this.pilotColor;
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.5, 0, this.size * 0.12, 0, Math.PI * 2); // Head
+                    ctx.fill();
+
+                    // Eyes
+                    ctx.fillStyle = '#000000';
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.45, -this.size * 0.03, this.size * 0.04, 0, Math.PI * 2);
+                    ctx.arc(this.size * 0.55, -this.size * 0.03, this.size * 0.04, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Engine glow
+                    ctx.fillStyle = 'rgba(255, 100, 50, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(-this.size * 0.8, 0, this.size * 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                drawOrganic() {
+                    // Organic curved body
+                    ctx.fillStyle = '#9b6b9e';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, this.size * 0.8, this.size * 0.5, Math.PI / 6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Translucent membrane cockpit
+                    ctx.fillStyle = 'rgba(200, 150, 255, 0.3)';
+                    ctx.strokeStyle = 'rgba(200, 150, 255, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.2, 0, this.size * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Alien pilot inside
+                    ctx.fillStyle = this.pilotColor;
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.2, 0, this.size * 0.15, 0, Math.PI * 2); // Head
+                    ctx.fill();
+
+                    // Large alien eyes
+                    ctx.fillStyle = '#000000';
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.12, -this.size * 0.05, this.size * 0.06, 0, Math.PI * 2);
+                    ctx.arc(this.size * 0.28, -this.size * 0.05, this.size * 0.06, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Bioluminescent spots
+                    ctx.fillStyle = 'rgba(150, 255, 200, 0.6)';
+                    ctx.beginPath();
+                    ctx.arc(-this.size * 0.3, this.size * 0.2, this.size * 0.08, 0, Math.PI * 2);
+                    ctx.arc(-this.size * 0.3, -this.size * 0.2, this.size * 0.08, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                drawCylindrical() {
+                    // Tube-shaped ship
+                    ctx.fillStyle = '#7a8a99';
+                    ctx.fillRect(-this.size, -this.size * 0.3, this.size * 2, this.size * 0.6);
+
+                    // Side cockpit window (transparent)
+                    ctx.fillStyle = 'rgba(255, 200, 100, 0.3)';
+                    ctx.strokeStyle = 'rgba(255, 200, 100, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.3, 0, this.size * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Alien pilot visible through side window
+                    ctx.fillStyle = this.pilotColor;
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.3, 0, this.size * 0.14, 0, Math.PI * 2); // Head
+                    ctx.fill();
+
+                    // Eyes
+                    ctx.fillStyle = '#000000';
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.22, -this.size * 0.03, this.size * 0.04, 0, Math.PI * 2);
+                    ctx.arc(this.size * 0.38, -this.size * 0.03, this.size * 0.04, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Engine exhausts
+                    ctx.fillStyle = 'rgba(50, 150, 255, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(-this.size, this.size * 0.15, this.size * 0.12, 0, Math.PI * 2);
+                    ctx.arc(-this.size, -this.size * 0.15, this.size * 0.12, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Fire Explosion class
+            class FireExplosion {
+                constructor(x, y, size) {
+                    this.x = x;
+                    this.y = y;
+                    this.size = size;
+                    this.particles = [];
+                    this.life = 60; // Frames
+                    this.maxLife = 60;
+
+                    // Create fire particles
+                    for (let i = 0; i < 30; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = Math.random() * 3 + 1;
+                        this.particles.push({
+                            x: 0,
+                            y: 0,
+                            vx: Math.cos(angle) * speed,
+                            vy: Math.sin(angle) * speed,
+                            size: Math.random() * size * 0.3 + size * 0.1,
+                            life: 1.0
+                        });
+                    }
+                }
+
+                update() {
+                    this.life--;
+
+                    // Update particles
+                    this.particles.forEach(p => {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.1; // Gravity
+                        p.vx *= 0.98; // Drag
+                        p.life -= 0.02; // Fade out
+                    });
+
+                    return this.life > 0;
+                }
+
+                draw() {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+
+                    this.particles.forEach(p => {
+                        if (p.life > 0) {
+                            // Fire color gradient: purple → red → orange → white
+                            const lifePercent = p.life;
+                            let color;
+
+                            if (lifePercent > 0.75) {
+                                // Purple to red
+                                const t = (lifePercent - 0.75) / 0.25;
+                                color = `rgba(${128 + 127 * (1 - t)}, ${0}, ${128 * t}, ${p.life})`;
+                            } else if (lifePercent > 0.5) {
+                                // Red to orange
+                                const t = (lifePercent - 0.5) / 0.25;
+                                color = `rgba(255, ${128 * (1 - t)}, 0, ${p.life})`;
+                            } else if (lifePercent > 0.25) {
+                                // Orange to white
+                                const t = (lifePercent - 0.25) / 0.25;
+                                color = `rgba(255, ${128 + 127 * (1 - t)}, ${255 * (1 - t)}, ${p.life})`;
+                            } else {
+                                // White fade out
+                                color = `rgba(255, 255, 255, ${p.life})`;
+                            }
+
+                            ctx.fillStyle = color;
+                            ctx.shadowBlur = 15;
+                            ctx.shadowColor = color;
+                            ctx.beginPath();
+                            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    });
+
+                    ctx.restore();
+                }
+            }
+
+            // Create initial stars
+            const stars = [];
+            for (let i = 0; i < 200; i++) {
+                stars.push(new Star());
+            }
+
+            const meteors = [];
+            const spaceships = [];
+            const aliens = [];
+            const lasers = [];
+            const explosions = [];
+            const spacemen = [];
+
+            // Update base positions on init
+            updateBasePositions();
+
+            // Animation loop
+            function animate() {
+                ctx.fillStyle = 'rgba(10, 10, 31, 0.2)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw stars
+                stars.forEach(star => star.draw());
+
+                // Draw team bases
+                updateBasePositions(); // Update positions each frame
+
+                // Draw team kill counters (scoreboard at top center)
+                ctx.save();
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.shadowBlur = 5;
+
+                const scoreboardY = 20;
+                const centerX = canvas.width / 2;
+
+                // Red team kills (left of center)
+                ctx.fillStyle = '#ff4444';
+                ctx.shadowColor = '#ff4444';
+                ctx.fillText(`RED: ${redTeamKills}`, centerX - 60, scoreboardY);
+
+                // VS separator
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowColor = '#ffffff';
+                ctx.fillText('VS', centerX, scoreboardY);
+
+                // Blue team kills (right of center)
+                ctx.fillStyle = '#4444ff';
+                ctx.shadowColor = '#4444ff';
+                ctx.fillText(`BLUE: ${blueTeamKills}`, centerX + 60, scoreboardY);
+
+                ctx.restore();
+
+                // Add meteors randomly (rare)
+                if (Math.random() > 0.99) {
+                    meteors.push(new Meteor());
+                }
+
+                // Add spaceships for both teams
+                if (Math.random() > 0.995 && spaceships.filter(s => s.team === 'red').length < 5) {
+                    spaceships.push(new Spaceship('red'));
+                }
+                if (Math.random() > 0.995 && spaceships.filter(s => s.team === 'blue').length < 5) {
+                    spaceships.push(new Spaceship('blue'));
+                }
+
+                // Add aliens VERY rarely
+                if (Math.random() > 0.9985) {
+                    aliens.push(new Alien());
+                }
+
+                // Update and draw meteors
+                for (let i = meteors.length - 1; i >= 0; i--) {
+                    if (meteors[i].update()) {
+                        meteors[i].draw();
+                    } else {
+                        meteors.splice(i, 1);
+                    }
+                }
+
+                // Update and draw spaceships (pass aliens, lasers, and spacemen)
+                for (let i = spaceships.length - 1; i >= 0; i--) {
+                    if (spaceships[i].update(aliens, lasers, spacemen)) {
+                        spaceships[i].draw();
+                    } else {
+                        spaceships.splice(i, 1);
+                    }
+                }
+
+                // Update and draw spacemen
+                for (let i = spacemen.length - 1; i >= 0; i--) {
+                    if (spacemen[i].update(spacemen)) {
+                        spacemen[i].draw();
+                    } else {
+                        spacemen.splice(i, 1);
+                    }
+                }
+
+                // Update and draw lasers
+                for (let i = lasers.length - 1; i >= 0; i--) {
+                    if (lasers[i].update()) {
+                        lasers[i].draw();
+
+                        // Check for hits on aliens
+                        for (let j = aliens.length - 1; j >= 0; j--) {
+                            if (aliens[j].checkHit(lasers[i])) {
+                                // Hit!
+                                const wasDestroyed = aliens[j].onHit();
+                                const shooter = lasers[i].shooter; // Save shooter reference
+                                lasers.splice(i, 1); // Remove laser
+
+                                if (wasDestroyed) {
+                                    // Alien destroyed! Credit the ship that fired the laser
+                                    if (shooter) {
+                                        shooter.registerKill();
+                                        // Increment team kill counter
+                                        if (shooter.team === 'red') {
+                                            redTeamKills++;
+                                        } else if (shooter.team === 'blue') {
+                                            blueTeamKills++;
+                                        }
+                                        // Check if a team has won
+                                        checkGameWinner();
+                                    }
+
+                                    // Create fire explosion at alien's position
+                                    explosions.push(new FireExplosion(aliens[j].x, aliens[j].y, aliens[j].size));
+
+                                    aliens.splice(j, 1);
+
+                                    // Spawn a new alien somewhere else (normal size)
+                                    setTimeout(() => {
+                                        aliens.push(new Alien());
+                                    }, 1000 + Math.random() * 2000);
+                                }
+                                break; // Laser already removed
+                            }
+                        }
+                    } else {
+                        lasers.splice(i, 1);
+                    }
+                }
+
+                // Update and draw aliens
+                for (let i = aliens.length - 1; i >= 0; i--) {
+                    if (aliens[i].update()) {
+                        aliens[i].draw();
+                    } else {
+                        aliens.splice(i, 1);
+                    }
+                }
+
+                // Update and draw explosions
+                for (let i = explosions.length - 1; i >= 0; i--) {
+                    if (explosions[i].update()) {
+                        explosions[i].draw();
+                    } else {
+                        explosions.splice(i, 1);
+                    }
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+        })();
+
+        // IMMEDIATE DEBUG - runs before DOMContentLoaded
+        console.log('🚀 TRICKED_OUT_RICKY: Script starting...');
+        console.log('Chart.js available?', typeof Chart);
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('📄 DOM Content Loaded');
+
+            if (typeof Chart !== 'undefined') {
+                console.log('✅ Chart.js loaded and ready!');
+            } else {
+                console.error('❌ Chart.js failed to load');
+            }
+
+            // Wait for auth state
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    console.log('✅ User authenticated:', user.email);
+                    currentUser = user;
+                    loadWeekData();
+                } else {
+                    console.log('❌ No user authenticated, redirecting to login');
+                    window.location.href = 'index.html';
+                }
+            });
+        });
+
+        function changeWeek(delta) {
+            const newWeek = currentWeek + delta;
+            if (newWeek >= 1 && newWeek <= 18) {
+                currentWeek = newWeek;
+                document.getElementById('current-week').textContent = `WEEK ${currentWeek}`;
+                loadWeekData();
+            }
+        }
+
+        async function loadWeekData() {
+            console.log('🎯 TRICKED_OUT_RICKY: Loading Week', currentWeek);
+            document.getElementById('current-week').textContent = `WEEK ${currentWeek}`;
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+
+            try {
+                // Check cache first (6 segments = valid Firestore path)
+                const cacheDoc = await db.doc(`artifacts/nerdfootball/pools/nerduniverse-2025/cache/tricked-out-ricky-week-${currentWeek}`).get();
+
+                let analyticsData;
+                if (cacheDoc.exists) {
+                    console.log('📦 Using cached analytics data');
+                    analyticsData = cacheDoc.data();
+                } else {
+                    console.log('🔄 Generating analytics data');
+                    analyticsData = await generateAnalytics();
+                }
+
+                renderDashboard(analyticsData);
+            } catch (error) {
+                console.error('❌ Error loading analytics:', error);
+                alert('Failed to load analytics data: ' + error.message);
+            }
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+        }
+
+        async function generateAnalytics() {
+            console.log(`🔥 TRICKED OUT RICKY: Fetching analytics for WEEK ${currentWeek}`);
+            console.log(`📍 Date check: ${new Date().toISOString()} | Season start: 2025-09-04`);
+
+            // Fetch Week Bible (game results)
+            const bibleDoc = await db.doc(`artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`).get();
+            if (!bibleDoc.exists) {
+                throw new Error(`Week ${currentWeek} data not found`);
+            }
+            const bible = bibleDoc.data();
+            console.log(`✅ Loaded bible for Week ${currentWeek}:`, Object.keys(bible).filter(k => k !== '_metadata'));
+
+            // Fetch all user picks
+            const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+            const picksSnapshot = await db.collection(picksPath).get();
+
+            // Fetch pool members
+            const membersDoc = await db.doc('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members').get();
+            const members = membersDoc.data() || {};
+
+            const games = Object.keys(bible).filter(k => k !== '_metadata');
+            const playerStats = [];
+            const gameStats = {};
+            const confidenceAccuracy = {}; // Track wins/losses per confidence level
+
+            // Initialize game stats
+            games.forEach(gameId => {
+                gameStats[gameId] = {
+                    picks: {},
+                    confidenceValues: [],
+                    winner: bible[gameId].winner,
+                    game: bible[gameId]
+                };
+            });
+
+            // Process each player's picks
+            picksSnapshot.forEach(doc => {
+                const userId = doc.id;
+                const picks = doc.data();
+
+                if (!members[userId]) return; // Skip non-members
+
+                let correctPicks = 0;
+                let totalPoints = 0;
+                let totalGames = 0;
+
+                games.forEach(gameId => {
+                    if (picks[gameId]) {
+                        totalGames++;
+                        const pick = picks[gameId];
+                        const confidence = pick.confidence || 0;
+                        const isCorrect = pick.winner === bible[gameId].winner;
+
+                        if (isCorrect) {
+                            correctPicks++;
+                            totalPoints += confidence;
+                        }
+
+                        // Track confidence accuracy
+                        if (!confidenceAccuracy[confidence]) {
+                            confidenceAccuracy[confidence] = { wins: 0, total: 0 };
+                        }
+                        confidenceAccuracy[confidence].total++;
+                        if (isCorrect) {
+                            confidenceAccuracy[confidence].wins++;
+                        }
+
+                        // Track game stats
+                        if (!gameStats[gameId].picks[pick.winner]) {
+                            gameStats[gameId].picks[pick.winner] = 0;
+                        }
+                        gameStats[gameId].picks[pick.winner]++;
+                        gameStats[gameId].confidenceValues.push(confidence);
+                    }
+                });
+
+                playerStats.push({
+                    userId,
+                    name: members[userId].displayName || members[userId].email.split('@')[0],
+                    points: totalPoints,
+                    accuracy: totalGames > 0 ? (correctPicks / totalGames * 100).toFixed(1) : 0,
+                    correctPicks,
+                    totalGames
+                });
+            });
+
+            // Sort by points
+            playerStats.sort((a, b) => b.points - a.points);
+
+            return {
+                playerStats,
+                gameStats,
+                confidenceAccuracy,
+                bible,
+                totalPlayers: playerStats.length,
+                totalGames: games.length
+            };
+        }
+
+        function renderDashboard(data) {
+            const { playerStats, gameStats, confidenceAccuracy, bible, totalPlayers, totalGames } = data;
+
+            // Week Overview Stats
+            const totalCorrect = playerStats.reduce((sum, p) => sum + p.correctPicks, 0);
+            const totalPicks = playerStats.reduce((sum, p) => sum + p.totalGames, 0);
+            const poolAccuracy = totalPicks > 0 ? ((totalCorrect / totalPicks) * 100).toFixed(1) : 0;
+            const avgPoints = totalPlayers > 0 ? (playerStats.reduce((sum, p) => sum + p.points, 0) / totalPlayers).toFixed(1) : 0;
+            const highScore = playerStats.length > 0 ? playerStats[0].points : 0;
+            const perfectPicks = playerStats.filter(p => parseFloat(p.accuracy) === 100).length;
+
+            document.getElementById('total-players').textContent = totalPlayers;
+            document.getElementById('total-games').textContent = totalGames;
+            document.getElementById('pool-accuracy').textContent = poolAccuracy + '%';
+            document.getElementById('avg-points').textContent = avgPoints;
+            document.getElementById('high-score').textContent = highScore;
+            document.getElementById('perfect-picks').textContent = perfectPicks;
+
+            // Render Weekly Leaderboard (compact)
+            renderWeeklyLeaderboard(playerStats);
+
+            // Render Charts
+            renderPerformanceChart(playerStats);
+            renderDistributionChart(playerStats);
+            renderAccuracyChart(playerStats);
+            renderConfidenceAccuracyCurve(confidenceAccuracy);
+            renderConfidenceComparison(confidenceAccuracy);
+            renderConfidenceHeatmap(confidenceAccuracy);
+
+            // Render Tables
+            renderLeaderboard(playerStats);
+            renderGameAnalysisTable(gameStats);
+        }
+
+        function renderWeeklyLeaderboard(playerStats) {
+            const grid = document.getElementById('weekly-leaderboard-grid');
+            const weekSpan = document.getElementById('leaderboard-week');
+
+            weekSpan.textContent = currentWeek;
+            grid.innerHTML = '';
+
+            let displayPlayers = playerStats.slice(0, 10);
+
+            // Check if current user is in top 10
+            const currentUserInTop10 = displayPlayers.some(p => p.userId === currentUser.uid);
+
+            // If current user is NOT in top 10, add them to the end
+            if (!currentUserInTop10) {
+                const currentUserStats = playerStats.find(p => p.userId === currentUser.uid);
+                if (currentUserStats) {
+                    displayPlayers.push(currentUserStats);
+                }
+            }
+
+            displayPlayers.forEach((player, index) => {
+                const actualRank = playerStats.findIndex(p => p.userId === player.userId) + 1;
+                const isCurrentUser = player.userId === currentUser.uid;
+                const rankClass = actualRank === 1 ? 'first' : actualRank === 2 ? 'second' : actualRank === 3 ? 'third' : '';
+                const userHighlight = isCurrentUser ? 'style="background: rgba(138, 124, 255, 0.2); border: 1px solid #8a7cff;"' : '';
+
+                grid.innerHTML += `
+                    <div class="leaderboard-item" ${userHighlight}>
+                        <div class="leaderboard-rank ${rankClass}">#${actualRank}</div>
+                        <div class="leaderboard-name">${player.name}${isCurrentUser ? ' (You)' : ''}</div>
+                        <div class="leaderboard-points">${player.points}</div>
+                    </div>
+                `;
+            });
+        }
+
+        let performanceChartInstance = null;
+
+        function renderPerformanceChart(playerStats) {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded');
+                return;
+            }
+
+            try {
+                const top15 = playerStats.slice(0, 15);
+
+                const ctx = document.getElementById('performance-chart').getContext('2d');
+
+                // Destroy existing chart if it exists
+                if (performanceChartInstance) {
+                    performanceChartInstance.destroy();
+                }
+
+                performanceChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: top15.map(p => p.name),
+                        datasets: [{
+                            label: 'Points',
+                            data: top15.map(p => p.points),
+                            backgroundColor: 'rgba(138, 124, 255, 0.3)',
+                            borderColor: COLORS.primary,
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointBackgroundColor: COLORS.primary,
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1a1a2f',
+                                borderColor: '#3a3a5c',
+                                borderWidth: 1,
+                                titleColor: '#e0e0e0',
+                                bodyColor: '#e0e0e0',
+                                titleFont: { weight: 'bold', size: 14 },
+                                bodyFont: { size: 13 },
+                                padding: 12,
+                                displayColors: false,
+                                callbacks: {
+                                    title: function(context) {
+                                        return context[0].label;
+                                    },
+                                    label: function(context) {
+                                        return context.parsed.y + ' points';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#e0e0e0',
+                                    font: {
+                                        weight: 'bold',
+                                        size: 12
+                                    },
+                                    maxRotation: 0,
+                                    minRotation: 0
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                ticks: {
+                                    color: '#8a8a9f',
+                                    font: { size: 11 }
+                                },
+                                grid: {
+                                    color: '#2a2a3c',
+                                    lineWidth: 1
+                                },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Error rendering performance chart:', error);
+            }
+        }
+
+        let distributionChartInstance = null;
+
+        function renderDistributionChart(playerStats) {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded');
+                return;
+            }
+
+            try {
+                const ctx = document.getElementById('distribution-chart').getContext('2d');
+
+                if (distributionChartInstance) {
+                    distributionChartInstance.destroy();
+                }
+
+                distributionChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: playerStats.map((_, i) => i + 1),
+                        datasets: [{
+                            label: 'Points',
+                            data: playerStats.map(p => p.points),
+                            borderColor: COLORS.secondary,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            pointBackgroundColor: COLORS.secondary,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1a1a2f',
+                                borderColor: '#3a3a5c',
+                                borderWidth: 1,
+                                titleColor: '#e0e0e0',
+                                bodyColor: '#e0e0e0'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Player Rank',
+                                    color: '#8a8a9f'
+                                },
+                                ticks: { color: '#8a8a9f' },
+                                grid: { color: '#2a2a3c' }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Points',
+                                    color: '#8a8a9f'
+                                },
+                                ticks: { color: '#8a8a9f' },
+                                grid: { color: '#2a2a3c' }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Error rendering distribution chart:', error);
+            }
+        }
+
+        let accuracyChartInstance = null;
+
+        function renderAccuracyChart(playerStats) {
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded');
+                return;
+            }
+
+            try {
+                // Group by accuracy ranges
+                const ranges = {
+                    '0-20%': 0,
+                    '21-40%': 0,
+                    '41-60%': 0,
+                    '61-80%': 0,
+                    '81-100%': 0
+                };
+
+                playerStats.forEach(p => {
+                    const acc = parseFloat(p.accuracy);
+                    if (acc <= 20) ranges['0-20%']++;
+                    else if (acc <= 40) ranges['21-40%']++;
+                    else if (acc <= 60) ranges['41-60%']++;
+                    else if (acc <= 80) ranges['61-80%']++;
+                    else ranges['81-100%']++;
+                });
+
+                const pieColors = ['#ff6b6b', '#ffa94d', '#ffd93d', '#6ac4ff', '#5edf89'];
+
+                const ctx = document.getElementById('accuracy-chart').getContext('2d');
+
+                if (accuracyChartInstance) {
+                    accuracyChartInstance.destroy();
+                }
+
+                accuracyChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(ranges),
+                        datasets: [{
+                            data: Object.values(ranges),
+                            backgroundColor: pieColors,
+                            borderColor: '#1a1a2f',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    color: '#e0e0e0',
+                                    padding: 15,
+                                    font: { size: 12 }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: '#1a1a2f',
+                                borderColor: '#3a3a5c',
+                                borderWidth: 1,
+                                titleColor: '#e0e0e0',
+                                bodyColor: '#e0e0e0'
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Error rendering accuracy chart:', error);
+            }
+        }
+
+        let confidenceAccuracyChartInstance = null;
+        let confidenceComparisonChartInstance = null;
+        let confidenceHeatmapChartInstance = null;
+
+        // Chart 1: Confidence Accuracy Curve (Area Chart)
+        function renderConfidenceAccuracyCurve(confidenceAccuracy) {
+            if (typeof Chart === 'undefined') return;
+
+            try {
+                const sortedKeys = Object.keys(confidenceAccuracy).sort((a, b) => a - b);
+                const accuracyData = sortedKeys.map(conf => {
+                    const data = confidenceAccuracy[conf];
+                    return data.total > 0 ? ((data.wins / data.total) * 100).toFixed(1) : 0;
+                });
+
+                const ctx = document.getElementById('confidence-accuracy-chart').getContext('2d');
+
+                if (confidenceAccuracyChartInstance) {
+                    confidenceAccuracyChartInstance.destroy();
+                }
+
+                confidenceAccuracyChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: sortedKeys,
+                        datasets: [{
+                            label: 'Win %',
+                            data: accuracyData,
+                            backgroundColor: 'rgba(94, 223, 137, 0.3)',
+                            borderColor: COLORS.success,
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 5,
+                            pointBackgroundColor: COLORS.success,
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointHoverRadius: 7
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1a1a2f',
+                                borderColor: '#3a3a5c',
+                                borderWidth: 1,
+                                titleColor: '#e0e0e0',
+                                bodyColor: '#e0e0e0',
+                                titleFont: { weight: 'bold', size: 14 },
+                                bodyFont: { size: 13 },
+                                padding: 12,
+                                displayColors: false,
+                                callbacks: {
+                                    title: function(context) {
+                                        const conf = context[0].label;
+                                        const data = confidenceAccuracy[conf];
+                                        return `Confidence ${conf} (${data.wins}/${data.total} picks)`;
+                                    },
+                                    label: function(context) {
+                                        return context.parsed.y + '% win rate';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Confidence Value',
+                                    color: '#e0e0e0',
+                                    font: { weight: 'bold', size: 13 }
+                                },
+                                ticks: {
+                                    color: '#e0e0e0',
+                                    font: { weight: 'bold', size: 12 }
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Win Percentage',
+                                    color: '#8a8a9f',
+                                    font: { size: 12 }
+                                },
+                                ticks: {
+                                    color: '#8a8a9f',
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                },
+                                grid: {
+                                    color: '#2a2a3c',
+                                    lineWidth: 1
+                                },
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Error rendering confidence accuracy curve:', error);
+            }
+        }
+
+        // Chart 2: High vs Low Confidence Comparison (Dual-Line Chart)
+        function renderConfidenceComparison(confidenceAccuracy) {
+            if (typeof Chart === 'undefined') return;
+
+            try {
+                const sortedKeys = Object.keys(confidenceAccuracy).sort((a, b) => a - b);
+
+                // Calculate high vs low confidence accuracy
+                let highConfWins = 0, highConfTotal = 0;
+                let lowConfWins = 0, lowConfTotal = 0;
+
+                sortedKeys.forEach(conf => {
+                    const confNum = parseInt(conf);
+                    const data = confidenceAccuracy[conf];
+
+                    if (confNum >= 12) {
+                        highConfWins += data.wins;
+                        highConfTotal += data.total;
+                    } else if (confNum <= 5) {
+                        lowConfWins += data.wins;
+                        lowConfTotal += data.total;
+                    }
+                });
+
+                const highAccuracy = highConfTotal > 0 ? ((highConfWins / highConfTotal) * 100).toFixed(1) : 0;
+                const lowAccuracy = lowConfTotal > 0 ? ((lowConfWins / lowConfTotal) * 100).toFixed(1) : 0;
+
+                const ctx = document.getElementById('confidence-comparison-chart').getContext('2d');
+
+                if (confidenceComparisonChartInstance) {
+                    confidenceComparisonChartInstance.destroy();
+                }
+
+                confidenceComparisonChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Low Confidence (1-5)', 'High Confidence (12-16)'],
+                        datasets: [{
+                            label: 'Win %',
+                            data: [lowAccuracy, highAccuracy],
+                            backgroundColor: [
+                                'rgba(255, 107, 107, 0.5)',
+                                'rgba(94, 223, 137, 0.5)'
+                            ],
+                            borderColor: [COLORS.danger, COLORS.success],
+                            borderWidth: 2,
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1a1a2f',
+                                borderColor: '#3a3a5c',
+                                borderWidth: 1,
+                                titleColor: '#e0e0e0',
+                                bodyColor: '#e0e0e0',
+                                titleFont: { weight: 'bold', size: 14 },
+                                bodyFont: { size: 13 },
+                                padding: 12,
+                                displayColors: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        const isHigh = context.dataIndex === 1;
+                                        const picks = isHigh ? `${highConfWins}/${highConfTotal}` : `${lowConfWins}/${lowConfTotal}`;
+                                        return [
+                                            context.parsed.y + '% win rate',
+                                            picks + ' picks correct'
+                                        ];
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#e0e0e0',
+                                    font: { weight: 'bold', size: 12 }
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Win Percentage',
+                                    color: '#8a8a9f',
+                                    font: { size: 12 }
+                                },
+                                ticks: {
+                                    color: '#8a8a9f',
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                },
+                                grid: {
+                                    color: '#2a2a3c',
+                                    lineWidth: 1
+                                },
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Error rendering confidence comparison:', error);
+            }
+        }
+
+        // Chart 3: Confidence Heatmap
+        function renderConfidenceHeatmap(confidenceAccuracy) {
+            if (typeof Chart === 'undefined') return;
+
+            try {
+                const canvas = document.getElementById('confidence-heatmap-chart');
+                const ctx = canvas.getContext('2d');
+
+                if (confidenceHeatmapChartInstance) {
+                    confidenceHeatmapChartInstance.destroy();
+                }
+
+                const sortedKeys = Object.keys(confidenceAccuracy).sort((a, b) => a - b);
+                const heatmapData = sortedKeys.map(conf => {
+                    const data = confidenceAccuracy[conf];
+                    const winRate = data.total > 0 ? (data.wins / data.total) : 0;
+                    return {
+                        x: conf,
+                        y: 1,
+                        v: winRate * 100
+                    };
+                });
+
+                // Create gradient colors based on win rate
+                const colors = heatmapData.map(d => {
+                    const winRate = d.v / 100;
+                    // Red (low) to Yellow (mid) to Green (high)
+                    if (winRate < 0.5) {
+                        const intensity = winRate * 2;
+                        return `rgba(255, ${Math.floor(107 + intensity * 148)}, 107, 0.8)`;
+                    } else {
+                        const intensity = (winRate - 0.5) * 2;
+                        return `rgba(${Math.floor(255 - intensity * 161)}, 223, ${Math.floor(107 + intensity * 30)}, 0.8)`;
+                    }
+                });
+
+                confidenceHeatmapChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: sortedKeys,
+                        datasets: [{
+                            label: 'Win %',
+                            data: heatmapData.map(d => 100),
+                            backgroundColor: colors,
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#1a1a2f',
+                                borderColor: '#3a3a5c',
+                                borderWidth: 1,
+                                titleColor: '#e0e0e0',
+                                bodyColor: '#e0e0e0',
+                                titleFont: { weight: 'bold', size: 14 },
+                                bodyFont: { size: 13 },
+                                padding: 12,
+                                displayColors: false,
+                                callbacks: {
+                                    title: function(context) {
+                                        const conf = context[0].label;
+                                        const data = confidenceAccuracy[conf];
+                                        return `Confidence ${conf}`;
+                                    },
+                                    label: function(context) {
+                                        const conf = context.label;
+                                        const data = confidenceAccuracy[conf];
+                                        const winRate = data.total > 0 ? ((data.wins / data.total) * 100).toFixed(1) : 0;
+                                        return [
+                                            winRate + '% win rate',
+                                            `${data.wins}/${data.total} picks correct`
+                                        ];
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#e0e0e0',
+                                    font: { weight: 'bold', size: 12 }
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                display: false,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('❌ Error rendering confidence heatmap:', error);
+            }
+        }
+
+        function renderLeaderboard(playerStats) {
+            const tbody = document.querySelector('#player-leaderboard tbody');
+            tbody.innerHTML = '';
+
+            playerStats.slice(0, 20).forEach((player, index) => {
+                const rank = index + 1;
+                const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : '';
+
+                const row = `
+                    <tr>
+                        <td class="${rankClass}">${rank}</td>
+                        <td>${player.name}</td>
+                        <td class="${rankClass}" style="text-align: right;">${player.points}</td>
+                        <td style="text-align: right;">${player.accuracy}%</td>
+                        <td style="text-align: right;">${player.correctPicks}/${player.totalGames}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function renderGameAnalysisTable(gameStats) {
+            const tbody = document.querySelector('#game-analysis-table tbody');
+            tbody.innerHTML = '';
+
+            // Convert to array and calculate stats
+            const gamesArray = Object.keys(gameStats).map(gameId => {
+                const game = gameStats[gameId];
+                const gameData = game.game;
+                const totalPicks = Object.values(game.picks).reduce((sum, count) => sum + count, 0);
+                const winnerPicks = game.picks[game.winner] || 0;
+                const popularPickPct = totalPicks > 0 ? ((winnerPicks / totalPicks) * 100).toFixed(1) : 0;
+                const isUpset = popularPickPct < 50;
+                const avgConfidence = game.confidenceValues.length > 0
+                    ? (game.confidenceValues.reduce((a, b) => a + b, 0) / game.confidenceValues.length)
+                    : 0;
+
+                return {
+                    gameId,
+                    awayTeam: gameData.a,
+                    homeTeam: gameData.h,
+                    winner: game.winner,
+                    popularPickPct,
+                    isUpset,
+                    avgConfidence: parseFloat(avgConfidence.toFixed(1))
+                };
+            });
+
+            // Sort by average confidence (highest first)
+            gamesArray.sort((a, b) => b.avgConfidence - a.avgConfidence);
+
+            gamesArray.forEach(game => {
+                const awayHelmet = TEAM_HELMETS[game.awayTeam] || '';
+                const homeHelmet = TEAM_HELMETS[game.homeTeam] || '';
+
+                const row = `
+                    <tr>
+                        <td>Game ${game.gameId}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <img src="${awayHelmet}" alt="${game.awayTeam}" style="width: 24px; height: 24px;" onerror="this.style.display='none'">
+                                <span>${game.awayTeam}</span>
+                                <span style="color: #8a8a9f;">@</span>
+                                <img src="${homeHelmet}" alt="${game.homeTeam}" style="width: 24px; height: 24px;" onerror="this.style.display='none'">
+                                <span>${game.homeTeam}</span>
+                            </div>
+                        </td>
+                        <td>${game.winner}</td>
+                        <td style="text-align: right;">${game.popularPickPct}%</td>
+                        <td style="text-align: right; color: ${game.isUpset ? '#ff6b6b' : '#5edf89'};">${game.isUpset ? 'YES' : 'NO'}</td>
+                        <td style="text-align: right;">${game.avgConfidence}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+    </script>
+</body>
+</html>

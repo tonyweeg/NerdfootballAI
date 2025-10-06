@@ -11,8 +11,9 @@ if (!initializeApp.apps || initializeApp.apps.length === 0) {
 }
 const db = getFirestore();
 
-// Cache configuration (matching ESPN cache pattern)
-const CACHE_DURATION_MS = 2 * 60 * 1000; // 2 minutes for more frequent updates during live games
+// Cache configuration - Smart caching: Past weeks cached, current week always fresh
+const CACHE_DURATION_PAST_WEEKS_MS = 24 * 60 * 60 * 1000; // 24 hours for past weeks (data won't change)
+const CACHE_DURATION_CURRENT_WEEK_MS = 0; // ZERO CACHE for current week (always fresh)
 const CACHE_PATH_PREFIX = 'cache/weekly_leaderboard_2025_week_';
 
 /**
@@ -26,6 +27,10 @@ exports.generateWeeklyLeaderboardCache = onRequest(
         const startTime = Date.now();
 
         try {
+            // Determine cache duration based on whether this is current week or past week
+            const currentWeekNum = getCurrentWeekNumber();
+            const cacheDuration = weekNumber === currentWeekNum ? CACHE_DURATION_CURRENT_WEEK_MS : CACHE_DURATION_PAST_WEEKS_MS;
+
             // Check if we have recent cached data
             const cacheRef = db.doc(`${CACHE_PATH_PREFIX}${weekNumber}`);
             const cacheSnap = await cacheRef.get();
@@ -34,8 +39,8 @@ exports.generateWeeklyLeaderboardCache = onRequest(
                 const cacheData = cacheSnap.data();
                 const cacheAge = Date.now() - cacheData.generatedAt;
 
-                if (cacheAge < CACHE_DURATION_MS) {
-                    console.log(`✅ Cache hit - returning existing Week ${weekNumber} data (age: ${Math.round(cacheAge/1000)}s)`);
+                if (cacheAge < cacheDuration) {
+                    console.log(`✅ Cache hit - returning existing Week ${weekNumber} data (age: ${Math.round(cacheAge/1000)}s, duration: ${cacheDuration}ms, current week: ${currentWeekNum})`);
                     return res.status(200).json({
                         success: true,
                         data: cacheData.leaderboard,
@@ -71,7 +76,7 @@ exports.generateWeeklyLeaderboardCache = onRequest(
                 cached: false,
                 responseTime: totalTime,
                 weekNumber: weekNumber,
-                nextRefresh: new Date(Date.now() + CACHE_DURATION_MS).toISOString()
+                nextRefresh: new Date(Date.now() + cacheDuration).toISOString()
             });
 
         } catch (error) {
@@ -96,6 +101,10 @@ exports.getWeeklyLeaderboard = onRequest(
         const startTime = Date.now();
 
         try {
+            // Determine cache duration based on whether this is current week or past week
+            const currentWeekNum = getCurrentWeekNumber();
+            const cacheDuration = weekNumber === currentWeekNum ? CACHE_DURATION_CURRENT_WEEK_MS : CACHE_DURATION_PAST_WEEKS_MS;
+
             // Get cached data
             const cacheRef = db.doc(`${CACHE_PATH_PREFIX}${weekNumber}`);
             const cacheSnap = await cacheRef.get();
@@ -114,7 +123,7 @@ exports.getWeeklyLeaderboard = onRequest(
 
             const cacheData = cacheSnap.data();
             const cacheAge = Date.now() - cacheData.generatedAt;
-            const isStale = cacheAge > CACHE_DURATION_MS;
+            const isStale = cacheAge > cacheDuration;
 
             // Return cached data (even if slightly stale for speed)
             res.status(200).json({
@@ -192,7 +201,7 @@ async function generateWeeklyLeaderboardData(weekNumber) {
         try {
             const memberInfo = poolMembers[memberId];
 
-            // Get user's picks for this week (same path as picks-viewer-auth.html)
+            // Get user's picks for this week (same path as tricked-out-ricky)
             const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/${memberId}`;
             const userPicksDoc = await db.doc(picksPath).get();
 
@@ -208,27 +217,48 @@ async function generateWeeklyLeaderboardData(weekNumber) {
                 picks: {}
             };
 
-            // Use the FIXED scoring data source instead of recalculating
-            const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${memberId}`;
-            const scoringDoc = await db.doc(scoringPath).get();
+            // BULLETPROOF: Calculate scores in real-time from picks + bible (like tricked-out-ricky)
+            if (userPicksDoc.exists) {
+                const userPicks = userPicksDoc.data();
+                const pickGameIds = Object.keys(userPicks).filter(key =>
+                    !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints',
+                      'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated',
+                      'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key)
+                );
 
-            if (scoringDoc.exists) {
-                const scoringData = scoringDoc.data();
-                const weekData = scoringData.weeklyPoints && scoringData.weeklyPoints[weekNumber.toString()];
+                let totalPoints = 0;
+                let correctPicks = 0;
+                let totalPicks = pickGameIds.length;
 
-                if (weekData) {
-                    weeklyData = {
-                        ...weeklyData,
-                        totalPoints: weekData.totalPoints || 0,
-                        correctPicks: weekData.gamesWon || 0,
-                        totalPicks: weekData.gamesPlayed || 0,
-                        pickAccuracy: weekData.gamesPlayed > 0 ? ((weekData.gamesWon / weekData.gamesPlayed) * 100) : 0,
-                        hasPicks: true,
-                        lastUpdated: weekData.lastUpdated
-                    };
-                } else {
-                    console.log(`⚠️ No scoring data for Week ${weekNumber} for user ${memberId}`);
+                // Calculate score from each pick
+                for (const gameId of pickGameIds) {
+                    const pick = userPicks[gameId];
+                    if (pick && pick.winner && bibleData[gameId]) {
+                        const actualWinner = bibleData[gameId].winner;
+                        const userPick = pick.winner;
+                        const confidence = pick.confidence || 0;
+                        const isCorrect = actualWinner === userPick;
+
+                        if (isCorrect) {
+                            correctPicks++;
+                            totalPoints += confidence;
+                        }
+                    }
                 }
+
+                weeklyData = {
+                    ...weeklyData,
+                    totalPoints,
+                    correctPicks,
+                    totalPicks,
+                    pickAccuracy: totalPicks > 0 ? ((correctPicks / totalPicks) * 100) : 0,
+                    hasPicks: true,
+                    lastUpdated: new Date().toISOString()
+                };
+
+                console.log(`  ✅ User ${memberInfo.name}: ${totalPoints} points (${correctPicks}/${totalPicks} correct)`);
+            } else {
+                console.log(`  ⚠️ No picks found for ${memberInfo.name}`);
             }
 
             userWeeklyResults.push(weeklyData);

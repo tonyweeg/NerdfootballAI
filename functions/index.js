@@ -1532,10 +1532,10 @@ const {
 
 exports.forceUpdateGame401 = forceUpdateGame401;
 
-// Import and export weekly scoring function (JUST RUN WEEK 4)
+// Import and export weekly scoring function (BULLETPROOF FOR ALL WEEKS)
 const {
     processWeeklyScoring
-} = require('./justRunWeek4');
+} = require('./bulletproofWeeklyScoring');
 
 exports.processWeeklyScoring = processWeeklyScoring;
 
