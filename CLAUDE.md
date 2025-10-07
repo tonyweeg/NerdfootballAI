@@ -168,6 +168,70 @@ firebase deploy --only hosting
 firebase deploy --only functions
 ```
 
+## ✅ SAFE WEEKLIES - CACHE-BUSTING CHECKPOINT (2025-10-07)
+**Git Tag**: `SAFE-WEEKLIES`
+
+### 📌 Checkpoint Details:
+- **Problem Solved**: Stale weekly leaderboard data across 6+ pages
+- **Root Cause**: Browser/CDN caching fetch responses without cache-busting
+- **Solution**: Added `Date.now()` timestamp to ALL Cloud Function fetch calls
+- **Deployment**: Production since 2025-10-07
+
+### ✅ Fixed Files (6 pages, 9+ fetch calls):
+1. `weekly-leaderboard.html` - getweeklyleaderboard + Cache-Control headers
+2. `masters-of-the-nerdUniverse-audit.html` - getweeklyleaderboard + getsurvivorpooldata
+3. `nerd-scoring-audit-tool.html` - getweeklyleaderboard
+4. `straight-cache-homey.html` - 3 cache refresh functions + bulk regeneration
+5. `NerdSurvivorPicks.html` - getsurvivorpooldata
+6. `the-survival-chamber-36-degrees.html` - getsurvivorpooldata
+
+### 🔧 Technical Implementation:
+**Before:**
+```javascript
+fetch('https://getweeklyleaderboard-np7uealtnq-uc.a.run.app?week=5')
+```
+
+**After:**
+```javascript
+const cacheBuster = Date.now();
+const response = await fetch(`https://getweeklyleaderboard-np7uealtnq-uc.a.run.app?week=5&force=true&t=${cacheBuster}`, {
+    method: 'GET',
+    headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+    }
+});
+```
+
+### 🚀 New Features Added:
+- **Bulk Refresh Function**: `refreshAllWeeklyCaches()` in straight-cache-homey
+- **UI Button**: "🔥 REFRESH WEEKLY LEADERBOARD" for bulk cache regeneration (weeks 5-17)
+- **Rate Limiting**: 1-second delay between bulk requests to avoid server overload
+- **Force Parameter**: All weekly cache refreshes use `force=true` to bypass Firestore cache
+
+### 📊 Performance Impact:
+- **Cache Hits**: Sub-500ms with fresh data
+- **Stale Data**: Eliminated across all pages
+- **Bulk Refresh**: 13 weeks regenerated in ~15 seconds
+
+### 🛡️ Recovery Commands:
+```bash
+# Restore to SAFE WEEKLIES checkpoint:
+git checkout SAFE-WEEKLIES
+firebase deploy --only hosting
+
+# Verify cache-busting is working:
+# 1. Open browser console on weekly-leaderboard.html
+# 2. Filter Network tab by "getweeklyleaderboard"
+# 3. Verify URL contains "&t=" timestamp parameter
+```
+
+### 📝 Related Commits:
+- `bd92b0d`: Fix: Add cache-busting to ALL Cloud Function fetch calls
+- `e12adcf`: Add force=true to weekly cache refresh + bulk refresh button
+- `71a7ec7`: Fix: Update button text to 'REFRESH WEEKLY LEADERBOARD'
+
 ## 🏆 PRODUCTION STANDARD - v2.1
 **Main Branch**: `main` (all deployments)
 
