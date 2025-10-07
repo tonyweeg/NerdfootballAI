@@ -391,9 +391,12 @@
                         <p class="text-xs text-gray-400">CREATED</p>
                         <p class="text-sm" id="weeklyCreated">--</p>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 mb-2">
                         <button onclick="refreshWeeklyCache()" class="btn-asteroid btn-success flex-1">REFRESH</button>
                         <button onclick="deleteCache('weekly')" class="btn-asteroid btn-danger flex-1">DELETE</button>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="refreshAllWeeklyCaches()" class="btn-asteroid btn-warning" style="width: 100%; background: linear-gradient(135deg, #ff9500 0%, #ff6b00 100%); border-color: #ff9500;">🔥 REFRESH WEEKS 5-17 (FORCE)</button>
                     </div>
                 </div>
 
@@ -793,13 +796,39 @@
             try {
                 const week = getCurrentNFLWeek();
                 const cacheBuster = Date.now();
-                const response = await fetch(`https://generateweeklyleaderboardcache-np7uealtnq-uc.a.run.app?week=${week}&t=${cacheBuster}`);
+                const response = await fetch(`https://generateweeklyleaderboardcache-np7uealtnq-uc.a.run.app?week=${week}&force=true&t=${cacheBuster}`);
                 const data = await response.json();
                 logTest(`✅ CACHE_REFRESH: Weekly cache refreshed - ${JSON.stringify(data)}`);
                 await loadWeeklyCache();
             } catch (error) {
                 logTest(`❌ CACHE_REFRESH: Weekly cache refresh failed - ${error.message}`);
             }
+        };
+
+        window.refreshAllWeeklyCaches = async () => {
+            logTest('🔄 CACHE_REFRESH: Refreshing ALL weekly caches (Weeks 5-17)...');
+            const startWeek = 5;
+            const endWeek = 17;
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let week = startWeek; week <= endWeek; week++) {
+                try {
+                    logTest(`🔄 CACHE_REFRESH: Refreshing Week ${week}...`);
+                    const cacheBuster = Date.now();
+                    const response = await fetch(`https://generateweeklyleaderboardcache-np7uealtnq-uc.a.run.app?week=${week}&force=true&t=${cacheBuster}`);
+                    const data = await response.json();
+                    logTest(`✅ CACHE_REFRESH: Week ${week} refreshed - ${JSON.stringify(data)}`);
+                    successCount++;
+                    // Small delay between requests to avoid overwhelming the server
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (error) {
+                    logTest(`❌ CACHE_REFRESH: Week ${week} failed - ${error.message}`);
+                    failCount++;
+                }
+            }
+
+            logTest(`🎯 CACHE_REFRESH: Complete! ${successCount} succeeded, ${failCount} failed`);
         };
 
         window.refreshSurvivorCache = async () => {
