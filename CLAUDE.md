@@ -402,6 +402,161 @@ gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, sec
 
 **DST RULES**: March 9 - November 2 (EDT), November 3 - March 8 (EST)
 
+## 🧰 CENTRALIZED UTILITY MODULES
+**Location**: `/public/js/utils/`
+**Purpose**: DRY principle implementation - single source of truth for common patterns
+
+### 📦 Available Utility Modules
+
+#### 1. Firebase Configuration (`firebase-config.js`)
+**Eliminates**: 224+ duplicate Firebase configurations across 61 HTML files
+**Pattern**: Centralized Firebase config with dual export system
+
+```javascript
+import { getFirebaseConfig } from './js/config/firebase-config.js';
+// OR for compat SDK:
+<script src="./js/config/firebase-config.js"></script>
+firebase.initializeApp(window.getFirebaseConfig());
+```
+
+#### 2. Centralized Logger (`logger.js`)
+**Eliminates**: Scattered console.log statements
+**Features**: LogLevel filtering, category-based debugging, emoji prefixes, localStorage persistence
+
+```javascript
+import { logger, LogLevel } from './js/utils/logger.js';
+
+// Domain-specific logging
+logger.auth('User authenticated', user);
+logger.cache('AI predictions loaded', aiData);
+logger.picks('Pick submitted', pickData);
+logger.survivor('Survivor choice made', choice);
+
+// Configuration
+logger.setLevel(LogLevel.DEBUG);
+logger.enableCategories(['AUTH', 'CACHE']);
+logger.toggleTimestamps();
+```
+
+**Available Categories**:
+- `AUTH` 🔐 - Authentication and user sessions
+- `CACHE` 🔥 - Firebase cache operations
+- `PICKS` 🎯 - Pick submissions and updates
+- `SURVIVOR` 💀 - Survivor pool operations
+- `CONFIDENCE` 🐝 - Confidence pool operations
+- `GRID` 🎲 - Grid game operations
+- `LEADERBOARD` 🏆 - Leaderboard calculations
+- `AI` 🤖 - AI prediction operations
+- `ESPN` 📊 - ESPN data fetching
+- `FIRESTORE` 📦 - Firestore operations
+
+#### 3. Firebase Cache System (`firebase-cache.js`)
+**Eliminates**: Duplicate cache validation logic in ai-picks-helper.html and help-ai-picks.html
+**Features**: TTL-based validation, two-tier caching (in-memory + Firestore), cache manager
+
+```javascript
+import { cacheManager } from './js/utils/firebase-cache.js';
+
+// Pre-registered caches
+const data = await cacheManager.load('ai-predictions', db);
+await cacheManager.save('ai-predictions', db, newData);
+await cacheManager.clear('ai-predictions', db);
+
+// Custom caches
+cacheManager.registerCache('my-cache', 'path/to/cache', 30); // 30 min TTL
+```
+
+**Pre-Registered Caches**:
+- `ai-predictions` - 15 min TTL at `artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-ai-intel-sheet`
+- `espn-scoreboard` - 6 hour TTL at `cache/espn_current_data`
+
+#### 4. Error Handler (`error-handler.js`)
+**Eliminates**: Inconsistent error handling patterns
+**Features**: Error classification, severity levels, user-friendly messages, recovery suggestions
+
+```javascript
+import { errorHandler } from './js/utils/error-handler.js';
+
+try {
+    await fetchData();
+} catch (error) {
+    const details = errorHandler.handle(error, { category: 'PICKS' });
+    errorHandler.displayError(details, containerElement);
+}
+
+// Or wrap async functions
+const safeFunction = errorHandler.wrapAsync(riskyFunction, { category: 'CACHE' });
+```
+
+**Error Categories**: `firebase`, `network`, `authentication`, `validation`, `permission`, `data`, `unknown`
+**Severity Levels**: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`
+
+#### 5. Team Data (`team-data.js`)
+**Eliminates**: Duplicate team mappings in espnNerdApi.js, core-bundle.js, survivor-bundle.js
+**Features**: 100+ team name variations normalized, complete team analytics database
+
+```javascript
+import { teamData } from './js/utils/team-data.js';
+
+// Team name normalization
+const fullName = teamData.normalizeTeamName('ARI'); // 'Arizona Cardinals'
+const fullName2 = teamData.normalizeTeamName('Cardinals'); // 'Arizona Cardinals'
+
+// Team analytics for AI predictions
+const analytics = teamData.getTeamAnalytics('Buffalo Bills');
+// Returns: { offense: 92, defense: 88, recentForm: 85, homeAdvantage: 3.2, ... }
+
+// Get all teams
+const allTeams = teamData.getAllTeamNames(); // All 32 NFL teams
+```
+
+**Team Name Mappings**:
+- ESPN abbreviations (ARI, ATL, BAL, etc.)
+- Display variations (NO Saints, KC Chiefs, SF 49ers)
+- City-only names (Arizona, Atlanta, Baltimore)
+- Team-only names (Cardinals, Falcons, Ravens)
+
+#### 6. Debug Control (`debug-control.js`)
+**Eliminates**: Manual localStorage manipulation for debugging
+**Features**: One-command debug activation, preset configurations, category-specific debugging
+
+```javascript
+// Browser Console Usage:
+enableDebug()                   // Full debug mode
+disableDebug()                  // Return to INFO level
+debugPreset('cache')            // Cache debugging only
+debugPreset('picks')            // Picks debugging only
+debugPreset('all')              // All systems debug
+showDebugConfig()               // Show current settings
+```
+
+**Debug Presets**:
+- `auth` - Authentication debugging (AUTH, FIRESTORE)
+- `cache` - Cache system debugging (CACHE, FIRESTORE, AI)
+- `picks` - Picks system debugging (PICKS, CONFIDENCE, FIRESTORE, ESPN)
+- `survivor` - Survivor pool debugging (SURVIVOR, FIRESTORE, ESPN)
+- `grid` - Grid system debugging (GRID, FIRESTORE, ESPN)
+- `leaderboard` - Leaderboard debugging (LEADERBOARD, FIRESTORE, CACHE)
+- `ai` - AI system debugging (AI, CACHE, ESPN)
+- `espn` - ESPN data debugging (ESPN, CACHE, FIRESTORE)
+- `all` - Full system debugging (all categories)
+
+### 🎯 Usage Guidelines
+
+**ALWAYS use centralized utilities instead of:**
+- ❌ Hardcoded Firebase configs
+- ❌ Direct console.log statements
+- ❌ Duplicate team mapping objects
+- ❌ Inline error handling logic
+- ❌ Custom cache validation functions
+
+**Migration pattern when encountering duplicates:**
+1. Identify duplicate pattern in code
+2. Check if utility module exists
+3. If yes: Import and use utility
+4. If no: Consider creating new utility module
+5. Update CLAUDE.md with new utility pattern
+
 ## 🎯 Critical Standards
 
 ### 1. Testing BEFORE Deployment
