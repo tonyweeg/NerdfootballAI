@@ -942,8 +942,9 @@
                     this.x = this.baseX;
                     this.y = this.baseY;
                     this.startY = Math.random() * (canvas.height * 0.6) + canvas.height * 0.2;
-                    this.size = Math.random() * 15 + 10;
+                    this.size = Math.random() * 15 + 20;
                     this.speed = team === 'red' ? 2 : -2;
+                    this.baseSpeed = this.speed;
                     this.blink = 0;
                     this.shootCooldown = 0;
                     this.kills = 0;
@@ -1124,9 +1125,11 @@
                             this.stateTimer = 0;
                         }
 
-                        // Check if out of bounds
-                        if ((this.speed > 0 && this.x > canvas.width + 100) || (this.speed < 0 && this.x < -100)) {
-                            return false; // Remove ship
+                        // Wrap around screen edges
+                        if (this.x > canvas.width + 50) {
+                            this.x = -50;
+                        } else if (this.x < -50) {
+                            this.x = canvas.width + 50;
                         }
 
                         return true;
@@ -1187,7 +1190,11 @@
                     // Upgrade every 2 kills, max level 3
                     if (this.kills % 2 === 0 && this.upgradeLevel < 3) {
                         this.upgradeLevel++;
-                        this.size = Math.min(this.size * 1.15, 40); // Grow slightly, cap at 40
+                        this.size = Math.min(this.size * 1.15, 50); // Grow slightly, cap at 50
+                        // Increase speed by 10% each upgrade
+                        const speedMultiplier = 1 + (this.upgradeLevel * 0.1);
+                        this.speed = this.baseSpeed * speedMultiplier;
+                        // Shooting power already enhanced via upgradeLevel in shootCooldown reduction
                     }
                 }
 
@@ -1387,9 +1394,8 @@
                     this.teleporting = false;
                     this.teleportPhase = 0;
 
-                    // Random ship type for variety
-                    const types = ['saucer', 'triangular', 'organic', 'cylindrical'];
-                    this.shipType = types[Math.floor(Math.random() * types.length)];
+                    // Classic saucer type only
+                    this.shipType = 'saucer';
 
                     // Random alien pilot color
                     const alienColors = ['#9933ff', '#33ff99', '#ff9933', '#3399ff', '#ff3399'];
