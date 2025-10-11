@@ -229,6 +229,15 @@
         const auth = getAuth(app);
         const functions = getFunctions(app);
 
+        // Calculate current NFL week dynamically
+        function getCurrentWeek() {
+            const seasonStart = new Date('2025-09-04'); // Week 1 starts Sept 4, 2025
+            const now = new Date();
+            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+        }
+
         // UI Elements
         const signInBtn = document.getElementById('signInBtn');
         const signOutBtn = document.getElementById('signOutBtn');
@@ -243,7 +252,7 @@
         // State
         let currentUser = null;
         let currentGames = {};
-        let selectedWeek = 4; // Default to current week
+        let selectedWeek = getCurrentWeek(); // Dynamic current week calculation
         let autoSaveTimeout = null;
         const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2', 'bEVzcZtSExT8cIjamWnGbWZ3J5s1'];
 
@@ -308,7 +317,7 @@
 
                 if (!gamesSnap.exists()) {
                     log('❌ No games found - creating empty structure', 'error');
-                    currentGames = createEmptyWeekStructure();
+                    currentGames = await createEmptyWeekStructure();
                     await setDoc(gamesRef, currentGames);
                 } else {
                     currentGames = gamesSnap.data();
@@ -322,11 +331,29 @@
             }
         }
 
-        function createEmptyWeekStructure() {
+        async function createEmptyWeekStructure() {
             const games = {};
-            // Dynamic game ID generation based on selected week
             const baseId = selectedWeek * 100;
-            const gameCount = 16; // All weeks have 16 games
+            let gameCount = 16; // Default to 16 games
+
+            // Try to determine game count from existing data or weekly JSON
+            try {
+                // First check if games already exist (shouldn't happen but safety check)
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${selectedWeek}`;
+                const gamesRef = doc(db, gamesPath);
+                const gamesSnap = await getDoc(gamesRef);
+
+                if (gamesSnap.exists()) {
+                    const existingGames = gamesSnap.data();
+                    const existingGameIds = Object.keys(existingGames).filter(k => !k.startsWith('_') && /^\d{3}$/.test(k));
+                    if (existingGameIds.length > 0) {
+                        gameCount = existingGameIds.length;
+                        log(`🔍 Found ${gameCount} existing games, using that count`, 'info');
+                    }
+                }
+            } catch (error) {
+                log(`⚠️ Could not check existing games, using default count of 16`, 'info');
+            }
 
             for (let i = 1; i <= gameCount; i++) {
                 const gameId = (baseId + i).toString();

@@ -926,16 +926,25 @@
                     `;
                 } else if (leaderboardCheck.discrepancies && leaderboardCheck.discrepancies.length > 0) {
                     const badDiscrepancies = leaderboardCheck.discrepancies.length;
+                    const cacheAgeMinutes = leaderboardCheck.cacheAge ? Math.round(leaderboardCheck.cacheAge / 1000 / 60) : 0;
+                    const isRecentCache = cacheAgeMinutes < 15;
+                    const severityColor = isRecentCache ? 'var(--nerd-gold)' : 'var(--nerd-red)';
+                    const severityIcon = isRecentCache ? '⚠️' : '🚨';
+                    const severityTitle = isRecentCache ? 'LEADERBOARD CACHE STALE' : 'LEADERBOARD CACHE SIGNIFICANTLY OUTDATED';
+
                     leaderboardDiv.innerHTML = `
-                        <div style="background: rgba(204, 65, 37, 0.1); border: 1px solid var(--nerd-red); border-radius: 8px; padding: 1rem;">
-                            <h4 style="color: var(--nerd-bright-red); margin-bottom: 0.5rem;">🚨 LEADERBOARD DATA CORRUPTION DETECTED</h4>
+                        <div style="background: rgba(204, 65, 37, 0.1); border: 1px solid ${severityColor}; border-radius: 8px; padding: 1rem;">
+                            <h4 style="color: ${severityColor}; margin-bottom: 0.5rem;">${severityIcon} ${severityTitle}</h4>
                             <p style="color: var(--nerd-silver); font-size: 0.9rem; margin-bottom: 1rem;">
-                                The leaderboard API shows corrupted data for ${badDiscrepancies} users!
-                                Firestore data is correct, but the Cloud Function cache is stale.
+                                The leaderboard API cache differs from Firestore for ${badDiscrepancies} users.
+                                ${isRecentCache ?
+                                    'This is <strong>NORMAL</strong> during the 15-minute cache window after games finish.' :
+                                    'Cache is older than normal - consider regenerating.'
+                                }
                             </p>
 
                             <div style="background: rgba(0, 0, 0, 0.3); padding: 0.8rem; border-radius: 4px; margin-bottom: 1rem;">
-                                <div style="color: var(--nerd-gold); font-size: 0.8rem; margin-bottom: 0.5rem;">EXAMPLES OF CORRUPTED LEADERBOARD DATA:</div>
+                                <div style="color: var(--nerd-gold); font-size: 0.8rem; margin-bottom: 0.5rem;">CACHE VS FIRESTORE DIFFERENCES:</div>
                                 ${leaderboardCheck.discrepancies.slice(0, 3).map(d => `
                                     <div style="color: var(--nerd-white); font-size: 0.8rem; margin-bottom: 0.3rem;">
                                         <strong>${d.name.split('@')[0]}</strong>:
@@ -947,9 +956,12 @@
                             </div>
 
                             <div style="color: var(--nerd-gold); font-size: 0.8rem;">
-                                ⚡ <strong>SOLUTION:</strong> The Cloud Function cache needs to be refreshed or regenerated.
+                                ${isRecentCache ?
+                                    '✅ <strong>NO ACTION NEEDED:</strong> Cache will auto-refresh within 15 minutes of last game finishing.' :
+                                    '⚡ <strong>ACTION RECOMMENDED:</strong> Use straight-cache-homey.html to regenerate Week ' + week + ' cache.'
+                                }
                                 ${leaderboardCheck.isStale ? '<br/>📅 Cache is marked as STALE' : ''}
-                                ${leaderboardCheck.cacheAge ? '<br/>🕐 Cache age: ' + Math.round(leaderboardCheck.cacheAge / 1000 / 60) + ' minutes' : ''}
+                                ${leaderboardCheck.cacheAge ? '<br/>🕐 Cache age: ' + cacheAgeMinutes + ' minutes (15-min TTL)' : ''}
                             </div>
                         </div>
                     `;

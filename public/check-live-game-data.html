@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 LIVE GAME DATA INSPECTOR</title>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #000;
+            color: #0f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* STAR FIELD ANIMATION */
+        #starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        @keyframes starfly {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translate(calc(var(--end-x) - 50%), calc(var(--end-y) - 50%)) scale(var(--size));
+                opacity: 0;
+            }
+        }
+
+        /* CONTENT OVER STARFIELD */
+        .container {
+            position: relative;
+            z-index: 100;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* HEADER */
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 2rem;
+            border-radius: 15px;
+            border: 2px solid #0f0;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-shadow: 0 0 10px #0f0, 0 0 20px #0f0, 0 0 30px #0f0;
+            letter-spacing: 3px;
+            margin-bottom: 0.5rem;
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 10px #0f0, 0 0 20px #0f0, 0 0 30px #0f0; }
+            50% { text-shadow: 0 0 20px #0f0, 0 0 30px #0f0, 0 0 40px #0f0, 0 0 50px #0f0; }
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: #0a0;
+            letter-spacing: 2px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #0f0;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        .control-row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        select, button {
+            font-family: 'JetBrains Mono', monospace;
+            padding: 0.75rem 1.5rem;
+            border: 2px solid #0f0;
+            background: #000;
+            color: #0f0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        select {
+            min-width: 200px;
+        }
+
+        button:hover {
+            background: #0f0;
+            color: #000;
+            box-shadow: 0 0 20px #0f0;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* OUTPUT */
+        #output {
+            position: relative;
+            z-index: 1;
+        }
+
+        .week {
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #0f0;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .week h2 {
+            color: #0f0;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 10px #0f0;
+            border-bottom: 2px solid #0f0;
+            padding-bottom: 0.5rem;
+        }
+
+        .game {
+            margin: 0.75rem 0;
+            padding: 0.75rem;
+            background: rgba(0, 50, 0, 0.3);
+            border-left: 3px solid #0a0;
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+
+        .game:hover {
+            background: rgba(0, 100, 0, 0.4);
+            border-left-color: #0f0;
+            transform: translateX(5px);
+        }
+
+        .winner {
+            color: #0f0;
+            font-weight: bold;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        .no-winner {
+            color: #f00;
+            text-shadow: 0 0 5px #f00;
+        }
+
+        .final {
+            color: #0f0;
+        }
+
+        .scheduled {
+            color: #ff0;
+        }
+
+        .summary {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(0, 50, 0, 0.5);
+            border: 1px solid #0a0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .path-info {
+            text-align: center;
+            color: #0a0;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+
+        code {
+            background: rgba(0, 255, 0, 0.1);
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            color: #0f0;
+        }
+
+        /* LOADING ANIMATION */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            font-size: 1.2rem;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* MILLENNIUM FALCON COCKPIT VIEWPORT */
+        .cockpit-frame {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 999;
+            pointer-events: none;
+        }
+
+        .cockpit-frame::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.8) 80%, rgba(0, 0, 0, 0.95) 100%);
+        }
+
+        .cockpit-frame::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 60px solid rgba(0, 0, 0, 0.9);
+            border-radius: 20px;
+            box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .control-row {
+                flex-direction: column;
+            }
+
+            select, button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="starfield"></div>
+    <div class="cockpit-frame"></div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🔍 LIVE GAME DATA INSPECTOR</h1>
+            <div class="subtitle">FIRESTORE DATABASE ACCESS TERMINAL</div>
+        </div>
+
+        <div class="controls">
+            <div class="path-info">Reading from: <code>artifacts/nerdfootball/public/data/nerdfootball_games/{week}</code></div>
+            <div class="control-row">
+                <select id="weekSelector">
+                    <option value="">Select Week...</option>
+                </select>
+                <button onclick="checkSelectedWeek()">🔍 INSPECT WEEK</button>
+                <button onclick="checkAllWeeks()">🌀 SCAN ALL WEEKS</button>
+            </div>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        // CREATE 3D FLYING STARFIELD (SUBTLE)
+        function createStarfield() {
+            const starfield = document.getElementById('starfield');
+            const numStars = 60; // Reduced from 200
+
+            for (let i = 0; i < numStars; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+
+                // Random size (bigger = closer)
+                const size = Math.random() * 2 + 0.5;
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+
+                // Start at center (50%, 50%)
+                star.style.left = '50%';
+                star.style.top = '50%';
+
+                // Random end position (radial from center)
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 60 + 30; // 30-90% from center (reduced from 50-150)
+                const endX = Math.cos(angle) * distance;
+                const endY = Math.sin(angle) * distance;
+
+                // Much slower speed for subtle movement
+                const speed = Math.random() * 5 + 8; // 8-13 seconds (was 1-3)
+                const delay = Math.random() * 10; // 0-10 second delay (was 0-3)
+
+                // Apply animation with CSS variables
+                star.style.setProperty('--end-x', `${endX}vw`);
+                star.style.setProperty('--end-y', `${endY}vh`);
+                star.style.setProperty('--size', size);
+                star.style.animation = `starfly ${speed}s linear ${delay}s infinite`;
+
+                starfield.appendChild(star);
+            }
+        }
+
+        createStarfield();
+
+        // FIREBASE SETUP
+        firebase.initializeApp(window.getFirebaseConfig());
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        // POPULATE WEEK SELECTOR
+        const weekSelector = document.getElementById('weekSelector');
+        for (let i = 1; i <= 18; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Week ${i}`;
+            weekSelector.appendChild(option);
+        }
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function checkWeek(weekNumber) {
+            await autoLogin();
+
+            const output = document.getElementById('output');
+            const weekDiv = document.createElement('div');
+            weekDiv.className = 'week';
+            weekDiv.innerHTML = `<h2>▶ SCANNING WEEK ${weekNumber}...</h2><div class="loading">⚡ ACCESSING FIRESTORE...</div>`;
+            output.appendChild(weekDiv);
+
+            try {
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`;
+                console.log(`🔍 Checking path: ${gamesPath}`);
+
+                const docRef = firebase.firestore().doc(gamesPath);
+                const docSnap = await docRef.get();
+
+                if (!docSnap.exists) {
+                    weekDiv.innerHTML = `
+                        <h2>WEEK ${weekNumber}</h2>
+                        <p class="no-winner">❌ NO DATA FOUND at ${gamesPath}</p>
+                    `;
+                    return;
+                }
+
+                const weekData = docSnap.data();
+                const gameIds = Object.keys(weekData).filter(key => !key.startsWith('_') && !key.startsWith('game_'));
+
+                let finalGames = 0;
+                let withWinners = 0;
+                let noWinners = 0;
+                let gamesHTML = '';
+
+                gameIds.forEach(gameId => {
+                    const game = weekData[gameId];
+                    const status = game.status || 'unknown';
+                    const winner = game.winner || null;
+                    const isFinal = status.includes('FINAL') || status === 'final';
+
+                    if (isFinal) finalGames++;
+                    if (winner) withWinners++;
+                    else if (isFinal) noWinners++;
+
+                    const statusClass = isFinal ? 'final' : 'scheduled';
+                    const winnerClass = winner ? 'winner' : 'no-winner';
+
+                    gamesHTML += `
+                        <div class="game">
+                            <strong>Game ${gameId}:</strong> ${game.a || game.awayTeam || '?'} @ ${game.h || game.homeTeam || '?'}
+                            - <span class="${statusClass}">${status}</span>
+                            - <span class="${winnerClass}">${winner || 'NO WINNER'}</span>
+                            ${game.awayScore !== undefined ? `(${game.awayScore}-${game.homeScore})` : ''}
+                        </div>
+                    `;
+                });
+
+                weekDiv.innerHTML = `
+                    <h2>WEEK ${weekNumber} DATA</h2>
+                    <p style="color: #0a0; margin-bottom: 1rem;">✅ Found ${gameIds.length} games in database</p>
+                    ${gamesHTML}
+                    <div class="summary">
+                        <strong>📊 SUMMARY:</strong>
+                        ${finalGames} FINAL games |
+                        ${withWinners} with winners |
+                        ${noWinners} missing winners
+                    </div>
+                `;
+
+            } catch (error) {
+                weekDiv.innerHTML = `
+                    <h2>WEEK ${weekNumber}</h2>
+                    <p class="no-winner">❌ ERROR: ${error.message}</p>
+                `;
+                console.error(error);
+            }
+        }
+
+        async function checkAllWeeks() {
+            document.getElementById('output').innerHTML = '';
+            for (let week = 1; week <= 18; week++) {
+                await checkWeek(week);
+                await new Promise(resolve => setTimeout(resolve, 300)); // Stagger animations
+            }
+        }
+
+        async function checkSelectedWeek() {
+            const week = parseInt(weekSelector.value);
+            if (week) {
+                document.getElementById('output').innerHTML = '';
+                await checkWeek(week);
+            } else {
+                alert('⚠️ Please select a week');
+            }
+        }
+
+        console.log('🚀 LIVE GAME DATA INSPECTOR READY');
+    </script>
+</body>
+</html>

@@ -255,36 +255,45 @@ async function triggerUserScoring(week) {
 }
 
 /**
- * Map ESPN game ID to our game ID using team matchups
- * Multiple ESPN games start with 401, so we need team-based mapping
+ * Map ESPN game to our game ID by matching team names against existing games
+ * This ensures backwards compatibility - we never create new games or change IDs
  */
-function mapESPNIdToOurId(espnId, awayTeam, homeTeam) {
-    // Team-based mapping for Week 4 games
-    const teamMapping = {
-        'Seattle Seahawks_Arizona Cardinals': '401',
-        'Minnesota Vikings_Pittsburgh Steelers': '402',
-        'Washington Commanders_Atlanta Falcons': '403',
-        'New Orleans Saints_Buffalo Bills': '404',
-        'Cleveland Browns_Detroit Lions': '405',
-        'Carolina Panthers_New England Patriots': '406',
-        'Los Angeles Chargers_New York Giants': '407',
-        'Philadelphia Eagles_Tampa Bay Buccaneers': '408',
-        'Tennessee Titans_Houston Texans': '409',
-        'Indianapolis Colts_Los Angeles Rams': '410',
-        'Jacksonville Jaguars_San Francisco 49ers': '411',
-        'Baltimore Ravens_Kansas City Chiefs': '412',
-        'Chicago Bears_Las Vegas Raiders': '413',
-        'Green Bay Packers_Dallas Cowboys': '414',
-        'New York Jets_Miami Dolphins': '415',
-        'Cincinnati Bengals_Denver Broncos': '416'
+async function mapESPNGameToOurGame(week, awayTeam, homeTeam, existingGames) {
+    // Normalize team names for comparison (handle variations)
+    const normalizeTeam = (team) => {
+        return team
+            .replace(/^(New York|Los Angeles|LA)\s+/i, '') // Remove city prefix for NY/LA teams
+            .toLowerCase()
+            .trim();
     };
 
-    const matchupKey = `${awayTeam}_${homeTeam}`;
-    const gameId = teamMapping[matchupKey];
+    const espnAway = normalizeTeam(awayTeam);
+    const espnHome = normalizeTeam(homeTeam);
 
-    console.log(`🔍 Mapping: ${matchupKey} → Game ${gameId} (ESPN ID: ${espnId})`);
+    // Search through existing games to find match
+    for (const [gameId, game] of Object.entries(existingGames)) {
+        // Skip metadata fields
+        if (gameId.startsWith('_')) continue;
 
-    return gameId || '000'; // Return 000 if not found
+        // Skip non-game fields
+        if (!/^\d{3,4}$/.test(gameId)) continue;
+
+        const ourAway = normalizeTeam(game.a || game.awayTeam || '');
+        const ourHome = normalizeTeam(game.h || game.homeTeam || '');
+
+        // Check if team names match (contains, not exact match)
+        const awayMatch = ourAway.includes(espnAway) || espnAway.includes(ourAway);
+        const homeMatch = ourHome.includes(espnHome) || espnHome.includes(ourHome);
+
+        if (awayMatch && homeMatch) {
+            console.log(`✅ Matched: ${awayTeam} @ ${homeTeam} → Game ${gameId}`);
+            return gameId;
+        }
+    }
+
+    // If no match found, log warning but don't create game 000
+    console.log(`⚠️  No match found for: ${awayTeam} @ ${homeTeam}`);
+    return null;
 }
 
 /**
@@ -295,33 +304,73 @@ async function monitorESPNScores() {
     console.log(`🏈 ESPN Score Monitor - Week ${currentWeek} - ${new Date().toISOString()}`);
 
     try {
-        // Fetch ESPN data
+        // STEP 1: Load existing games from Firestore first (backwards compatibility)
+        console.log(`📥 Loading existing Week ${currentWeek} games from Firestore...`);
+        const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+        const gamesRef = db.doc(gamesPath);
+        const gamesSnap = await gamesRef.get();
+
+        if (!gamesSnap.exists()) {
+            console.log(`⚠️  No existing games found for Week ${currentWeek} - skipping ESPN sync`);
+            return {
+                week: currentWeek,
+                gamesUpdated: 0,
+                gamesCompleted: 0,
+                completedGameIds: [],
+                error: 'No existing games to update',
+                timestamp: new Date().toISOString()
+            };
+        }
+
+        const existingGames = gamesSnap.data();
+        console.log(`✅ Loaded ${Object.keys(existingGames).filter(k => !k.startsWith('_')).length} existing games`);
+
+        // STEP 2: Fetch ESPN data
         const espnData = await fetchESPNScoreboard(currentWeek);
 
         if (!espnData.events || espnData.events.length === 0) {
-            console.log(`⚠️ No games found for Week ${currentWeek}`);
-            return;
+            console.log(`⚠️ No ESPN games found for Week ${currentWeek}`);
+            return {
+                week: currentWeek,
+                gamesUpdated: 0,
+                gamesCompleted: 0,
+                completedGameIds: [],
+                error: 'No ESPN data available',
+                timestamp: new Date().toISOString()
+            };
         }
 
         let gamesUpdated = 0;
         let gamesCompleted = 0;
+        let gamesSkipped = 0;
         const completedGameIds = [];
 
-        // Process each game
+        // STEP 3: Process each ESPN game
         for (const espnGame of espnData.events) {
             const gameData = parseESPNGame(espnGame);
 
             if (!gameData) {
+                gamesSkipped++;
                 continue;
             }
 
-            // Map ESPN game ID to our game ID format
-            // ESPN uses full IDs like '401772938', we use simplified like '401'
-            const ourGameId = mapESPNIdToOurId(espnGame.id, gameData.awayTeam, gameData.homeTeam);
+            // STEP 4: Match ESPN game to our existing game (backwards compatible)
+            const ourGameId = await mapESPNGameToOurGame(
+                currentWeek,
+                gameData.awayTeam,
+                gameData.homeTeam,
+                existingGames
+            );
+
+            if (!ourGameId) {
+                console.log(`⏭️  Skipping unmapped game: ${gameData.awayTeam} @ ${gameData.homeTeam}`);
+                gamesSkipped++;
+                continue;
+            }
 
             console.log(`🎯 Processing Game ${ourGameId}: ${gameData.awayTeam} @ ${gameData.homeTeam} - ${gameData.status}`);
 
-            // Prepare update data
+            // STEP 5: Prepare update data
             const updates = {
                 status: gameData.status,
                 awayScore: gameData.awayScore,
@@ -335,7 +384,7 @@ async function monitorESPNScores() {
                 lastPlay: gameData.lastPlay
             };
 
-            // Update in Firestore
+            // STEP 6: Update in Firestore
             const success = await updateGameInFirestore(currentWeek, ourGameId, updates);
 
             if (success) {
@@ -354,7 +403,7 @@ async function monitorESPNScores() {
             }
         }
 
-        console.log(`✅ Monitor complete: ${gamesUpdated} games updated, ${gamesCompleted} games completed`);
+        console.log(`✅ Monitor complete: ${gamesUpdated} games updated, ${gamesSkipped} games skipped, ${gamesCompleted} games completed`);
 
         // If any games completed, trigger user scoring
         if (gamesCompleted > 0) {
@@ -364,6 +413,7 @@ async function monitorESPNScores() {
         return {
             week: currentWeek,
             gamesUpdated,
+            gamesSkipped,
             gamesCompleted,
             completedGameIds,
             timestamp: new Date().toISOString()

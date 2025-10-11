@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗑️ Delete Game 000</title>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: #1a1a1a;
+            color: #0f0;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            background: #000;
+            border: 2px solid #0f0;
+            border-radius: 10px;
+            padding: 30px;
+        }
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px #0f0;
+        }
+        button {
+            background: #f00;
+            color: #fff;
+            border: 2px solid #f00;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        button:hover {
+            background: #ff3333;
+        }
+        button:disabled {
+            background: #666;
+            border-color: #666;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            background: rgba(0, 255, 0, 0.1);
+        }
+        .error {
+            border-color: #f00;
+            background: rgba(255, 0, 0, 0.1);
+            color: #f00;
+        }
+        .success {
+            border-color: #0f0;
+            background: rgba(0, 255, 0, 0.1);
+            color: #0f0;
+        }
+        pre {
+            background: #000;
+            border: 1px solid #333;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ DELETE GAME 000 - WEEK 6</h1>
+
+        <div class="status">
+            <strong>⚠️ WARNING:</strong> This will permanently delete game "000" from Week 6 Firestore data.
+            <br><br>
+            <strong>Path:</strong> <code>artifacts/nerdfootball/public/data/nerdfootball_games/6</code>
+        </div>
+
+        <button id="deleteBtn" onclick="deleteGame000()">🚨 DELETE GAME 000 NOW</button>
+        <button id="verifyBtn" onclick="verifyDeletion()" disabled>✅ VERIFY DELETION</button>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        firebase.initializeApp(window.getFirebaseConfig());
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        const deleteBtn = document.getElementById('deleteBtn');
+        const verifyBtn = document.getElementById('verifyBtn');
+        const output = document.getElementById('output');
+
+        const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2', 'bEVzcZtSExT8cIjamWnGbWZ3J5s1'];
+
+        // Check admin auth
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await auth.signInWithPopup(provider);
+                return;
+            }
+
+            if (!ADMIN_UIDS.includes(user.uid)) {
+                output.innerHTML = '<div class="status error"><strong>❌ ACCESS DENIED:</strong> Admin access required</div>';
+                deleteBtn.disabled = true;
+                return;
+            }
+
+            output.innerHTML = '<div class="status success"><strong>✅ AUTHENTICATED:</strong> ' + user.email + '</div>';
+        });
+
+        async function deleteGame000() {
+            try {
+                output.innerHTML = '<div class="status">🔄 Deleting game 000...</div>';
+                deleteBtn.disabled = true;
+
+                const week6Path = 'artifacts/nerdfootball/public/data/nerdfootball_games/6';
+                const week6Ref = db.doc(week6Path);
+
+                // Delete the 000 field
+                await week6Ref.update({
+                    '000': firebase.firestore.FieldValue.delete()
+                });
+
+                output.innerHTML = '<div class="status success"><strong>✅ SUCCESS:</strong> Game 000 deleted from Week 6</div>';
+                verifyBtn.disabled = false;
+
+            } catch (error) {
+                output.innerHTML = '<div class="status error"><strong>❌ ERROR:</strong> ' + error.message + '</div>';
+                console.error(error);
+                deleteBtn.disabled = false;
+            }
+        }
+
+        async function verifyDeletion() {
+            try {
+                output.innerHTML = '<div class="status">🔍 Verifying deletion...</div>';
+
+                const week6Path = 'artifacts/nerdfootball/public/data/nerdfootball_games/6';
+                const week6Ref = db.doc(week6Path);
+                const week6Snap = await week6Ref.get();
+
+                if (!week6Snap.exists()) {
+                    output.innerHTML = '<div class="status error"><strong>❌ ERROR:</strong> Week 6 document not found</div>';
+                    return;
+                }
+
+                const games = week6Snap.data();
+                const gameIds = Object.keys(games).filter(k => !k.startsWith('_'));
+
+                let gamesHTML = '<div class="status success">';
+                gamesHTML += '<strong>✅ VERIFICATION:</strong> Week 6 now has ' + gameIds.length + ' games<br><br>';
+                gamesHTML += '<pre>';
+
+                gameIds.sort((a, b) => parseInt(a) - parseInt(b)).forEach(id => {
+                    const game = games[id];
+                    gamesHTML += 'Game ' + id + ': ' + (game.a || '?') + ' @ ' + (game.h || '?') + '\n';
+                });
+
+                gamesHTML += '</pre>';
+
+                if (games['000']) {
+                    gamesHTML += '<br><strong>⚠️ WARNING:</strong> Game 000 still exists!';
+                } else {
+                    gamesHTML += '<br><strong>✅ CONFIRMED:</strong> Game 000 does not exist';
+                }
+
+                gamesHTML += '</div>';
+                output.innerHTML = gamesHTML;
+
+            } catch (error) {
+                output.innerHTML = '<div class="status error"><strong>❌ ERROR:</strong> ' + error.message + '</div>';
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

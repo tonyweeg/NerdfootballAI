@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 FIX Week 4 Game 401 - SEA Winner</title>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+        .status { margin: 20px 0; padding: 15px; border: 1px solid #0f0; background: #000; }
+        .error { color: #f00; border-color: #f00; }
+        .success { color: #0f0; border-color: #0f0; }
+        button { background: #f00; color: #fff; padding: 15px 30px; margin: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        button:hover { background: #ff3333; }
+        pre { background: #000; padding: 10px; border: 1px solid #0f0; }
+    </style>
+</head>
+<body>
+    <h1>🔧 FIX WEEK 4 GAME 401 - SEATTLE WINNER</h1>
+
+    <div class="status">
+        <h3>CURRENT PROBLEM:</h3>
+        <p>Game 401 (SEA @ ARI) showing WRONG winner in Firestore</p>
+        <p><strong>ESPN Result:</strong> Seahawks 23, Cardinals 20</p>
+        <p><strong>Path:</strong> <code>artifacts/nerdfootball/public/data/nerdfootball_games/4</code></p>
+    </div>
+
+    <button onclick="fixGame401()">🚨 FIX GAME 401 NOW</button>
+    <button onclick="verifyFix()">✅ VERIFY FIX</button>
+
+    <div id="output"></div>
+
+    <script>
+        firebase.initializeApp(window.getFirebaseConfig());
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        async function autoLogin() {
+            return new Promise((resolve) => {
+                const unsubscribe = window.auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('🔓 AUTHENTICATED:', user.email);
+                        unsubscribe();
+                        resolve(user);
+                    } else {
+                        console.log('🔐 Signing in...');
+                        try {
+                            const provider = new firebase.auth.GoogleAuthProvider();
+                            await window.auth.signInWithPopup(provider);
+                        } catch (error) {
+                            console.error('❌ SIGN IN FAILED:', error);
+                        }
+                    }
+                });
+            });
+        }
+
+        async function fixGame401() {
+            await autoLogin();
+
+            const output = document.getElementById('output');
+            output.innerHTML = '<div class="status"><h3>🔧 FIXING GAME 401...</h3>';
+
+            try {
+                const gamesPath = 'artifacts/nerdfootball/public/data/nerdfootball_games/4';
+                const docRef = firebase.firestore().doc(gamesPath);
+
+                // Read current data
+                const docSnap = await docRef.get();
+                if (!docSnap.exists) {
+                    throw new Error('Week 4 games document not found!');
+                }
+
+                const weekData = docSnap.data();
+                const game401 = weekData['401'];
+
+                output.innerHTML += `<p>📊 CURRENT Game 401 data:</p><pre>${JSON.stringify(game401, null, 2)}</pre>`;
+
+                // Update with correct data
+                const correctedGame = {
+                    ...game401,
+                    winner: 'Seattle Seahawks',
+                    awayScore: 23,
+                    homeScore: 20,
+                    status: 'FINAL',
+                    lastUpdated: new Date().toISOString(),
+                    correctedBy: 'Manual Fix - SEA won 23-20'
+                };
+
+                // Save to Firestore
+                await docRef.update({
+                    '401': correctedGame
+                });
+
+                output.innerHTML += `<p class="success">✅ FIXED! Game 401 updated with:</p>`;
+                output.innerHTML += `<pre>${JSON.stringify(correctedGame, null, 2)}</pre>`;
+                output.innerHTML += `<p class="success"><strong>Winner now correctly set to: Seattle Seahawks</strong></p>`;
+
+            } catch (error) {
+                output.innerHTML += `<p class="error">❌ ERROR: ${error.message}</p>`;
+                console.error(error);
+            }
+
+            output.innerHTML += '</div>';
+        }
+
+        async function verifyFix() {
+            await autoLogin();
+
+            const output = document.getElementById('output');
+            output.innerHTML = '<div class="status"><h3>✅ VERIFYING FIX...</h3>';
+
+            try {
+                const gamesPath = 'artifacts/nerdfootball/public/data/nerdfootball_games/4';
+                const docRef = firebase.firestore().doc(gamesPath);
+                const docSnap = await docRef.get();
+
+                if (!docSnap.exists) {
+                    throw new Error('Week 4 games not found');
+                }
+
+                const weekData = docSnap.data();
+                const game401 = weekData['401'];
+
+                output.innerHTML += `<p>📊 CURRENT Game 401 data:</p><pre>${JSON.stringify(game401, null, 2)}</pre>`;
+
+                if (game401.winner === 'Seattle Seahawks') {
+                    output.innerHTML += `<p class="success">✅ VERIFIED: Winner is correctly set to Seattle Seahawks</p>`;
+                    output.innerHTML += `<p class="success">✅ Score: ${game401.awayScore} - ${game401.homeScore}</p>`;
+                } else {
+                    output.innerHTML += `<p class="error">❌ STILL WRONG: Winner is ${game401.winner}</p>`;
+                }
+
+            } catch (error) {
+                output.innerHTML += `<p class="error">❌ ERROR: ${error.message}</p>`;
+                console.error(error);
+            }
+
+            output.innerHTML += '</div>';
+        }
+
+        window.addEventListener('load', () => {
+            console.log('🚀 Ready to fix Game 401');
+        });
+    </script>
+</body>
+</html>
