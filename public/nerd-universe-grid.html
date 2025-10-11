@@ -1164,7 +1164,25 @@
             const pick = userPicks[gameId];
             const isGameComplete = isGameCompleted(game);
             const isGameLive = isGameInProgress(game);
-            const isCorrect = isGameComplete && game.winner === pick.winner;
+
+            // 🔥 TIE GAME LOGIC: Check if game ended in a tie
+            const isTie = isGameComplete && (
+                game.winner === 'TIE' ||
+                game.winner === 'TIE/OT' ||
+                game.winner === 'DRAW' ||
+                (game.awayScore !== undefined && game.homeScore !== undefined &&
+                 game.awayScore === game.homeScore && game.awayScore > 0)
+            );
+
+            // If it's a tie, user is correct if they picked EITHER team in this game
+            let isCorrect;
+            if (isTie) {
+                const gameTeams = [game.h, game.a]; // home and away teams
+                isCorrect = gameTeams.includes(pick.winner);
+                console.log(`🎯 TIE GAME ${gameId}: ${game.a} @ ${game.h} ended ${game.awayScore}-${game.homeScore}. User picked ${pick.winner}, isCorrect: ${isCorrect}`);
+            } else {
+                isCorrect = isGameComplete && game.winner === pick.winner;
+            }
 
             if (shouldHidePick) {
                 return `<td class="pick-cell pick-pending">-</td>`;
@@ -1290,9 +1308,21 @@
                     gameIds.forEach(gameId => {
                         const pick = userPicks[gameId];
                         const game = bibleData[gameId];
-                        if (pick && game.winner && game.winner !== 'TBD' && game.winner === pick.winner) {
-                            points += pick.confidence || 0;
-                            correctPicks++;
+                        if (pick && game.winner && game.winner !== 'TBD') {
+                            // 🔥 TIE GAME LOGIC: Check if game ended in a tie
+                            const isTie = game.winner === 'TIE' ||
+                                          game.winner === 'TIE/OT' ||
+                                          game.winner === 'DRAW' ||
+                                          (game.awayScore !== undefined && game.homeScore !== undefined &&
+                                           game.awayScore === game.homeScore && game.awayScore > 0);
+
+                            const gameTeams = [game.h, game.a]; // home and away teams
+                            const isCorrect = isTie ? gameTeams.includes(pick.winner) : (game.winner === pick.winner);
+
+                            if (isCorrect) {
+                                points += pick.confidence || 0;
+                                correctPicks++;
+                            }
                         }
                     });
                 }
@@ -1490,7 +1520,16 @@
                     confidenceSum += pick.confidence;
 
                     if (game.winner && game.winner !== 'TBD') {
-                        const isCorrect = game.winner === pick.winner;
+                        // 🔥 TIE GAME LOGIC: Check if game ended in a tie
+                        const isTie = game.winner === 'TIE' ||
+                                      game.winner === 'TIE/OT' ||
+                                      game.winner === 'DRAW' ||
+                                      (game.awayScore !== undefined && game.homeScore !== undefined &&
+                                       game.awayScore === game.homeScore && game.awayScore > 0);
+
+                        const gameTeams = [game.h, game.a]; // home and away teams
+                        const isCorrect = isTie ? gameTeams.includes(pick.winner) : (game.winner === pick.winner);
+
                         if (isCorrect) {
                             correctPicks++;
                             totalPointsEarned += pick.confidence;
@@ -1530,7 +1569,20 @@
                 }
 
                 const isGameComplete = game.winner && game.winner !== 'TBD';
-                const isCorrect = isGameComplete && game.winner === pick.winner;
+
+                // 🔥 TIE GAME LOGIC: Check if game ended in a tie
+                let isCorrect = false;
+                if (isGameComplete) {
+                    const isTie = game.winner === 'TIE' ||
+                                  game.winner === 'TIE/OT' ||
+                                  game.winner === 'DRAW' ||
+                                  (game.awayScore !== undefined && game.homeScore !== undefined &&
+                                   game.awayScore === game.homeScore && game.awayScore > 0);
+
+                    const gameTeams = [game.h, game.a]; // home and away teams
+                    isCorrect = isTie ? gameTeams.includes(pick.winner) : (game.winner === pick.winner);
+                }
+
                 const bgColor = isGameComplete ? (isCorrect ? 'bg-gray-100 border-gray-300' : 'bg-gray-800 border-gray-600') : 'bg-nerd-darker border-nerd-grey';
                 const textColor = isGameComplete ? (isCorrect ? 'text-gray-900' : 'text-gray-300') : 'text-nerd-grey';
 
@@ -1569,8 +1621,18 @@
                 const game = bibleData[gameId];
 
                 if (pick && pick.winner && pick.confidence && game && game.winner && game.winner !== 'TBD') {
+                    // 🔥 TIE GAME LOGIC: Check if game ended in a tie
+                    const isTie = game.winner === 'TIE' ||
+                                  game.winner === 'TIE/OT' ||
+                                  game.winner === 'DRAW' ||
+                                  (game.awayScore !== undefined && game.homeScore !== undefined &&
+                                   game.awayScore === game.homeScore && game.awayScore > 0);
+
+                    const gameTeams = [game.h, game.a]; // home and away teams
+                    const isCorrect = isTie ? gameTeams.includes(pick.winner) : (pick.winner === game.winner);
+
                     // Game is complete, check if pick is correct
-                    if (pick.winner === game.winner) {
+                    if (isCorrect) {
                         totalPoints += parseInt(pick.confidence) || 0;
                     }
                 }
@@ -1599,17 +1661,35 @@
                 let currentCorrectPick = false;
 
                 if (isGameComplete) {
-                    if (clickedPick && clickedPick.winner === game.winner) {
-                        clickedGameScore = parseInt(clickedPick.confidence) || 0;
-                        clickedCorrectPick = true;
-                        clickedScore += clickedGameScore;
-                        clickedCorrect++;
+                    // 🔥 TIE GAME LOGIC: Check if game ended in a tie
+                    const isTie = game.winner === 'TIE' ||
+                                  game.winner === 'TIE/OT' ||
+                                  game.winner === 'DRAW' ||
+                                  (game.awayScore !== undefined && game.homeScore !== undefined &&
+                                   game.awayScore === game.homeScore && game.awayScore > 0);
+
+                    const gameTeams = [game.h, game.a]; // home and away teams
+
+                    // Check clicked user's pick
+                    if (clickedPick) {
+                        const isCorrect = isTie ? gameTeams.includes(clickedPick.winner) : (clickedPick.winner === game.winner);
+                        if (isCorrect) {
+                            clickedGameScore = parseInt(clickedPick.confidence) || 0;
+                            clickedCorrectPick = true;
+                            clickedScore += clickedGameScore;
+                            clickedCorrect++;
+                        }
                     }
-                    if (currentPick && currentPick.winner === game.winner) {
-                        currentGameScore = parseInt(currentPick.confidence) || 0;
-                        currentCorrectPick = true;
-                        currentScore += currentGameScore;
-                        currentCorrect++;
+
+                    // Check current user's pick
+                    if (currentPick) {
+                        const isCorrect = isTie ? gameTeams.includes(currentPick.winner) : (currentPick.winner === game.winner);
+                        if (isCorrect) {
+                            currentGameScore = parseInt(currentPick.confidence) || 0;
+                            currentCorrectPick = true;
+                            currentScore += currentGameScore;
+                            currentCorrect++;
+                        }
                     }
                 }
 
