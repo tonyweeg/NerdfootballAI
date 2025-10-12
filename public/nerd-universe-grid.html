@@ -259,18 +259,18 @@
             opacity: 0.9;
         }
 
-        /* Tony Highlight */
-        .tony-row {
-            background: linear-gradient(135deg, rgba(0, 206, 209, 0.15) 0%, rgba(52, 152, 219, 0.15) 100%) !important;
-            border-left: 3px solid #00ced1 !important;
-            box-shadow: 0 0 15px rgba(0, 206, 209, 0.3);
+        /* Current User Highlight - Golden Hue */
+        .current-user-row {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(218, 165, 32, 0.15) 100%) !important;
+            border-left: 3px solid #ffd700 !important;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
         }
 
-        .tony-row .user-name {
-            background: linear-gradient(135deg, #00ced1 0%, #20b2aa 100%) !important;
-            color: #ffffff !important;
+        .current-user-row .user-name {
+            background: linear-gradient(135deg, #ffd700 0%, #daa520 100%) !important;
+            color: #000000 !important;
             font-weight: 900 !important;
-            border-right: 2px solid #00ced1 !important;
+            border-right: 2px solid #ffd700 !important;
         }
 
         /* Terminal Header */
@@ -606,8 +606,8 @@
             <button class="toggle-button" onclick="toggleAllColumns()">
                 👁️ TOGGLE ALL
             </button>
-            <button class="toggle-button" id="sort-toggle" onclick="toggleSort()">
-                📊 SORT BY SCORE
+            <button class="toggle-button active" id="sort-toggle" onclick="toggleSort()">
+                📊 SORTED BY SCORE
             </button>
             <button class="toggle-button" onclick="showCacheStatus()">
                 🔥 CACHE STATUS
@@ -682,7 +682,7 @@
         let allPicks = {};
         let gameIds = [];
         let isLoadingWeek = false;
-        let sortByScore = false;
+        let sortByScore = true;
 
         // Column grouping state
         let columnGroups = {
@@ -1127,20 +1127,43 @@
                 previousScore = player.score;
             });
 
+            // Extract current user row to pin at top
+            const currentUserIndex = playerRankings.findIndex(p => p.isCurrentUser);
+            let currentUserRow = null;
+            if (currentUserIndex !== -1) {
+                currentUserRow = playerRankings.splice(currentUserIndex, 1)[0];
+            }
+
             let rowsHTML = '';
 
+            // Render current user first if exists
+            if (currentUserRow) {
+                rowsHTML += `<tr class="current-user-row">`;
+                rowsHTML += `<td class="place-column">${currentUserRow.place}</td>`;
+                rowsHTML += `<td class="user-name" onclick="showUserDetails('${currentUserRow.memberId}')">
+                    👤 ${currentUserRow.member.name || currentUserRow.member.email || 'Unknown'}
+                </td>`;
+
+                gameIds.forEach(gameId => {
+                    rowsHTML += createPickCellHTML(gameId, currentUserRow.userPicks, currentUserRow.memberId);
+                });
+
+                rowsHTML += `<td class="total-column">${currentUserRow.score}</td>`;
+                rowsHTML += `</tr>`;
+            }
+
+            // Render remaining players
             playerRankings.forEach(player => {
-                rowsHTML += `<tr ${player.isTony ? 'class="tony-row"' : ''}>`;
+                rowsHTML += `<tr>`;
                 rowsHTML += `<td class="place-column">${player.place}</td>`;
                 rowsHTML += `<td class="user-name" onclick="showUserDetails('${player.memberId}')">
-                    ${player.isTony ? '👤 ' : ''}${player.member.name || player.member.email || 'Unknown'}
+                    ${player.member.name || player.member.email || 'Unknown'}
                 </td>`;
 
                 gameIds.forEach(gameId => {
                     rowsHTML += createPickCellHTML(gameId, player.userPicks, player.memberId);
                 });
 
-                // Add total column
                 rowsHTML += `<td class="total-column">${player.score}</td>`;
                 rowsHTML += `</tr>`;
             });
