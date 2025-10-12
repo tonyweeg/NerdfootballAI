@@ -1166,20 +1166,25 @@
             const isGameLive = isGameInProgress(game);
 
             // 🔥 TIE GAME LOGIC: Check if game ended in a tie
+            // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
             const isTie = isGameComplete && (
-                game.winner === 'TIE' ||
-                game.winner === 'TIE/OT' ||
-                game.winner === 'DRAW' ||
+                (game.winner && (
+                    game.winner.toUpperCase() === 'TIE' ||
+                    game.winner.toUpperCase() === 'TIE/OT' ||
+                    game.winner.toUpperCase() === 'DRAW' ||
+                    game.winner.toUpperCase().includes('TIE')
+                )) ||
                 (game.awayScore !== undefined && game.homeScore !== undefined &&
-                 game.awayScore === game.homeScore && game.awayScore > 0)
+                 parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                 parseInt(game.awayScore) > 0)
             );
 
-            // If it's a tie, user is correct if they picked EITHER team in this game
+            // If it's a tie, EVERYONE who made a pick gets credit (scoring already handles this)
             let isCorrect;
             if (isTie) {
-                const gameTeams = [game.h, game.a]; // home and away teams
-                isCorrect = gameTeams.includes(pick.winner);
-                console.log(`🎯 TIE GAME ${gameId}: ${game.a} @ ${game.h} ended ${game.awayScore}-${game.homeScore}. User picked ${pick.winner}, isCorrect: ${isCorrect}`);
+                // In a tie, anyone who made a pick for this game is correct
+                isCorrect = true;
+                console.log(`🎯 TIE GAME DETECTED - Game ${gameId}: ${game.a} @ ${game.h} (${game.awayScore}-${game.homeScore}). User picked ${pick.winner}, gets credit!`);
             } else {
                 isCorrect = isGameComplete && game.winner === pick.winner;
             }
@@ -1310,14 +1315,19 @@
                         const game = bibleData[gameId];
                         if (pick && game.winner && game.winner !== 'TBD') {
                             // 🔥 TIE GAME LOGIC: Check if game ended in a tie
-                            const isTie = game.winner === 'TIE' ||
-                                          game.winner === 'TIE/OT' ||
-                                          game.winner === 'DRAW' ||
+                            // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
+                            const isTie = (game.winner && (
+                                              game.winner.toUpperCase() === 'TIE' ||
+                                              game.winner.toUpperCase() === 'TIE/OT' ||
+                                              game.winner.toUpperCase() === 'DRAW' ||
+                                              game.winner.toUpperCase().includes('TIE')
+                                          )) ||
                                           (game.awayScore !== undefined && game.homeScore !== undefined &&
-                                           game.awayScore === game.homeScore && game.awayScore > 0);
+                                           parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                                           parseInt(game.awayScore) > 0);
 
-                            const gameTeams = [game.h, game.a]; // home and away teams
-                            const isCorrect = isTie ? gameTeams.includes(pick.winner) : (game.winner === pick.winner);
+                            // In a tie, EVERYONE who made a pick is correct
+                            const isCorrect = isTie ? true : (game.winner === pick.winner);
 
                             if (isCorrect) {
                                 points += pick.confidence || 0;
@@ -1521,14 +1531,19 @@
 
                     if (game.winner && game.winner !== 'TBD') {
                         // 🔥 TIE GAME LOGIC: Check if game ended in a tie
-                        const isTie = game.winner === 'TIE' ||
-                                      game.winner === 'TIE/OT' ||
-                                      game.winner === 'DRAW' ||
+                        // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
+                        const isTie = (game.winner && (
+                                          game.winner.toUpperCase() === 'TIE' ||
+                                          game.winner.toUpperCase() === 'TIE/OT' ||
+                                          game.winner.toUpperCase() === 'DRAW' ||
+                                          game.winner.toUpperCase().includes('TIE')
+                                      )) ||
                                       (game.awayScore !== undefined && game.homeScore !== undefined &&
-                                       game.awayScore === game.homeScore && game.awayScore > 0);
+                                       parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                                       parseInt(game.awayScore) > 0);
 
-                        const gameTeams = [game.h, game.a]; // home and away teams
-                        const isCorrect = isTie ? gameTeams.includes(pick.winner) : (game.winner === pick.winner);
+                        // In a tie, EVERYONE who made a pick is correct
+                        const isCorrect = isTie ? true : (game.winner === pick.winner);
 
                         if (isCorrect) {
                             correctPicks++;
@@ -1571,16 +1586,21 @@
                 const isGameComplete = game.winner && game.winner !== 'TBD';
 
                 // 🔥 TIE GAME LOGIC: Check if game ended in a tie
+                // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
                 let isCorrect = false;
                 if (isGameComplete) {
-                    const isTie = game.winner === 'TIE' ||
-                                  game.winner === 'TIE/OT' ||
-                                  game.winner === 'DRAW' ||
+                    const isTie = (game.winner && (
+                                      game.winner.toUpperCase() === 'TIE' ||
+                                      game.winner.toUpperCase() === 'TIE/OT' ||
+                                      game.winner.toUpperCase() === 'DRAW' ||
+                                      game.winner.toUpperCase().includes('TIE')
+                                  )) ||
                                   (game.awayScore !== undefined && game.homeScore !== undefined &&
-                                   game.awayScore === game.homeScore && game.awayScore > 0);
+                                   parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                                   parseInt(game.awayScore) > 0);
 
-                    const gameTeams = [game.h, game.a]; // home and away teams
-                    isCorrect = isTie ? gameTeams.includes(pick.winner) : (game.winner === pick.winner);
+                    // In a tie, EVERYONE who made a pick is correct
+                    isCorrect = isTie ? true : (game.winner === pick.winner);
                 }
 
                 const bgColor = isGameComplete ? (isCorrect ? 'bg-gray-100 border-gray-300' : 'bg-gray-800 border-gray-600') : 'bg-nerd-darker border-nerd-grey';
@@ -1622,14 +1642,19 @@
 
                 if (pick && pick.winner && pick.confidence && game && game.winner && game.winner !== 'TBD') {
                     // 🔥 TIE GAME LOGIC: Check if game ended in a tie
-                    const isTie = game.winner === 'TIE' ||
-                                  game.winner === 'TIE/OT' ||
-                                  game.winner === 'DRAW' ||
+                    // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
+                    const isTie = (game.winner && (
+                                      game.winner.toUpperCase() === 'TIE' ||
+                                      game.winner.toUpperCase() === 'TIE/OT' ||
+                                      game.winner.toUpperCase() === 'DRAW' ||
+                                      game.winner.toUpperCase().includes('TIE')
+                                  )) ||
                                   (game.awayScore !== undefined && game.homeScore !== undefined &&
-                                   game.awayScore === game.homeScore && game.awayScore > 0);
+                                   parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                                   parseInt(game.awayScore) > 0);
 
-                    const gameTeams = [game.h, game.a]; // home and away teams
-                    const isCorrect = isTie ? gameTeams.includes(pick.winner) : (pick.winner === game.winner);
+                    // In a tie, EVERYONE who made a pick is correct
+                    const isCorrect = isTie ? true : (pick.winner === game.winner);
 
                     // Game is complete, check if pick is correct
                     if (isCorrect) {
@@ -1661,18 +1686,20 @@
                 let currentCorrectPick = false;
 
                 if (isGameComplete) {
-                    // 🔥 TIE GAME LOGIC: Check if game ended in a tie
-                    const isTie = game.winner === 'TIE' ||
-                                  game.winner === 'TIE/OT' ||
-                                  game.winner === 'DRAW' ||
+                    // 🔥 TIE GAME LOGIC: Check if game ended in a tie - EVERYONE gets credit
+                    const isTie = (game.winner && (
+                                      game.winner.toUpperCase() === 'TIE' ||
+                                      game.winner.toUpperCase() === 'TIE/OT' ||
+                                      game.winner.toUpperCase() === 'DRAW' ||
+                                      game.winner.toUpperCase().includes('TIE')
+                                  )) ||
                                   (game.awayScore !== undefined && game.homeScore !== undefined &&
-                                   game.awayScore === game.homeScore && game.awayScore > 0);
-
-                    const gameTeams = [game.h, game.a]; // home and away teams
+                                   parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                                   parseInt(game.awayScore) > 0);
 
                     // Check clicked user's pick
                     if (clickedPick) {
-                        const isCorrect = isTie ? gameTeams.includes(clickedPick.winner) : (clickedPick.winner === game.winner);
+                        const isCorrect = isTie ? true : (clickedPick.winner === game.winner);
                         if (isCorrect) {
                             clickedGameScore = parseInt(clickedPick.confidence) || 0;
                             clickedCorrectPick = true;
@@ -1683,7 +1710,7 @@
 
                     // Check current user's pick
                     if (currentPick) {
-                        const isCorrect = isTie ? gameTeams.includes(currentPick.winner) : (currentPick.winner === game.winner);
+                        const isCorrect = isTie ? true : (currentPick.winner === game.winner);
                         if (isCorrect) {
                             currentGameScore = parseInt(currentPick.confidence) || 0;
                             currentCorrectPick = true;
