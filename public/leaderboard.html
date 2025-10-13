@@ -497,15 +497,28 @@
                         pickResults[gameId] = { isValid: false, isCorrect: false };
                     } else if (pick.winner && bibleData && bibleData[gameId]) {
                         // Compare user pick with bible result
-                        const actualWinner = bibleData[gameId].winner;
+                        const game = bibleData[gameId];
                         const userPick = pick.winner;
-                        const isCorrect = actualWinner === userPick;
+
+                        // 🔥 TIE GAME LOGIC: Check if game ended in a tie (EXACT same logic as Cloud Function and Grid)
+                        // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
+                        const isTie = (game.winner && (
+                            game.winner.toUpperCase() === 'TIE' ||
+                            game.winner.toUpperCase() === 'TIE/OT' ||
+                            game.winner.toUpperCase() === 'DRAW' ||
+                            game.winner.toUpperCase().includes('TIE')
+                        )) || (game.awayScore !== undefined && game.homeScore !== undefined &&
+                               parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                               parseInt(game.awayScore) > 0);
+
+                        // In a tie, EVERYONE who made a pick is correct
+                        const isCorrect = isTie ? true : (game.winner === userPick);
 
                         pickResults[gameId] = {
                             isValid: true,
                             isCorrect: isCorrect,
                             userPick: userPick,
-                            actualWinner: actualWinner
+                            actualWinner: game.winner
                         };
 
                         totalValidPicks++;

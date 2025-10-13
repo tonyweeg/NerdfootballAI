@@ -233,11 +233,31 @@ async function generateWeeklyLeaderboardData(weekNumber) {
                 // Calculate score from each pick
                 for (const gameId of pickGameIds) {
                     const pick = userPicks[gameId];
-                    if (pick && pick.winner && bibleData[gameId]) {
-                        const actualWinner = bibleData[gameId].winner;
-                        const userPick = pick.winner;
+                    const game = bibleData[gameId];
+
+                    // Check if game is completed (has winner OR has equal scores indicating tie)
+                    const gameIsCompleted = game && (
+                        (game.winner && game.winner !== 'TBD') ||
+                        (game.awayScore !== undefined && game.homeScore !== undefined &&
+                         parseInt(game.awayScore) === parseInt(game.homeScore) && parseInt(game.awayScore) > 0)
+                    );
+
+                    if (pick && pick.winner && gameIsCompleted) {
                         const confidence = pick.confidence || 0;
-                        const isCorrect = actualWinner === userPick;
+
+                        // 🔥 TIE GAME LOGIC: Check if game ended in a tie (EXACT Grid logic)
+                        // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
+                        const isTie = (game.winner && (
+                            game.winner.toUpperCase() === 'TIE' ||
+                            game.winner.toUpperCase() === 'TIE/OT' ||
+                            game.winner.toUpperCase() === 'DRAW' ||
+                            game.winner.toUpperCase().includes('TIE')
+                        )) || (game.awayScore !== undefined && game.homeScore !== undefined &&
+                               parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                               parseInt(game.awayScore) > 0);
+
+                        // In a tie, EVERYONE who made a pick is correct
+                        const isCorrect = isTie ? true : (game.winner === pick.winner);
 
                         if (isCorrect) {
                             correctPicks++;
@@ -296,6 +316,7 @@ async function generateWeeklyLeaderboardData(weekNumber) {
 
 /**
  * Analyze game states to determine which are live, completed, upcoming
+ * MATCHES THE GRID'S LOGIC EXACTLY - nerd-universe-grid.html lines 2052-2072
  */
 async function analyzeGameStates(bibleData) {
     const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata');
@@ -306,10 +327,23 @@ async function analyzeGameStates(bibleData) {
 
     for (const gameId of gameIds) {
         const game = bibleData[gameId];
-        // Game is completed if status is final (includes ties where winner is null)
-        if (game.status === 'STATUS_FINAL' || game.status === 'final') {
+
+        // Normalize status to lowercase for case-insensitive comparison
+        const status = (game.status || '').toLowerCase();
+
+        // Game is completed (EXACT Grid logic)
+        const isCompleted = status === 'final' ||
+                           status === 'final/ot' ||
+                           status === 'status_final' ||
+                           (game.winner && game.winner !== 'TBD');
+
+        // Game is in progress (EXACT Grid logic)
+        const isInProgress = status === 'in_progress' ||
+                            status === 'halftime';
+
+        if (isCompleted) {
             completed++;
-        } else if (game.status === 'IN_PROGRESS' || game.status === 'HALFTIME') {
+        } else if (isInProgress) {
             live++;
         } else {
             upcoming++;

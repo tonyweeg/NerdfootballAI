@@ -89,6 +89,16 @@
         .form-btn:hover {
             background-image: linear-gradient(to bottom, #475569, #1e293b);
         }
+        /* Gold highlight for correct picks */
+        .gold-glow {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #ffd700 100%);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.3);
+            animation: subtle-pulse 2s ease-in-out infinite;
+        }
+        @keyframes subtle-pulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.3); }
+            50% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), 0 0 25px rgba(255, 215, 0, 0.4); }
+        }
     </style>
 </head>
 <body class="bg-slate-200 text-slate-800">
@@ -732,7 +742,20 @@
                 games.forEach(game => {
                     const awayAbbr = TEAM_ABBREVIATIONS[game.away] || game.away;
                     const homeAbbr = TEAM_ABBREVIATIONS[game.home] || game.home;
-                    tableHTML += `<th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">${awayAbbr}@${homeAbbr}</th>`;
+                    const winner = gameResults[game.id];
+
+                    // Bold the winning team, normal for losing team
+                    let awayDisplay = awayAbbr;
+                    let homeDisplay = homeAbbr;
+                    if (winner) {
+                        if (winner === game.away) {
+                            awayDisplay = `<span class="font-bold">${awayAbbr}</span>`;
+                        } else if (winner === game.home) {
+                            homeDisplay = `<span class="font-bold">${homeAbbr}</span>`;
+                        }
+                    }
+
+                    tableHTML += `<th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">${awayDisplay}<br>@<br>${homeDisplay}</th>`;
                 });
                 tableHTML += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
 
@@ -826,7 +849,7 @@
                                     <div class="text-xs text-gray-600">${pick.confidence}</div>
                                 </div>`;
                                 if(gameResults[game.id]){
-                                    cellClass = pick.winner === gameResults[game.id] ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                                    cellClass = pick.winner === gameResults[game.id] ? 'gold-glow' : 'bg-red-100 text-red-800';
                                 }
                             }
                         }
