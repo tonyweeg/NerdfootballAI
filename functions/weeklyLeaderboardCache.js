@@ -11,9 +11,10 @@ if (!initializeApp.apps || initializeApp.apps.length === 0) {
 }
 const db = getFirestore();
 
-// Cache configuration - Smart caching: Past weeks cached, current week always fresh
-const CACHE_DURATION_PAST_WEEKS_MS = 24 * 60 * 60 * 1000; // 24 hours for past weeks (data won't change)
+// Cache configuration - Smart caching: Current week fresh, previous week updating, past weeks locked
 const CACHE_DURATION_CURRENT_WEEK_MS = 0; // ZERO CACHE for current week (always fresh)
+const CACHE_DURATION_PREVIOUS_WEEK_MS = 5 * 60 * 1000; // 5 minutes for previous week (MNF/SNF updates)
+const CACHE_DURATION_PAST_WEEKS_MS = 24 * 60 * 60 * 1000; // 24 hours for past weeks (final data)
 const CACHE_PATH_PREFIX = 'cache/weekly_leaderboard_2025_week_';
 
 /**
@@ -27,9 +28,12 @@ exports.generateWeeklyLeaderboardCache = onRequest(
         const startTime = Date.now();
 
         try {
-            // Determine cache duration based on whether this is current week or past week
+            // Determine cache duration: current week (0ms), previous week (5min), past weeks (24h)
             const currentWeekNum = getCurrentWeekNumber();
-            const cacheDuration = weekNumber === currentWeekNum ? CACHE_DURATION_CURRENT_WEEK_MS : CACHE_DURATION_PAST_WEEKS_MS;
+            const isPreviousWeek = weekNumber === (currentWeekNum - 1);
+            const cacheDuration = weekNumber === currentWeekNum ? CACHE_DURATION_CURRENT_WEEK_MS :
+                                 isPreviousWeek ? CACHE_DURATION_PREVIOUS_WEEK_MS :
+                                 CACHE_DURATION_PAST_WEEKS_MS;
 
             // Check if we have recent cached data
             const cacheRef = db.doc(`${CACHE_PATH_PREFIX}${weekNumber}`);
@@ -101,9 +105,12 @@ exports.getWeeklyLeaderboard = onRequest(
         const startTime = Date.now();
 
         try {
-            // Determine cache duration based on whether this is current week or past week
+            // Determine cache duration: current week (0ms), previous week (5min), past weeks (24h)
             const currentWeekNum = getCurrentWeekNumber();
-            const cacheDuration = weekNumber === currentWeekNum ? CACHE_DURATION_CURRENT_WEEK_MS : CACHE_DURATION_PAST_WEEKS_MS;
+            const isPreviousWeek = weekNumber === (currentWeekNum - 1);
+            const cacheDuration = weekNumber === currentWeekNum ? CACHE_DURATION_CURRENT_WEEK_MS :
+                                 isPreviousWeek ? CACHE_DURATION_PREVIOUS_WEEK_MS :
+                                 CACHE_DURATION_PAST_WEEKS_MS;
 
             // Get cached data
             const cacheRef = db.doc(`${CACHE_PATH_PREFIX}${weekNumber}`);

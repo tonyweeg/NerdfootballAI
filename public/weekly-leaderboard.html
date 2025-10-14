@@ -988,6 +988,84 @@
             text-shadow: 0 0 15px rgba(255, 0, 128, 0.6);
             font-weight: bold;
         }
+
+        /* Game Results Grid */
+        .grid {
+            display: grid;
+        }
+        .grid-cols-1 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+        .gap-4 {
+            gap: 1rem;
+        }
+        @media (min-width: 768px) {
+            .md\:grid-cols-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        .game-result-card {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            border: 2px solid #333;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .game-result-card.completed {
+            border-color: #00ff41;
+        }
+
+        .game-result-card.live {
+            border-color: #ff0080;
+            animation: liveGlow 2s ease-in-out infinite;
+        }
+
+        .game-matchup {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .game-team {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .game-team.winner {
+            color: #00ff41;
+            font-weight: bold;
+        }
+
+        .game-team.loser {
+            color: #666;
+        }
+
+        .game-score {
+            font-size: 1.2rem;
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .game-status {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .game-status.final {
+            color: #00ff41;
+        }
+
+        .game-status.live {
+            color: #ff0080;
+        }
     </style>
 </head>
 
@@ -1075,6 +1153,14 @@
                     </div>
                 </div>
 
+                <!-- Game Results Section -->
+                <div id="game-results" class="wu-tang-panel p-6 mb-6">
+                    <h2 class="text-xl font-bold terminal-text mb-4">🏈 GAME RESULTS</h2>
+                    <div id="game-results-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+
                 <!-- Full Leaderboard Table -->
                 <div id="full-leaderboard" class="wu-tang-panel p-6">
                     <div class="flex justify-between items-center mb-6">
@@ -1116,16 +1202,21 @@
         </div>
     </main>
 
+
     <!-- Firebase SDK and Authentication -->
     <script type="module">
         import { getFirebaseConfig } from './js/config/firebase-config.js';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { gameStatusChecker } from './js/utils/game-status.js';
 
         // Initialize Firebase
         const app = initializeApp(getFirebaseConfig());
         const auth = getAuth(app);
+        const db = getFirestore(app);
         window.auth = auth;
+        window.db = db;
 
         // Global variables
         let currentWeek = window.getMostRecentWeekWithData();
@@ -1188,61 +1279,143 @@
             document.getElementById('week-down').disabled = currentWeek <= 1;
         }
 
-        // Load weekly leaderboard data
+        // Load weekly leaderboard data - CLIENT-SIDE CALCULATION (SAME AS GRID)
         async function loadWeeklyLeaderboard() {
             try {
                 showLoading();
-                console.log(`🔥 WEEKLY LEADERBOARD: Loading Week ${currentWeek} leaderboard...`);
+                console.log(`🔥 WEEKLY LEADERBOARD: Loading Week ${currentWeek} data from Firestore...`);
                 console.log(`📍 Date: ${new Date().toISOString()}`);
-                console.log(`📊 Fetching from Cloud Function for Week ${currentWeek}`);
 
-                const cacheBuster = Date.now();
-                const response = await fetch(`https://getweeklyleaderboard-np7uealtnq-uc.a.run.app?week=${currentWeek}&t=${cacheBuster}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Cache-Control': 'no-cache, no-store, must-revalidate',
-                        'Pragma': 'no-cache'
-                    }
-                });
+                // Load pool members
+                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersDoc = await getDoc(doc(db, poolMembersPath));
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                if (!membersDoc.exists()) {
+                    throw new Error('Pool members not found');
                 }
 
-                const result = await response.json();
-                console.log('🎮 Response from backend:', result);
+                const poolMembers = membersDoc.data();
+                const memberIds = Object.keys(poolMembers);
 
-                if (result.success) {
-                    leaderboardData = result.data;
+                // Load game bible data
+                const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const gamesDoc = await getDoc(doc(db, gamesPath));
 
-                    // Check if week has meaningful data (games started or completed)
-                    const hasGamesStarted = result.data.gameStates &&
-                        (result.data.gameStates.live > 0 || result.data.gameStates.completed > 0);
-                    const hasScores = result.data.metadata && result.data.metadata.highScore > 0;
+                if (!gamesDoc.exists()) {
+                    throw new Error(`No games data found for Week ${currentWeek}`);
+                }
 
-                    if (!hasGamesStarted && !hasScores && result.data.gameStates.upcoming > 0) {
-                        // Week hasn't started yet - show helpful message
-                        showNoDataMessage(currentWeek, result.data);
-                    } else {
-                        renderWeeklyLeaderboard(leaderboardData);
+                const bibleData = gamesDoc.data();
+                const gameIds = Object.keys(bibleData).filter(k => !k.startsWith('_') && k !== '000');
 
-                        // Auto-refresh disabled per user request
-                        // if (leaderboardData.gameStates.live > 0) {
-                        //     startLiveUpdates();
-                        // } else {
-                        //     stopLiveUpdates();
-                        // }
+                // Analyze game states
+                const gameStates = analyzeGameStates(bibleData);
+
+                // Calculate scores for each user - SAME LOGIC AS GRID
+                const standings = [];
+
+                for (const memberId of memberIds) {
+                    const memberInfo = poolMembers[memberId];
+                    const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`;
+                    const userPicksDoc = await getDoc(doc(db, picksPath));
+
+                    let userData = {
+                        userId: memberId,
+                        name: memberInfo.name || memberInfo.email || 'Unknown',
+                        email: memberInfo.email,
+                        totalPoints: 0,
+                        correctPicks: 0,
+                        totalPicks: 0,
+                        pickAccuracy: 0,
+                        hasPicks: false
+                    };
+
+                    if (userPicksDoc.exists()) {
+                        const userPicks = userPicksDoc.data();
+                        const pickGameIds = Object.keys(userPicks).filter(key =>
+                            !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints',
+                              'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated',
+                              'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key)
+                        );
+
+                        let totalPoints = 0;
+                        let correctPicks = 0;
+
+                        // EXACT GRID SCORING LOGIC
+                        gameIds.forEach(gameId => {
+                            const pick = userPicks[gameId];
+                            const game = bibleData[gameId];
+
+                            if (pick && pick.winner && pick.confidence && game) {
+                                if (game.winner && game.winner !== 'TBD') {
+                                    // TIE LOGIC (EXACT GRID LOGIC)
+                                    const isTie = (game.winner && (
+                                        game.winner.toUpperCase() === 'TIE' ||
+                                        game.winner.toUpperCase() === 'TIE/OT' ||
+                                        game.winner.toUpperCase() === 'DRAW' ||
+                                        game.winner.toUpperCase().includes('TIE')
+                                    )) || (game.awayScore !== undefined && game.homeScore !== undefined &&
+                                           parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                                           parseInt(game.awayScore) > 0);
+
+                                    const isCorrect = isTie ? true : (game.winner === pick.winner);
+
+                                    if (isCorrect) {
+                                        correctPicks++;
+                                        totalPoints += pick.confidence;
+                                    }
+                                }
+                            }
+                        });
+
+                        userData = {
+                            ...userData,
+                            totalPoints,
+                            correctPicks,
+                            totalPicks: pickGameIds.length,
+                            pickAccuracy: pickGameIds.length > 0 ? ((correctPicks / pickGameIds.length) * 100) : 0,
+                            hasPicks: true
+                        };
                     }
-                } else if (result.regenerating) {
-                    // Cache not found - backend is generating fresh data
-                    console.log('🔄 Backend is regenerating cache for Week', currentWeek);
-                    showNoDataMessage(currentWeek, {
-                        gameStates: { upcoming: 1 },
-                        metadata: { highScore: 0 }
-                    });
+
+                    standings.push(userData);
+                }
+
+                // Sort by total points
+                standings.sort((a, b) => b.totalPoints - a.totalPoints);
+
+                // Add rankings
+                standings.forEach((user, index) => {
+                    user.rank = index + 1;
+                    user.pointsFromLeader = index === 0 ? 0 : standings[0].totalPoints - user.totalPoints;
+                });
+
+                leaderboardData = {
+                    type: 'weekly',
+                    week: currentWeek,
+                    generatedAt: new Date().toISOString(),
+                    standings: standings,
+                    gameStates: gameStates,
+                    metadata: {
+                        totalUsers: memberIds.length,
+                        totalGames: gameIds.length,
+                        liveGames: gameStates.live,
+                        completedGames: gameStates.completed,
+                        highScore: standings.length > 0 ? standings[0].totalPoints : 0,
+                        usersWithPicks: standings.filter(u => u.hasPicks).length
+                    }
+                };
+
+                // Check if week has meaningful data (games started or completed)
+                const hasGamesStarted = leaderboardData.gameStates &&
+                    (leaderboardData.gameStates.live > 0 || leaderboardData.gameStates.completed > 0);
+                const hasScores = leaderboardData.metadata && leaderboardData.metadata.highScore > 0;
+
+                if (!hasGamesStarted && !hasScores && leaderboardData.gameStates.upcoming > 0) {
+                    // Week hasn't started yet - show helpful message
+                    showNoDataMessage(currentWeek, leaderboardData);
                 } else {
-                    throw new Error(result.error || 'Failed to load leaderboard');
+                    renderWeeklyLeaderboard(leaderboardData);
                 }
 
             } catch (error) {
@@ -1502,7 +1675,7 @@
                 row.innerHTML = `
                     <td class="py-3 px-2 terminal-text font-bold">${rankDisplay}</td>
                     <td class="py-3 px-2">
-                        <div class="terminal-text font-semibold">${user.name.split('@')[0]}</div>
+                        <div class="terminal-text font-semibold" style="cursor: pointer; text-decoration: underline;" onclick="showPlayerDetails('${user.userId}', '${user.name.replace(/'/g, "\\'")}')">${user.name.split('@')[0]}</div>
                         ${!user.hasPicks ? '<span class="text-xs terminal-muted">No picks</span>' : ''}
                     </td>
                     <td class="text-center py-3 px-2 terminal-accent text-lg font-bold">${user.totalPoints}</td>
@@ -1547,6 +1720,37 @@
                 clearInterval(updateInterval);
                 updateInterval = null;
             }
+        }
+
+        // Analyze game states (EXACT GRID LOGIC)
+        function analyzeGameStates(bibleData) {
+            const gameIds = Object.keys(bibleData).filter(k => !k.startsWith('_') && k !== '000');
+
+            let live = 0;
+            let completed = 0;
+            let upcoming = 0;
+
+            for (const gameId of gameIds) {
+                const game = bibleData[gameId];
+                const status = (game.status || '').toLowerCase();
+
+                const isCompleted = status === 'final' ||
+                                   status === 'final/ot' ||
+                                   status === 'status_final' ||
+                                   (game.winner && game.winner !== 'TBD');
+
+                const isInProgress = status === 'in_progress' || status === 'halftime';
+
+                if (isCompleted) {
+                    completed++;
+                } else if (isInProgress) {
+                    live++;
+                } else {
+                    upcoming++;
+                }
+            }
+
+            return { live, completed, upcoming };
         }
 
         // Utility functions - Use the correct NFL week calculation (same as window.getCurrentNFLWeek)

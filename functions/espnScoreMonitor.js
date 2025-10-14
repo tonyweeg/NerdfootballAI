@@ -310,7 +310,7 @@ async function monitorESPNScores() {
         const gamesRef = db.doc(gamesPath);
         const gamesSnap = await gamesRef.get();
 
-        if (!gamesSnap.exists()) {
+        if (!gamesSnap.exists) {
             console.log(`⚠️  No existing games found for Week ${currentWeek} - skipping ESPN sync`);
             return {
                 week: currentWeek,
@@ -376,6 +376,7 @@ async function monitorESPNScores() {
                 awayScore: gameData.awayScore,
                 homeScore: gameData.homeScore,
                 winner: gameData.winner,
+                gameTime: gameData.startTime, // Store as gameTime for consistency
                 lastUpdated: gameData.lastUpdated,
                 // Enhanced in-progress details
                 gameDetail: gameData.gameDetail,
