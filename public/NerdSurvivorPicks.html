@@ -395,6 +395,11 @@
         console.log('🚀 SURVIVOR_DEBUG: Script loading started');
         const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
 
+        // 👑 GOD MODE: Check URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const GOD_MODE = urlParams.get('godmode') === 'true';
+        console.log(`👑 GOD_MODE: ${GOD_MODE ? 'ENABLED' : 'DISABLED'}`);
+
         let currentUser = null;
         let isAuthenticated = false;
         let userSurvivorData = null;
@@ -411,7 +416,8 @@
             if (user) {
                 currentUser = user;
                 isAuthenticated = true;
-                authStatus.innerHTML = `✅ ${user.email?.split('@')[0] || 'User'}`;
+                const godModeIndicator = GOD_MODE && ADMIN_UIDS.includes(user.uid) ? ' 👑 GOD MODE' : '';
+                authStatus.innerHTML = `✅ ${user.email?.split('@')[0] || 'User'}${godModeIndicator}`;
                 await initializeUserInterface();
             } else {
                 authStatus.innerHTML = `❌ Please sign in`;
@@ -430,6 +436,16 @@
                 // PHASE 1: Load centralized survivor status FIRST
                 console.log('💀 SURVIVOR_INIT: Step 1 - Loading survivor status...');
                 userSurvivorStatus = await loadUserSurvivorStatus();
+
+                // 👑 GOD MODE: Admin bypass for eliminated status
+                if (GOD_MODE && ADMIN_UIDS.includes(currentUser.uid)) {
+                    console.log('👑 GOD_MODE: Admin user bypassing elimination check');
+                    if (userSurvivorStatus.isEliminated) {
+                        console.log('👑 GOD_MODE: Overriding ELIMINATED status → treating as ALIVE');
+                        userSurvivorStatus.isAlive = true;
+                        userSurvivorStatus.isEliminated = false;
+                    }
+                }
 
                 // PHASE 2: Route based on survivor status
                 if (userSurvivorStatus.isEliminated) {
@@ -907,8 +923,8 @@
 
             if (!weekGames || !window.easternTimeParser) {
                 gameInfoContent.innerHTML = `
-                    <div class="text-center p-4 bg-gray-50 rounded-lg">
-                        <p class="text-gray-600">Game information not available</p>
+                    <div class="text-center p-4 bg-chamber-surface rounded-lg border border-chamber-border">
+                        <p class="chamber-bone">Game information not available</p>
                     </div>
                 `;
                 return;
@@ -930,12 +946,12 @@
                     }
 
                     html += `
-                        <div class="flex items-center justify-between p-3 ${hasStarted ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'} rounded-lg">
+                        <div class="flex items-center justify-between p-3 ${hasStarted ? 'bg-chamber-shadow border border-chamber-death' : 'bg-chamber-surface border border-chamber-border'} rounded-lg">
                             <div>
-                                <div class="font-medium">${game.a} @ ${game.h}</div>
-                                <div class="text-sm text-gray-600">${gameTime}</div>
+                                <div class="font-medium chamber-bone">${game.a} @ ${game.h}</div>
+                                <div class="text-sm chamber-muted">${gameTime}</div>
                             </div>
-                            <div class="text-sm font-medium ${hasStarted ? 'text-red-600' : 'text-blue-600'}">
+                            <div class="text-sm font-medium ${hasStarted ? 'chamber-death' : 'chamber-blood'}">
                                 ${hasStarted ? '🔴 Started' : '🟢 Upcoming'}
                             </div>
                         </div>
@@ -951,9 +967,9 @@
                 const minutesUntil = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
 
                 html = `
-                    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-                        <div class="font-bold text-yellow-800">⏰ Picks lock in ${hoursUntil}h ${minutesUntil}m</div>
-                        <div class="text-sm text-yellow-600">First game starts ${window.easternTimeParser.formatGameTime(firstGameTime)}</div>
+                    <div class="mb-4 p-4 bg-chamber-shadow border border-chamber-blood rounded-lg text-center">
+                        <div class="font-bold chamber-blood glow-text">⏰ Picks lock in ${hoursUntil}h ${minutesUntil}m</div>
+                        <div class="text-sm chamber-bone">First game starts ${window.easternTimeParser.formatGameTime(firstGameTime)}</div>
                     </div>
                 ` + html;
             }

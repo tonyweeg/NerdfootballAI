@@ -146,9 +146,16 @@ class EasternTimeParserV2 {
      */
     getTimeUntilGameStart(espnTimestamp) {
         try {
-            const gameTimeUTC = this.parseESPNTimestamp(espnTimestamp);
-            const nowUTC = new Date();
-            return gameTimeUTC.getTime() - nowUTC.getTime();
+            // Bible data has wrong timezone - subtract 4 hours to get correct game time
+            const cleanTime = espnTimestamp.replace('Z', '');
+            const wrongTime = new Date(cleanTime);
+            const correctedGameTime = new Date(wrongTime.getTime() - (4 * 60 * 60 * 1000));
+            const now = new Date();
+            const timeUntil = correctedGameTime.getTime() - now.getTime();
+
+            console.log(`⏰ TIME_UNTIL: Game at ${correctedGameTime.toLocaleString()}, Now: ${now.toLocaleString()}, Until: ${Math.floor(timeUntil / (1000 * 60 * 60))}h ${Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60))}m`);
+
+            return timeUntil;
         } catch (error) {
             console.error('Error calculating time until game:', error);
             return -1; // Assume started

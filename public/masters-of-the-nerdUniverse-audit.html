@@ -523,6 +523,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
+    <!-- Eastern Time Parser for accurate game start detection -->
+    <script src="easternTimeParser-v2.js"></script>
+
     <script>
         // Initialize Firebase
         firebase.initializeApp(window.getFirebaseConfig());
@@ -1110,16 +1113,24 @@
                 const currentWeek = getCurrentWeekNumber();
                 console.log(`🏈 Loading current week (${currentWeek}) survivor picks for alive players...`);
 
-                // Check if current week has started by loading bible data
+                // Check if current week has started using Eastern Time Parser (DYNAMIC DETECTION)
                 const bibleData = await loadBibleData(currentWeek);
                 let weekHasStarted = false;
 
-                if (bibleData) {
+                if (bibleData && window.easternTimeParser) {
                     const games = Object.values(bibleData).filter(g => g && typeof g === 'object');
-                    weekHasStarted = games.some(game => game.status === 'in_progress' || game.status === 'final' || game.status === 'FINAL' || game.started === true);
+                    // Use Eastern Time Parser to check if ANY game has started
+                    weekHasStarted = games.some(game => {
+                        if (game.dt) {
+                            const hasStarted = window.easternTimeParser.hasGameStarted(game.dt);
+                            console.log(`  🎯 Game ${game.a} @ ${game.h}: ${game.dt} → ${hasStarted ? 'STARTED ✅' : 'NOT STARTED 🔒'}`);
+                            return hasStarted;
+                        }
+                        return false;
+                    });
                     console.log(`🏈 Current week ${currentWeek} has ${weekHasStarted ? 'STARTED ✅' : 'NOT STARTED 🔒'}`);
                 } else {
-                    console.warn(`⚠️ No bible data for Week ${currentWeek}`);
+                    console.warn(`⚠️ No bible data or Eastern Time Parser for Week ${currentWeek}`);
                 }
 
                 const currentWeekPicks = {};
