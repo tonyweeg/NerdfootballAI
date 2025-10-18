@@ -120,6 +120,7 @@
             80%, 100% { content: ''; }
         }
     </style>
+    <script src="./js/utils/logger.js"></script>
 </head>
 <body class="min-h-screen text-terminal-text">
     <!-- Starry Background -->
@@ -256,7 +257,7 @@
         async function loadSeasonLeaderboard() {
             try {
                 showLoading();
-                console.log('⚡ Loading season data with real-time calculation...');
+                logger.leaderboard('⚡ Loading season data with real-time calculation...');
                 const startTime = Date.now();
 
                 // Load pool members for validation
@@ -268,7 +269,7 @@
                         poolMembers = membersSnap.data();
                     }
                 } catch (e) {
-                    console.warn('Could not load pool members:', e);
+                    logger.warn('LEADERBOARD', 'Could not load pool members:', e);
                 }
 
                 // Batch load all user names in one query (MUCH FASTER!)
@@ -285,9 +286,9 @@
                         userEmails[userDoc.id] = userData.email || userData.emailAddress || 'No Email';
                     });
 
-                    console.log(`✅ Loaded ${usersSnap.size} total users in batch`);
+                    logger.leaderboard(`✅ Loaded ${usersSnap.size} total users in batch`);
                 } catch (e) {
-                    console.warn('Could not batch load users:', e);
+                    logger.warn('LEADERBOARD', 'Could not batch load users:', e);
                 }
 
                 // Initialize season totals for all users
@@ -296,13 +297,13 @@
 
                 // Process each week (1-18)
                 for (let weekNumber = 1; weekNumber <= 18; weekNumber++) {
-                    console.log(`📊 Processing Week ${weekNumber}...`);
+                    logger.leaderboard(`📊 Processing Week ${weekNumber}...`);
 
                     try {
                         // Load bible data for this week
                         const bibleData = await loadBibleData(weekNumber);
                         if (!bibleData) {
-                            console.warn(`No bible data for Week ${weekNumber}, skipping...`);
+                            logger.warn('LEADERBOARD', `No bible data for Week ${weekNumber}, skipping...`);
                             continue;
                         }
 
@@ -312,7 +313,7 @@
                         const picksSnap = await getDocs(picksCollection);
 
                         if (picksSnap.size === 0) {
-                            console.warn(`No picks for Week ${weekNumber}, skipping...`);
+                            logger.warn('LEADERBOARD', `No picks for Week ${weekNumber}, skipping...`);
                             continue;
                         }
 
@@ -365,7 +366,7 @@
                         });
 
                     } catch (error) {
-                        console.warn(`Error processing Week ${weekNumber}:`, error);
+                        logger.warn('LEADERBOARD', `Error processing Week ${weekNumber}:`, error);
                     }
                 }
 
@@ -402,14 +403,14 @@
                     metadata: metadata
                 };
 
-                console.log(`✅ Real-time calculation completed in ${Date.now() - startTime}ms`);
-                console.log(`📊 Processed ${seasonData.length} users across ${metadata.totalWeeks} weeks`);
+                logger.leaderboard(`✅ Real-time calculation completed in ${Date.now() - startTime}ms`);
+                logger.leaderboard(`📊 Processed ${seasonData.length} users across ${metadata.totalWeeks} weeks`);
 
                 processLeaderboardData(fakeLeaderboardData);
                 showContent();
 
             } catch (error) {
-                console.error('❌ Error loading leaderboard:', error);
+                logger.error('LEADERBOARD', '❌ Error loading leaderboard:', error);
                 showError(error.message);
             }
         }
@@ -440,7 +441,7 @@
         }
 
         async function loadBibleData(weekNumber) {
-            console.log(`🔍 Loading Week ${weekNumber} bible data from Firestore...`);
+            logger.leaderboard(`🔍 Loading Week ${weekNumber} bible data from Firestore...`);
 
             try {
                 // Load from Firestore (single source of truth)
@@ -448,16 +449,16 @@
                 const gamesSnap = await getDoc(gamesRef);
 
                 if (!gamesSnap.exists()) {
-                    console.warn(`No games found for Week ${weekNumber} in Firestore`);
+                    logger.warn('LEADERBOARD', `No games found for Week ${weekNumber} in Firestore`);
                     return null;
                 }
 
                 const bibleData = gamesSnap.data();
-                console.log(`✅ Loaded Week ${weekNumber} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
+                logger.leaderboard(`✅ Loaded Week ${weekNumber} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
 
                 return bibleData;
             } catch (error) {
-                console.error(`❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
+                logger.error('LEADERBOARD', `❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
                 return null;
             }
         }

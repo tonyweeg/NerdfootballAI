@@ -622,6 +622,7 @@
             text-shadow: 0 0 20px rgba(137, 207, 240, 0.8), 0 0 30px rgba(137, 207, 240, 0.5);
         }
     </style>
+    <script src="./js/utils/logger.js"></script>
 </head>
 
 <body class="min-h-screen">
@@ -747,7 +748,7 @@
 
                 const currentUserId = auth.currentUser?.uid;
                 const currentWeekNum = getCurrentWeekNumber();
-                console.log('⚔️ GRID SECURITY INIT:', {
+                logger.grid('⚔️ GRID SECURITY INIT:', {
                     authenticatedUser: auth.currentUser?.uid || 'none',
                     fallbackToTony: currentUserId,
                     currentWeek: currentWeekNum,
@@ -757,7 +758,7 @@
                 await loadPoolMembers();
 
                 // ALWAYS LOAD FRESH DATA - NO CACHE
-                console.log('🔥 Loading fresh grid data from Firestore (cache disabled)');
+                logger.grid('🔥 Loading fresh grid data from Firestore (cache disabled)');
                 await loadBibleData();
                 await loadAllPicks();
 
@@ -769,7 +770,7 @@
                 setupWeekNavigation();
                 hideLoading();
             } catch (error) {
-                console.error('❌ Error initializing grid:', error);
+                logger.error('GRID', '❌ Error initializing grid:', error);
                 showError('GRID LOAD FAILED. REFRESH PAGE.');
             }
         }
@@ -819,7 +820,7 @@
                 }
             }
 
-            console.log('⏱️ COUNTDOWN:', { notStartedCount, incompleteCount, nextGameTime, totalGames: gameIds.length });
+            logger.grid('⏱️ COUNTDOWN:', { notStartedCount, incompleteCount, nextGameTime, totalGames: gameIds.length });
 
             // Update both countdown displays
             const countdownElement = document.getElementById('next-game-countdown');
@@ -878,20 +879,20 @@
 
         // Force refresh grid - delete cache and reload data
         window.forceRefreshGrid = async function() {
-            console.log('🔄 FORCE_REFRESH: User clicked refresh button');
+            logger.grid('🔄 FORCE_REFRESH: User clicked refresh button');
 
             try {
                 // Delete the cache for current week
                 const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
-                console.log('🗑️ FORCE_REFRESH: Deleting cache at', cachePath);
+                logger.grid('🗑️ FORCE_REFRESH: Deleting cache at', cachePath);
                 await deleteDoc(doc(db, cachePath));
-                console.log('✅ FORCE_REFRESH: Cache deleted');
+                logger.grid('✅ FORCE_REFRESH: Cache deleted');
 
                 // Show loading state
                 document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="text-center p-4 text-nerd-grey">🔄 REFRESHING DATA...</td></tr>';
 
                 // Reload fresh data (bypass cache)
-                console.log('🔥 FORCE_REFRESH: Loading fresh data from Firestore');
+                logger.grid('🔥 FORCE_REFRESH: Loading fresh data from Firestore');
                 await loadBibleData();
                 await loadAllPicks();
 
@@ -902,11 +903,11 @@
                 // Save new cache
                 await saveFirebaseCachedGrid();
 
-                console.log('✅ FORCE_REFRESH: Complete! Fresh data loaded and cached');
+                logger.grid('✅ FORCE_REFRESH: Complete! Fresh data loaded and cached');
                 alert('✅ Grid refreshed with latest data!');
 
             } catch (error) {
-                console.error('❌ FORCE_REFRESH: Error:', error);
+                logger.error('GRID', '❌ FORCE_REFRESH: Error:', error);
                 alert('❌ Refresh failed: ' + error.message);
             }
         }
@@ -924,7 +925,7 @@
 
             try {
                 // ALWAYS LOAD FRESH DATA - NO CACHE
-                console.log('🔥 Loading fresh data for week', currentWeek);
+                logger.grid('🔥 Loading fresh data for week', currentWeek);
                 await loadBibleData();
                 await loadAllPicks();
                 renderGrid();
@@ -933,7 +934,7 @@
 
                 updateWeekButtons();
             } catch (error) {
-                console.error('❌ Error loading Week', currentWeek, 'data:', error);
+                logger.error('GRID', '❌ Error loading Week', currentWeek, 'data:', error);
                 showError(`WEEK ${currentWeek} LOAD FAILED.`);
             }
         }
@@ -980,12 +981,12 @@
 
                 if (membersDoc.exists()) {
                     poolMembers = membersDoc.data();
-                    console.log('✅ Pool members loaded:', Object.keys(poolMembers).length);
+                    logger.grid('✅ Pool members loaded:', Object.keys(poolMembers).length);
                 } else {
                     throw new Error('Pool members not found');
                 }
             } catch (error) {
-                console.error('❌ FIREBASE ERROR in loadPoolMembers():', error);
+                logger.error('GRID', '❌ FIREBASE ERROR in loadPoolMembers():', error);
                 throw error;
             }
         }
@@ -993,12 +994,12 @@
         // Load bible data for current week
         async function loadBibleData() {
             if (isLoadingWeek) {
-                console.log(`⏸️ Week ${currentWeek} already loading, skipping...`);
+                logger.grid(`⏸️ Week ${currentWeek} already loading, skipping...`);
                 return;
             }
 
             isLoadingWeek = true;
-            console.log(`🔄 Loading Week ${currentWeek} bible data...`);
+            logger.grid(`🔄 Loading Week ${currentWeek} bible data...`);
 
             try {
                 const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
@@ -1025,9 +1026,9 @@
                     })
                     .sort((a, b) => parseInt(a) - parseInt(b));
 
-                console.log('✅ Bible data loaded:', gameIds.length, 'games for Week', currentWeek);
+                logger.grid('✅ Bible data loaded:', gameIds.length, 'games for Week', currentWeek);
             } catch (error) {
-                console.error('❌ Error loading bible data:', error);
+                logger.error('GRID', '❌ Error loading bible data:', error);
                 throw error;
             } finally {
                 isLoadingWeek = false;
@@ -1037,7 +1038,7 @@
         // Load all picks for current week
         async function loadAllPicks() {
             const memberIds = Object.keys(poolMembers);
-            console.log('🔍 Loading picks for', memberIds.length, 'members, week', currentWeek);
+            logger.grid('🔍 Loading picks for', memberIds.length, 'members, week', currentWeek);
 
             const pickPromises = memberIds.map(async (memberId) => {
                 try {
@@ -1049,29 +1050,29 @@
                     if (userPicksDoc.exists()) {
                         allPicks[memberId] = userPicksDoc.data();
                         const gameCount = Object.keys(allPicks[memberId]).filter(k => k.match(/^\d+$/)).length;
-                        console.log(`✅ ${memberName}: ${gameCount} picks loaded`);
+                        logger.grid(`✅ ${memberName}: ${gameCount} picks loaded`);
                     } else {
                         allPicks[memberId] = null;
-                        console.log(`❌ ${memberName}: NO PICKS FOUND at ${picksPath}`);
+                        logger.grid(`❌ ${memberName}: NO PICKS FOUND at ${picksPath}`);
                     }
                 } catch (error) {
-                    console.error(`❌ Error loading picks for ${memberId}:`, error);
+                    logger.error('GRID', `❌ Error loading picks for ${memberId}:`, error);
                     allPicks[memberId] = null;
                 }
             });
 
             await Promise.all(pickPromises);
-            console.log('✅ Picks loaded for', Object.keys(allPicks).length, 'users');
+            logger.grid('✅ Picks loaded for', Object.keys(allPicks).length, 'users');
 
             // DEBUG: Check Andrea's picks specifically
             const andreaId = 'bEVzcZtSExT8cIjamWnGbWZ3J5s1';
             if (allPicks[andreaId]) {
                 const andreaPicks = allPicks[andreaId];
                 const andreaGamePicks = Object.keys(andreaPicks).filter(k => k.match(/^\d+$/));
-                console.log('🔍 ANDREA DEBUG: Has', andreaGamePicks.length, 'game picks in allPicks');
-                console.log('🔍 ANDREA DEBUG: Game 501 pick:', andreaPicks['501']);
+                logger.grid('🔍 ANDREA DEBUG: Has', andreaGamePicks.length, 'game picks in allPicks');
+                logger.grid('🔍 ANDREA DEBUG: Game 501 pick:', andreaPicks['501']);
             } else {
-                console.log('❌ ANDREA DEBUG: NOT FOUND in allPicks object!');
+                logger.grid('❌ ANDREA DEBUG: NOT FOUND in allPicks object!');
             }
         }
 
@@ -1083,7 +1084,7 @@
                 const cacheDoc = await getDoc(doc(db, cachePath));
 
                 if (!cacheDoc.exists()) {
-                    console.log('❌ GRID_CACHE: No cached data found');
+                    logger.grid('❌ GRID_CACHE: No cached data found');
                     return false;
                 }
 
@@ -1092,11 +1093,11 @@
                 const maxAge = 15 * 60 * 1000; // 15 minutes
 
                 if (cacheAge > maxAge) {
-                    console.log('⏰ GRID_CACHE: Cache expired (', Math.round(cacheAge / 1000 / 60), 'min old)');
+                    logger.grid('⏰ GRID_CACHE: Cache expired (', Math.round(cacheAge / 1000 / 60), 'min old)');
                     return false;
                 }
 
-                console.log('🎯 GRID_CACHE: Loading cached grid data (', Math.round(cacheAge / 1000), 's old)');
+                logger.grid('🎯 GRID_CACHE: Loading cached grid data (', Math.round(cacheAge / 1000), 's old)');
 
                 // Restore cached data
                 bibleData = cacheData.bibleData;
@@ -1107,11 +1108,11 @@
                 renderGrid();
                 updateStats();
 
-                console.log('⚡ GRID_CACHE: Successfully loaded from cache!');
+                logger.grid('⚡ GRID_CACHE: Successfully loaded from cache!');
                 return true;
 
             } catch (error) {
-                console.error('❌ GRID_CACHE: Error loading from cache:', error);
+                logger.error('GRID', '❌ GRID_CACHE: Error loading from cache:', error);
                 return false;
             }
         }
@@ -1119,7 +1120,7 @@
         async function saveFirebaseCachedGrid() {
             try {
                 const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
-                console.log('💾 GRID_CACHE: Saving grid data to Firebase cache');
+                logger.grid('💾 GRID_CACHE: Saving grid data to Firebase cache');
 
                 const cacheData = {
                     createdDate: new Date().toISOString(),
@@ -1135,16 +1136,16 @@
                 };
 
                 await setDoc(doc(db, cachePath), cacheData);
-                console.log('✅ GRID_CACHE: Successfully saved to Firebase cache');
+                logger.grid('✅ GRID_CACHE: Successfully saved to Firebase cache');
 
             } catch (error) {
-                console.error('❌ GRID_CACHE: Error saving to cache:', error);
+                logger.error('GRID', '❌ GRID_CACHE: Error saving to cache:', error);
             }
         }
 
         // Render the picks table
         function renderGrid() {
-            console.log(`🎯 Rendering grid for Week ${currentWeek} with gameIds:`, gameIds);
+            logger.grid(`🎯 Rendering grid for Week ${currentWeek} with gameIds:`, gameIds);
             renderTableHeader();
             renderTableBody();
 
@@ -1152,7 +1153,7 @@
             categorizeGamesByStatus();
             updateColumnVisibility();
 
-            console.log(`✅ Grid render complete for Week ${currentWeek}`);
+            logger.grid(`✅ Grid render complete for Week ${currentWeek}`);
         }
 
         // Render table header
@@ -1255,7 +1256,7 @@
                 const name = (poolMembers[id].name || poolMembers[id].displayName || '').toLowerCase();
                 return name.includes('andrea') || name.includes('nerdmamma');
             });
-            console.log('🔍 RENDERING DEBUG: Andrea-related members in poolMembers:', andreaMembers.map(id => ({
+            logger.grid('🔍 RENDERING DEBUG: Andrea-related members in poolMembers:', andreaMembers.map(id => ({
                 id,
                 name: poolMembers[id].name || poolMembers[id].displayName,
                 hasPicks: allPicks[id] ? Object.keys(allPicks[id]).filter(k => k.match(/^\d+$/)).length : 0
@@ -1413,7 +1414,7 @@
             if (isTie) {
                 // In a tie, anyone who made a pick for this game is correct
                 isCorrect = true;
-                console.log(`🎯 TIE GAME DETECTED - Game ${gameId}: ${game.a} @ ${game.h} (${game.awayScore}-${game.homeScore}). User picked ${pick.winner}, gets credit!`);
+                logger.grid(`🎯 TIE GAME DETECTED - Game ${gameId}: ${game.a} @ ${game.h} (${game.awayScore}-${game.homeScore}). User picked ${pick.winner}, gets credit!`);
             } else {
                 isCorrect = isGameComplete && game.winner === pick.winner;
             }
@@ -2056,14 +2057,14 @@
             columnGroups.active.games = [];
             columnGroups.notstarted.games = [];
 
-            console.log('🔍 CATEGORIZING GAMES BY STATUS:');
+            logger.grid('🔍 CATEGORIZING GAMES BY STATUS:');
 
             gameIds.forEach(gameId => {
                 const game = bibleData[gameId];
                 if (!game) return;
 
                 const status = getGameStatus(game);
-                console.log(`Game ${gameId}:`, {
+                logger.grid(`Game ${gameId}:`, {
                     winner: game.winner,
                     gameTime: game.gameTime,
                     date: game.date,
@@ -2079,7 +2080,7 @@
                 }
             });
 
-            console.log('📊 GAME STATUS SUMMARY:', {
+            logger.grid('📊 GAME STATUS SUMMARY:', {
                 completed: columnGroups.completed.games.length,
                 active: columnGroups.active.games.length,
                 notstarted: columnGroups.notstarted.games.length
@@ -2233,10 +2234,10 @@
 ${cacheAge > 15 * 60 * 1000 ? '⚠️ Cache expired (>15min) - will regenerate on next load' : '✅ Cache fresh (<15min) - serving instant loads'}`;
 
                 alert(status);
-                console.log('🔥 GRID_CACHE: Status check completed');
+                logger.grid('🔥 GRID_CACHE: Status check completed');
 
             } catch (error) {
-                console.error('❌ GRID_CACHE: Error checking status:', error);
+                logger.error('GRID', '❌ GRID_CACHE: Error checking status:', error);
                 alert('❌ Error checking cache status');
             }
         };
@@ -2246,11 +2247,11 @@ ${cacheAge > 15 * 60 * 1000 ? '⚠️ Cache expired (>15min) - will regenerate o
                 const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
                 await deleteDoc(doc(db, cachePath));
 
-                console.log('🗑️ GRID_CACHE: Cache cleared for week', currentWeek);
+                logger.grid('🗑️ GRID_CACHE: Cache cleared for week', currentWeek);
                 alert('🗑️ Cache cleared for Week ' + currentWeek + '\n\nNext visitor will generate fresh data.');
 
             } catch (error) {
-                console.error('❌ GRID_CACHE: Error clearing cache:', error);
+                logger.error('GRID', '❌ GRID_CACHE: Error clearing cache:', error);
                 alert('❌ Error clearing cache');
             }
         };
@@ -2350,7 +2351,7 @@ ${cacheAge > 15 * 60 * 1000 ? '⚠️ Cache expired (>15min) - will regenerate o
                     teamShort.style.fontSize = `${16 * fontScale}px`;
                 });
 
-                console.log(`🎯 Applied scaling: ${visibleGroups} groups visible, ${Math.round((fontScale - 1) * 100)}% size increase`);
+                logger.grid(`🎯 Applied scaling: ${visibleGroups} groups visible, ${Math.round((fontScale - 1) * 100)}% size increase`);
             }
         }
 

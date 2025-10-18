@@ -134,6 +134,7 @@
         .terminal-surface { background: #1a1a1a; }
         .terminal-border { border-color: #2a2a2a; }
     </style>
+    <script src="./js/utils/logger.js"></script>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
     <!-- Matrix Background Effect -->
@@ -350,7 +351,7 @@
             const userDisplay = document.getElementById('user-display');
 
             if (user) {
-                console.log('🔐 User authenticated:', user.email);
+                logger.auth('🔐 User authenticated:', user.email);
                 const isAdmin = ADMIN_UIDS.includes(user.uid);
 
                 // Store current user globally for admin checks
@@ -358,7 +359,7 @@
 
                 loadSurvivorData();
             } else {
-                console.log('🚫 User not authenticated - redirecting to login');
+                logger.auth('🚫 User not authenticated - redirecting to login');
                 // Redirect to main page for authentication
                 window.location.href = '/';
             }
@@ -413,7 +414,7 @@
         }
 
         async function loadBibleData(weekNumber) {
-            console.log(`🔍 Loading Week ${weekNumber} bible data from Firestore...`);
+            logger.auth(`🔍 Loading Week ${weekNumber} bible data from Firestore...`);
 
             try {
                 const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`;
@@ -421,23 +422,23 @@
                 const gamesSnap = await window.getDoc(gamesRef);
 
                 if (!gamesSnap.exists()) {
-                    console.warn(`No games found for Week ${weekNumber} in Firestore`);
+                    logger.warn('AUTH', `No games found for Week ${weekNumber} in Firestore`);
                     return null;
                 }
 
                 const bibleData = gamesSnap.data();
-                console.log(`✅ Loaded Week ${weekNumber} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
+                logger.auth(`✅ Loaded Week ${weekNumber} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
 
                 return bibleData;
             } catch (error) {
-                console.error(`❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
+                logger.error('AUTH', `❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
                 return null;
             }
         }
 
         async function loadCurrentWeekPicks() {
             const currentWeek = getCurrentWeekNumber();
-            console.log(`🏈 Loading current week (${currentWeek}) survivor picks for alive players...`);
+            logger.auth(`🏈 Loading current week (${currentWeek}) survivor picks for alive players...`);
 
             try {
                 // Check if current week has started by loading bible data
@@ -452,18 +453,18 @@
                         game.status === 'FINAL' ||
                         game.started === true
                     );
-                    console.log(`🏈 Current week ${currentWeek} has ${weekHasStarted ? 'STARTED ✅' : 'NOT STARTED 🔒'}`);
+                    logger.auth(`🏈 Current week ${currentWeek} has ${weekHasStarted ? 'STARTED ✅' : 'NOT STARTED 🔒'}`);
                 } else {
-                    console.warn(`⚠️ No bible data for Week ${currentWeek}`);
+                    logger.warn('AUTH', `⚠️ No bible data for Week ${currentWeek}`);
                     return { weekHasStarted: false, picks: {} };
                 }
 
                 const currentWeekPicks = {};
 
                 // Only load picks if week has started
-                console.log(`🎯 weekHasStarted = ${weekHasStarted}, currentWeek = ${currentWeek}`);
+                logger.auth(`🎯 weekHasStarted = ${weekHasStarted}, currentWeek = ${currentWeek}`);
                 if (weekHasStarted) {
-                    console.log(`🎯 Loading currentWeek picks for alive survivors...`);
+                    logger.auth(`🎯 Loading currentWeek picks for alive survivors...`);
 
                     // Get alive survivor UIDs
                     const aliveUIDs = survivorsData
@@ -474,7 +475,7 @@
                     const pickLoadPromises = aliveUIDs.map(async (userId) => {
                         try {
                             const userPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`;
-                            console.log(`  🔍 Loading picks for ${userId} from: ${userPicksPath}`);
+                            logger.auth(`  🔍 Loading picks for ${userId} from: ${userPicksPath}`);
                             const userPicksRef = window.doc(window.db, userPicksPath);
                             const userPicksSnap = await window.getDoc(userPicksRef);
 
@@ -482,34 +483,34 @@
                                 const userData = userPicksSnap.data();
 
                                 // Debug: show picks structure
-                                console.log(`  📋 ${userId} picks object:`, userData.picks);
+                                logger.auth(`  📋 ${userId} picks object:`, userData.picks);
 
                                 // Picks are stored under userData.picks object, field is "team"
                                 const weekKey = currentWeek.toString();
                                 if (userData.picks && userData.picks[weekKey] && userData.picks[weekKey].team) {
                                     currentWeekPicks[userId] = userData.picks[weekKey].team;
-                                    console.log(`  ✅ ${userId}: Week ${currentWeek} pick = ${userData.picks[weekKey].team}`);
+                                    logger.auth(`  ✅ ${userId}: Week ${currentWeek} pick = ${userData.picks[weekKey].team}`);
                                 } else {
-                                    console.log(`  ⚠️ ${userId}: No pick found`);
+                                    logger.auth(`  ⚠️ ${userId}: No pick found`);
                                 }
                             } else {
-                                console.log(`  ⚠️ ${userId}: No survivor picks document found`);
+                                logger.auth(`  ⚠️ ${userId}: No survivor picks document found`);
                             }
                         } catch (error) {
-                            console.warn(`  ❌ Error loading picks for ${userId}:`, error);
+                            logger.warn('AUTH', `  ❌ Error loading picks for ${userId}:`, error);
                         }
                     });
 
                     await Promise.all(pickLoadPromises);
-                    console.log(`✅ Loaded ${Object.keys(currentWeekPicks).length} current week survivor picks`);
+                    logger.auth(`✅ Loaded ${Object.keys(currentWeekPicks).length} current week survivor picks`);
                 } else {
-                    console.log(`🔒 Week ${currentWeek} hasn't started - not showing picks yet`);
+                    logger.auth(`🔒 Week ${currentWeek} hasn't started - not showing picks yet`);
                 }
 
                 return { weekHasStarted, picks: currentWeekPicks };
 
             } catch (error) {
-                console.error('❌ Error loading current week picks:', error);
+                logger.error('AUTH', '❌ Error loading current week picks:', error);
                 return { weekHasStarted: false, picks: {} };
             }
         }
@@ -593,10 +594,10 @@
             });
 
             // Check for current week picks if any games have started (Masters Audit logic)
-            console.log('🔍 About to call loadCurrentWeekPicks()...');
+            logger.auth('🔍 About to call loadCurrentWeekPicks()...');
             try {
                 const { weekHasStarted, picks: currentWeekPicks } = await loadCurrentWeekPicks();
-                console.log('✅ loadCurrentWeekPicks() completed:', { weekHasStarted, pickCount: Object.keys(currentWeekPicks).length });
+                logger.auth('✅ loadCurrentWeekPicks() completed:', { weekHasStarted, pickCount: Object.keys(currentWeekPicks).length });
 
                 // Add current week picks to alive survivors
                 if (weekHasStarted && Object.keys(currentWeekPicks).length > 0) {
@@ -606,12 +607,12 @@
                                 team: currentWeekPicks[survivor.userId],
                                 week: currentWeek
                             };
-                            console.log(`✅ Added Week ${currentWeek} pick for ${survivor.name}: ${currentWeekPicks[survivor.userId]}`);
+                            logger.auth(`✅ Added Week ${currentWeek} pick for ${survivor.name}: ${currentWeekPicks[survivor.userId]}`);
                         }
                     });
                 }
             } catch (error) {
-                console.error('❌ Error in loadCurrentWeekPicks():', error);
+                logger.error('AUTH', '❌ Error in loadCurrentWeekPicks():', error);
             }
 
             displaySurvivorData();
@@ -619,7 +620,7 @@
 
         async function loadSurvivorData() {
             try {
-                console.log('🧊 Loading fresh survival chamber data...');
+                logger.auth('🧊 Loading fresh survival chamber data...');
                 const cacheBuster = Date.now();
                 const response = await fetch(`https://getsurvivorpooldata-np7uealtnq-uc.a.run.app?t=${cacheBuster}`);
 
@@ -633,13 +634,13 @@
                     throw new Error(result.error || 'Failed to load survivor data');
                 }
 
-                console.log('✅ Survivor data loaded from Firebase Function:', result.data.summary);
+                logger.auth('✅ Survivor data loaded from Firebase Function:', result.data.summary);
 
                 // Process data and display
                 await processSurvivorData(result);
 
             } catch (error) {
-                console.error('❌ Error loading survivor data:', error);
+                logger.error('AUTH', '❌ Error loading survivor data:', error);
                 showError(error.message);
             }
         }
@@ -723,7 +724,7 @@
             document.getElementById('stats').classList.remove('hidden');
             document.getElementById('survivor-table').classList.remove('hidden');
 
-            console.log(`✅ Chamber loaded: ${aliveSurvivors.length} alive, ${eliminatedSurvivors.length} eliminated, ${nonParticipating.length} not participating`);
+            logger.auth(`✅ Chamber loaded: ${aliveSurvivors.length} alive, ${eliminatedSurvivors.length} eliminated, ${nonParticipating.length} not participating`);
         }
 
         function displayCurrentWeekPicks() {
@@ -732,7 +733,7 @@
             // Debug logging
             const aliveCount = survivorsData.filter(s => s.status === 'ALIVE').length;
             const aliveWithPicksCount = survivorsData.filter(s => s.status === 'ALIVE' && s.currentWeekPick).length;
-            console.log(`📊 Week ${currentWeek} display: ${aliveCount} alive, ${aliveWithPicksCount} with current picks`);
+            logger.auth(`📊 Week ${currentWeek} display: ${aliveCount} alive, ${aliveWithPicksCount} with current picks`);
 
             const aliveWithCurrentPicks = survivorsData
                 .filter(s => s.status === 'ALIVE' && s.currentWeekPick)
@@ -741,7 +742,7 @@
             const currentPicksContainer = document.getElementById('current-week-picks');
 
             if (aliveWithCurrentPicks.length === 0) {
-                console.log(`❌ No current week picks to display - hiding container`);
+                logger.auth(`❌ No current week picks to display - hiding container`);
                 currentPicksContainer.style.display = 'none';
                 return;
             }
@@ -801,7 +802,7 @@
                     await window.signOut(auth);
                     window.location.href = './login.html';
                 } catch (error) {
-                    console.error('Logout error:', error);
+                    logger.error('AUTH', 'Logout error:', error);
                     alert('Error logging out. Please try again.');
                 }
             }

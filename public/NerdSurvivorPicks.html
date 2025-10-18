@@ -148,7 +148,7 @@
 
     <!-- 🤖 ML PREDICTION SYSTEM - SURVIVOR POOL -->
     <script>
-        console.log('🧠 SURVIVOR ML: Loading AI prediction system...');
+        logger.survivor('🧠 SURVIVOR ML: Loading AI prediction system...');
 
         // Team database for survivor analysis
         const survivorTeamDB = {
@@ -176,7 +176,7 @@
         window.openMLPredictionModal = function(gameId, team, gameInfo, event) {
             if (event) event.stopPropagation();
 
-            console.log(`🧠 SURVIVOR AI: Analyzing ${team}...`);
+            logger.survivor(`🧠 SURVIVOR AI: Analyzing ${team}...`);
             const prediction = generateSurvivorPrediction(team);
 
             // Create modal
@@ -239,8 +239,9 @@
             document.body.appendChild(modal);
         };
 
-        console.log('🧠 SURVIVOR ML: AI prediction system ready');
+        logger.survivor('🧠 SURVIVOR ML: AI prediction system ready');
     </script>
+    <script src="./js/utils/logger.js"></script>
 </head>
 <body class="min-h-screen chamber-text">
     <!-- Header -->
@@ -392,13 +393,13 @@
         ];
 
         // Admin user IDs who can see AI predictions
-        console.log('🚀 SURVIVOR_DEBUG: Script loading started');
+        logger.survivor('🚀 SURVIVOR_DEBUG: Script loading started');
         const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
 
         // 👑 GOD MODE: Check URL parameter
         const urlParams = new URLSearchParams(window.location.search);
         const GOD_MODE = urlParams.get('godmode') === 'true';
-        console.log(`👑 GOD_MODE: ${GOD_MODE ? 'ENABLED' : 'DISABLED'}`);
+        logger.survivor(`👑 GOD_MODE: ${GOD_MODE ? 'ENABLED' : 'DISABLED'}`);
 
         let currentUser = null;
         let isAuthenticated = false;
@@ -434,14 +435,14 @@
                 }
 
                 // PHASE 1: Load centralized survivor status FIRST
-                console.log('💀 SURVIVOR_INIT: Step 1 - Loading survivor status...');
+                logger.survivor('💀 SURVIVOR_INIT: Step 1 - Loading survivor status...');
                 userSurvivorStatus = await loadUserSurvivorStatus();
 
                 // 👑 GOD MODE: Admin bypass for eliminated status
                 if (GOD_MODE && ADMIN_UIDS.includes(currentUser.uid)) {
-                    console.log('👑 GOD_MODE: Admin user bypassing elimination check');
+                    logger.survivor('👑 GOD_MODE: Admin user bypassing elimination check');
                     if (userSurvivorStatus.isEliminated) {
-                        console.log('👑 GOD_MODE: Overriding ELIMINATED status → treating as ALIVE');
+                        logger.survivor('👑 GOD_MODE: Overriding ELIMINATED status → treating as ALIVE');
                         userSurvivorStatus.isAlive = true;
                         userSurvivorStatus.isEliminated = false;
                     }
@@ -449,20 +450,20 @@
 
                 // PHASE 2: Route based on survivor status
                 if (userSurvivorStatus.isEliminated) {
-                    console.log('💀 SURVIVOR_INIT: User is ELIMINATED - showing death screen');
+                    logger.survivor('💀 SURVIVOR_INIT: User is ELIMINATED - showing death screen');
                     await loadUserSurvivorData(); // Load picks for history display
                     showEliminationScreen();
                     return; // STOP - no more functionality for dead users
                 }
 
                 if (userSurvivorStatus.notParticipating) {
-                    console.log('⚠️ SURVIVOR_INIT: User NOT PARTICIPATING - showing not participating screen');
+                    logger.survivor('⚠️ SURVIVOR_INIT: User NOT PARTICIPATING - showing not participating screen');
                     showNotParticipatingScreen();
                     return; // STOP
                 }
 
                 // User is ALIVE - proceed with normal interface
-                console.log('✅ SURVIVOR_INIT: User is ALIVE - loading full interface');
+                logger.survivor('✅ SURVIVOR_INIT: User is ALIVE - loading full interface');
                 currentWeek = getCurrentWeek();
                 await loadUserSurvivorData();
                 await loadGameData();
@@ -471,7 +472,7 @@
                 displayUserInterface();
 
             } catch (error) {
-                console.error('Error initializing interface:', error);
+                logger.error('SURVIVOR', 'Error initializing interface:', error);
                 showError(`Error loading data: ${error.message}`);
             }
         }
@@ -484,7 +485,7 @@
 
                 return membersSnap.exists() && membersSnap.data()[currentUser.uid];
             } catch (error) {
-                console.error('Error checking pool membership:', error);
+                logger.error('SURVIVOR', 'Error checking pool membership:', error);
                 return false;
             }
         }
@@ -501,7 +502,7 @@
                     userSurvivorData = { picks: {} };
                 }
             } catch (error) {
-                console.error('Error loading survivor data:', error);
+                logger.error('SURVIVOR', 'Error loading survivor data:', error);
                 userSurvivorData = { picks: {} };
             }
         }
@@ -509,7 +510,7 @@
         // PHASE 1: Load centralized survivor status from Cloud Function
         async function loadUserSurvivorStatus() {
             try {
-                console.log('💀 SURVIVOR_STATUS: Loading centralized survivor status...');
+                logger.survivor('💀 SURVIVOR_STATUS: Loading centralized survivor status...');
                 const cacheBuster = Date.now();
                 const response = await fetch(`https://getsurvivorpooldata-np7uealtnq-uc.a.run.app?t=${cacheBuster}`);
                 const result = await response.json();
@@ -519,12 +520,12 @@
                 }
 
                 const survivorData = result.data;
-                console.log('💀 SURVIVOR_STATUS: Cloud Function data loaded', survivorData);
+                logger.survivor('💀 SURVIVOR_STATUS: Cloud Function data loaded', survivorData);
 
                 // Find current user in alive array
                 const aliveUser = survivorData.alive.find(s => s.userId === currentUser.uid);
                 if (aliveUser) {
-                    console.log('✅ SURVIVOR_STATUS: User is ALIVE');
+                    logger.survivor('✅ SURVIVOR_STATUS: User is ALIVE');
                     return {
                         isAlive: true,
                         isEliminated: false,
@@ -535,7 +536,7 @@
                 // Find current user in eliminated array
                 const deadUser = survivorData.eliminated.find(s => s.userId === currentUser.uid);
                 if (deadUser) {
-                    console.log('💀 SURVIVOR_STATUS: User is ELIMINATED');
+                    logger.survivor('💀 SURVIVOR_STATUS: User is ELIMINATED');
                     return {
                         isAlive: false,
                         isEliminated: true,
@@ -546,7 +547,7 @@
                 }
 
                 // User not participating
-                console.log('⚠️ SURVIVOR_STATUS: User is NOT PARTICIPATING');
+                logger.survivor('⚠️ SURVIVOR_STATUS: User is NOT PARTICIPATING');
                 return {
                     isAlive: false,
                     isEliminated: false,
@@ -554,7 +555,7 @@
                 };
 
             } catch (error) {
-                console.error('Error loading survivor status:', error);
+                logger.error('SURVIVOR', 'Error loading survivor status:', error);
                 throw error;
             }
         }
@@ -570,7 +571,7 @@
                     gameData[currentWeek] = gameSnap.data();
                 }
             } catch (error) {
-                console.error('Error loading game data:', error);
+                logger.error('SURVIVOR', 'Error loading game data:', error);
                 gameData[currentWeek] = {};
             }
         }
@@ -620,10 +621,10 @@
         function isWeekLocked(week) {
             // Check if any game in the week has started using Eastern Time Parser
             const weekGames = gameData[week];
-            console.log(`🔒 LOCK_CHECK: Week ${week}, hasGameData: ${!!weekGames}, hasParser: ${!!window.easternTimeParser}`);
+            logger.survivor(`🔒 LOCK_CHECK: Week ${week}, hasGameData: ${!!weekGames}, hasParser: ${!!window.easternTimeParser}`);
 
             if (!weekGames || !window.easternTimeParser) {
-                console.log(`🔒 LOCK_CHECK: Using fallback logic - week ${week} vs current ${currentWeek}`);
+                logger.survivor(`🔒 LOCK_CHECK: Using fallback logic - week ${week} vs current ${currentWeek}`);
                 return week < currentWeek; // Fallback: lock past weeks
             }
 
@@ -634,20 +635,20 @@
                 const game = weekGames[gameId];
                 if (game.dt) {
                     const hasStarted = window.easternTimeParser.hasGameStarted(game.dt);
-                    console.log(`🔒 LOCK_CHECK: Game ${gameId} (${game.dt}) hasStarted: ${hasStarted}`);
+                    logger.survivor(`🔒 LOCK_CHECK: Game ${gameId} (${game.dt}) hasStarted: ${hasStarted}`);
                     if (hasStarted) {
                         return true; // Week is locked if any game started
                     }
                 }
             }
 
-            console.log(`🔒 LOCK_CHECK: Week ${week} is NOT locked`);
+            logger.survivor(`🔒 LOCK_CHECK: Week ${week} is NOT locked`);
             return false;
         }
 
         function displayUserInterface() {
             // PHASE 3: Alive users see CURRENT WEEK ONLY (no navigation)
-            console.log('✅ ALIVE_UI: Displaying current week only interface');
+            logger.survivor('✅ ALIVE_UI: Displaying current week only interface');
 
             displayStatusCard();
             displayCurrentWeekCard();
@@ -693,7 +694,7 @@
 
         // PHASE 3: Display previous winning picks for alive users
         function displayPreviousWinsSidebar() {
-            console.log('✅ PREVIOUS_WINS: Displaying winning picks sidebar');
+            logger.survivor('✅ PREVIOUS_WINS: Displaying winning picks sidebar');
             const historyContent = document.getElementById('historyContent');
 
             // Use centralized survivor status data for winning picks
@@ -738,7 +739,7 @@
         }
 
         function displayCurrentWeekCard() {
-            console.log(`🎯 DISPLAY_CARD: Checking lock for currentWeek: ${currentWeek}`);
+            logger.survivor(`🎯 DISPLAY_CARD: Checking lock for currentWeek: ${currentWeek}`);
             const weekLocked = isWeekLocked(currentWeek);
             const picks = userSurvivorData.picks || {};
             const currentPick = picks[currentWeek.toString()];
@@ -1101,7 +1102,7 @@
                 showSuccess(`✅ Pick saved: ${team} for Week ${selectedWeek}`);
 
             } catch (error) {
-                console.error('Error saving pick:', error);
+                logger.error('SURVIVOR', 'Error saving pick:', error);
                 showError(`Failed to save pick: ${error.message}`);
             }
         }
@@ -1139,7 +1140,7 @@
 
         // PHASE 2: Elimination Screen - Block eliminated users from making picks
         function showEliminationScreen() {
-            console.log('💀 ELIMINATION_SCREEN: Showing death screen');
+            logger.survivor('💀 ELIMINATION_SCREEN: Showing death screen');
 
             // Hide all cards
             document.getElementById('statusCard').classList.add('hidden');
@@ -1214,7 +1215,7 @@
 
         // PHASE 2: Not Participating Screen
         function showNotParticipatingScreen() {
-            console.log('⚠️ NOT_PARTICIPATING_SCREEN: Showing not participating screen');
+            logger.survivor('⚠️ NOT_PARTICIPATING_SCREEN: Showing not participating screen');
 
             // Hide all cards
             document.getElementById('statusCard').classList.add('hidden');
@@ -1332,11 +1333,11 @@
                 event.stopPropagation();
             }
 
-            console.log(`🧠 BRAIN_ICON_DEBUG: Opening survivor ML prediction for ${team}`);
+            logger.survivor(`🧠 BRAIN_ICON_DEBUG: Opening survivor ML prediction for ${team}`);
 
             // Check if Firebase is loaded and user is authenticated
             if (typeof window.currentUser === 'undefined' || !window.currentUser) {
-                console.log('🧠 BRAIN_ICON_DEBUG: User not authenticated yet, showing basic prediction');
+                logger.survivor('🧠 BRAIN_ICON_DEBUG: User not authenticated yet, showing basic prediction');
                 // Show basic prediction without user checks
                 showBasicMLPrediction(team, gameId);
                 return;
@@ -1345,7 +1346,7 @@
             // Check admin status
             const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
             if (!ADMIN_UIDS.includes(window.currentUser.uid)) {
-                console.log('🧠 BRAIN_ICON_DEBUG: Non-admin user, showing message');
+                logger.survivor('🧠 BRAIN_ICON_DEBUG: Non-admin user, showing message');
                 alert('AI predictions are currently in beta testing');
                 return;
             }
@@ -1449,7 +1450,7 @@
             }
         });
 
-        console.log('🧠 ML PREDICTION DEBUG: Global ML prediction functions loaded');
+        logger.survivor('🧠 ML PREDICTION DEBUG: Global ML prediction functions loaded');
     </script>
 
     <!-- ML Prediction Modal -->

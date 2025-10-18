@@ -100,6 +100,7 @@
             50% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), 0 0 25px rgba(255, 215, 0, 0.4); }
         }
     </style>
+    <script src="./js/utils/logger.js"></script>
 </head>
 <body class="bg-slate-200 text-slate-800">
 
@@ -300,7 +301,7 @@
                             allUI.settingsModal.classList.remove('flex');
                         }, 2000);
                     } catch (error) {
-                        console.error("Error updating settings:", error);
+                        logger.error('GRID', "Error updating settings:", error);
                         allUI.settingsError.textContent = `Error: ${error.message}. You may need to log out and log back in to change your email.`;
                         allUI.settingsError.classList.remove('hidden');
                     }
@@ -392,7 +393,7 @@
             async function getGamesForWeek(weekNumber) {
                 // BYPASS BROKEN CACHE - DIRECT FETCH
                 try {
-                    console.log(`🔥 Grid: Direct fetching schedule for week ${weekNumber}`);
+                    logger.grid(`🔥 Grid: Direct fetching schedule for week ${weekNumber}`);
                     const response = await fetch(`nfl_2025_week_${weekNumber}.json`);
                     if (!response.ok) {
                         throw new Error(`Failed to fetch schedule for week ${weekNumber}: ${response.status}`);
@@ -406,7 +407,7 @@
                         stadium: game.stadium,
                     })) : [];
                 } catch (error) {
-                    console.error(`Error fetching games for week ${weekNumber}:`, error);
+                    logger.error('GRID', `Error fetching games for week ${weekNumber}:`, error);
                     return [];
                 }
             }
@@ -476,31 +477,31 @@
             
             async function renderGrid() {
                 try {
-                    console.log('🚨 renderGrid STARTED');
+                    logger.grid('🚨 renderGrid STARTED');
                     const gridContainer = document.getElementById('grid-container');
                     const weekSelector = document.getElementById('grid-week-selector');
                     const mainContent = document.getElementById('main-content');
                     
                     
                     if (!currentUser) {
-                        console.log('🚨 No current user');
+                        logger.grid('🚨 No current user');
                         mainContent.innerHTML = `<p class="text-center">Please <a href="./index.html" class="font-bold text-slate-600 hover:text-slate-808">log in</a> to view The Grid.</p>`;
                         return;
                     }
                     
-                    console.log('🚨 Setting loader');
+                    logger.grid('🚨 Setting loader');
                     gridContainer.innerHTML = `<div class="loader"></div>`;
                     const selectedWeek = weekSelector.value;
-                    console.log('🚨 Getting games for week', selectedWeek);
+                    logger.grid('🚨 Getting games for week', selectedWeek);
                     const games = await getGamesForWeek(selectedWeek);
-                    console.log('🚨 Got games:', games.length);
+                    logger.grid('🚨 Got games:', games.length);
 
                     const now = new Date();
 
                 // BYPASS BROKEN CACHE - DIRECT FETCH ALL DATA
                 let gridData;
                 try {
-                    console.log(`🔥 Grid: Direct fetching ALL data for week ${selectedWeek}`);
+                    logger.grid(`🔥 Grid: Direct fetching ALL data for week ${selectedWeek}`);
                     
                     // CRITICAL FIX: Use pool members path (same as admin) instead of legacy users path
                     let userMap = new Map();
@@ -508,11 +509,11 @@
                     try {
                         // Primary source: Pool members (same as admin panel uses)
                         const poolMembersDoc = await getDoc(doc(db, poolMembersPath()));
-                        console.log('🔥 Fetching from POOL MEMBERS path:', poolMembersPath());
+                        logger.grid('🔥 Fetching from POOL MEMBERS path:', poolMembersPath());
                         
                         if (poolMembersDoc.exists()) {
                             const members = poolMembersDoc.data();
-                            console.log('✅ Pool members found:', Object.keys(members).length);
+                            logger.grid('✅ Pool members found:', Object.keys(members).length);
                             
                             // Convert pool members to user format - NO GHOST USERS HERE!
                             for (const [uid, memberData] of Object.entries(members)) {
@@ -524,43 +525,43 @@
                                     role: memberData.role || 'member',
                                     ...memberData
                                 });
-                                console.log('✅ Added pool member:', memberData.displayName, uid);
+                                logger.grid('✅ Added pool member:', memberData.displayName, uid);
                             }
-                            console.log(`🎯 SUCCESS: Using pool members (${userMap.size} users)`);
+                            logger.grid(`🎯 SUCCESS: Using pool members (${userMap.size} users)`);
                         } else {
                             throw new Error('Pool members document does not exist');
                         }
                     } catch (poolError) {
-                        console.log('⚠️ Pool members not found, falling back to legacy users with ghost blocking');
+                        logger.grid('⚠️ Pool members not found, falling back to legacy users with ghost blocking');
                         
                         // Fallback to legacy users path with comprehensive ghost blocking
                         const usersCollectionPath = usersPath();
-                        console.log('🚨 Fetching users from LEGACY path:', usersCollectionPath);
+                        logger.grid('🚨 Fetching users from LEGACY path:', usersCollectionPath);
                         const usersSnap = await getDocs(collection(db, usersCollectionPath));
-                        console.log('🚨 Users snapshot size:', usersSnap.size);
+                        logger.grid('🚨 Users snapshot size:', usersSnap.size);
                         
                         // Process legacy users with ghost blocking
                         usersSnap.forEach(doc => {
                             // IMMEDIATE GHOST BLOCKING
                             if (doc.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
-                                console.log('🚫 GHOST USER BLOCKED FROM LEGACY:', doc.id);
+                                logger.grid('🚫 GHOST USER BLOCKED FROM LEGACY:', doc.id);
                                 return;
                             }
                             
                             const userData = { id: doc.id, uid: doc.id, ...doc.data() };
                             userMap.set(doc.id, userData);
-                            console.log('✅ Added legacy user:', userData.displayName || userData.email, doc.id);
+                            logger.grid('✅ Added legacy user:', userData.displayName || userData.email, doc.id);
                         });
-                        console.log(`⚠️ FALLBACK: Using legacy users (${userMap.size} users)`);
+                        logger.grid(`⚠️ FALLBACK: Using legacy users (${userMap.size} users)`);
                     }
                     
-                    console.log(`✅ Final user count: ${userMap.size} users loaded`);
+                    logger.grid(`✅ Final user count: ${userMap.size} users loaded`);
                     
                     // CRITICAL: ADMIN PROTECTION - Eliminate ALL conflicts with admin users
                     emailToUsers.forEach((users, email) => {
                         if (users.length > 1) {
-                            console.log(`🚫 EMAIL CONFLICT: ${users.length} users with email "${email}"`);
-                            users.forEach(u => console.log(`   - ${u.id} (name: ${u.displayName || 'none'}) (role: ${u.role || 'none'})`));
+                            logger.grid(`🚫 EMAIL CONFLICT: ${users.length} users with email "${email}"`);
+                            users.forEach(u => logger.grid(`   - ${u.id} (name: ${u.displayName || 'none'}) (role: ${u.role || 'none'})`));
                             
                             // Find real admin users (those with proper admin data)
                             const adminUsers = users.filter(u => 
@@ -571,7 +572,7 @@
                             
                             // If we have admin users, eliminate ALL non-admin duplicates
                             if (adminUsers.length > 0) {
-                                console.log(`🔥 ADMIN EMAIL PROTECTION: Eliminating ${users.length - adminUsers.length} ghost/duplicate users`);
+                                logger.grid(`🔥 ADMIN EMAIL PROTECTION: Eliminating ${users.length - adminUsers.length} ghost/duplicate users`);
                                 
                                 // Remove ALL non-admin users with this email from candidates
                                 users.forEach(user => {
@@ -579,7 +580,7 @@
                                         const ghostIndex = userCandidates.findIndex(u => u.id === user.id);
                                         if (ghostIndex !== -1) {
                                             userCandidates.splice(ghostIndex, 1);
-                                            console.log(`🚫🚫 ELIMINATED GHOST/DUPLICATE: ${user.id} (protecting admin with same email)`);
+                                            logger.grid(`🚫🚫 ELIMINATED GHOST/DUPLICATE: ${user.id} (protecting admin with same email)`);
                                         }
                                     }
                                 });
@@ -593,20 +594,20 @@
                             // Single user - keep it UNLESS it's the known ghost
                             const user = users[0];
                             if (user.id === 'okl4sw2aDhW3yKpOfOwe5lH7OQj1') {
-                                console.log('🚫🚫 BLOCKING KNOWN GHOST USER:', user.id);
+                                logger.grid('🚫🚫 BLOCKING KNOWN GHOST USER:', user.id);
                                 return;
                             }
                             userMap.set(user.id, user);
-                            console.log('✅ Single user kept:', displayName, user.id);
+                            logger.grid('✅ Single user kept:', displayName, user.id);
                         } else {
                             // Multiple users with same name - keep the most complete one
-                            console.log(`🚫 GHOST CONFLICT: ${users.length} users named "${displayName}"`);
-                            users.forEach(u => console.log(`   - ${u.id} (email: ${u.email || 'none'})`));
+                            logger.grid(`🚫 GHOST CONFLICT: ${users.length} users named "${displayName}"`);
+                            users.forEach(u => logger.grid(`   - ${u.id} (email: ${u.email || 'none'})`));
                             
                             // Filter out known ghost users first
                             const validUsers = users.filter(u => u.id !== 'okl4sw2aDhW3yKpOfOwe5lH7OQj1');
                             if (validUsers.length === 0) {
-                                console.log('🚫 ALL USERS WERE GHOSTS - SKIPPING GROUP');
+                                logger.grid('🚫 ALL USERS WERE GHOSTS - SKIPPING GROUP');
                                 return;
                             }
                             
@@ -618,26 +619,26 @@
                             });
                             
                             userMap.set(bestUser.id, bestUser);
-                            console.log(`✅ Best user selected: ${displayName} -> ${bestUser.id}`);
+                            logger.grid(`✅ Best user selected: ${displayName} -> ${bestUser.id}`);
                             
                             // Log rejected ghosts
                             users.forEach(user => {
                                 if (user.id !== bestUser.id) {
-                                    console.log(`🚫 GHOST ELIMINATED: ${user.id} (duplicate of ${bestUser.id})`);
+                                    logger.grid(`🚫 GHOST ELIMINATED: ${user.id} (duplicate of ${bestUser.id})`);
                                 }
                             });
                         }
                     });
-                    console.log('🚨 Raw user count:', rawUserCount);
-                    console.log('🚨 Deduplicated user count:', userMap.size);
+                    logger.grid('🚨 Raw user count:', rawUserCount);
+                    logger.grid('🚨 Deduplicated user count:', userMap.size);
                     
                     // If no users found in legacy path, try pool members
                     if (userMap.size === 0) {
-                        console.log('🚨 No users in legacy path, trying pool members');
+                        logger.grid('🚨 No users in legacy path, trying pool members');
                         const poolMembersDoc = await getDoc(doc(db, poolMembersPath()));
                         if (poolMembersDoc.exists()) {
                             const members = poolMembersDoc.data();
-                            console.log('🚨 Pool members found:', Object.keys(members).length);
+                            logger.grid('🚨 Pool members found:', Object.keys(members).length);
                             for (const [uid, memberData] of Object.entries(members)) {
                                 userMap.set(uid, {
                                     id: uid,
@@ -667,7 +668,7 @@
                     
                     gridData = { allUsers, gameResults, allPicks };
                 } catch (error) {
-                    console.error('❌ Grid cache error:', error);
+                    logger.error('GRID', '❌ Grid cache error:', error);
                     // Fallback to direct fetch if cache fails
                     const usersSnap = await getDocs(collection(db, usersPath()));
                     const userMap = new Map();
@@ -700,7 +701,7 @@
                 // 🚀 Extract cached data - ZERO server calls for repeated access!
                 const { allUsers, gameResults, allPicks } = gridData;
                 
-                console.log('🚨 allUsers count:', allUsers.length);
+                logger.grid('🚨 allUsers count:', allUsers.length);
                 const userScores = allUsers.map(user => {
                     let totalPoints = 0;
                     let pointsLeft = 0;
@@ -729,9 +730,9 @@
                 });
                 
                 cachedUserScores = userScores;
-                console.log('🚨 cachedUserScores count:', cachedUserScores.length);
+                logger.grid('🚨 cachedUserScores count:', cachedUserScores.length);
                 applySorting();
-                console.log('🚨 After sorting, cachedUserScores count:', cachedUserScores.length);
+                logger.grid('🚨 After sorting, cachedUserScores count:', cachedUserScores.length);
                 
                 let tableHTML = `<table class="min-w-full divide-y divide-gray-200 grid-table">`;
                 tableHTML += `<thead class="bg-gray-50"><tr>`;
@@ -807,7 +808,7 @@
                         
                         // Debug first game for tonight
                         if (gameIndex === 0 && userIndex === 0) {
-                            console.log('🚨 GRID DEBUG:', {
+                            logger.grid('🚨 GRID DEBUG:', {
                                 game: game.away + ' @ ' + game.home,
                                 kickoff: game.kickoff,
                                 gameTime: gameTime.toISOString(),
@@ -859,10 +860,10 @@
                 });
 
                 tableHTML += `</tbody></table>`;
-                console.log('🚨 Table HTML length:', tableHTML.length);
-                console.log('🚨 Setting gridContainer.innerHTML');
+                logger.grid('🚨 Table HTML length:', tableHTML.length);
+                logger.grid('🚨 Setting gridContainer.innerHTML');
                 gridContainer.innerHTML = tableHTML;
-                console.log('🚨 gridContainer.innerHTML set successfully');
+                logger.grid('🚨 gridContainer.innerHTML set successfully');
                 
                 // Add column hover effects
                 const gameCells = gridContainer.querySelectorAll('.game-cell');
@@ -879,9 +880,9 @@
                         allCellsInColumn.forEach(c => c.classList.remove('highlight-column'));
                     });
                 });
-                console.log('🚨 renderGrid COMPLETED SUCCESSFULLY');
+                logger.grid('🚨 renderGrid COMPLETED SUCCESSFULLY');
                 } catch (error) {
-                    console.error('💥 CRITICAL ERROR in renderGrid:', error);
+                    logger.error('GRID', '💥 CRITICAL ERROR in renderGrid:', error);
                     gridContainer.innerHTML = `<p class="text-red-600">Error loading grid: ${error.message}</p>`;
                 }
             }

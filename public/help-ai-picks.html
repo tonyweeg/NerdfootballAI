@@ -23,6 +23,7 @@
             }
         }
     </script>
+    <script src="./js/utils/logger.js"></script>
 </head>
 <body class="bg-black min-h-screen text-yellow-400 font-mono">
 
@@ -144,11 +145,11 @@
                 if (adminUID && ADMIN_UIDS.includes(adminUID)) {
                     // Clear URL for security
                     window.history.replaceState({}, document.title, window.location.pathname);
-                    console.log('🎯 NERDAI_DEBUG: Admin access granted via URL parameter');
+                    logger.ai('🎯 NERDAI_DEBUG: Admin access granted via URL parameter');
 
                     try {
                         // Generate custom token for proper Firebase authentication
-                        console.log('🎯 NERDAI_DEBUG: Requesting custom token for admin UID:', adminUID);
+                        logger.ai('🎯 NERDAI_DEBUG: Requesting custom token for admin UID:', adminUID);
 
                         const response = await fetch('https://us-central1-nerdfootball.cloudfunctions.net/generateAdminTokenHTTP', {
                             method: 'POST',
@@ -163,11 +164,11 @@
                         }
 
                         const tokenData = await response.json();
-                        console.log('🎯 NERDAI_DEBUG: Custom token received');
+                        logger.ai('🎯 NERDAI_DEBUG: Custom token received');
 
                         // Sign in with the custom token
                         const userCredential = await window.auth.signInWithCustomToken(tokenData.customToken);
-                        console.log('🎯 NERDAI_DEBUG: Authenticated with custom token, UID:', userCredential.user.uid);
+                        logger.ai('🎯 NERDAI_DEBUG: Authenticated with custom token, UID:', userCredential.user.uid);
 
                         // Verify the UID matches what we requested
                         if (userCredential.user.uid !== adminUID) {
@@ -177,11 +178,11 @@
                         window.currentUser = userCredential.user;
                         window.isAdmin = true;
 
-                        console.log('🎯 NERDAI_DEBUG: Admin authentication successful with proper Firebase Auth');
+                        logger.ai('🎯 NERDAI_DEBUG: Admin authentication successful with proper Firebase Auth');
                         updateUIForAdmin();
                         return;
                     } catch (error) {
-                        console.error('🎯 NERDAI_DEBUG: Admin authentication failed:', error);
+                        logger.error('AI', '🎯 NERDAI_DEBUG: Admin authentication failed:', error);
                         blockNonAdminAccess('Failed to establish proper Firebase authentication: ' + error.message);
                         return;
                     }
@@ -191,11 +192,11 @@
                 window.auth.onAuthStateChanged((user) => {
                     window.currentUser = user;
                     if (user) {
-                        console.log('🎯 NERDAI_DEBUG: Firebase authenticated for data access');
+                        logger.ai('🎯 NERDAI_DEBUG: Firebase authenticated for data access');
                         if (ADMIN_UIDS.includes(user.uid)) {
                             window.isAdmin = true;
                             updateUIForAdmin();
-                            console.log('🎯 NERDAI_DEBUG: Admin privileges activated');
+                            logger.ai('🎯 NERDAI_DEBUG: Admin privileges activated');
                         } else {
                             // User is authenticated but not admin
                             blockNonAdminAccess('Authenticated user does not have admin privileges');
@@ -206,7 +207,7 @@
                     }
                 });
             } catch (error) {
-                console.log('🎯 NERDAI_DEBUG: Firebase auth setup failed:', error.message);
+                logger.ai('🎯 NERDAI_DEBUG: Firebase auth setup failed:', error.message);
             }
         });
 
@@ -227,11 +228,11 @@
                 section.style.display = 'block';
             });
 
-            console.log('🎯 NERDAI_DEBUG: Admin UI features activated - Wu-Tang Admin Arsenal now visible');
+            logger.ai('🎯 NERDAI_DEBUG: Admin UI features activated - Wu-Tang Admin Arsenal now visible');
         }
 
         function showAdminLoginOptions() {
-            console.log('🎯 NERDAI_DEBUG: Showing admin login options');
+            logger.ai('🎯 NERDAI_DEBUG: Showing admin login options');
 
             // Show admin login interface
             document.body.innerHTML = `
@@ -269,7 +270,7 @@
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
                 const result = await window.auth.signInWithPopup(provider);
-                console.log('🎯 NERDAI_DEBUG: Google sign-in successful, UID:', result.user.uid);
+                logger.ai('🎯 NERDAI_DEBUG: Google sign-in successful, UID:', result.user.uid);
 
                 if (ADMIN_UIDS.includes(result.user.uid)) {
                     window.currentUser = result.user;
@@ -280,7 +281,7 @@
                     alert('Access denied: This account does not have admin privileges for the Wu-Tang AI Chamber.');
                 }
             } catch (error) {
-                console.error('🎯 NERDAI_DEBUG: Google sign-in failed:', error);
+                logger.error('AI', '🎯 NERDAI_DEBUG: Google sign-in failed:', error);
                 alert('Sign-in failed: ' + error.message);
             }
         }
@@ -294,7 +295,7 @@
 
             try {
                 const result = await window.auth.signInWithEmailAndPassword(email, password);
-                console.log('🎯 NERDAI_DEBUG: Email sign-in successful, UID:', result.user.uid);
+                logger.ai('🎯 NERDAI_DEBUG: Email sign-in successful, UID:', result.user.uid);
 
                 if (ADMIN_UIDS.includes(result.user.uid)) {
                     window.currentUser = result.user;
@@ -305,13 +306,13 @@
                     alert('Access denied: This account does not have admin privileges for the Wu-Tang AI Chamber.');
                 }
             } catch (error) {
-                console.error('🎯 NERDAI_DEBUG: Email sign-in failed:', error);
+                logger.error('AI', '🎯 NERDAI_DEBUG: Email sign-in failed:', error);
                 alert('Sign-in failed: ' + error.message);
             }
         }
 
         function blockNonAdminAccess(reason) {
-            console.log('🚫 ACCESS_DENIED:', reason);
+            logger.ai('🚫 ACCESS_DENIED:', reason);
 
             // Hide the main content
             document.body.innerHTML = `
@@ -336,7 +337,7 @@
                 window.isAdmin = false;
                 location.reload();
             } catch (error) {
-                console.error('🎯 NERDAI_DEBUG: Sign out failed:', error);
+                logger.error('AI', '🎯 NERDAI_DEBUG: Sign out failed:', error);
                 alert('Sign out failed: ' + error.message);
             }
         }
@@ -361,7 +362,7 @@
 
             // Check cache first (unless force fresh requested)
             if (!forceFresh && predictionCache.isValid()) {
-                console.log('🎯 CACHE: Using cached predictions (less than 15 minutes old)');
+                logger.ai('🎯 CACHE: Using cached predictions (less than 15 minutes old)');
                 displayRichAIResults(predictionCache.data);
                 results.classList.remove('hidden');
                 return;
@@ -371,7 +372,7 @@
             results.classList.add('hidden');
 
             try {
-                console.log('🎯 CACHE: Generating fresh predictions (cache expired or forced refresh)');
+                logger.ai('🎯 CACHE: Generating fresh predictions (cache expired or forced refresh)');
                 const richAI = window.RichNerdAITool;
                 richAI.setDebugMode(true);
 
@@ -383,7 +384,7 @@
                     // Cache the fresh results
                     predictionCache.data = comprehensiveAnalysis;
                     predictionCache.timestamp = Date.now();
-                    console.log('🎯 CACHE: Fresh predictions cached for 15 minutes');
+                    logger.ai('🎯 CACHE: Fresh predictions cached for 15 minutes');
 
                     displayRichAIResults(comprehensiveAnalysis);
                 }
@@ -392,7 +393,7 @@
                 results.classList.remove('hidden');
 
             } catch (error) {
-                console.error('Rich AI Error:', error);
+                logger.error('AI', 'Rich AI Error:', error);
                 content.innerHTML = `<div class="text-red-600">Error: ${error.message}</div>`;
                 loading.classList.add('hidden');
                 results.classList.remove('hidden');
@@ -984,7 +985,7 @@
             results.classList.add('hidden');
 
             try {
-                console.log('🎯 NERDAI_DEBUG: Fetching comprehensive betting lines...');
+                logger.ai('🎯 NERDAI_DEBUG: Fetching comprehensive betting lines...');
 
                 const richAI = window.RichNerdAITool;
                 const espnData = await richAI.getESPNScoreboard();
@@ -1092,7 +1093,7 @@
                 results.classList.remove('hidden');
 
             } catch (error) {
-                console.error('Betting lines error:', error);
+                logger.error('AI', 'Betting lines error:', error);
                 content.innerHTML = `<div class="text-red-600">Error loading betting lines: ${error.message}</div>`;
                 loading.classList.add('hidden');
                 results.classList.remove('hidden');
@@ -1104,11 +1105,11 @@
             const results = document.getElementById('aiResults');
 
             try {
-                console.log('🎯 NERDAI_DEBUG: Generating accuracy report...');
+                logger.ai('🎯 NERDAI_DEBUG: Generating accuracy report...');
 
                 // Check authentication status
                 if (!window.auth.currentUser) {
-                    console.log('🎯 NERDAI_DEBUG: No authenticated user - proceeding with limited access');
+                    logger.ai('🎯 NERDAI_DEBUG: No authenticated user - proceeding with limited access');
                 }
 
                 const dashboardHTML = await window.PredictionTracker.displayAccuracyDashboard();
@@ -1127,7 +1128,7 @@
             const testOutput = document.getElementById('testOutput');
 
             try {
-                console.log('🎯 NERDAI_DEBUG: Testing Rich AI Tool...');
+                logger.ai('🎯 NERDAI_DEBUG: Testing Rich AI Tool...');
                 const result = await window.testRichAI();
 
                 testOutput.textContent = JSON.stringify(result, null, 2);
@@ -1144,11 +1145,11 @@
             const results = document.getElementById('aiResults');
 
             try {
-                console.log('🔄 RESULTS_TRACKER: Updating predictions with actual results...');
+                logger.ai('🔄 RESULTS_TRACKER: Updating predictions with actual results...');
 
                 // Check authentication status
                 if (!window.auth.currentUser) {
-                    console.log('🔄 RESULTS_TRACKER: No authenticated user - proceeding with limited access');
+                    logger.ai('🔄 RESULTS_TRACKER: No authenticated user - proceeding with limited access');
                 }
 
                 const currentWeek = 4; // Dynamic: getCurrentNFLWeek()
@@ -1199,11 +1200,11 @@
             const results = document.getElementById('aiResults');
 
             try {
-                console.log('🧠 RESULTS_TRACKER: Analyzing learning insights...');
+                logger.ai('🧠 RESULTS_TRACKER: Analyzing learning insights...');
 
                 // Check authentication status
                 if (!window.auth.currentUser) {
-                    console.log('🧠 RESULTS_TRACKER: No authenticated user - proceeding with limited access');
+                    logger.ai('🧠 RESULTS_TRACKER: No authenticated user - proceeding with limited access');
                 }
 
                 const analysisResult = await window.ResultsTracker.analyzeAccuracyTrends();
@@ -1304,7 +1305,7 @@
             const results = document.getElementById('aiResults');
 
             try {
-                console.log('🗄️ DATA_MANAGER: Loading prediction data management interface...');
+                logger.ai('🗄️ DATA_MANAGER: Loading prediction data management interface...');
 
                 // Get all stored predictions
                 const predictionsCollection = await window.db.collection('artifacts/nerdfootball/ai-predictions').get();
@@ -1362,7 +1363,7 @@
             }
 
             try {
-                console.log('📤 EXPORT: Generating comprehensive analysis export...');
+                logger.ai('📤 EXPORT: Generating comprehensive analysis export...');
 
                 // Get current analysis
                 const richAI = window.RichNerdAITool;
@@ -1407,7 +1408,7 @@
                 const doc = await window.db.doc(`artifacts/nerdfootball/ai-predictions/${docId}`).get();
                 if (doc.exists) {
                     const data = doc.data();
-                    console.log(`📊 Prediction Details for ${docId}:`, data);
+                    logger.ai(`📊 Prediction Details for ${docId}:`, data);
 
                     // Display in a modal or new section
                     const detailsWindow = window.open('', '_blank', 'width=800,height=600');
@@ -1449,7 +1450,7 @@ ${JSON.stringify(data, null, 2)}
             }
 
             try {
-                console.log('🧠 LEARNING: Adding AZ vs SEA learning experience...');
+                logger.ai('🧠 LEARNING: Adding AZ vs SEA learning experience...');
 
                 // Create the learning experience document
                 const learningExperience = {
@@ -1471,11 +1472,11 @@ ${JSON.stringify(data, null, 2)}
                 const learningPath = 'artifacts/nerdfootball/ai-learning';
                 const docRef = await window.db.collection(learningPath).add(learningExperience);
 
-                console.log('🧠 LEARNING: ✅ Learning experience added successfully:', docRef.id);
+                logger.ai('🧠 LEARNING: ✅ Learning experience added successfully:', docRef.id);
                 alert('✅ AZ vs SEA learning experience added! Future predictions involving Arizona will have reduced confidence.');
 
             } catch (error) {
-                console.error('🧠 LEARNING: ❌ Failed to add learning experience:', error);
+                logger.error('AI', '🧠 LEARNING: ❌ Failed to add learning experience:', error);
                 alert('❌ Failed to add learning experience: ' + error.message);
             }
         }

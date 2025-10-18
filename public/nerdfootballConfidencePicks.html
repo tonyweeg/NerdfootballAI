@@ -206,7 +206,7 @@
 
     <!-- 🤖 ML PREDICTION SYSTEM - CONFIDENCE POOL -->
     <script>
-        console.log('🧠 CONFIDENCE ML: Loading AI prediction system...');
+        logger.confidence('🧠 CONFIDENCE ML: Loading AI prediction system...');
 
         // Team database for confidence analysis
         const confidenceTeamDB = {
@@ -248,7 +248,7 @@
         window.openMLPredictionModal = function(gameId, awayTeam, homeTeam, event) {
             if (event) event.stopPropagation();
 
-            console.log(`🧠 CONFIDENCE AI: Analyzing Game ${gameId}: ${awayTeam} @ ${homeTeam}...`);
+            logger.confidence(`🧠 CONFIDENCE AI: Analyzing Game ${gameId}: ${awayTeam} @ ${homeTeam}...`);
             const prediction = generateConfidencePrediction(awayTeam, homeTeam, gameId);
 
             // Create modal
@@ -313,8 +313,9 @@
             document.body.appendChild(modal);
         };
 
-        console.log('🧠 CONFIDENCE ML: AI prediction system ready');
+        logger.confidence('🧠 CONFIDENCE ML: AI prediction system ready');
     </script>
+    <script src="./js/utils/logger.js"></script>
 </head>
 <body class="min-h-screen wutang-text">
     <!-- Starry Background -->
@@ -523,7 +524,7 @@
                     poolMemberInfo = members[currentUser.uid];
                 }
             } catch (error) {
-                console.error('Error checking pool membership:', error);
+                logger.error('CONFIDENCE', 'Error checking pool membership:', error);
             }
         }
 
@@ -595,7 +596,7 @@
                 populatePicksEditor();
 
             } catch (error) {
-                console.error('Error loading week data:', error);
+                logger.error('CONFIDENCE', 'Error loading week data:', error);
                 updateStatus(`Error loading Week ${currentWeek}`, 'error');
             }
         }
@@ -605,9 +606,9 @@
                 const response = await fetch(`/game-data/nfl_2025_week_${currentWeek}.json?v=${Date.now()}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 weekBible = await response.json();
-                console.log(`✅ Loaded Week ${currentWeek} bible`);
+                logger.confidence(`✅ Loaded Week ${currentWeek} bible`);
             } catch (error) {
-                console.error(`Failed to load Week ${currentWeek} bible:`, error);
+                logger.error('CONFIDENCE', `Failed to load Week ${currentWeek} bible:`, error);
                 weekBible = {};
             }
         }
@@ -624,19 +625,19 @@
                     // 🛡️ VALIDATION: Verify loaded picks are complete
                     const expectedGames = Object.keys(weekBible).filter(k => k !== '_metadata');
                     const loadedGamePicks = Object.keys(userPicks).filter(k => /^\d+$/.test(k));
-                    console.log(`✅ Loaded user picks for Week ${currentWeek}: ${loadedGamePicks.length}/${expectedGames.length} games`);
+                    logger.confidence(`✅ Loaded user picks for Week ${currentWeek}: ${loadedGamePicks.length}/${expectedGames.length} games`);
 
                     if (loadedGamePicks.length < expectedGames.length) {
-                        console.warn(`⚠️ INCOMPLETE PICKS LOADED: Missing ${expectedGames.length - loadedGamePicks.length} games`);
-                        console.warn('Missing games:', expectedGames.filter(g => !loadedGamePicks.includes(g)));
+                        logger.warn('CONFIDENCE', `⚠️ INCOMPLETE PICKS LOADED: Missing ${expectedGames.length - loadedGamePicks.length} games`);
+                        logger.warn('CONFIDENCE', 'Missing games:', expectedGames.filter(g => !loadedGamePicks.includes(g)));
                     }
                 } else {
                     userPicks = {};
-                    console.log(`📝 No picks found for Week ${currentWeek}`);
+                    logger.confidence(`📝 No picks found for Week ${currentWeek}`);
                 }
             } catch (error) {
-                console.error('❌ Error loading user picks:', error);
-                console.error('Setting userPicks to empty object - DO NOT SAVE until user creates picks!');
+                logger.error('CONFIDENCE', '❌ Error loading user picks:', error);
+                logger.error('CONFIDENCE', 'Setting userPicks to empty object - DO NOT SAVE until user creates picks!');
                 userPicks = {};
             }
         }
@@ -648,8 +649,8 @@
             // Find confidence values already used by locked games
             const usedByLockedGames = new Set();
 
-            console.log(`🔍 DEBUG: Checking available confidence for ${currentGameId}, total games: ${totalGames}`);
-            console.log(`🔍 DEBUG: Current userPicks:`, userPicks);
+            logger.confidence(`🔍 DEBUG: Checking available confidence for ${currentGameId}, total games: ${totalGames}`);
+            logger.confidence(`🔍 DEBUG: Current userPicks:`, userPicks);
 
             // Check all locked rows for used confidence values
             document.querySelectorAll('.locked-row').forEach(row => {
@@ -658,11 +659,11 @@
                     const gameId = gameElement.getAttribute('data-game-id');
                     const pick = userPicks[gameId];
 
-                    console.log(`🔒 DEBUG: Found locked row for game ${gameId}, pick:`, pick);
+                    logger.confidence(`🔒 DEBUG: Found locked row for game ${gameId}, pick:`, pick);
 
                     if (pick && pick.confidence) {
                         usedByLockedGames.add(parseInt(pick.confidence));
-                        console.log(`🔒 CONFIDENCE_FILTER: Game ${gameId} is locked with confidence ${pick.confidence}`);
+                        logger.confidence(`🔒 CONFIDENCE_FILTER: Game ${gameId} is locked with confidence ${pick.confidence}`);
                     }
                 }
             });
@@ -686,7 +687,7 @@
 
                         if (isTimeLocked) {
                             usedByLockedGames.add(parseInt(pick.confidence));
-                            console.log(`⏰ CONFIDENCE_FILTER: Game ${gameId} is time-locked with confidence ${pick.confidence}`);
+                            logger.confidence(`⏰ CONFIDENCE_FILTER: Game ${gameId} is time-locked with confidence ${pick.confidence}`);
                         }
                     }
                 }
@@ -695,7 +696,7 @@
             // Filter out confidence values used by locked games
             const availableValues = allValues.filter(value => !usedByLockedGames.has(value));
 
-            console.log(`🎯 CONFIDENCE_FILTER: Available values for ${currentGameId}: [${availableValues.join(', ')}] (excluded locked: [${Array.from(usedByLockedGames).join(', ')}])`);
+            logger.confidence(`🎯 CONFIDENCE_FILTER: Available values for ${currentGameId}: [${availableValues.join(', ')}] (excluded locked: [${Array.from(usedByLockedGames).join(', ')}])`);
 
             return availableValues;
         }
@@ -724,7 +725,7 @@
                     select.appendChild(option);
                 });
 
-                console.log(`🔄 CONFIDENCE_REFRESH: Updated dropdown for ${gameId} with ${availableValues.length} available values`);
+                logger.confidence(`🔄 CONFIDENCE_REFRESH: Updated dropdown for ${gameId} with ${availableValues.length} available values`);
             });
         }
 
@@ -891,7 +892,7 @@
             // Refresh confidence dropdowns after page load to apply locked game filtering
             setTimeout(() => {
                 refreshConfidenceDropdowns();
-                console.log('🔄 INITIAL_LOAD: Refreshed confidence dropdowns after page load');
+                logger.confidence('🔄 INITIAL_LOAD: Refreshed confidence dropdowns after page load');
             }, 100);
         }
 
@@ -1017,8 +1018,8 @@
                 const expectedGames = Object.keys(weekBible).filter(k => k !== '_metadata');
                 const actualGamePicks = Object.keys(userPicks).filter(k => /^\d+$/.test(k));
                 if (actualGamePicks.length < expectedGames.length) {
-                    console.warn(`⚠️ INCOMPLETE PICKS: Saving ${actualGamePicks.length}/${expectedGames.length} games`);
-                    console.warn('Missing games:', expectedGames.filter(g => !actualGamePicks.includes(g)));
+                    logger.warn('CONFIDENCE', `⚠️ INCOMPLETE PICKS: Saving ${actualGamePicks.length}/${expectedGames.length} games`);
+                    logger.warn('CONFIDENCE', 'Missing games:', expectedGames.filter(g => !actualGamePicks.includes(g)));
                 }
 
                 const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
@@ -1033,7 +1034,7 @@
                 }, 2000);
 
             } catch (error) {
-                console.error('Auto-save failed:', error);
+                logger.error('CONFIDENCE', 'Auto-save failed:', error);
                 showAutoSaveStatus('error');
             }
         }
@@ -1294,7 +1295,7 @@
                 return;
             }
 
-            console.log(`🧠 BRAIN_ICON_DEBUG: Opening ML prediction for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
+            logger.confidence(`🧠 BRAIN_ICON_DEBUG: Opening ML prediction for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
 
             const mlPrediction = generateMLPrediction(awayTeam, homeTeam, gameId);
 
@@ -1477,11 +1478,11 @@
                 event.stopPropagation();
             }
 
-            console.log(`🧠 BRAIN_ICON_DEBUG: Opening confidence ML prediction for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
+            logger.confidence(`🧠 BRAIN_ICON_DEBUG: Opening confidence ML prediction for Game ${gameId}: ${awayTeam} @ ${homeTeam}`);
 
             // Check if Firebase is loaded and user is authenticated
             if (typeof window.currentUser === 'undefined' || !window.currentUser) {
-                console.log('🧠 BRAIN_ICON_DEBUG: User not authenticated yet, showing basic prediction');
+                logger.confidence('🧠 BRAIN_ICON_DEBUG: User not authenticated yet, showing basic prediction');
                 showBasicConfidencePrediction(gameId, awayTeam, homeTeam);
                 return;
             }
@@ -1489,7 +1490,7 @@
             // Check admin status
             const ADMIN_UIDS = ['WxSPmEildJdqs6T5hIpBUZrscwt2', 'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'];
             if (!ADMIN_UIDS.includes(window.currentUser.uid)) {
-                console.log('🧠 BRAIN_ICON_DEBUG: Non-admin user, showing message');
+                logger.confidence('🧠 BRAIN_ICON_DEBUG: Non-admin user, showing message');
                 alert('AI predictions are currently in beta testing');
                 return;
             }
@@ -1613,7 +1614,7 @@
             }
         });
 
-        console.log('🧠 ML PREDICTION DEBUG: Global confidence ML prediction functions loaded');
+        logger.confidence('🧠 ML PREDICTION DEBUG: Global confidence ML prediction functions loaded');
     </script>
 </body>
 </html>

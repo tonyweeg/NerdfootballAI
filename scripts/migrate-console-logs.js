@@ -138,7 +138,8 @@ class ConsoleLogMigrator {
                 this.results.consoleErrorCount += errors.length;
                 this.results.consoleInfoCount += infos.length;
 
-                const category = this.detectCategory(content);
+                const filename = path.basename(filePath);
+                const category = this.detectCategory(content, filename);
                 if (category) {
                     this.results.categorized[category] = (this.results.categorized[category] || 0) + matches.length;
                 }
@@ -163,9 +164,27 @@ class ConsoleLogMigrator {
     }
 
     /**
-     * Detect category based on file content
+     * Detect category based on filename first, then content
      */
-    detectCategory(content) {
+    detectCategory(content, filename = '') {
+        // Filename-based detection (higher priority)
+        const filenamePatterns = {
+            AI: /ai-picks|help-ai/i,
+            CACHE: /cache|straight-cache/i,
+            CONFIDENCE: /confidence.*picks/i,
+            SURVIVOR: /survivor/i,
+            GRID: /grid/i,
+            LEADERBOARD: /leaderboard/i,
+            FIRESTORE: /crud|admin/i
+        };
+
+        for (const [category, pattern] of Object.entries(filenamePatterns)) {
+            if (pattern.test(filename)) {
+                return category;
+            }
+        }
+
+        // Content-based detection (fallback)
         for (const [category, pattern] of Object.entries(CATEGORY_PATTERNS)) {
             if (pattern.test(content)) {
                 return category;
@@ -175,17 +194,49 @@ class ConsoleLogMigrator {
     }
 
     /**
+     * Load core production files list
+     */
+    loadCoreFilesList() {
+        const coreFilesPath = path.join(__dirname, '..', 'core-production-files.txt');
+        if (!fs.existsSync(coreFilesPath)) {
+            return null;
+        }
+
+        const content = fs.readFileSync(coreFilesPath, 'utf8');
+        return content.split('\n')
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#'))
+            .map(file => file.replace(/^public\//, '')); // Normalize paths
+    }
+
+    /**
      * Migrate files to use centralized logger
      */
-    async migrate(dryRun = false) {
+    async migrate(dryRun = false, coreOnly = false) {
         console.log(`🚀 ${dryRun ? '[DRY RUN] ' : ''}Migrating console statements to logger.js...\n`);
 
         // First analyze
         await this.analyze();
 
-        console.log(`\n📦 Found ${this.files.length} files with console statements\n`);
+        let filesToMigrate = this.files;
 
-        for (const file of this.files) {
+        // Filter to core files only if requested
+        if (coreOnly) {
+            const coreFiles = this.loadCoreFilesList();
+            if (coreFiles) {
+                filesToMigrate = this.files.filter(f => {
+                    const relativePath = f.path.replace(/^public\//, '');
+                    return coreFiles.includes(relativePath);
+                });
+                console.log(`\n📋 Core-only mode: Filtering to ${filesToMigrate.length} of ${this.files.length} files\n`);
+            } else {
+                console.log(`\n⚠️  Warning: core-production-files.txt not found, migrating all files\n`);
+            }
+        }
+
+        console.log(`\n📦 Migrating ${filesToMigrate.length} files with console statements\n`);
+
+        for (const file of filesToMigrate) {
             await this.migrateFile(file, dryRun);
         }
 
@@ -304,25 +355,30 @@ if (require.main === module) {
     const args = process.argv.slice(2);
     const command = args[0];
     const dryRun = args.includes('--dry-run');
+    const coreOnly = args.includes('--core-only');
 
     const migrator = new ConsoleLogMigrator();
 
     if (command === '--analyze') {
         migrator.analyze();
     } else if (command === '--migrate') {
-        migrator.migrate(dryRun);
+        migrator.migrate(dryRun, coreOnly);
     } else {
         console.log(`
 Console.log Migration Script
 
 Usage:
-  node scripts/migrate-console-logs.js --analyze       Analyze files only
-  node scripts/migrate-console-logs.js --migrate       Perform migration
-  node scripts/migrate-console-logs.js --migrate --dry-run  Test migration
+  node scripts/migrate-console-logs.js --analyze              Analyze files only
+  node scripts/migrate-console-logs.js --migrate              Perform migration (all files)
+  node scripts/migrate-console-logs.js --migrate --core-only  Migrate core production files only
+  node scripts/migrate-console-logs.js --migrate --dry-run    Test migration
+  node scripts/migrate-console-logs.js --migrate --core-only --dry-run  Test core migration
 
 Examples:
-  npm run analyze-console-logs   (analyze only)
-  npm run migrate-console-logs   (perform migration)
+  npm run analyze:logs              (analyze only)
+  npm run migrate:logs              (perform migration - all files)
+  npm run migrate:logs:core         (migrate core production files)
+  npm run migrate:logs:dry          (test migration)
         `);
     }
 }
