@@ -308,8 +308,31 @@ firebase deploy --only functions
 ## 🔧 FIREBASE CONFIGURATION MANAGEMENT
 **CRITICAL: Consistent Firebase configs prevent authentication disasters**
 
-### 🛡️ Standard Firebase Configuration (USE THIS):
+### ✅ ALWAYS USE CENTRALIZED CONFIGURATION FILES
+
+**DO NOT copy Firebase config objects into your code. ALWAYS import from centralized config:**
+
 ```javascript
+// For ES6 modules (recommended):
+import { getFirebaseConfig } from './js/config/firebase-config.js';
+const firebaseConfig = getFirebaseConfig();
+firebase.initializeApp(firebaseConfig);
+
+// For compatibility SDK:
+<script src="./js/config/firebase-config-compat.js"></script>
+<script>
+  const firebaseConfig = window.getFirebaseConfig();
+  firebase.initializeApp(firebaseConfig);
+</script>
+```
+
+**Centralized config files:**
+- `/public/js/config/firebase-config.js` (ES6 modules)
+- `/public/js/config/firebase-config-compat.js` (compat SDK)
+
+### 🛡️ Standard Firebase Configuration (REFERENCE ONLY - DO NOT COPY):
+```javascript
+// ⚠️ DO NOT COPY THIS - Use centralized config files above
 const firebaseConfig = {
     apiKey: "AIzaSyDAF1MbAhL2uPIVUGMDlXvCqtknUUCX5Gw",
     authDomain: "nerdfootball.firebaseapp.com",
