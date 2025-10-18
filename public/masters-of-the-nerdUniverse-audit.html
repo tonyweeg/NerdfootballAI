@@ -752,12 +752,29 @@
                 const userSeasonTotals = {};
                 let weeklyHighScore = 0;
 
-                for (let weekNumber = 1; weekNumber <= completedWeeks; weekNumber++) {
-                    const bibleData = await loadBibleData(weekNumber);
-                    if (!bibleData) continue;
+                // ⚡ PARALLEL FETCH: Load all weeks simultaneously
+                logger.auth(`⚡ Starting parallel fetch for weeks 1-${completedWeeks}...`);
+                const weekNumbers = Array.from({length: completedWeeks}, (_, i) => i + 1);
 
-                    const picksRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_picks').doc(weekNumber.toString()).collection('submissions');
-                    const picksSnap = await picksRef.get();
+                const allWeeksData = await Promise.all(
+                    weekNumbers.map(async (weekNumber) => {
+                        try {
+                            const bibleData = await loadBibleData(weekNumber);
+                            const picksRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_picks').doc(weekNumber.toString()).collection('submissions');
+                            const picksSnap = await picksRef.get();
+                            return { weekNumber, bibleData, picksSnap };
+                        } catch (error) {
+                            logger.warn('AUTH', `Error fetching Week ${weekNumber}:`, error);
+                            return { weekNumber, bibleData: null, picksSnap: null };
+                        }
+                    })
+                );
+
+                logger.auth(`✅ Parallel fetch complete, processing ${allWeeksData.length} weeks...`);
+
+                // Process all weeks (now that we have all data)
+                allWeeksData.forEach(({ weekNumber, bibleData, picksSnap }) => {
+                    if (!bibleData || !picksSnap) return;
 
                     picksSnap.forEach(userDoc => {
                         const userId = userDoc.id;
@@ -773,7 +790,7 @@
                             weeklyHighScore = analysis.totalPointsEarned;
                         }
                     });
-                }
+                });
 
                 const seasonScores = Object.values(userSeasonTotals);
                 const seasonHighScore = seasonScores.length > 0 ? Math.max(...seasonScores) : 0;
@@ -956,79 +973,86 @@
                 const seasonTotals = {};
                 const actualCurrentWeek = getCurrentWeekNumber();
 
-                // Process each week (1-18)
-                for (let weekNumber = 1; weekNumber <= 18; weekNumber++) {
-                    logger.auth(`📊 Processing Week ${weekNumber}...`);
+                // ⚡ PARALLEL FETCH: Load all 18 weeks simultaneously
+                logger.auth(`⚡ Starting parallel fetch for weeks 1-18...`);
+                const seasonWeekNumbers = Array.from({length: 18}, (_, i) => i + 1);
 
-                    try {
-                        // Load bible data for this week
-                        const bibleData = await loadBibleData(weekNumber);
-                        if (!bibleData) {
-                            logger.warn('AUTH', `No bible data for Week ${weekNumber}, skipping...`);
-                            continue;
+                const allSeasonWeeksData = await Promise.all(
+                    seasonWeekNumbers.map(async (weekNumber) => {
+                        try {
+                            const bibleData = await loadBibleData(weekNumber);
+                            const picksRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_picks').doc(weekNumber.toString()).collection('submissions');
+                            const picksSnap = await picksRef.get();
+                            return { weekNumber, bibleData, picksSnap };
+                        } catch (error) {
+                            logger.warn('AUTH', `Error fetching Week ${weekNumber}:`, error);
+                            return { weekNumber, bibleData: null, picksSnap: null };
                         }
+                    })
+                );
 
-                        // Load picks for this week
-                        const picksRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_picks').doc(weekNumber.toString()).collection('submissions');
-                        const picksSnap = await picksRef.get();
+                logger.auth(`✅ Parallel fetch complete, processing ${allSeasonWeeksData.length} weeks...`);
 
-                        if (picksSnap.size === 0) {
-                            logger.warn('AUTH', `No picks for Week ${weekNumber}, skipping...`);
-                            continue;
-                        }
-
-                        // Process each user's picks for this week
-                        picksSnap.forEach(userDoc => {
-                            const userId = userDoc.id;
-                            const picks = userDoc.data();
-
-                            // Initialize user if not exists
-                            if (!seasonTotals[userId]) {
-                                seasonTotals[userId] = {
-                                    userId,
-                                    userName: userNames[userId] || 'Unknown',
-                                    userEmail: userEmails[userId] || 'No Email',
-                                    isPoolMember: !!poolMembers[userId],
-                                    totalPointsEarned: 0,
-                                    totalCorrectPicks: 0,
-                                    totalValidPicks: 0,
-                                    weeklyBreakdown: {},
-                                    winningPicks: [],
-                                    weeksPlayed: 0
-                                };
-                            }
-
-                            // Analyze picks for this week
-                            const analysis = analyzePicks(picks, bibleData);
-
-                            // Add to season totals
-                            seasonTotals[userId].totalPointsEarned += analysis.totalPointsEarned;
-                            seasonTotals[userId].totalCorrectPicks += analysis.correctPicks;
-                            seasonTotals[userId].totalValidPicks += analysis.totalValidPicks;
-                            seasonTotals[userId].weeksPlayed += 1;
-
-                            // Store weekly breakdown
-                            seasonTotals[userId].weeklyBreakdown[weekNumber] = {
-                                pointsEarned: analysis.totalPointsEarned,
-                                correctPicks: analysis.correctPicks,
-                                totalPicks: analysis.totalValidPicks
-                            };
-
-                            // Add winning picks with week context
-                            if (analysis.winningPicks && analysis.winningPicks.length > 0) {
-                                analysis.winningPicks.forEach(pick => {
-                                    seasonTotals[userId].winningPicks.push({
-                                        ...pick,
-                                        week: weekNumber
-                                    });
-                                });
-                            }
-                        });
-
-                    } catch (error) {
-                        logger.warn('AUTH', `Error processing Week ${weekNumber}:`, error);
+                // Process all weeks (now that we have all data)
+                allSeasonWeeksData.forEach(({ weekNumber, bibleData, picksSnap }) => {
+                    if (!bibleData) {
+                        logger.warn('AUTH', `No bible data for Week ${weekNumber}, skipping...`);
+                        return;
                     }
-                }
+
+                    if (!picksSnap || picksSnap.size === 0) {
+                        logger.warn('AUTH', `No picks for Week ${weekNumber}, skipping...`);
+                        return;
+                    }
+
+                    // Process each user's picks for this week
+                    picksSnap.forEach(userDoc => {
+                        const userId = userDoc.id;
+                        const picks = userDoc.data();
+
+                        // Initialize user if not exists
+                        if (!seasonTotals[userId]) {
+                            seasonTotals[userId] = {
+                                userId,
+                                userName: userNames[userId] || 'Unknown',
+                                userEmail: userEmails[userId] || 'No Email',
+                                isPoolMember: !!poolMembers[userId],
+                                totalPointsEarned: 0,
+                                totalCorrectPicks: 0,
+                                totalValidPicks: 0,
+                                weeklyBreakdown: {},
+                                winningPicks: [],
+                                weeksPlayed: 0
+                            };
+                        }
+
+                        // Analyze picks for this week
+                        const analysis = analyzePicks(picks, bibleData);
+
+                        // Add to season totals
+                        seasonTotals[userId].totalPointsEarned += analysis.totalPointsEarned;
+                        seasonTotals[userId].totalCorrectPicks += analysis.correctPicks;
+                        seasonTotals[userId].totalValidPicks += analysis.totalValidPicks;
+                        seasonTotals[userId].weeksPlayed += 1;
+
+                        // Store weekly breakdown
+                        seasonTotals[userId].weeklyBreakdown[weekNumber] = {
+                            pointsEarned: analysis.totalPointsEarned,
+                            correctPicks: analysis.correctPicks,
+                            totalPicks: analysis.totalValidPicks
+                        };
+
+                        // Add winning picks with week context
+                        if (analysis.winningPicks && analysis.winningPicks.length > 0) {
+                            analysis.winningPicks.forEach(pick => {
+                                seasonTotals[userId].winningPicks.push({
+                                    ...pick,
+                                    week: weekNumber
+                                });
+                            });
+                        }
+                    });
+                });
 
                 // Convert to array and sort by total points
                 const sortedUsers = Object.values(seasonTotals)
