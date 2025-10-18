@@ -258,12 +258,12 @@ class ConsoleLogMigrator {
             let modified = false;
 
             // Check if file already has logger import/script
-            const hasLoggerImport = content.includes('logger.js') || content.includes('window.logger');
+            const hasLoggerImport = content.includes('logger.js') || content.includes('logger-compat.js') || content.includes('window.logger');
 
             if (!hasLoggerImport) {
                 // Add logger script tag for HTML files
                 if (file.fullPath.endsWith('.html')) {
-                    const scriptTag = `    <script src="./js/utils/logger.js"></script>\n</head>`;
+                    const scriptTag = `    <script src="./js/utils/logger-compat.js"></script>\n</head>`;
                     if (content.includes('</head>')) {
                         content = content.replace('</head>', scriptTag);
                         modified = true;
