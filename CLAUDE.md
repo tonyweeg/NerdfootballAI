@@ -107,6 +107,19 @@
 - **fantasy-sports-ux-designer** - UI/UX design and user experience
 - **firebase-deployment-specialist** - Production deployments and Firebase expertise
 
+## 🎯 CLAUDE CODE SKILLS (Proactive Usage)
+**Claude will automatically invoke these skills when appropriate - user doesn't need to remember them.**
+
+- **nerdfootball-deploy** - Complete deployment workflow (test → deploy → verify → backup)
+- **triple-backup** - TRIPLE-BACKUP protocol (git → GitHub → Firebase)
+- **performance-audit** - Validate all performance targets (<500ms caches, <100ms UI)
+- **config-audit** - Verify centralized Firebase config usage
+- **espn-sync** - ESPN API integration and cache management
+- **speedy-code** - Performance optimization patterns and techniques
+- **firebase-expert** - Firebase deployment, Firestore, Functions, Auth expertise
+
+**Skill Reference:** See `.claude/SKILLS_REFERENCE.md` for detailed invocation patterns.
+
 ## 📚 PAPYRUS NERDS v1.0 - COMPREHENSIVE DOCUMENTATION STANDARD
 **CURRENT DOCUMENTATION STANDARD - COMPLETE TECHNICAL REFERENCE**
 
