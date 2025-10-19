@@ -1314,74 +1314,92 @@
                 const gameStates = analyzeGameStates(bibleData);
 
                 // Calculate scores for each user - SAME LOGIC AS GRID
-                const standings = [];
+                // ⚡ PARALLEL FETCH: Load all user picks simultaneously
+                const allUserData = await Promise.all(
+                    memberIds.map(async (memberId) => {
+                        const memberInfo = poolMembers[memberId];
+                        const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`;
 
-                for (const memberId of memberIds) {
-                    const memberInfo = poolMembers[memberId];
-                    const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions/${memberId}`;
-                    const userPicksDoc = await getDoc(doc(db, picksPath));
+                        try {
+                            const userPicksDoc = await getDoc(doc(db, picksPath));
 
-                    let userData = {
-                        userId: memberId,
-                        name: memberInfo.name || memberInfo.email || 'Unknown',
-                        email: memberInfo.email,
-                        totalPoints: 0,
-                        correctPicks: 0,
-                        totalPicks: 0,
-                        pickAccuracy: 0,
-                        hasPicks: false
-                    };
+                            let userData = {
+                                userId: memberId,
+                                name: memberInfo.name || memberInfo.email || 'Unknown',
+                                email: memberInfo.email,
+                                totalPoints: 0,
+                                correctPicks: 0,
+                                totalPicks: 0,
+                                pickAccuracy: 0,
+                                hasPicks: false
+                            };
 
-                    if (userPicksDoc.exists()) {
-                        const userPicks = userPicksDoc.data();
-                        const pickGameIds = Object.keys(userPicks).filter(key =>
-                            !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints',
-                              'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated',
-                              'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key)
-                        );
+                            if (userPicksDoc.exists()) {
+                                const userPicks = userPicksDoc.data();
+                                const pickGameIds = Object.keys(userPicks).filter(key =>
+                                    !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints',
+                                      'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated',
+                                      'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key)
+                                );
 
-                        let totalPoints = 0;
-                        let correctPicks = 0;
+                                let totalPoints = 0;
+                                let correctPicks = 0;
 
-                        // EXACT GRID SCORING LOGIC
-                        gameIds.forEach(gameId => {
-                            const pick = userPicks[gameId];
-                            const game = bibleData[gameId];
+                                // EXACT GRID SCORING LOGIC
+                                gameIds.forEach(gameId => {
+                                    const pick = userPicks[gameId];
+                                    const game = bibleData[gameId];
 
-                            if (pick && pick.winner && pick.confidence && game) {
-                                if (game.winner && game.winner !== 'TBD') {
-                                    // TIE LOGIC (EXACT GRID LOGIC)
-                                    const isTie = (game.winner && (
-                                        game.winner.toUpperCase() === 'TIE' ||
-                                        game.winner.toUpperCase() === 'TIE/OT' ||
-                                        game.winner.toUpperCase() === 'DRAW' ||
-                                        game.winner.toUpperCase().includes('TIE')
-                                    )) || (game.awayScore !== undefined && game.homeScore !== undefined &&
-                                           parseInt(game.awayScore) === parseInt(game.homeScore) &&
-                                           parseInt(game.awayScore) > 0);
+                                    if (pick && pick.winner && pick.confidence && game) {
+                                        if (game.winner && game.winner !== 'TBD') {
+                                            // TIE LOGIC (EXACT GRID LOGIC)
+                                            const isTie = (game.winner && (
+                                                game.winner.toUpperCase() === 'TIE' ||
+                                                game.winner.toUpperCase() === 'TIE/OT' ||
+                                                game.winner.toUpperCase() === 'DRAW' ||
+                                                game.winner.toUpperCase().includes('TIE')
+                                            )) || (game.awayScore !== undefined && game.homeScore !== undefined &&
+                                                   parseInt(game.awayScore) === parseInt(game.homeScore) &&
+                                                   parseInt(game.awayScore) > 0);
 
-                                    const isCorrect = isTie ? true : (game.winner === pick.winner);
+                                            const isCorrect = isTie ? true : (game.winner === pick.winner);
 
-                                    if (isCorrect) {
-                                        correctPicks++;
-                                        totalPoints += pick.confidence;
+                                            if (isCorrect) {
+                                                correctPicks++;
+                                                totalPoints += pick.confidence;
+                                            }
+                                        }
                                     }
-                                }
+                                });
+
+                                userData = {
+                                    ...userData,
+                                    totalPoints,
+                                    correctPicks,
+                                    totalPicks: pickGameIds.length,
+                                    pickAccuracy: pickGameIds.length > 0 ? ((correctPicks / pickGameIds.length) * 100) : 0,
+                                    hasPicks: true
+                                };
                             }
-                        });
 
-                        userData = {
-                            ...userData,
-                            totalPoints,
-                            correctPicks,
-                            totalPicks: pickGameIds.length,
-                            pickAccuracy: pickGameIds.length > 0 ? ((correctPicks / pickGameIds.length) * 100) : 0,
-                            hasPicks: true
-                        };
-                    }
+                            return userData;
+                        } catch (error) {
+                            console.warn(`⚠️ Error fetching picks for ${memberId}:`, error);
+                            return {
+                                userId: memberId,
+                                name: memberInfo.name || memberInfo.email || 'Unknown',
+                                email: memberInfo.email,
+                                totalPoints: 0,
+                                correctPicks: 0,
+                                totalPicks: 0,
+                                pickAccuracy: 0,
+                                hasPicks: false
+                            };
+                        }
+                    })
+                );
 
-                    standings.push(userData);
-                }
+                const standings = allUserData;
 
                 // Sort by total points
                 standings.sort((a, b) => b.totalPoints - a.totalPoints);
