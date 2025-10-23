@@ -271,13 +271,28 @@ async function generateSurvivorPoolData(poolId) {
                 if (isEliminated) break; // Stop checking if already eliminated
 
                 const weekPick = picks[weekNumber.toString()];
+
+                // CRITICAL: Only check for missing picks on weeks with FINAL games
+                // Don't eliminate for missing picks on weeks that haven't finished yet
+                const weekResults = nflResults[weekNumber];
+                const hasFinalGames = weekResults && weekResults.finalGamesCount > 0;
+
                 if (!weekPick || !weekPick.team) {
-                    console.log(`⚠️ ${memberName} has NO pick for Week ${weekNumber}`);
-                    continue; // Skip weeks with no picks (might eliminate them later for missing picks)
+                    // If week has final games and no pick submitted, ELIMINATE
+                    if (hasFinalGames) {
+                        isEliminated = true;
+                        eliminatedWeek = weekNumber;
+                        eliminatedBy = 'NO_PICK_SUBMITTED';
+                        console.log(`💀 ${memberName} ELIMINATED Week ${weekNumber} - NO PICK SUBMITTED`);
+                        break;
+                    } else {
+                        // Week hasn't finished yet, can't eliminate for missing pick
+                        console.log(`⏳ ${memberName} Week ${weekNumber} - no pick yet, but week not complete`);
+                        continue;
+                    }
                 }
 
                 const teamName = typeof weekPick.team === 'string' ? weekPick.team : (weekPick.team.teamPicked || weekPick.team.team || 'UNKNOWN');
-                const weekResults = nflResults[weekNumber];
 
                 console.log(`🏈 ${memberName} Week ${weekNumber} pick: ${teamName}`);
 

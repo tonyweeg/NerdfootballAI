@@ -613,20 +613,49 @@
 
         function getCurrentWeek() {
             const now = new Date();
-            const seasonStart = new Date('2025-09-04');
+            const seasonStart = new Date('2025-09-03'); // NFL 2025 Week 1 starts Sep 3
             const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
             const weeksSinceStart = Math.floor(daysSinceStart / 7);
             return Math.max(1, Math.min(18, weeksSinceStart + 1));
         }
 
         function isWeekLocked(week) {
-            // Check if any game in the week has started using Eastern Time Parser
+            // SURVIVOR RULE: Picks allowed from Tuesday forward until first game starts
+            // Week is UNLOCKED if:
+            // 1. It's the current week AND today is Tuesday or later
+            // 2. No game has started yet
+
+            logger.survivor(`🔒 LOCK_CHECK: Week ${week}, currentWeek: ${currentWeek}`);
+
+            // Past weeks are always locked
+            if (week < currentWeek) {
+                logger.survivor(`🔒 LOCK_CHECK: Week ${week} is PAST - LOCKED`);
+                return true;
+            }
+
+            // Future weeks are always locked
+            if (week > currentWeek) {
+                logger.survivor(`🔒 LOCK_CHECK: Week ${week} is FUTURE - LOCKED`);
+                return true;
+            }
+
+            // Current week: Check if it's Tuesday or later
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, 2=Tuesday, etc.
+
+            // If it's before Tuesday (Sunday=0, Monday=1), week is locked
+            if (dayOfWeek < 2) {
+                logger.survivor(`🔒 LOCK_CHECK: Before Tuesday (day ${dayOfWeek}) - LOCKED`);
+                return true;
+            }
+
+            // Tuesday or later - check if games have started
             const weekGames = gameData[week];
-            logger.survivor(`🔒 LOCK_CHECK: Week ${week}, hasGameData: ${!!weekGames}, hasParser: ${!!window.easternTimeParser}`);
 
             if (!weekGames || !window.easternTimeParser) {
-                logger.survivor(`🔒 LOCK_CHECK: Using fallback logic - week ${week} vs current ${currentWeek}`);
-                return week < currentWeek; // Fallback: lock past weeks
+                // No game data yet - allow picks from Tuesday onward
+                logger.survivor(`🔒 LOCK_CHECK: Tuesday+ without game data - UNLOCKED for picks`);
+                return false;
             }
 
             // Check if any game has started
@@ -643,7 +672,7 @@
                 }
             }
 
-            logger.survivor(`🔒 LOCK_CHECK: Week ${week} is NOT locked`);
+            logger.survivor(`🔒 LOCK_CHECK: Week ${week} is UNLOCKED - Tuesday+ and no games started`);
             return false;
         }
 
