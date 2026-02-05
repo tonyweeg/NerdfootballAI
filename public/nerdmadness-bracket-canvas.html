@@ -58,7 +58,7 @@
 
         .viewport {
             position: fixed;
-            top: 50px;
+            top: 94px;
             left: 0;
             right: 0;
             bottom: 0;
@@ -164,17 +164,18 @@
         .zoom-level-btn:hover { border-color: #4285F4; color: #4285F4; }
         .zoom-level-btn.active { background: #4285F4; border-color: #4285F4; color: #fff; }
 
-        .nav-btns {
+        .minimap-nav {
             display: flex;
-            gap: 2px;
+            align-items: center;
+            gap: 4px;
         }
         .nav-btn {
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
             background: #fff;
             border: 1px solid #ddd;
             color: #4285F4;
-            font-size: 12px;
+            font-size: 11px;
             cursor: pointer;
             border-radius: 4px;
             display: flex;
@@ -223,6 +224,8 @@
         .team-row:last-child { border-bottom: none; }
         .team-row:hover { background: #f0f7ff; }
         .team-row.picked { background: #e6f4ea; border-left: 3px solid #34A853; }
+        .team-row.picked.upset { background: #ffebee; border-left: 3px solid #EA4335; position: relative; }
+        .team-row.picked.upset::after { content: '🔥'; position: absolute; right: 3px; top: 50%; transform: translateY(-50%); font-size: 8px; }
         .team-row.eliminated { opacity: 0.35; text-decoration: line-through; }
         .team-row.tbd { cursor: default; opacity: 0.3; }
 
@@ -271,7 +274,7 @@
 
         .login-overlay {
             position: fixed;
-            top: 50px;
+            top: 94px;
             left: 0;
             right: 0;
             bottom: 0;
@@ -318,7 +321,7 @@
 
         .loading-overlay {
             position: fixed;
-            top: 50px;
+            top: 94px;
             left: 0;
             right: 0;
             bottom: 0;
@@ -339,23 +342,95 @@
             top: 50px;
             left: 0;
             right: 0;
-            height: 36px;
-            background: #fff;
+            height: 44px;
+            background: linear-gradient(to right, #fff 0%, #f8f9fa 50%, #fff 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 30px;
-            font-size: 12px;
+            gap: 20px;
+            font-size: 11px;
             z-index: 400;
             border-bottom: 1px solid #e0e0e0;
+            padding: 0 20px;
         }
-        .stat { color: #666; }
+        .stat { color: #666; display: flex; align-items: center; gap: 4px; }
         .stat strong { color: #4285F4; }
         .stat.champ strong { color: #EA4335; }
+        .stat-divider { width: 1px; height: 24px; background: #e0e0e0; }
+
+        .upset-chalk-meter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .meter-bar {
+            width: 60px;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .meter-fill-upset {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #EA4335, #ff6b5b);
+            border-radius: 4px 0 0 4px;
+            transition: width 0.3s;
+        }
+        .meter-fill-chalk {
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #5bb3ff, #4285F4);
+            border-radius: 0 4px 4px 0;
+            transition: width 0.3s;
+        }
+        .upset-label { color: #EA4335; font-weight: 600; font-size: 10px; }
+        .chalk-label { color: #4285F4; font-weight: 600; font-size: 10px; }
+
+        .uniqueness-meter {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .unique-bar {
+            width: 50px;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .unique-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #34A853, #7FE08E);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .unique-pct { color: #34A853; font-weight: 700; font-size: 10px; min-width: 28px; }
+
+        .win-chances {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .chances-value {
+            font-weight: 700;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .chances-value.high { background: #d4edda; color: #155724; }
+        .chances-value.medium { background: #fff3cd; color: #856404; }
+        .chances-value.low { background: #f8d7da; color: #721c24; }
+        .chances-value.theoretical { background: #e7e3ff; color: #5a4fcf; }
 
         .save-btn-fixed {
             position: fixed;
-            top: 54px;
+            top: 56px;
             right: 20px;
             background: #34A853;
             color: #fff;
@@ -418,9 +493,36 @@
     </div>
 
     <div class="stats-bar" id="stats-bar" style="display:none;">
-        <div class="stat">Picks: <strong id="picks-made">0</strong> / <strong>63</strong></div>
-        <div class="stat">Points: <strong id="points-earned">0</strong></div>
-        <div class="stat champ">Champion: <strong id="champion-pick">---</strong></div>
+        <div class="stat">Picks: <strong id="picks-made">0</strong>/63</div>
+        <div class="stat-divider"></div>
+
+        <div class="upset-chalk-meter">
+            <span class="upset-label" id="upset-count">0</span>
+            <div class="meter-bar">
+                <div class="meter-fill-upset" id="upset-fill" style="width:0%"></div>
+                <div class="meter-fill-chalk" id="chalk-fill" style="width:0%"></div>
+            </div>
+            <span class="chalk-label" id="chalk-count">0</span>
+        </div>
+        <div class="stat-divider"></div>
+
+        <div class="uniqueness-meter">
+            <span style="color:#666;font-size:10px;">Unique:</span>
+            <div class="unique-bar">
+                <div class="unique-fill" id="unique-fill" style="width:0%"></div>
+            </div>
+            <span class="unique-pct" id="unique-pct">--%</span>
+        </div>
+        <div class="stat-divider"></div>
+
+        <div class="win-chances">
+            <span style="color:#666;font-size:10px;">Win:</span>
+            <span class="chances-value theoretical" id="win-chances">--%</span>
+        </div>
+        <div class="stat-divider"></div>
+
+        <div class="stat">Pts: <strong id="points-earned">0</strong></div>
+        <div class="stat champ">🏆 <strong id="champion-pick">---</strong></div>
     </div>
     <button class="save-btn-fixed" id="save-btn" style="display:none;" onclick="app.savePicks()">💾 Save</button>
 
@@ -431,32 +533,26 @@
     </div>
 
     <div class="bottom-controls" id="bottom-controls">
-        <div class="nav-btns">
-            <button class="nav-btn" id="nav-prev-btn" onclick="app.navPrev()">←</button>
-        </div>
-
         <div class="zoom-level-btns" id="zoom-level-btns">
             <button class="zoom-level-btn" data-level="full" onclick="app.setZoomLevel('full')">Full</button>
-            <button class="zoom-level-btn" data-level="half-left" onclick="app.setZoomLevel('half-left')">Left</button>
-            <button class="zoom-level-btn" data-level="half-right" onclick="app.setZoomLevel('half-right')">Right</button>
             <button class="zoom-level-btn" data-level="region" onclick="app.setZoomLevel('region')">Region</button>
-            <button class="zoom-level-btn" data-level="finals" onclick="app.setZoomLevel('finals')">Finals</button>
+            <button class="zoom-level-btn" data-level="finals" onclick="app.setZoomLevel('finals')">16→</button>
         </div>
 
-        <div class="minimap" id="minimap">
-            <div class="minimap-content">
-                <canvas class="minimap-bracket" id="minimap-canvas"></canvas>
-                <div class="minimap-viewport" id="minimap-viewport"></div>
+        <div class="minimap-nav">
+            <button class="nav-btn" id="nav-prev-btn" onclick="app.navPrev()">←</button>
+            <div class="minimap" id="minimap">
+                <div class="minimap-content">
+                    <canvas class="minimap-bracket" id="minimap-canvas"></canvas>
+                    <div class="minimap-viewport" id="minimap-viewport"></div>
+                </div>
             </div>
+            <button class="nav-btn" id="nav-next-btn" onclick="app.navNext()">→</button>
         </div>
 
         <div class="zoom-controls">
             <button class="zoom-btn" id="zoom-in-btn" onclick="app.zoomIn()">+</button>
             <button class="zoom-btn" id="zoom-out-btn" onclick="app.zoomOut()">−</button>
-        </div>
-
-        <div class="nav-btns">
-            <button class="nav-btn" id="nav-next-btn" onclick="app.navNext()">→</button>
         </div>
     </div>
 
@@ -497,10 +593,8 @@
 
     const ZOOM_LEVELS = {
         full: { scale: 0.38, name: 'Full Bracket' },
-        'half-left': { scale: 0.55, name: 'Left Side' },
-        'half-right': { scale: 0.55, name: 'Right Side' },
         region: { scale: 1.25, name: 'Region' },
-        finals: { scale: 0.9, name: 'Final Rounds' }
+        finals: { scale: 0.75, name: 'Final Rounds' }
     };
 
     let app = null;
@@ -527,6 +621,7 @@
             this.picks = {};
             this.feeders = {};
             this.settings = {};
+            this.allBrackets = [];
 
             this.scale = 0.45;
             this.panX = 0;
@@ -549,6 +644,7 @@
             await this.loadTournamentData();
             this.buildFeedersMap();
             await this.loadUserPicks();
+            await this.loadAllBrackets();
 
             this.calculateLayout();
             this.renderBracket();
@@ -603,6 +699,202 @@
                 const data = snap.data();
                 this.picks = data.picks || {};
             }
+        }
+
+        async loadAllBrackets() {
+            try {
+                const bracketsSnap = await db.collection(`${BASE}/brackets`).get();
+                this.allBrackets = [];
+                bracketsSnap.forEach(doc => {
+                    if (doc.id !== this.user.uid) {
+                        const data = doc.data();
+                        if (data.picks) {
+                            this.allBrackets.push({ id: doc.id, picks: data.picks });
+                        }
+                    }
+                });
+            } catch (e) {
+                console.warn('Could not load pool brackets for uniqueness calc:', e);
+                this.allBrackets = [];
+            }
+        }
+
+        calculateUpsetChalk() {
+            let upsets = 0;
+            let chalk = 0;
+
+            for (const [matchupId, pickedTeamId] of Object.entries(this.picks)) {
+                const m = this.matchups[matchupId];
+                if (!m) continue;
+
+                const topTeamId = this.getTeamForSlot(matchupId, 'top');
+                const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
+                if (!topTeamId || !bottomTeamId) continue;
+
+                let topSeed, bottomSeed;
+                if (m.round_id === 'round_of_64') {
+                    topSeed = parseInt(m.top_seed) || 16;
+                    bottomSeed = parseInt(m.bottom_seed) || 16;
+                } else {
+                    const topTeam = this.teams[topTeamId];
+                    const bottomTeam = this.teams[bottomTeamId];
+                    topSeed = topTeam ? (parseInt(topTeam.team_seed) || parseInt(topTeam.seed) || 16) : 16;
+                    bottomSeed = bottomTeam ? (parseInt(bottomTeam.team_seed) || parseInt(bottomTeam.seed) || 16) : 16;
+                }
+
+                if (topSeed === bottomSeed) continue;
+
+                if (pickedTeamId === topTeamId) {
+                    topSeed > bottomSeed ? upsets++ : chalk++;
+                } else if (pickedTeamId === bottomTeamId) {
+                    bottomSeed > topSeed ? upsets++ : chalk++;
+                }
+            }
+
+            return { upsets, chalk };
+        }
+
+        isUpsetPick(matchupId, pickedTeamId) {
+            const m = this.matchups[matchupId];
+            if (!m) return false;
+
+            const topTeamId = this.getTeamForSlot(matchupId, 'top');
+            const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
+            if (!topTeamId || !bottomTeamId) return false;
+
+            let topSeed, bottomSeed;
+            if (m.round_id === 'round_of_64') {
+                topSeed = parseInt(m.top_seed) || 16;
+                bottomSeed = parseInt(m.bottom_seed) || 16;
+            } else {
+                const topTeam = this.teams[topTeamId];
+                const bottomTeam = this.teams[bottomTeamId];
+                topSeed = topTeam ? (parseInt(topTeam.team_seed) || parseInt(topTeam.seed) || 16) : 16;
+                bottomSeed = bottomTeam ? (parseInt(bottomTeam.team_seed) || parseInt(bottomTeam.seed) || 16) : 16;
+            }
+
+            if (topSeed === bottomSeed) return false;
+
+            if (pickedTeamId === topTeamId) {
+                return topSeed > bottomSeed;
+            } else if (pickedTeamId === bottomTeamId) {
+                return bottomSeed > topSeed;
+            }
+            return false;
+        }
+
+        calculateUniqueness() {
+            if (this.allBrackets.length === 0) return 0;
+
+            const myPicks = this.picks;
+            const myPickCount = Object.keys(myPicks).length;
+            if (myPickCount === 0) return 0;
+
+            let totalDifference = 0;
+
+            for (const bracket of this.allBrackets) {
+                let different = 0;
+                for (const [matchupId, myPick] of Object.entries(myPicks)) {
+                    const theirPick = bracket.picks[matchupId];
+                    if (theirPick && theirPick !== myPick) {
+                        different++;
+                    } else if (!theirPick) {
+                        different += 0.5;
+                    }
+                }
+                totalDifference += different / myPickCount;
+            }
+
+            const avgDifference = totalDifference / this.allBrackets.length;
+            return Math.round(avgDifference * 100);
+        }
+
+        calculateWinChances() {
+            const isBracketLocked = this.settings.bracket_locked === true;
+            const scoring = this.settings.scoring_system || {
+                round_of_64: 1, round_of_32: 2, sweet_16: 4,
+                elite_eight: 8, final_four: 16, championship: 32
+            };
+
+            const myPicks = this.picks;
+            const myPickCount = Object.keys(myPicks).length;
+            if (myPickCount === 0 || this.allBrackets.length === 0) {
+                return { chance: 0, mode: 'theoretical' };
+            }
+
+            if (!isBracketLocked) {
+                let myMaxPossible = 0;
+                for (const [matchupId, pickedTeamId] of Object.entries(myPicks)) {
+                    const m = this.matchups[matchupId];
+                    if (m) myMaxPossible += scoring[m.round_id] || 0;
+                }
+
+                let poolAvgMax = 0;
+                for (const bracket of this.allBrackets) {
+                    let bracketMax = 0;
+                    for (const [matchupId, pick] of Object.entries(bracket.picks)) {
+                        const m = this.matchups[matchupId];
+                        if (m) bracketMax += scoring[m.round_id] || 0;
+                    }
+                    poolAvgMax += bracketMax;
+                }
+                poolAvgMax = poolAvgMax / this.allBrackets.length;
+
+                const relativeStrength = poolAvgMax > 0 ? (myMaxPossible / poolAvgMax) : 1;
+                const baseChance = 100 / (this.allBrackets.length + 1);
+                const adjustedChance = Math.min(99, Math.max(1, baseChance * relativeStrength));
+
+                return { chance: Math.round(adjustedChance), mode: 'theoretical' };
+            }
+
+            let myPoints = 0;
+            let myMaxRemaining = 0;
+            let myEliminated = false;
+
+            for (const [matchupId, pickedTeamId] of Object.entries(myPicks)) {
+                const m = this.matchups[matchupId];
+                if (!m) continue;
+                const pts = scoring[m.round_id] || 0;
+
+                if (m.complete) {
+                    if (m.winning_team_id === pickedTeamId) {
+                        myPoints += pts;
+                    }
+                } else {
+                    const pickedTeam = this.teams[pickedTeamId];
+                    if (pickedTeam && !pickedTeam.eliminated) {
+                        myMaxRemaining += pts;
+                    }
+                }
+            }
+
+            const myMaxPossible = myPoints + myMaxRemaining;
+
+            let canWin = 0;
+            for (const bracket of this.allBrackets) {
+                let theirPoints = 0;
+                let theirMax = 0;
+
+                for (const [matchupId, pick] of Object.entries(bracket.picks)) {
+                    const m = this.matchups[matchupId];
+                    if (!m) continue;
+                    const pts = scoring[m.round_id] || 0;
+
+                    if (m.complete) {
+                        if (m.winning_team_id === pick) theirPoints += pts;
+                    } else {
+                        const team = this.teams[pick];
+                        if (team && !team.eliminated) theirMax += pts;
+                    }
+                }
+
+                if (myMaxPossible >= theirPoints + theirMax) {
+                    canWin++;
+                }
+            }
+
+            const chance = Math.round((canWin / this.allBrackets.length) * 100);
+            return { chance, mode: 'live' };
         }
 
         async savePicks() {
@@ -710,8 +1002,8 @@
             const southE8 = this.matchupPositions[this.getMatchupsForRegionRound('south', 'elite_eight')[0]?.matchup_id];
             const westE8 = this.matchupPositions[this.getMatchupsForRegionRound('west', 'elite_eight')[0]?.matchup_id];
 
-            const ff1Y = southE8 ? southE8.y + (MATCHUP_HEIGHT / 2) - (MATCHUP_HEIGHT / 2) : MARGIN + REGION_HEIGHT / 2;
-            const ff2Y = westE8 ? westE8.y + (MATCHUP_HEIGHT / 2) - (MATCHUP_HEIGHT / 2) : CENTER_Y + REGION_HEIGHT / 2;
+            const ff1Y = southE8 ? southE8.y : MARGIN + REGION_HEIGHT / 2;
+            const ff2Y = westE8 ? westE8.y : CENTER_Y + REGION_HEIGHT / 2;
 
             if (ffGames[0]) {
                 this.matchupPositions[ffGames[0].matchup_id] = {
@@ -831,8 +1123,10 @@
 
             const isPicked = picked === teamId;
             const isEliminated = picked && picked !== teamId;
+            const isUpset = isPicked && this.isUpsetPick(matchupId, teamId);
             const classes = ['team-row'];
             if (isPicked) classes.push('picked');
+            if (isUpset) classes.push('upset');
             if (isEliminated) classes.push('eliminated');
 
             return `<div class="${classes.join(' ')}" onclick="app.pickWinner('${matchupId}','${teamId}')">
@@ -1343,6 +1637,35 @@
             const champId = this.picks['R6_G01'];
             const champTeam = champId ? this.teams[champId] : null;
             document.getElementById('champion-pick').textContent = champTeam ? champTeam.team_name : '---';
+
+            const { upsets, chalk } = this.calculateUpsetChalk();
+            const total = upsets + chalk;
+            const upsetPct = total > 0 ? (upsets / total) * 100 : 0;
+            const chalkPct = total > 0 ? (chalk / total) * 100 : 0;
+
+            document.getElementById('upset-count').textContent = upsets;
+            document.getElementById('chalk-count').textContent = chalk;
+            document.getElementById('upset-fill').style.width = `${upsetPct / 2}%`;
+            document.getElementById('chalk-fill').style.width = `${chalkPct / 2}%`;
+
+            const uniqueness = this.calculateUniqueness();
+            document.getElementById('unique-fill').style.width = `${uniqueness}%`;
+            document.getElementById('unique-pct').textContent = `${uniqueness}%`;
+
+            const { chance, mode } = this.calculateWinChances();
+            const chanceEl = document.getElementById('win-chances');
+            chanceEl.textContent = `${chance}%`;
+            chanceEl.className = 'chances-value';
+
+            if (mode === 'theoretical') {
+                chanceEl.classList.add('theoretical');
+            } else if (chance >= 50) {
+                chanceEl.classList.add('high');
+            } else if (chance >= 20) {
+                chanceEl.classList.add('medium');
+            } else {
+                chanceEl.classList.add('low');
+            }
         }
     }
 
