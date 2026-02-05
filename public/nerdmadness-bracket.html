@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness 2026 - Bracket Picker</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #f4f6f9;
+            color: #2d3436;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4285F4 0%, #34A853 50%, #FBBC05 100%);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(66,133,244,0.3);
+        }
+        .header h1 {
+            font-size: 22px;
+            color: #fff;
+            letter-spacing: 2px;
+            font-weight: 800;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .header h1 span { color: #fff; }
+        .auth-section { font-size: 13px; color: rgba(255,255,255,0.85); }
+        .auth-section button {
+            background: #fff;
+            color: #4285F4;
+            border: none;
+            padding: 6px 16px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            margin-left: 8px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        .auth-section button:hover { background: #e8f0fe; }
+
+        .stepper {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            padding: 14px 10px;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+        .step {
+            padding: 8px 18px;
+            font-size: 12px;
+            color: #888;
+            border: 2px solid #e0e0e0;
+            border-radius: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        .step:hover { border-color: #4285F4; color: #4285F4; }
+        .step.active { background: #4285F4; color: #fff; border-color: #4285F4; }
+        .step.complete { border-color: #34A853; color: #34A853; background: #e6f4ea; }
+        .step .check { display: none; }
+        .step.complete .check { display: inline; }
+
+        .points-bar {
+            display: flex;
+            justify-content: center;
+            gap: 28px;
+            padding: 10px;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+        .points-bar .stat { color: #666; }
+        .points-bar .stat strong { color: #4285F4; font-size: 15px; }
+        .points-bar .stat.champ strong { color: #EA4335; }
+
+        #bracket-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .login-prompt {
+            text-align: center;
+            padding: 80px 20px;
+            color: #666;
+            font-size: 16px;
+        }
+        .login-prompt button {
+            display: block;
+            margin: 20px auto;
+            background: #4285F4;
+            color: #fff;
+            border: none;
+            padding: 14px 36px;
+            font-size: 15px;
+            font-family: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 28px;
+            box-shadow: 0 2px 8px rgba(66,133,244,0.35);
+        }
+        .login-prompt button:hover { background: #3367d6; }
+
+        .loading {
+            text-align: center;
+            padding: 80px 20px;
+            color: #4285F4;
+            font-size: 16px;
+        }
+
+        .region-header {
+            text-align: center;
+            padding: 18px 0 10px;
+            border-bottom: 3px solid #4285F4;
+            margin-bottom: 22px;
+        }
+        .region-header h2 {
+            color: #4285F4;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 800;
+        }
+        .region-header .venue {
+            color: #999;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .round-section {
+            margin-bottom: 28px;
+        }
+        .round-title {
+            color: #34A853;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            border-left: 4px solid #34A853;
+            padding: 6px 0 6px 12px;
+            font-weight: 700;
+        }
+        .round-title .pts { color: #999; font-size: 11px; text-transform: none; font-weight: 400; }
+
+        .matchups-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 10px;
+        }
+
+        .matchup {
+            background: #fff;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .matchup:hover { box-shadow: 0 2px 10px rgba(66,133,244,0.12); }
+        .matchup.decided { border-color: #34A853; }
+
+        .team-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border-bottom: 1px solid #f0f0f0;
+            gap: 10px;
+        }
+        .team-row:last-child { border-bottom: none; }
+        .team-row:hover { background: #f0f7ff; }
+        .team-row.picked {
+            background: #e6f4ea;
+            border-left: 4px solid #34A853;
+        }
+        .team-row.eliminated {
+            opacity: 0.35;
+            text-decoration: line-through;
+        }
+        .team-row.tbd {
+            cursor: default;
+            opacity: 0.25;
+        }
+
+        .seed-badge {
+            background: #4285F4;
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            flex-shrink: 0;
+            border-radius: 50%;
+        }
+        .seed-badge.tbd { background: #ddd; color: #aaa; }
+
+        .team-name {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 700;
+            color: #2d3436;
+        }
+        .team-mascot {
+            color: #999;
+            font-size: 11px;
+        }
+
+        .bracket-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border-top: 1px solid #e0e0e0;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            z-index: 100;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
+        }
+        .bracket-nav button {
+            background: #f4f6f9;
+            color: #555;
+            border: 2px solid #ddd;
+            padding: 10px 24px;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            border-radius: 24px;
+        }
+        .bracket-nav button:hover { background: #e8e8e8; }
+        .bracket-nav button.primary {
+            background: #4285F4;
+            color: #fff;
+            border-color: #4285F4;
+        }
+        .bracket-nav button.primary:hover { background: #3367d6; }
+        .bracket-nav button.save-btn {
+            background: #34A853;
+            color: #fff;
+            border-color: #34A853;
+        }
+        .bracket-nav button.save-btn:hover { background: #2d9249; }
+        .bracket-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .review-section { padding: 20px 0; }
+        .review-section h2 {
+            color: #4285F4;
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 800;
+        }
+        .review-region {
+            margin-bottom: 16px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .review-region h3 {
+            color: #34A853;
+            margin-bottom: 12px;
+            font-size: 14px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .review-pick {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #f4f4f4;
+        }
+        .review-pick .round-label { color: #999; }
+        .review-pick .team-label { color: #2d3436; font-weight: 600; }
+        .review-pick .team-label.missing { color: #EA4335; font-style: italic; font-weight: 400; }
+
+        .champion-display {
+            text-align: center;
+            padding: 28px;
+            margin: 20px 0;
+            border: 3px solid #FBBC05;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #fffde7 0%, #fff8e1 100%);
+        }
+        .champion-display h3 { color: #EA4335; font-size: 11px; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 8px; font-weight: 700; }
+        .champion-display .champ-name { color: #EA4335; font-size: 28px; font-weight: 800; }
+
+        .toast {
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #34A853;
+            color: #fff;
+            padding: 10px 28px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 200;
+            display: none;
+            border-radius: 24px;
+            box-shadow: 0 4px 12px rgba(52,168,83,0.35);
+        }
+        .toast.error { background: #EA4335; box-shadow: 0 4px 12px rgba(234,67,53,0.35); }
+        .toast.show { display: block; }
+
+        .picks-count {
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            margin-top: 10px;
+            padding-bottom: 80px;
+        }
+
+        .ff-label {
+            text-align: center;
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><span>NERD</span>MADNESS <span>2026</span></h1>
+        <div class="auth-section" id="auth-section">
+            <button id="login-btn" onclick="signIn()">Sign In</button>
+        </div>
+    </div>
+
+    <div class="stepper" id="stepper"></div>
+
+    <div class="points-bar" id="points-bar" style="display:none;">
+        <div class="stat">Picks: <strong id="picks-made">0</strong> / <strong>63</strong></div>
+        <div class="stat">Points: <strong id="points-earned">0</strong></div>
+        <div class="stat champ">Champion: <strong id="champion-pick">---</strong></div>
+    </div>
+
+    <div id="bracket-content">
+        <div class="login-prompt" id="login-prompt">
+            <p>Sign in to fill out your NerdMadness 2026 bracket.</p>
+            <button onclick="signIn()">Sign In with Google</button>
+        </div>
+    </div>
+
+    <div class="bracket-nav" id="bracket-nav" style="display:none;">
+        <button id="prev-btn" onclick="app.prevStep()" disabled>&larr; Prev</button>
+        <button id="next-btn" class="primary" onclick="app.nextStep()">Next &rarr;</button>
+        <button id="save-btn" class="save-btn" onclick="app.savePicks()">Save Bracket</button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    const firebaseConfig = window.getFirebaseConfig();
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+    const STEPS = ['south', 'west', 'midwest', 'east', 'final_four', 'championship', 'review'];
+    const STEP_LABELS = {
+        south: 'South', west: 'West', midwest: 'Midwest', east: 'East',
+        final_four: 'Final Four', championship: 'Championship', review: 'Review'
+    };
+    const REGION_ROUNDS = ['round_of_64', 'round_of_32', 'sweet_16', 'elite_eight'];
+    const ROUND_NAMES = {
+        round_of_64: 'First Round', round_of_32: 'Second Round',
+        sweet_16: 'Sweet 16', elite_eight: 'Elite Eight',
+        final_four: 'Final Four', championship: 'National Championship'
+    };
+
+    let app = null;
+
+    function signIn() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider);
+    }
+
+    function showToast(msg, isError) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'toast show' + (isError ? ' error' : '');
+        setTimeout(() => { el.className = 'toast'; }, 3000);
+    }
+
+    class BracketApp {
+        constructor(user) {
+            this.user = user;
+            this.teams = {};
+            this.matchups = {};
+            this.rounds = {};
+            this.regions = {};
+            this.picks = {};
+            this.feeders = {};
+            this.currentStep = 0;
+            this.settings = {};
+        }
+
+        async init() {
+            document.getElementById('bracket-content').innerHTML = '<div class="loading">Loading tournament data...</div>';
+            await this.loadTournamentData();
+            this.buildFeedersMap();
+            await this.loadUserPicks();
+            this.renderStepper();
+            this.renderCurrentStep();
+            this.updatePointsBar();
+            document.getElementById('points-bar').style.display = 'flex';
+            document.getElementById('bracket-nav').style.display = 'flex';
+        }
+
+        async loadTournamentData() {
+            const [teamsSnap, matchupsSnap, roundsSnap, regionsSnap, settingsSnap] = await Promise.all([
+                db.collection(`${BASE}/teams`).get(),
+                db.collection(`${BASE}/matchups`).get(),
+                db.collection(`${BASE}/rounds`).get(),
+                db.collection(`${BASE}/regions`).get(),
+                db.doc(`${BASE}/metadata/settings`).get()
+            ]);
+
+            teamsSnap.forEach(doc => { this.teams[doc.id] = doc.data(); });
+            matchupsSnap.forEach(doc => { this.matchups[doc.id] = doc.data(); });
+            roundsSnap.forEach(doc => { this.rounds[doc.id] = doc.data(); });
+            regionsSnap.forEach(doc => { this.regions[doc.id] = doc.data(); });
+            if (settingsSnap.exists) this.settings = settingsSnap.data();
+
+            if (Object.keys(this.matchups).length === 0) {
+                document.getElementById('bracket-content').innerHTML =
+                    '<div class="login-prompt"><p>Tournament data not found. Run the seed script first.</p></div>';
+                return;
+            }
+        }
+
+        buildFeedersMap() {
+            this.feeders = {};
+            for (const [id, m] of Object.entries(this.matchups)) {
+                if (m.next_matchup_id) {
+                    if (!this.feeders[m.next_matchup_id]) this.feeders[m.next_matchup_id] = {};
+                    this.feeders[m.next_matchup_id][m.next_matchup_slot] = id;
+                }
+            }
+        }
+
+        async loadUserPicks() {
+            const snap = await db.doc(`${BASE}/brackets/${this.user.uid}`).get();
+            if (snap.exists) {
+                const data = snap.data();
+                this.picks = data.picks || {};
+            }
+        }
+
+        async savePicks() {
+            const championMatchup = this.matchups['R6_G01'];
+            const championPick = this.picks['R6_G01'] || null;
+            const pickCount = Object.keys(this.picks).length;
+
+            await db.doc(`${BASE}/brackets/${this.user.uid}`).set({
+                user_id: this.user.uid,
+                display_name: this.user.displayName || this.user.email,
+                picks: this.picks,
+                champion_pick: championPick,
+                total_picks: pickCount,
+                submitted_at: firebase.firestore.FieldValue.serverTimestamp(),
+                locked: false,
+                total_points: this.calculatePoints(),
+                correct_picks: 0,
+                max_possible_points: 192
+            }, { merge: true });
+
+            showToast(`Bracket saved! (${pickCount}/63 picks)`);
+        }
+
+        calculatePoints() {
+            let points = 0;
+            const scoring = this.settings.scoring_system || {};
+            for (const [matchupId, pickedTeamId] of Object.entries(this.picks)) {
+                const m = this.matchups[matchupId];
+                if (m && m.complete && m.winning_team_id === pickedTeamId) {
+                    points += scoring[m.round_id] || 0;
+                }
+            }
+            return points;
+        }
+
+        getTeamForSlot(matchupId, slot) {
+            const m = this.matchups[matchupId];
+            if (!m) return null;
+            if (m.round_id === 'round_of_64') {
+                return slot === 'top' ? m.top_team_id : m.bottom_team_id;
+            }
+            const feederId = this.feeders[matchupId]?.[slot];
+            return feederId ? (this.picks[feederId] || null) : null;
+        }
+
+        getSeedForSlot(matchupId, slot) {
+            const m = this.matchups[matchupId];
+            if (!m) return null;
+            if (m.round_id === 'round_of_64') {
+                return slot === 'top' ? m.top_seed : m.bottom_seed;
+            }
+            const feederId = this.feeders[matchupId]?.[slot];
+            if (!feederId) return null;
+            const pickedTeamId = this.picks[feederId];
+            if (!pickedTeamId) return null;
+            const team = this.teams[pickedTeamId];
+            return team ? team.team_seed : null;
+        }
+
+        pickWinner(matchupId, teamId) {
+            const oldPick = this.picks[matchupId];
+            if (oldPick === teamId) return;
+            this.picks[matchupId] = teamId;
+            if (oldPick && oldPick !== teamId) {
+                this.cascadeClear(matchupId, oldPick);
+            }
+            this.renderCurrentStep();
+            this.updatePointsBar();
+        }
+
+        cascadeClear(matchupId, eliminatedTeamId) {
+            const m = this.matchups[matchupId];
+            if (!m || !m.next_matchup_id) return;
+            const nextId = m.next_matchup_id;
+            if (this.picks[nextId] === eliminatedTeamId) {
+                delete this.picks[nextId];
+                this.cascadeClear(nextId, eliminatedTeamId);
+            }
+        }
+
+        getMatchupsForRegionRound(regionId, roundId) {
+            return Object.values(this.matchups)
+                .filter(m => m.region_id === regionId && m.round_id === roundId)
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+        }
+
+        renderStepper() {
+            const el = document.getElementById('stepper');
+            el.innerHTML = STEPS.map((step, i) => {
+                const isComplete = this.isStepComplete(step);
+                return `<div class="step ${i === this.currentStep ? 'active' : ''} ${isComplete ? 'complete' : ''}"
+                    onclick="app.goToStep(${i})">
+                    <span class="check">&#10003; </span>${STEP_LABELS[step]}
+                </div>`;
+            }).join('');
+        }
+
+        isStepComplete(step) {
+            if (step === 'review') return false;
+            if (step === 'final_four') {
+                const games = Object.values(this.matchups).filter(m => m.round_id === 'final_four');
+                return games.every(g => this.picks[g.matchup_id]);
+            }
+            if (step === 'championship') {
+                return !!this.picks['R6_G01'];
+            }
+            for (const roundId of REGION_ROUNDS) {
+                const games = this.getMatchupsForRegionRound(step, roundId);
+                if (!games.every(g => this.picks[g.matchup_id])) return false;
+            }
+            return true;
+        }
+
+        goToStep(i) {
+            this.currentStep = i;
+            this.renderStepper();
+            this.renderCurrentStep();
+            window.scrollTo(0, 0);
+        }
+
+        prevStep() {
+            if (this.currentStep > 0) this.goToStep(this.currentStep - 1);
+        }
+
+        nextStep() {
+            if (this.currentStep < STEPS.length - 1) this.goToStep(this.currentStep + 1);
+        }
+
+        updatePointsBar() {
+            const pickCount = Object.keys(this.picks).length;
+            document.getElementById('picks-made').textContent = pickCount;
+            document.getElementById('points-earned').textContent = this.calculatePoints();
+            const champId = this.picks['R6_G01'];
+            const champTeam = champId ? this.teams[champId] : null;
+            document.getElementById('champion-pick').textContent =
+                champTeam ? `${champTeam.team_name}` : '---';
+
+            document.getElementById('prev-btn').disabled = (this.currentStep === 0);
+            document.getElementById('next-btn').disabled = (this.currentStep === STEPS.length - 1);
+        }
+
+        renderCurrentStep() {
+            const step = STEPS[this.currentStep];
+            const content = document.getElementById('bracket-content');
+
+            if (step === 'review') {
+                content.innerHTML = this.renderReview();
+                return;
+            }
+            if (step === 'final_four') {
+                content.innerHTML = this.renderFinalFour();
+                return;
+            }
+            if (step === 'championship') {
+                content.innerHTML = this.renderChampionship();
+                return;
+            }
+
+            content.innerHTML = this.renderRegion(step);
+        }
+
+        renderRegion(regionId) {
+            const region = this.regions[regionId];
+            const regionName = region ? region.region_name : regionId.toUpperCase();
+            const venue = region ? `${region.regional_venue} - ${region.regional_city}, ${region.regional_state}` : '';
+
+            let html = `
+                <div class="region-header">
+                    <h2>${regionName}</h2>
+                    <div class="venue">${venue}</div>
+                </div>`;
+
+            for (const roundId of REGION_ROUNDS) {
+                const matchups = this.getMatchupsForRegionRound(regionId, roundId);
+                if (matchups.length === 0) continue;
+
+                const pts = this.settings.scoring_system?.[roundId] || 0;
+                html += `
+                    <div class="round-section">
+                        <div class="round-title">${ROUND_NAMES[roundId]} <span class="pts">(${pts} pt${pts !== 1 ? 's' : ''} each)</span></div>
+                        <div class="matchups-grid">
+                            ${matchups.map(m => this.renderMatchup(m)).join('')}
+                        </div>
+                    </div>`;
+            }
+
+            const picksInRegion = REGION_ROUNDS.reduce((sum, r) => {
+                const games = this.getMatchupsForRegionRound(regionId, r);
+                return sum + games.filter(g => this.picks[g.matchup_id]).length;
+            }, 0);
+            html += `<div class="picks-count">${picksInRegion} / 15 picks made in this region</div>`;
+
+            return html;
+        }
+
+        renderMatchup(m) {
+            const topTeamId = this.getTeamForSlot(m.matchup_id, 'top');
+            const bottomTeamId = this.getTeamForSlot(m.matchup_id, 'bottom');
+            const topTeam = topTeamId ? this.teams[topTeamId] : null;
+            const bottomTeam = bottomTeamId ? this.teams[bottomTeamId] : null;
+            const topSeed = this.getSeedForSlot(m.matchup_id, 'top');
+            const bottomSeed = this.getSeedForSlot(m.matchup_id, 'bottom');
+            const picked = this.picks[m.matchup_id];
+            const decided = !!picked;
+
+            return `
+                <div class="matchup ${decided ? 'decided' : ''}">
+                    ${this.renderTeamRow(m.matchup_id, topTeamId, topTeam, topSeed, picked)}
+                    ${this.renderTeamRow(m.matchup_id, bottomTeamId, bottomTeam, bottomSeed, picked)}
+                </div>`;
+        }
+
+        renderTeamRow(matchupId, teamId, team, seed, picked) {
+            if (!teamId || !team) {
+                return `<div class="team-row tbd">
+                    <div class="seed-badge tbd">?</div>
+                    <div class="team-name" style="color:#444;">TBD</div>
+                </div>`;
+            }
+
+            const isPicked = picked === teamId;
+            const isEliminated = picked && picked !== teamId;
+            const classes = ['team-row'];
+            if (isPicked) classes.push('picked');
+            if (isEliminated) classes.push('eliminated');
+
+            return `<div class="${classes.join(' ')}" onclick="app.pickWinner('${matchupId}','${teamId}')">
+                <div class="seed-badge">${seed || '?'}</div>
+                <div>
+                    <div class="team-name">${team.team_name}</div>
+                    <div class="team-mascot">${team.team_mascot}</div>
+                </div>
+            </div>`;
+        }
+
+        renderFinalFour() {
+            const games = Object.values(this.matchups)
+                .filter(m => m.round_id === 'final_four')
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+            const pts = this.settings.scoring_system?.final_four || 16;
+
+            const labels = ['South vs West', 'Midwest vs East'];
+
+            let html = `
+                <div class="region-header">
+                    <h2>Final Four</h2>
+                    <div class="venue">Lucas Oil Stadium - Indianapolis, IN</div>
+                </div>
+                <div class="round-section">
+                    <div class="round-title">National Semifinals <span class="pts">(${pts} pts each)</span></div>
+                    <div class="matchups-grid">
+                        ${games.map((m, i) => `
+                            <div>
+                                <div class="ff-label">${labels[i]}</div>
+                                ${this.renderMatchup(m)}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+
+            const pickCount = games.filter(g => this.picks[g.matchup_id]).length;
+            html += `<div class="picks-count">${pickCount} / 2 Final Four picks made</div>`;
+            return html;
+        }
+
+        renderChampionship() {
+            const m = this.matchups['R6_G01'];
+            const pts = this.settings.scoring_system?.championship || 32;
+
+            let html = `
+                <div class="region-header">
+                    <h2>National Championship</h2>
+                    <div class="venue">Lucas Oil Stadium - Indianapolis, IN - April 6, 2026</div>
+                </div>
+                <div class="round-section">
+                    <div class="round-title">Championship Game <span class="pts">(${pts} pts)</span></div>
+                    <div class="matchups-grid">
+                        ${this.renderMatchup(m)}
+                    </div>
+                </div>`;
+
+            const champId = this.picks['R6_G01'];
+            if (champId) {
+                const champ = this.teams[champId];
+                html += `
+                    <div class="champion-display">
+                        <h3>Your Champion</h3>
+                        <div class="champ-name">${champ ? champ.team_name + ' ' + champ.team_mascot : champId}</div>
+                    </div>`;
+            }
+
+            return html;
+        }
+
+        renderReview() {
+            const allRegions = ['south', 'west', 'midwest', 'east'];
+            const allRoundIds = [...REGION_ROUNDS, 'final_four', 'championship'];
+
+            let html = `<div class="review-section"><h2>Bracket Review</h2>`;
+
+            const champId = this.picks['R6_G01'];
+            if (champId) {
+                const champ = this.teams[champId];
+                html += `
+                    <div class="champion-display">
+                        <h3>Your Champion</h3>
+                        <div class="champ-name">${champ ? champ.team_name + ' ' + champ.team_mascot : champId}</div>
+                    </div>`;
+            }
+
+            for (const regionId of allRegions) {
+                const regionData = this.regions[regionId];
+                html += `<div class="review-region"><h3>${regionData ? regionData.region_name : regionId}</h3>`;
+
+                for (const roundId of REGION_ROUNDS) {
+                    const matchups = this.getMatchupsForRegionRound(regionId, roundId);
+                    for (const m of matchups) {
+                        const pickedId = this.picks[m.matchup_id];
+                        const team = pickedId ? this.teams[pickedId] : null;
+                        html += `<div class="review-pick">
+                            <span class="round-label">${ROUND_NAMES[roundId]}</span>
+                            <span class="team-label ${!team ? 'missing' : ''}">
+                                ${team ? `(${team.team_seed}) ${team.team_name}` : 'No pick'}
+                            </span>
+                        </div>`;
+                    }
+                }
+                html += `</div>`;
+            }
+
+            html += `<div class="review-region"><h3>Final Four & Championship</h3>`;
+            const ffGames = Object.values(this.matchups)
+                .filter(m => m.round_id === 'final_four')
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+            for (const m of ffGames) {
+                const pickedId = this.picks[m.matchup_id];
+                const team = pickedId ? this.teams[pickedId] : null;
+                html += `<div class="review-pick">
+                    <span class="round-label">Semifinal</span>
+                    <span class="team-label ${!team ? 'missing' : ''}">
+                        ${team ? `(${team.team_seed}) ${team.team_name}` : 'No pick'}
+                    </span>
+                </div>`;
+            }
+            const champPick = this.picks['R6_G01'];
+            const champTeam = champPick ? this.teams[champPick] : null;
+            html += `<div class="review-pick">
+                <span class="round-label">Champion</span>
+                <span class="team-label ${!champTeam ? 'missing' : ''}" style="${champTeam ? 'color:#ffd700;font-weight:bold;' : ''}">
+                    ${champTeam ? `(${champTeam.team_seed}) ${champTeam.team_name} ${champTeam.team_mascot}` : 'No pick'}
+                </span>
+            </div>`;
+            html += `</div>`;
+
+            const totalPicks = Object.keys(this.picks).length;
+            const missing = 63 - totalPicks;
+            html += `<div class="picks-count" style="padding-bottom:100px;">
+                ${totalPicks}/63 picks made${missing > 0 ? ` (${missing} remaining)` : ' - BRACKET COMPLETE!'}
+            </div>`;
+
+            html += `</div>`;
+            return html;
+        }
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+        const authEl = document.getElementById('auth-section');
+        if (user) {
+            authEl.innerHTML = `<span>${user.displayName || user.email}</span>
+                <button onclick="auth.signOut()">Sign Out</button>`;
+            document.getElementById('login-prompt')?.remove();
+            app = new BracketApp(user);
+            await app.init();
+        } else {
+            authEl.innerHTML = '<button onclick="signIn()">Sign In</button>';
+            document.getElementById('bracket-content').innerHTML =
+                '<div class="login-prompt"><p>Sign in to fill out your NerdMadness 2026 bracket.</p><button onclick="signIn()">Sign In with Google</button></div>';
+            document.getElementById('points-bar').style.display = 'none';
+            document.getElementById('bracket-nav').style.display = 'none';
+            app = null;
+        }
+    });
+    </script>
+</body>
+</html>
