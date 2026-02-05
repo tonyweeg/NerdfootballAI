@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness 2026 - Bracket View</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #f4f6f9;
+            color: #2d3436;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4285F4 0%, #34A853 50%, #FBBC05 100%);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            height: 50px;
+            box-shadow: 0 2px 8px rgba(66,133,244,0.3);
+        }
+        .header h1 {
+            font-size: 20px;
+            color: #fff;
+            letter-spacing: 2px;
+            font-weight: 800;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .auth-section { font-size: 12px; color: rgba(255,255,255,0.9); display: flex; align-items: center; gap: 10px; }
+        .auth-section button {
+            background: #fff;
+            color: #4285F4;
+            border: none;
+            padding: 5px 14px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 700;
+            border-radius: 16px;
+            font-size: 11px;
+            transition: background 0.2s;
+        }
+        .auth-section button:hover { background: #e8f0fe; }
+
+        .viewport {
+            position: fixed;
+            top: 50px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            cursor: grab;
+            background: #f4f6f9;
+        }
+        .viewport:active { cursor: grabbing; }
+        .viewport.dragging { cursor: grabbing; }
+
+        .canvas {
+            position: absolute;
+            transform-origin: 0 0;
+            transition: transform 0.3s ease-out;
+            width: 2400px;
+            height: 1400px;
+        }
+        .canvas.no-transition { transition: none; }
+
+        .minimap {
+            position: fixed;
+            top: 60px;
+            right: 10px;
+            width: 220px;
+            height: 120px;
+            background: #fff;
+            border: 2px solid #4285F4;
+            border-radius: 8px;
+            z-index: 500;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        .minimap-content {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .minimap-bracket {
+            width: 100%;
+            height: 100%;
+            opacity: 0.8;
+        }
+        .minimap-viewport {
+            position: absolute;
+            border: 2px solid #EA4335;
+            background: rgba(234,67,53,0.15);
+            cursor: move;
+            border-radius: 2px;
+        }
+
+        .zoom-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 500;
+        }
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: #fff;
+            border: 2px solid #4285F4;
+            color: #4285F4;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .zoom-btn:hover { background: #4285F4; color: #fff; }
+        .zoom-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .zoom-level-btns {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 500;
+        }
+        .zoom-level-btn {
+            background: #fff;
+            border: 2px solid #ddd;
+            color: #666;
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        .zoom-level-btn:hover { border-color: #4285F4; color: #4285F4; }
+        .zoom-level-btn.active { background: #4285F4; border-color: #4285F4; color: #fff; }
+
+        .nav-arrows {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 500;
+            display: none;
+        }
+        .nav-arrows.show { display: block; }
+        .nav-arrow-left { left: 15px; }
+        .nav-arrow-right { right: 15px; }
+        .nav-arrow {
+            width: 50px;
+            height: 50px;
+            background: #fff;
+            border: 2px solid #4285F4;
+            color: #4285F4;
+            font-size: 24px;
+            cursor: pointer;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        .nav-arrow:hover { background: #4285F4; color: #fff; }
+
+        .region-label {
+            position: absolute;
+            font-size: 16px;
+            font-weight: 800;
+            color: #4285F4;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            white-space: nowrap;
+        }
+
+        .matchup {
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            width: 120px;
+            overflow: hidden;
+            position: absolute;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .matchup:hover { border-color: #4285F4; box-shadow: 0 2px 10px rgba(66,133,244,0.25); }
+        .matchup.decided { border-color: #34A853; }
+        .matchup.highlight { border-color: #FBBC05; box-shadow: 0 0 15px rgba(251,188,5,0.5); }
+
+        .team-row {
+            display: flex;
+            align-items: center;
+            padding: 5px 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border-bottom: 1px solid #f0f0f0;
+            gap: 6px;
+        }
+        .team-row:last-child { border-bottom: none; }
+        .team-row:hover { background: #f0f7ff; }
+        .team-row.picked { background: #e6f4ea; border-left: 3px solid #34A853; }
+        .team-row.eliminated { opacity: 0.35; text-decoration: line-through; }
+        .team-row.tbd { cursor: default; opacity: 0.3; }
+
+        .seed-badge {
+            background: #4285F4;
+            color: #fff;
+            min-width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .seed-badge.tbd { background: #ddd; color: #999; }
+
+        .team-name {
+            flex: 1;
+            font-size: 11px;
+            font-weight: 600;
+            color: #2d3436;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        svg.bracket-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        svg.bracket-lines path {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 2;
+        }
+        svg.bracket-lines path.active {
+            stroke: #34A853;
+            stroke-width: 3;
+        }
+
+        .login-overlay {
+            position: fixed;
+            top: 50px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(244,246,249,0.98);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .login-box {
+            text-align: center;
+            padding: 40px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .login-box h2 {
+            color: #4285F4;
+            font-size: 28px;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+        .login-box p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .login-box button {
+            background: linear-gradient(135deg, #4285F4, #34A853);
+            color: #fff;
+            border: none;
+            padding: 14px 40px;
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(66,133,244,0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .login-box button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(66,133,244,0.5);
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 50px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(244,246,249,0.98);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .loading-text {
+            color: #4285F4;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .stats-bar {
+            position: fixed;
+            top: 50px;
+            left: 0;
+            right: 240px;
+            height: 36px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            font-size: 12px;
+            z-index: 400;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .stat { color: #666; }
+        .stat strong { color: #4285F4; }
+        .stat.champ strong { color: #EA4335; }
+
+        .save-btn-fixed {
+            position: fixed;
+            top: 56px;
+            right: 240px;
+            background: #34A853;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 4px;
+            z-index: 450;
+            transition: background 0.2s;
+        }
+        .save-btn-fixed:hover { background: #2d9249; }
+
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #34A853;
+            color: #fff;
+            padding: 10px 28px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 2000;
+            display: none;
+            border-radius: 24px;
+            box-shadow: 0 4px 12px rgba(52,168,83,0.35);
+        }
+        .toast.error { background: #EA4335; }
+        .toast.show { display: block; }
+
+        .final-four-label {
+            position: absolute;
+            font-size: 14px;
+            font-weight: 800;
+            color: #34A853;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .championship-label {
+            position: absolute;
+            font-size: 16px;
+            font-weight: 800;
+            color: #EA4335;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>NERDMADNESS 2026</h1>
+        <div class="auth-section" id="auth-section">
+            <button onclick="signIn()">Sign In</button>
+        </div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar" style="display:none;">
+        <div class="stat">Picks: <strong id="picks-made">0</strong> / <strong>63</strong></div>
+        <div class="stat">Points: <strong id="points-earned">0</strong></div>
+        <div class="stat champ">Champion: <strong id="champion-pick">---</strong></div>
+    </div>
+    <button class="save-btn-fixed" id="save-btn" style="display:none;" onclick="app.savePicks()">💾 Save</button>
+
+    <div class="viewport" id="viewport">
+        <div class="canvas" id="canvas">
+            <svg class="bracket-lines" id="bracket-lines"></svg>
+        </div>
+    </div>
+
+    <div class="minimap" id="minimap">
+        <div class="minimap-content">
+            <canvas class="minimap-bracket" id="minimap-canvas"></canvas>
+            <div class="minimap-viewport" id="minimap-viewport"></div>
+        </div>
+    </div>
+
+    <div class="zoom-controls">
+        <button class="zoom-btn" id="zoom-in-btn" onclick="app.zoomIn()">+</button>
+        <button class="zoom-btn" id="zoom-out-btn" onclick="app.zoomOut()">−</button>
+    </div>
+
+    <div class="zoom-level-btns" id="zoom-level-btns">
+        <button class="zoom-level-btn" data-level="full" onclick="app.setZoomLevel('full')">Full</button>
+        <button class="zoom-level-btn" data-level="half-left" onclick="app.setZoomLevel('half-left')">Left</button>
+        <button class="zoom-level-btn" data-level="half-right" onclick="app.setZoomLevel('half-right')">Right</button>
+        <button class="zoom-level-btn" data-level="region" onclick="app.setZoomLevel('region')">Region</button>
+        <button class="zoom-level-btn" data-level="finals" onclick="app.setZoomLevel('finals')">Finals</button>
+    </div>
+
+    <div class="nav-arrows nav-arrow-left" id="nav-left">
+        <button class="nav-arrow" onclick="app.navPrev()">←</button>
+    </div>
+    <div class="nav-arrows nav-arrow-right" id="nav-right">
+        <button class="nav-arrow" onclick="app.navNext()">→</button>
+    </div>
+
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-box">
+            <h2>NERDMADNESS</h2>
+            <p>Sign in to fill out your 2026 bracket</p>
+            <button onclick="signIn()">Sign In with Google</button>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading-overlay" style="display:none;">
+        <div class="loading-text">Loading bracket data...</div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    const firebaseConfig = window.getFirebaseConfig();
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+    const REGIONS = ['south', 'west', 'midwest', 'east'];
+    const REGION_ROUNDS = ['round_of_64', 'round_of_32', 'sweet_16', 'elite_eight'];
+    const ROUND_NAMES = {
+        round_of_64: 'R64', round_of_32: 'R32',
+        sweet_16: 'S16', elite_eight: 'E8',
+        final_four: 'FF', championship: 'CHAMP'
+    };
+
+    const CANVAS_WIDTH = 2400;
+    const CANVAS_HEIGHT = 1400;
+    const MATCHUP_WIDTH = 120;
+    const MATCHUP_HEIGHT = 48;
+    const ROUND_GAP = 35;
+
+    const ZOOM_LEVELS = {
+        full: { scale: 0.38, name: 'Full Bracket' },
+        'half-left': { scale: 0.55, name: 'Left Side' },
+        'half-right': { scale: 0.55, name: 'Right Side' },
+        region: { scale: 1.4, name: 'Region' },
+        finals: { scale: 0.9, name: 'Final Rounds' }
+    };
+
+    let app = null;
+
+    function signIn() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider);
+    }
+
+    function showToast(msg, isError) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'toast show' + (isError ? ' error' : '');
+        setTimeout(() => { el.className = 'toast'; }, 3000);
+    }
+
+    class BracketCanvasApp {
+        constructor(user) {
+            this.user = user;
+            this.teams = {};
+            this.matchups = {};
+            this.rounds = {};
+            this.regions = {};
+            this.picks = {};
+            this.feeders = {};
+            this.settings = {};
+
+            this.scale = 0.45;
+            this.panX = 0;
+            this.panY = 0;
+            this.currentZoomLevel = 'full';
+            this.currentRegionIndex = 0;
+
+            this.isDragging = false;
+            this.dragStartX = 0;
+            this.dragStartY = 0;
+            this.lastPanX = 0;
+            this.lastPanY = 0;
+
+            this.matchupElements = {};
+            this.matchupPositions = {};
+        }
+
+        async init() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            await this.loadTournamentData();
+            this.buildFeedersMap();
+            await this.loadUserPicks();
+
+            this.calculateLayout();
+            this.renderBracket();
+            this.renderBracketLines();
+            this.setupPanZoom();
+            this.updateMinimap();
+            this.updateStatsBar();
+
+            document.getElementById('loading-overlay').style.display = 'none';
+            document.getElementById('stats-bar').style.display = 'flex';
+            document.getElementById('save-btn').style.display = 'block';
+
+            const isBracketLocked = this.settings.bracket_locked === true;
+
+            if (isBracketLocked) {
+                this.setZoomLevel('full');
+            } else {
+                this.currentRegionIndex = 0;
+                this.setZoomLevel('region');
+            }
+        }
+
+        async loadTournamentData() {
+            const [teamsSnap, matchupsSnap, roundsSnap, regionsSnap, settingsSnap] = await Promise.all([
+                db.collection(`${BASE}/teams`).get(),
+                db.collection(`${BASE}/matchups`).get(),
+                db.collection(`${BASE}/rounds`).get(),
+                db.collection(`${BASE}/regions`).get(),
+                db.doc(`${BASE}/metadata/settings`).get()
+            ]);
+
+            teamsSnap.forEach(doc => { this.teams[doc.id] = doc.data(); });
+            matchupsSnap.forEach(doc => { this.matchups[doc.id] = doc.data(); });
+            roundsSnap.forEach(doc => { this.rounds[doc.id] = doc.data(); });
+            regionsSnap.forEach(doc => { this.regions[doc.id] = doc.data(); });
+            if (settingsSnap.exists) this.settings = settingsSnap.data();
+        }
+
+        buildFeedersMap() {
+            this.feeders = {};
+            for (const [id, m] of Object.entries(this.matchups)) {
+                if (m.next_matchup_id) {
+                    if (!this.feeders[m.next_matchup_id]) this.feeders[m.next_matchup_id] = {};
+                    this.feeders[m.next_matchup_id][m.next_matchup_slot] = id;
+                }
+            }
+        }
+
+        async loadUserPicks() {
+            const snap = await db.doc(`${BASE}/brackets/${this.user.uid}`).get();
+            if (snap.exists) {
+                const data = snap.data();
+                this.picks = data.picks || {};
+            }
+        }
+
+        async savePicks() {
+            const championPick = this.picks['R6_G01'] || null;
+            const pickCount = Object.keys(this.picks).length;
+
+            await db.doc(`${BASE}/brackets/${this.user.uid}`).set({
+                user_id: this.user.uid,
+                display_name: this.user.displayName || this.user.email,
+                picks: this.picks,
+                champion_pick: championPick,
+                total_picks: pickCount,
+                submitted_at: firebase.firestore.FieldValue.serverTimestamp(),
+                locked: false,
+                total_points: this.calculatePoints(),
+                correct_picks: 0,
+                max_possible_points: 192
+            }, { merge: true });
+
+            showToast(`Bracket saved! (${pickCount}/63 picks)`);
+        }
+
+        calculatePoints() {
+            let points = 0;
+            const scoring = this.settings.scoring_system || {};
+            for (const [matchupId, pickedTeamId] of Object.entries(this.picks)) {
+                const m = this.matchups[matchupId];
+                if (m && m.complete && m.winning_team_id === pickedTeamId) {
+                    points += scoring[m.round_id] || 0;
+                }
+            }
+            return points;
+        }
+
+        calculateLayout() {
+            const MARGIN = 50;
+            const CENTER_X = CANVAS_WIDTH / 2;
+            const CENTER_Y = CANVAS_HEIGHT / 2;
+
+            const BASE_SPACING = MATCHUP_HEIGHT + 22;
+            const ROUND_WIDTH = MATCHUP_WIDTH + ROUND_GAP;
+
+            const REGION_HEIGHT = BASE_SPACING * 8;
+            const HALF_HEIGHT = REGION_HEIGHT + 80;
+
+            const regionConfig = {
+                south: {
+                    startX: MARGIN,
+                    startY: MARGIN + 40,
+                    direction: 1,
+                    flowsRight: true
+                },
+                west: {
+                    startX: MARGIN,
+                    startY: CENTER_Y + 40,
+                    direction: 1,
+                    flowsRight: true
+                },
+                midwest: {
+                    startX: CANVAS_WIDTH - MARGIN - MATCHUP_WIDTH,
+                    startY: MARGIN + 40,
+                    direction: -1,
+                    flowsRight: false
+                },
+                east: {
+                    startX: CANVAS_WIDTH - MARGIN - MATCHUP_WIDTH,
+                    startY: CENTER_Y + 40,
+                    direction: -1,
+                    flowsRight: false
+                }
+            };
+
+            for (const regionId of REGIONS) {
+                const config = regionConfig[regionId];
+                const gamesPerRound = [8, 4, 2, 1];
+
+                for (let roundIdx = 0; roundIdx < 4; roundIdx++) {
+                    const roundId = REGION_ROUNDS[roundIdx];
+                    const matchups = this.getMatchupsForRegionRound(regionId, roundId);
+                    const numGames = gamesPerRound[roundIdx];
+
+                    const roundSpacing = BASE_SPACING * Math.pow(2, roundIdx);
+                    const roundOffset = (roundSpacing - BASE_SPACING) / 2;
+
+                    const x = config.startX + (config.direction * roundIdx * ROUND_WIDTH);
+
+                    matchups.forEach((m, gameIdx) => {
+                        const y = config.startY + roundOffset + (gameIdx * roundSpacing);
+                        this.matchupPositions[m.matchup_id] = {
+                            x,
+                            y,
+                            roundIdx,
+                            region: regionId
+                        };
+                    });
+                }
+            }
+
+            const ffGames = Object.values(this.matchups)
+                .filter(m => m.round_id === 'final_four')
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+
+            const ffX = CENTER_X - (MATCHUP_WIDTH / 2);
+
+            const southE8 = this.matchupPositions[this.getMatchupsForRegionRound('south', 'elite_eight')[0]?.matchup_id];
+            const westE8 = this.matchupPositions[this.getMatchupsForRegionRound('west', 'elite_eight')[0]?.matchup_id];
+
+            const ff1Y = southE8 ? southE8.y + (MATCHUP_HEIGHT / 2) - (MATCHUP_HEIGHT / 2) : MARGIN + REGION_HEIGHT / 2;
+            const ff2Y = westE8 ? westE8.y + (MATCHUP_HEIGHT / 2) - (MATCHUP_HEIGHT / 2) : CENTER_Y + REGION_HEIGHT / 2;
+
+            if (ffGames[0]) {
+                this.matchupPositions[ffGames[0].matchup_id] = {
+                    x: ffX,
+                    y: ff1Y,
+                    roundIdx: 4,
+                    region: 'final_four'
+                };
+            }
+            if (ffGames[1]) {
+                this.matchupPositions[ffGames[1].matchup_id] = {
+                    x: ffX,
+                    y: ff2Y,
+                    roundIdx: 4,
+                    region: 'final_four'
+                };
+            }
+
+            const champY = (ff1Y + ff2Y + MATCHUP_HEIGHT) / 2 - MATCHUP_HEIGHT / 2;
+            this.matchupPositions['R6_G01'] = {
+                x: ffX,
+                y: champY,
+                roundIdx: 5,
+                region: 'championship'
+            };
+        }
+
+        getMatchupsForRegionRound(regionId, roundId) {
+            return Object.values(this.matchups)
+                .filter(m => m.region_id === regionId && m.round_id === roundId)
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+        }
+
+        renderBracket() {
+            const canvas = document.getElementById('canvas');
+            canvas.innerHTML = '<svg class="bracket-lines" id="bracket-lines"></svg>';
+
+            const CENTER_X = CANVAS_WIDTH / 2;
+            const CENTER_Y = CANVAS_HEIGHT / 2;
+            const MARGIN = 50;
+
+            const regionLabels = {
+                south: { x: MARGIN, y: MARGIN + 10 },
+                west: { x: MARGIN, y: CENTER_Y + 10 },
+                midwest: { x: CANVAS_WIDTH - MARGIN - 120, y: MARGIN + 10 },
+                east: { x: CANVAS_WIDTH - MARGIN - 60, y: CENTER_Y + 10 }
+            };
+
+            for (const [regionId, pos] of Object.entries(regionLabels)) {
+                const label = document.createElement('div');
+                label.className = 'region-label';
+                label.style.left = pos.x + 'px';
+                label.style.top = pos.y + 'px';
+                label.textContent = regionId.toUpperCase();
+                canvas.appendChild(label);
+            }
+
+            const ffLabel = document.createElement('div');
+            ffLabel.className = 'final-four-label';
+            ffLabel.style.left = (CENTER_X - 55) + 'px';
+            ffLabel.style.top = (MARGIN + 10) + 'px';
+            ffLabel.textContent = 'FINAL FOUR';
+            canvas.appendChild(ffLabel);
+
+            const champPos = this.matchupPositions['R6_G01'];
+            if (champPos) {
+                const champLabel = document.createElement('div');
+                champLabel.className = 'championship-label';
+                champLabel.style.left = (champPos.x - 30) + 'px';
+                champLabel.style.top = (champPos.y - 35) + 'px';
+                champLabel.style.width = (MATCHUP_WIDTH + 60) + 'px';
+                champLabel.textContent = 'CHAMPIONSHIP';
+                canvas.appendChild(champLabel);
+            }
+
+            for (const [matchupId, pos] of Object.entries(this.matchupPositions)) {
+                const m = this.matchups[matchupId];
+                if (!m) continue;
+
+                const el = this.createMatchupElement(m);
+                el.style.left = pos.x + 'px';
+                el.style.top = pos.y + 'px';
+                canvas.appendChild(el);
+                this.matchupElements[matchupId] = el;
+            }
+        }
+
+        createMatchupElement(m) {
+            const el = document.createElement('div');
+            el.className = 'matchup';
+            el.dataset.matchupId = m.matchup_id;
+
+            const topTeamId = this.getTeamForSlot(m.matchup_id, 'top');
+            const bottomTeamId = this.getTeamForSlot(m.matchup_id, 'bottom');
+            const picked = this.picks[m.matchup_id];
+
+            if (picked) el.classList.add('decided');
+
+            el.innerHTML = `
+                ${this.renderTeamRow(m.matchup_id, topTeamId, 'top', picked)}
+                ${this.renderTeamRow(m.matchup_id, bottomTeamId, 'bottom', picked)}
+            `;
+
+            return el;
+        }
+
+        renderTeamRow(matchupId, teamId, slot, picked) {
+            const team = teamId ? this.teams[teamId] : null;
+            const seed = this.getSeedForSlot(matchupId, slot);
+
+            if (!teamId || !team) {
+                return `<div class="team-row tbd">
+                    <div class="seed-badge tbd">?</div>
+                    <div class="team-name">TBD</div>
+                </div>`;
+            }
+
+            const isPicked = picked === teamId;
+            const isEliminated = picked && picked !== teamId;
+            const classes = ['team-row'];
+            if (isPicked) classes.push('picked');
+            if (isEliminated) classes.push('eliminated');
+
+            return `<div class="${classes.join(' ')}" onclick="app.pickWinner('${matchupId}','${teamId}')">
+                <div class="seed-badge">${seed || '?'}</div>
+                <div class="team-name">${team.team_name}</div>
+            </div>`;
+        }
+
+        getTeamForSlot(matchupId, slot) {
+            const m = this.matchups[matchupId];
+            if (!m) return null;
+            if (m.round_id === 'round_of_64') {
+                return slot === 'top' ? m.top_team_id : m.bottom_team_id;
+            }
+            const feederId = this.feeders[matchupId]?.[slot];
+            return feederId ? (this.picks[feederId] || null) : null;
+        }
+
+        getSeedForSlot(matchupId, slot) {
+            const m = this.matchups[matchupId];
+            if (!m) return null;
+            if (m.round_id === 'round_of_64') {
+                return slot === 'top' ? m.top_seed : m.bottom_seed;
+            }
+            const feederId = this.feeders[matchupId]?.[slot];
+            if (!feederId) return null;
+            const pickedTeamId = this.picks[feederId];
+            if (!pickedTeamId) return null;
+            const team = this.teams[pickedTeamId];
+            return team ? team.team_seed : null;
+        }
+
+        pickWinner(matchupId, teamId) {
+            const m = this.matchups[matchupId];
+            if (!m) return;
+
+            const topTeamId = this.getTeamForSlot(matchupId, 'top');
+            const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
+            if (!topTeamId || !bottomTeamId) return;
+
+            const oldPick = this.picks[matchupId];
+            if (oldPick === teamId) return;
+
+            this.picks[matchupId] = teamId;
+
+            if (oldPick && oldPick !== teamId) {
+                this.cascadeClear(matchupId, oldPick);
+            }
+
+            this.refreshMatchup(matchupId);
+
+            if (m.next_matchup_id) {
+                this.refreshMatchup(m.next_matchup_id);
+            }
+
+            this.renderBracketLines();
+            this.updateStatsBar();
+            this.updateMinimap();
+
+            this.advanceToNextPick(matchupId);
+        }
+
+        cascadeClear(matchupId, eliminatedTeamId) {
+            const m = this.matchups[matchupId];
+            if (!m || !m.next_matchup_id) return;
+            const nextId = m.next_matchup_id;
+            if (this.picks[nextId] === eliminatedTeamId) {
+                delete this.picks[nextId];
+                this.refreshMatchup(nextId);
+                this.cascadeClear(nextId, eliminatedTeamId);
+            }
+        }
+
+        refreshMatchup(matchupId) {
+            const el = this.matchupElements[matchupId];
+            const m = this.matchups[matchupId];
+            if (!el || !m) return;
+
+            const topTeamId = this.getTeamForSlot(matchupId, 'top');
+            const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
+            const picked = this.picks[matchupId];
+
+            el.className = 'matchup' + (picked ? ' decided' : '');
+            el.innerHTML = `
+                ${this.renderTeamRow(matchupId, topTeamId, 'top', picked)}
+                ${this.renderTeamRow(matchupId, bottomTeamId, 'bottom', picked)}
+            `;
+        }
+
+        advanceToNextPick(currentMatchupId) {
+            const current = this.matchups[currentMatchupId];
+            if (!current) return;
+
+            const sameRoundMatchups = Object.values(this.matchups)
+                .filter(m => m.region_id === current.region_id && m.round_id === current.round_id)
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+
+            const currentIdx = sameRoundMatchups.findIndex(m => m.matchup_id === currentMatchupId);
+
+            for (let i = currentIdx + 1; i < sameRoundMatchups.length; i++) {
+                const m = sameRoundMatchups[i];
+                if (!this.picks[m.matchup_id]) {
+                    const topTeam = this.getTeamForSlot(m.matchup_id, 'top');
+                    const bottomTeam = this.getTeamForSlot(m.matchup_id, 'bottom');
+                    if (topTeam && bottomTeam) {
+                        this.scrollToMatchup(m.matchup_id);
+                        return;
+                    }
+                }
+            }
+
+            for (let i = 0; i < currentIdx; i++) {
+                const m = sameRoundMatchups[i];
+                if (!this.picks[m.matchup_id]) {
+                    const topTeam = this.getTeamForSlot(m.matchup_id, 'top');
+                    const bottomTeam = this.getTeamForSlot(m.matchup_id, 'bottom');
+                    if (topTeam && bottomTeam) {
+                        this.scrollToMatchup(m.matchup_id);
+                        return;
+                    }
+                }
+            }
+        }
+
+        scrollToMatchup(matchupId) {
+            const pos = this.matchupPositions[matchupId];
+            if (!pos) return;
+
+            const el = this.matchupElements[matchupId];
+            if (el) {
+                el.classList.add('highlight');
+                setTimeout(() => el.classList.remove('highlight'), 1500);
+            }
+        }
+
+        renderBracketLines() {
+            const svg = document.getElementById('bracket-lines');
+            svg.innerHTML = '';
+            svg.setAttribute('width', CANVAS_WIDTH);
+            svg.setAttribute('height', CANVAS_HEIGHT);
+
+            const leftRegions = ['south', 'west'];
+            const rightRegions = ['midwest', 'east'];
+
+            for (const [matchupId, m] of Object.entries(this.matchups)) {
+                if (!m.next_matchup_id) continue;
+
+                const fromPos = this.matchupPositions[matchupId];
+                const toPos = this.matchupPositions[m.next_matchup_id];
+                if (!fromPos || !toPos) continue;
+
+                const isLeftRegion = leftRegions.includes(m.region_id);
+                const isRightRegion = rightRegions.includes(m.region_id);
+                const isFinalFour = m.round_id === 'final_four';
+
+                let x1, y1, x2, y2, midX;
+
+                if (isLeftRegion) {
+                    x1 = fromPos.x + MATCHUP_WIDTH;
+                    y1 = fromPos.y + MATCHUP_HEIGHT / 2;
+                    x2 = toPos.x;
+                    y2 = toPos.y + MATCHUP_HEIGHT / 2;
+                    midX = x1 + (x2 - x1) / 2;
+                } else if (isRightRegion) {
+                    x1 = fromPos.x;
+                    y1 = fromPos.y + MATCHUP_HEIGHT / 2;
+                    x2 = toPos.x + MATCHUP_WIDTH;
+                    y2 = toPos.y + MATCHUP_HEIGHT / 2;
+                    midX = x1 + (x2 - x1) / 2;
+                } else if (isFinalFour) {
+                    x1 = fromPos.x + MATCHUP_WIDTH / 2;
+                    y1 = fromPos.y + MATCHUP_HEIGHT;
+                    x2 = toPos.x + MATCHUP_WIDTH / 2;
+                    y2 = toPos.y;
+
+                    if (y1 > y2) {
+                        y1 = fromPos.y;
+                        y2 = toPos.y + MATCHUP_HEIGHT;
+                    }
+
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', `M${x1},${y1} V${(y1 + y2) / 2} H${x2} V${y2}`);
+                    if (this.picks[matchupId]) path.classList.add('active');
+                    svg.appendChild(path);
+                    continue;
+                } else {
+                    continue;
+                }
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M${x1},${y1} H${midX} V${y2} H${x2}`);
+
+                if (this.picks[matchupId]) {
+                    path.classList.add('active');
+                }
+
+                svg.appendChild(path);
+            }
+        }
+
+        setupPanZoom() {
+            const viewport = document.getElementById('viewport');
+            const canvas = document.getElementById('canvas');
+
+            viewport.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.matchup')) return;
+                this.isDragging = true;
+                this.dragStartX = e.clientX;
+                this.dragStartY = e.clientY;
+                this.lastPanX = this.panX;
+                this.lastPanY = this.panY;
+                viewport.classList.add('dragging');
+                canvas.classList.add('no-transition');
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!this.isDragging) return;
+                const dx = e.clientX - this.dragStartX;
+                const dy = e.clientY - this.dragStartY;
+                this.panX = this.lastPanX + dx;
+                this.panY = this.lastPanY + dy;
+                this.clampPan();
+                this.applyTransform();
+                this.updateMinimapViewport();
+            });
+
+            window.addEventListener('mouseup', () => {
+                this.isDragging = false;
+                viewport.classList.remove('dragging');
+                canvas.classList.remove('no-transition');
+            });
+
+            viewport.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    this.zoomIn();
+                } else {
+                    this.zoomOut();
+                }
+            }, { passive: false });
+
+            this.setupMinimapDrag();
+        }
+
+        setupMinimapDrag() {
+            const minimapViewport = document.getElementById('minimap-viewport');
+            const minimap = document.getElementById('minimap');
+            let isDraggingMinimap = false;
+
+            minimapViewport.addEventListener('mousedown', (e) => {
+                isDraggingMinimap = true;
+                e.stopPropagation();
+            });
+
+            minimap.addEventListener('click', (e) => {
+                if (e.target === minimapViewport) return;
+                const rect = minimap.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                const scaleX = CANVAS_WIDTH / rect.width;
+                const scaleY = CANVAS_HEIGHT / rect.height;
+
+                const canvasX = clickX * scaleX;
+                const canvasY = clickY * scaleY;
+
+                const viewportEl = document.getElementById('viewport');
+                const viewWidth = viewportEl.clientWidth / this.scale;
+                const viewHeight = viewportEl.clientHeight / this.scale;
+
+                this.panX = -(canvasX - viewWidth / 2) * this.scale;
+                this.panY = -(canvasY - viewHeight / 2) * this.scale;
+                this.clampPan();
+                this.applyTransform();
+                this.updateMinimapViewport();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDraggingMinimap) return;
+                const rect = minimap.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                const scaleX = CANVAS_WIDTH / rect.width;
+                const scaleY = CANVAS_HEIGHT / rect.height;
+
+                const canvasX = clickX * scaleX;
+                const canvasY = clickY * scaleY;
+
+                const viewportEl = document.getElementById('viewport');
+                const viewWidth = viewportEl.clientWidth / this.scale;
+                const viewHeight = viewportEl.clientHeight / this.scale;
+
+                this.panX = -(canvasX - viewWidth / 2) * this.scale;
+                this.panY = -(canvasY - viewHeight / 2) * this.scale;
+                this.clampPan();
+                this.applyTransform();
+                this.updateMinimapViewport();
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDraggingMinimap = false;
+            });
+        }
+
+        clampPan() {
+            const viewport = document.getElementById('viewport');
+            const viewW = viewport.clientWidth;
+            const viewH = viewport.clientHeight;
+
+            const canvasW = CANVAS_WIDTH * this.scale;
+            const canvasH = CANVAS_HEIGHT * this.scale;
+
+            const maxPanX = 0;
+            const minPanX = viewW - canvasW;
+            const maxPanY = 0;
+            const minPanY = viewH - canvasH;
+
+            if (canvasW <= viewW) {
+                this.panX = (viewW - canvasW) / 2;
+            } else {
+                this.panX = Math.min(maxPanX, Math.max(minPanX, this.panX));
+            }
+
+            if (canvasH <= viewH) {
+                this.panY = (viewH - canvasH) / 2;
+            } else {
+                this.panY = Math.min(maxPanY, Math.max(minPanY, this.panY));
+            }
+        }
+
+        applyTransform() {
+            const canvas = document.getElementById('canvas');
+            canvas.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+        }
+
+        zoomIn() {
+            const levels = Object.keys(ZOOM_LEVELS);
+            const currentIdx = levels.indexOf(this.currentZoomLevel);
+            if (currentIdx < levels.length - 1) {
+                this.setZoomLevel(levels[currentIdx + 1]);
+            }
+        }
+
+        zoomOut() {
+            const levels = Object.keys(ZOOM_LEVELS);
+            const currentIdx = levels.indexOf(this.currentZoomLevel);
+            if (currentIdx > 0) {
+                this.setZoomLevel(levels[currentIdx - 1]);
+            }
+        }
+
+        setZoomLevel(level) {
+            const config = ZOOM_LEVELS[level];
+            if (!config) return;
+
+            this.currentZoomLevel = level;
+            this.scale = config.scale;
+
+            document.querySelectorAll('.zoom-level-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.level === level);
+            });
+
+            const showArrows = (level === 'region');
+            document.getElementById('nav-left').classList.toggle('show', showArrows);
+            document.getElementById('nav-right').classList.toggle('show', showArrows);
+
+            this.centerOnLevel(level);
+            if (level !== 'region') {
+                this.clampPan();
+            }
+            this.applyTransform();
+            this.updateMinimapViewport();
+        }
+
+        centerOnLevel(level) {
+            const viewport = document.getElementById('viewport');
+            const viewW = viewport.clientWidth;
+            const viewH = viewport.clientHeight;
+
+            switch(level) {
+                case 'full':
+                    this.panX = (viewW - CANVAS_WIDTH * this.scale) / 2;
+                    this.panY = (viewH - CANVAS_HEIGHT * this.scale) / 2;
+                    break;
+
+                case 'half-left':
+                    this.panX = 0;
+                    this.panY = (viewH - CANVAS_HEIGHT * this.scale) / 2;
+                    break;
+
+                case 'half-right':
+                    this.panX = viewW - CANVAS_WIDTH * this.scale;
+                    this.panY = (viewH - CANVAS_HEIGHT * this.scale) / 2;
+                    break;
+
+                case 'region':
+                    this.centerOnRegion(REGIONS[this.currentRegionIndex]);
+                    break;
+
+                case 'finals':
+                    const champPos = this.matchupPositions['R6_G01'];
+                    if (champPos) {
+                        const centerX = champPos.x + MATCHUP_WIDTH / 2;
+                        const centerY = champPos.y + MATCHUP_HEIGHT / 2;
+                        this.panX = viewW / 2 - centerX * this.scale;
+                        this.panY = viewH / 2 - centerY * this.scale;
+                    }
+                    break;
+            }
+        }
+
+        centerOnRegion(regionId) {
+            const viewport = document.getElementById('viewport');
+            const viewW = viewport.clientWidth;
+            const viewH = viewport.clientHeight;
+
+            const regionMatchups = Object.entries(this.matchupPositions)
+                .filter(([id]) => {
+                    const m = this.matchups[id];
+                    return m && m.region_id === regionId;
+                });
+
+            if (regionMatchups.length === 0) return;
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for (const [id, pos] of regionMatchups) {
+                minX = Math.min(minX, pos.x);
+                maxX = Math.max(maxX, pos.x + MATCHUP_WIDTH);
+                minY = Math.min(minY, pos.y);
+                maxY = Math.max(maxY, pos.y + MATCHUP_HEIGHT);
+            }
+
+            const titlePadding = 40;
+            const regionCenterX = (minX + maxX) / 2;
+            const regionCenterY = (minY + maxY) / 2;
+
+            this.panX = (viewW / 2) - (regionCenterX * this.scale);
+            this.panY = (viewH / 2) - ((regionCenterY - titlePadding) * this.scale);
+        }
+
+        navPrev() {
+            this.currentRegionIndex = (this.currentRegionIndex - 1 + REGIONS.length) % REGIONS.length;
+            this.centerOnRegion(REGIONS[this.currentRegionIndex]);
+            this.clampPan();
+            this.applyTransform();
+            this.updateMinimapViewport();
+        }
+
+        navNext() {
+            this.currentRegionIndex = (this.currentRegionIndex + 1) % REGIONS.length;
+            this.centerOnRegion(REGIONS[this.currentRegionIndex]);
+            this.clampPan();
+            this.applyTransform();
+            this.updateMinimapViewport();
+        }
+
+        updateMinimap() {
+            const canvas = document.getElementById('minimap-canvas');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            ctx.scale(2, 2);
+
+            const scaleX = rect.width / CANVAS_WIDTH;
+            const scaleY = rect.height / CANVAS_HEIGHT;
+
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+
+            for (const [matchupId, pos] of Object.entries(this.matchupPositions)) {
+                const x = pos.x * scaleX;
+                const y = pos.y * scaleY;
+                const w = MATCHUP_WIDTH * scaleX;
+                const h = MATCHUP_HEIGHT * scaleY;
+
+                ctx.fillStyle = this.picks[matchupId] ? '#4ade80' : '#3d3d5c';
+                ctx.fillRect(x, y, w, h);
+            }
+
+            this.updateMinimapViewport();
+        }
+
+        updateMinimapViewport() {
+            const minimapEl = document.getElementById('minimap');
+            const viewportEl = document.getElementById('minimap-viewport');
+            const mainViewport = document.getElementById('viewport');
+
+            const mmRect = minimapEl.getBoundingClientRect();
+            const scaleX = mmRect.width / CANVAS_WIDTH;
+            const scaleY = mmRect.height / CANVAS_HEIGHT;
+
+            const viewW = mainViewport.clientWidth / this.scale;
+            const viewH = mainViewport.clientHeight / this.scale;
+            const viewX = -this.panX / this.scale;
+            const viewY = -this.panY / this.scale;
+
+            viewportEl.style.left = (viewX * scaleX) + 'px';
+            viewportEl.style.top = (viewY * scaleY) + 'px';
+            viewportEl.style.width = (viewW * scaleX) + 'px';
+            viewportEl.style.height = (viewH * scaleY) + 'px';
+        }
+
+        updateStatsBar() {
+            const pickCount = Object.keys(this.picks).length;
+            document.getElementById('picks-made').textContent = pickCount;
+            document.getElementById('points-earned').textContent = this.calculatePoints();
+
+            const champId = this.picks['R6_G01'];
+            const champTeam = champId ? this.teams[champId] : null;
+            document.getElementById('champion-pick').textContent = champTeam ? champTeam.team_name : '---';
+        }
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+        const authEl = document.getElementById('auth-section');
+        const loginOverlay = document.getElementById('login-overlay');
+
+        if (user) {
+            authEl.innerHTML = `<span>${user.displayName || user.email}</span>
+                <button onclick="auth.signOut()">Sign Out</button>`;
+            loginOverlay.style.display = 'none';
+            app = new BracketCanvasApp(user);
+            await app.init();
+        } else {
+            authEl.innerHTML = '<button onclick="signIn()">Sign In</button>';
+            loginOverlay.style.display = 'flex';
+            document.getElementById('stats-bar').style.display = 'none';
+            document.getElementById('save-btn').style.display = 'none';
+            app = null;
+        }
+    });
+    </script>
+</body>
+</html>
