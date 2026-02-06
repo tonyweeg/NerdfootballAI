@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness 2026 - March Madness Bracket Pool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-100: #f1f5f9;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-gold: #eab308;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --glass-bg: rgba(30, 41, 59, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            color: var(--slate-100);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 80px;
+            margin-bottom: 10px;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .year {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--accent-blue);
+            letter-spacing: 8px;
+            margin-bottom: 30px;
+        }
+
+        .tagline {
+            font-size: 18px;
+            color: var(--slate-300);
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .feature {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px 16px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .feature:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-blue);
+        }
+
+        .feature-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .feature-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--slate-100);
+        }
+
+        .auth-section {
+            margin-bottom: 30px;
+        }
+
+        .sign-in-btn {
+            background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .sign-in-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(59, 130, 246, 0.5);
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-name {
+            font-size: 18px;
+            color: var(--slate-300);
+        }
+
+        .user-name strong {
+            color: var(--accent-green);
+        }
+
+        .enter-btn {
+            background: linear-gradient(135deg, var(--accent-green), #16a34a);
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .enter-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(34, 197, 94, 0.5);
+        }
+
+        .sign-out-btn {
+            background: transparent;
+            color: var(--slate-400);
+            border: 1px solid var(--slate-600);
+            padding: 8px 20px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .sign-out-btn:hover {
+            color: var(--slate-100);
+            border-color: var(--slate-400);
+        }
+
+        .deadline {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 12px 20px;
+            margin-bottom: 30px;
+        }
+
+        .deadline-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-red);
+            font-weight: 700;
+        }
+
+        .deadline-date {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--slate-100);
+            margin-top: 4px;
+        }
+
+        .footer {
+            margin-top: 40px;
+            font-size: 12px;
+            color: var(--slate-500);
+        }
+
+        .footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 32px; letter-spacing: 2px; }
+            .year { font-size: 18px; letter-spacing: 4px; }
+            .logo { font-size: 60px; }
+            .features { grid-template-columns: 1fr; }
+            .tagline { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🏀</div>
+        <h1>NerdMadness</h1>
+        <div class="year">2026</div>
+
+        <p class="tagline">
+            Fill out your bracket. Track your picks. Compete with friends.<br>
+            May the best nerd win.
+        </p>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Full Bracket</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔥</div>
+                <div class="feature-title">Upset Tracker</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🏆</div>
+                <div class="feature-title">Leaderboard</div>
+            </div>
+        </div>
+
+        <div class="deadline">
+            <div class="deadline-label">Bracket Lock Deadline</div>
+            <div class="deadline-date">Thursday, March 19, 2026 @ 12:00 PM ET</div>
+        </div>
+
+        <div class="auth-section" id="auth-section">
+            <button class="sign-in-btn" onclick="signIn()">Sign In with Google</button>
+        </div>
+
+        <div class="footer">
+            Part of the <a href="nerd-universe.html">NerdFootball Universe</a>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = window.getFirebaseConfig();
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        function signIn() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider);
+        }
+
+        auth.onAuthStateChanged((user) => {
+            const authEl = document.getElementById('auth-section');
+            if (user) {
+                authEl.innerHTML = `
+                    <div class="user-info">
+                        <div class="user-name">Welcome, <strong>${user.displayName || user.email}</strong></div>
+                        <a href="nerdmadness-bracket-canvas.html" class="enter-btn">Enter Bracket</a>
+                        <button class="sign-out-btn" onclick="auth.signOut()">Sign Out</button>
+                    </div>
+                `;
+            } else {
+                authEl.innerHTML = `
+                    <button class="sign-in-btn" onclick="signIn()">Sign In with Google</button>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
