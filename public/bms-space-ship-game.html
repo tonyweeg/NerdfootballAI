@@ -1,0 +1,3762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BENNETT MIDDLE SCHOOL SPACE INVADERS GAME</title>
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+            background: linear-gradient(to bottom, #87CEEB 0%, #B0E0E6 50%, #98FB98 100%);
+            color: #333;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .game-ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            padding: 20px;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9) 0%, transparent 100%);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: 700;
+            color: #2E7D32;
+            letter-spacing: 3px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .team-selection {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .team-selection h3 {
+            margin-bottom: 12px;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .team-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .team-btn {
+            padding: 12px 35px;
+            font-size: 16px;
+            font-weight: bold;
+            border: 2px solid;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+        }
+
+        .team-btn.red {
+            color: #ff4444;
+            border-color: #ff4444;
+        }
+
+        .team-btn.red:hover {
+            background: rgba(255, 68, 68, 0.2);
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+        }
+
+        .team-btn.red.selected {
+            background: rgba(255, 68, 68, 0.4);
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.8);
+        }
+
+        .team-btn.blue {
+            color: #4444ff;
+            border-color: #4444ff;
+        }
+
+        .team-btn.blue:hover {
+            background: rgba(68, 68, 255, 0.2);
+            box-shadow: 0 0 20px rgba(68, 68, 255, 0.5);
+        }
+
+        .team-btn.blue.selected {
+            background: rgba(68, 68, 255, 0.4);
+            box-shadow: 0 0 30px rgba(68, 68, 255, 0.8);
+        }
+
+        .team-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .prediction-status {
+            margin-top: 12px;
+            font-size: 14px;
+            color: #aaaaaa;
+        }
+
+        #victory-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 0, 0);
+            pointer-events: none;
+            z-index: 9999;
+            transition: background 0.5s ease;
+        }
+
+        #victory-glow.active {
+            background: rgba(255, 255, 0, 0.3);
+        }
+
+        .restart-btn {
+            display: none;
+            margin-top: 15px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffd93d;
+            border: 2px solid #ffd93d;
+            border-radius: 8px;
+            background: rgba(255, 217, 61, 0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+        }
+
+        .restart-btn:hover {
+            background: rgba(255, 217, 61, 0.3);
+            box-shadow: 0 0 20px rgba(255, 217, 61, 0.5);
+        }
+
+        .back-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            font-size: 14px;
+            color: #2E7D32;
+            border: 1px solid #2E7D32;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.85);
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.3s ease;
+            font-family: 'Atkinson Hyperlegible', sans-serif;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .back-btn:hover {
+            background: rgba(46, 125, 50, 0.2);
+        }
+
+        .win-threshold {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            font-size: 12px;
+            color: #333;
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 4px;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .your-pick {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            z-index: 10;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .your-pick.red {
+            color: #ff4444;
+            border: 2px solid #ff4444;
+        }
+
+        .your-pick.blue {
+            color: #4444ff;
+            border: 2px solid #4444ff;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 24px;
+            }
+            .team-btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            .team-buttons {
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="starfield"></canvas>
+
+    <div id="victory-glow"></div>
+
+    <div class="game-ui">
+        <div class="header">
+            <h1>BENNETT MIDDLE SCHOOL SPACE INVADERS</h1>
+            <div class="subtitle">First to 10 Kills Wins</div>
+        </div>
+
+        <div class="team-selection" id="team-selection">
+            <h3>Which team will win the space battle?</h3>
+            <div class="team-buttons">
+                <button class="team-btn red" id="red-btn" onclick="selectTeam('red')">RED TEAM</button>
+                <button class="team-btn blue" id="blue-btn" onclick="selectTeam('blue')">BLUE TEAM</button>
+            </div>
+            <div class="prediction-status" id="prediction-status">Make your prediction!</div>
+            <button class="restart-btn" id="restart-btn" onclick="restartGame()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <div class="your-pick" id="your-pick">Your Pick: <span id="pick-team"></span></div>
+
+    <script>
+        const canvas = document.getElementById('starfield');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Bird class
+        class Bird {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * (canvas.height * 0.4) + 50;
+                this.size = Math.random() * 8 + 5;
+                this.speed = Math.random() * 1.5 + 0.5;
+                this.flapPhase = Math.random() * Math.PI * 2;
+                this.flapSpeed = Math.random() * 0.15 + 0.1;
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+            }
+
+            update() {
+                this.x += this.speed * this.direction;
+                this.flapPhase += this.flapSpeed;
+                if (this.x > canvas.width + 50) this.x = -50;
+                if (this.x < -50) this.x = canvas.width + 50;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                if (this.direction < 0) ctx.scale(-1, 1);
+
+                const flapOffset = Math.sin(this.flapPhase) * 0.4;
+                ctx.fillStyle = '#222';
+
+                // Body
+                ctx.beginPath();
+                ctx.ellipse(0, 0, this.size, this.size * 0.4, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Left wing
+                ctx.beginPath();
+                ctx.moveTo(-this.size * 0.3, 0);
+                ctx.quadraticCurveTo(-this.size, -this.size * flapOffset, -this.size * 1.5, -this.size * 0.3 * flapOffset);
+                ctx.quadraticCurveTo(-this.size * 0.8, this.size * 0.2, -this.size * 0.3, 0);
+                ctx.fill();
+
+                // Right wing
+                ctx.beginPath();
+                ctx.moveTo(this.size * 0.3, 0);
+                ctx.quadraticCurveTo(this.size, -this.size * flapOffset, this.size * 1.5, -this.size * 0.3 * flapOffset);
+                ctx.quadraticCurveTo(this.size * 0.8, this.size * 0.2, this.size * 0.3, 0);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // Cloud with dancing cat class
+        class CloudWithCat {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * (canvas.height * 0.35) + 80;
+                this.cloudWidth = Math.random() * 60 + 80;
+                this.cloudHeight = this.cloudWidth * 0.4;
+                this.speed = Math.random() * 0.5 + 0.2;
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+                this.driftPhase = Math.random() * Math.PI * 2;
+                this.driftSpeed = Math.random() * 0.02 + 0.01;
+
+                // Cat properties
+                this.catSize = Math.random() * 10 + 15;
+                const catColors = ['#FF6B35', '#FFD166', '#808080', '#333333', '#FFFFFF', '#FF69B4', '#9B59B6', '#3498DB', '#2ECC71', '#E74C3C'];
+                this.catColor = catColors[Math.floor(Math.random() * catColors.length)];
+                this.dancePhase = Math.random() * Math.PI * 2;
+                this.danceSpeed = Math.random() * 0.15 + 0.1;
+                this.danceType = Math.floor(Math.random() * 4); // Different dance moves
+            }
+
+            update() {
+                this.x += this.speed * this.direction;
+                this.driftPhase += this.driftSpeed;
+                this.dancePhase += this.danceSpeed;
+
+                // Wrap around screen
+                if (this.x > canvas.width + this.cloudWidth) {
+                    this.x = -this.cloudWidth;
+                }
+                if (this.x < -this.cloudWidth) {
+                    this.x = canvas.width + this.cloudWidth;
+                }
+            }
+
+            draw() {
+                const driftY = Math.sin(this.driftPhase) * 5;
+
+                ctx.save();
+                ctx.translate(this.x, this.y + driftY);
+
+                // Draw fluffy cloud
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+
+                // Cloud puffs
+                ctx.beginPath();
+                ctx.arc(-this.cloudWidth * 0.3, 0, this.cloudHeight * 0.6, 0, Math.PI * 2);
+                ctx.arc(0, -this.cloudHeight * 0.2, this.cloudHeight * 0.8, 0, Math.PI * 2);
+                ctx.arc(this.cloudWidth * 0.25, 0, this.cloudHeight * 0.7, 0, Math.PI * 2);
+                ctx.arc(-this.cloudWidth * 0.1, this.cloudHeight * 0.2, this.cloudHeight * 0.5, 0, Math.PI * 2);
+                ctx.arc(this.cloudWidth * 0.15, this.cloudHeight * 0.15, this.cloudHeight * 0.55, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.shadowBlur = 0;
+
+                // Draw dancing cat on cloud
+                this.drawCat();
+
+                ctx.restore();
+            }
+
+            drawCat() {
+                const s = this.catSize;
+                const catY = -this.cloudHeight * 0.5 - s * 0.5;
+
+                // Dance animations
+                let bounce = 0;
+                let tilt = 0;
+                let armLeft = 0;
+                let armRight = 0;
+                let tailWag = Math.sin(this.dancePhase * 2) * 0.5;
+
+                switch(this.danceType) {
+                    case 0: // Bouncing dance
+                        bounce = Math.abs(Math.sin(this.dancePhase)) * s * 0.4;
+                        armLeft = Math.sin(this.dancePhase) * 0.5;
+                        armRight = Math.sin(this.dancePhase + Math.PI) * 0.5;
+                        break;
+                    case 1: // Side to side
+                        tilt = Math.sin(this.dancePhase) * 0.3;
+                        bounce = Math.abs(Math.sin(this.dancePhase * 2)) * s * 0.2;
+                        break;
+                    case 2: // Arms up disco
+                        bounce = Math.abs(Math.sin(this.dancePhase)) * s * 0.3;
+                        armLeft = -0.8 + Math.sin(this.dancePhase) * 0.3;
+                        armRight = -0.8 + Math.sin(this.dancePhase + 0.5) * 0.3;
+                        break;
+                    case 3: // Headbob
+                        bounce = Math.abs(Math.sin(this.dancePhase * 2)) * s * 0.15;
+                        tilt = Math.sin(this.dancePhase) * 0.2;
+                        break;
+                }
+
+                ctx.save();
+                ctx.translate(0, catY - bounce);
+                ctx.rotate(tilt);
+
+                // Tail (wagging behind)
+                ctx.strokeStyle = this.catColor;
+                ctx.lineWidth = s * 0.15;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.3, s * 0.2);
+                ctx.quadraticCurveTo(
+                    -s * 0.6 + tailWag * s * 0.3,
+                    -s * 0.2,
+                    -s * 0.5 + tailWag * s * 0.4,
+                    -s * 0.5
+                );
+                ctx.stroke();
+
+                // Body
+                ctx.fillStyle = this.catColor;
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.1, s * 0.35, s * 0.3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Front legs
+                ctx.fillRect(-s * 0.2, s * 0.25, s * 0.12, s * 0.3);
+                ctx.fillRect(s * 0.08, s * 0.25, s * 0.12, s * 0.3);
+
+                // Arms (dancing)
+                ctx.save();
+                ctx.translate(-s * 0.3, 0);
+                ctx.rotate(armLeft);
+                ctx.fillRect(-s * 0.05, 0, s * 0.1, s * 0.25);
+                ctx.restore();
+
+                ctx.save();
+                ctx.translate(s * 0.3, 0);
+                ctx.rotate(armRight);
+                ctx.fillRect(-s * 0.05, 0, s * 0.1, s * 0.25);
+                ctx.restore();
+
+                // Head
+                ctx.beginPath();
+                ctx.arc(0, -s * 0.2, s * 0.28, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Ears
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.2, -s * 0.35);
+                ctx.lineTo(-s * 0.28, -s * 0.55);
+                ctx.lineTo(-s * 0.08, -s * 0.4);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(s * 0.2, -s * 0.35);
+                ctx.lineTo(s * 0.28, -s * 0.55);
+                ctx.lineTo(s * 0.08, -s * 0.4);
+                ctx.closePath();
+                ctx.fill();
+
+                // Inner ears (pink)
+                ctx.fillStyle = '#FFB6C1';
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.18, -s * 0.38);
+                ctx.lineTo(-s * 0.23, -s * 0.5);
+                ctx.lineTo(-s * 0.12, -s * 0.4);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(s * 0.18, -s * 0.38);
+                ctx.lineTo(s * 0.23, -s * 0.5);
+                ctx.lineTo(s * 0.12, -s * 0.4);
+                ctx.closePath();
+                ctx.fill();
+
+                // Face
+                // Eyes
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.ellipse(-s * 0.1, -s * 0.22, s * 0.06, s * 0.08, 0, 0, Math.PI * 2);
+                ctx.ellipse(s * 0.1, -s * 0.22, s * 0.06, s * 0.08, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eye shine
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(-s * 0.08, -s * 0.24, s * 0.025, 0, Math.PI * 2);
+                ctx.arc(s * 0.12, -s * 0.24, s * 0.025, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Nose
+                ctx.fillStyle = '#FF69B4';
+                ctx.beginPath();
+                ctx.moveTo(0, -s * 0.12);
+                ctx.lineTo(-s * 0.04, -s * 0.08);
+                ctx.lineTo(s * 0.04, -s * 0.08);
+                ctx.closePath();
+                ctx.fill();
+
+                // Mouth (smile)
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = s * 0.03;
+                ctx.beginPath();
+                ctx.moveTo(0, -s * 0.08);
+                ctx.lineTo(0, -s * 0.04);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(-s * 0.05, -s * 0.02, s * 0.05, 0.2, Math.PI - 0.2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(s * 0.05, -s * 0.02, s * 0.05, 0.2, Math.PI - 0.2);
+                ctx.stroke();
+
+                // Whiskers
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = s * 0.015;
+                // Left whiskers
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.15, -s * 0.1);
+                ctx.lineTo(-s * 0.35, -s * 0.15);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.15, -s * 0.05);
+                ctx.lineTo(-s * 0.35, -s * 0.05);
+                ctx.stroke();
+                // Right whiskers
+                ctx.beginPath();
+                ctx.moveTo(s * 0.15, -s * 0.1);
+                ctx.lineTo(s * 0.35, -s * 0.15);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s * 0.15, -s * 0.05);
+                ctx.lineTo(s * 0.35, -s * 0.05);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        // Chicken Coop class
+        class ChickenCoop {
+            constructor() {
+                this.x = canvas.width * 0.85;
+                this.y = canvas.height - 80;
+                this.width = 120;
+                this.height = 100;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Coop base/floor
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(-this.width/2, this.height * 0.7, this.width, this.height * 0.15);
+
+                // Coop walls
+                const wallGradient = ctx.createLinearGradient(-this.width/2, 0, this.width/2, 0);
+                wallGradient.addColorStop(0, '#CD853F');
+                wallGradient.addColorStop(0.5, '#DEB887');
+                wallGradient.addColorStop(1, '#CD853F');
+                ctx.fillStyle = wallGradient;
+                ctx.fillRect(-this.width/2, 0, this.width, this.height * 0.7);
+
+                // Wood plank lines
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 2;
+                for (let i = 1; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(-this.width/2, this.height * 0.14 * i);
+                    ctx.lineTo(this.width/2, this.height * 0.14 * i);
+                    ctx.stroke();
+                }
+
+                // Roof
+                ctx.fillStyle = '#A52A2A';
+                ctx.beginPath();
+                ctx.moveTo(-this.width/2 - 15, 0);
+                ctx.lineTo(0, -this.height * 0.5);
+                ctx.lineTo(this.width/2 + 15, 0);
+                ctx.closePath();
+                ctx.fill();
+
+                // Roof shingles
+                ctx.strokeStyle = '#8B0000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-this.width/2 - 10, -this.height * 0.1);
+                ctx.lineTo(this.width/2 + 10, -this.height * 0.1);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-this.width/2, -this.height * 0.25);
+                ctx.lineTo(this.width/2, -this.height * 0.25);
+                ctx.stroke();
+
+                // Door opening (dark inside)
+                ctx.fillStyle = '#2F1810';
+                ctx.beginPath();
+                ctx.ellipse(0, this.height * 0.45, this.width * 0.25, this.height * 0.35, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Door arch highlight
+                ctx.strokeStyle = '#5D3A1A';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, this.height * 0.45, this.width * 0.25, Math.PI, 0);
+                ctx.stroke();
+
+                // Perch inside door
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(-this.width * 0.2, this.height * 0.55);
+                ctx.lineTo(this.width * 0.2, this.height * 0.55);
+                ctx.stroke();
+
+                // Little window
+                ctx.fillStyle = '#87CEEB';
+                ctx.fillRect(this.width * 0.2, this.height * 0.15, this.width * 0.18, this.height * 0.18);
+                ctx.strokeStyle = '#5D3A1A';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.width * 0.2, this.height * 0.15, this.width * 0.18, this.height * 0.18);
+                // Window cross
+                ctx.beginPath();
+                ctx.moveTo(this.width * 0.29, this.height * 0.15);
+                ctx.lineTo(this.width * 0.29, this.height * 0.33);
+                ctx.moveTo(this.width * 0.2, this.height * 0.24);
+                ctx.lineTo(this.width * 0.38, this.height * 0.24);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            isChickenInside(chicken) {
+                const dx = Math.abs(chicken.x - this.x);
+                return dx < this.width * 0.4;
+            }
+        }
+
+        // Colorful Worm class
+        class ColorfulWorm {
+            constructor(startX = 100) {
+                this.x = startX;
+                this.y = canvas.height - 40;
+                this.segments = [];
+                this.segmentCount = 12;
+                this.segmentSize = 18;
+                this.speed = 2.5; // Much faster!
+                this.phase = 0;
+                this.colors = ['#FF6B6B', '#FFE66D', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3', '#A8D8EA'];
+
+                // Initialize segments
+                for (let i = 0; i < this.segmentCount; i++) {
+                    this.segments.push({
+                        x: this.x - i * this.segmentSize * 0.8,
+                        y: this.y,
+                        color: this.colors[i % this.colors.length]
+                    });
+                }
+
+                this.targetX = this.x;
+                this.waiting = false;
+                this.waitTimer = 0;
+            }
+
+            update(chicken, coop) {
+                this.phase += 0.15;
+
+                // If chicken is hiding, worm waits near coop then wanders
+                if (chicken.hiding) {
+                    if (!this.waiting) {
+                        this.waiting = true;
+                        this.waitTimer = 180; // Wait 3 seconds
+                    }
+                    this.waitTimer--;
+                    if (this.waitTimer <= 0) {
+                        // Wander away
+                        this.targetX = Math.random() * canvas.width * 0.5;
+                        this.waiting = false;
+                    }
+                } else if (chicken.alive) {
+                    // Chase the chicken!
+                    this.targetX = chicken.x;
+                    this.waiting = false;
+                }
+
+                // Move head toward target
+                const dx = this.targetX - this.x;
+                if (Math.abs(dx) > 5) {
+                    this.x += Math.sign(dx) * this.speed;
+                }
+
+                // Update head position with wave
+                this.segments[0].x = this.x;
+                this.segments[0].y = this.y + Math.sin(this.phase) * 8;
+
+                // Each segment follows the one before it
+                for (let i = 1; i < this.segments.length; i++) {
+                    const prev = this.segments[i - 1];
+                    const curr = this.segments[i];
+                    const segDx = prev.x - curr.x;
+                    const segDy = prev.y - curr.y;
+                    const dist = Math.sqrt(segDx * segDx + segDy * segDy);
+                    const targetDist = this.segmentSize * 0.7;
+
+                    if (dist > targetDist) {
+                        curr.x += (segDx / dist) * (dist - targetDist) * 0.5;
+                        curr.y = this.y + Math.sin(this.phase - i * 0.5) * 8;
+                    }
+                }
+            }
+
+            checkCatch(chicken) {
+                if (!chicken.alive || chicken.hiding) return false;
+                const dx = this.x - chicken.x;
+                const dy = this.y - chicken.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                return dist < 50;
+            }
+
+            draw() {
+                // Draw segments from back to front
+                for (let i = this.segments.length - 1; i >= 0; i--) {
+                    const seg = this.segments[i];
+                    const size = this.segmentSize * (1 - i * 0.03);
+
+                    ctx.save();
+                    ctx.translate(seg.x, seg.y);
+
+                    // Segment body
+                    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+                    gradient.addColorStop(0, seg.color);
+                    gradient.addColorStop(0.7, seg.color);
+                    gradient.addColorStop(1, this.darkenColor(seg.color));
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Segment shine
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(-size * 0.3, -size * 0.3, size * 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.restore();
+                }
+
+                // Draw head (first segment) details
+                const head = this.segments[0];
+                ctx.save();
+                ctx.translate(head.x, head.y);
+
+                // Eyes
+                const eyeOffset = this.targetX > this.x ? 1 : -1;
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(-8 * eyeOffset, -8, 8, 0, Math.PI * 2);
+                ctx.arc(8 * eyeOffset, -8, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pupils (looking at chicken)
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(-8 * eyeOffset + 2 * eyeOffset, -8, 4, 0, Math.PI * 2);
+                ctx.arc(8 * eyeOffset + 2 * eyeOffset, -8, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Cute smile
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 2, 8, 0.2, Math.PI - 0.2);
+                ctx.stroke();
+
+                // Antennae
+                ctx.strokeStyle = this.segments[0].color;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                const antennaWave = Math.sin(this.phase * 2) * 5;
+                ctx.beginPath();
+                ctx.moveTo(-6, -15);
+                ctx.quadraticCurveTo(-10 + antennaWave, -30, -5, -35);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(6, -15);
+                ctx.quadraticCurveTo(10 - antennaWave, -30, 5, -35);
+                ctx.stroke();
+
+                // Antenna tips
+                ctx.fillStyle = '#FFE66D';
+                ctx.beginPath();
+                ctx.arc(-5, -35, 4, 0, Math.PI * 2);
+                ctx.arc(5, -35, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            darkenColor(color) {
+                // Simple darken function
+                const r = parseInt(color.slice(1, 3), 16) * 0.7;
+                const g = parseInt(color.slice(3, 5), 16) * 0.7;
+                const b = parseInt(color.slice(5, 7), 16) * 0.7;
+                return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
+            }
+        }
+
+        // Big Chicken with Mango Shoes class
+        class MangoChicken {
+            constructor(coop) {
+                this.x = canvas.width * 0.3;
+                this.y = canvas.height - 60;
+                this.groundY = canvas.height - 60;
+                this.size = 80;
+                this.speed = 1.2;
+                this.runSpeed = 3.5;
+                this.direction = 1;
+                this.walkPhase = 0;
+                this.walkSpeed = 0.12;
+                this.headBob = 0;
+                this.wingFlap = 0;
+                this.coop = coop;
+                this.hiding = false;
+                this.alive = true;
+                this.deathTimer = 0;
+                this.panicLevel = 0;
+                this.respawnTimer = 0;
+
+                // Mars jump physics
+                this.velocityY = 0;
+                this.gravity = 0.15; // Mars gravity (weak!)
+                this.jumpPower = -8;
+                this.isJumping = false;
+                this.jumpCooldown = 0;
+                this.floatWiggle = 0;
+            }
+
+            update(worm) {
+                if (!this.alive) {
+                    this.deathTimer++;
+                    if (this.deathTimer > 180) {
+                        // Respawn after 3 seconds
+                        this.alive = true;
+                        this.deathTimer = 0;
+                        this.x = 100;
+                        this.y = this.groundY;
+                        this.velocityY = 0;
+                        this.hiding = false;
+                    }
+                    return;
+                }
+
+                // Mars jump physics
+                this.jumpCooldown--;
+                this.velocityY += this.gravity;
+                this.y += this.velocityY;
+
+                // Ground collision
+                if (this.y >= this.groundY) {
+                    this.y = this.groundY;
+                    this.velocityY = 0;
+                    this.isJumping = false;
+                }
+
+                // Float wiggle when in air
+                if (this.isJumping) {
+                    this.floatWiggle += 0.2;
+                    this.wingFlap = Math.sin(this.floatWiggle) * 0.5; // Flap wings while jumping
+                }
+
+                this.walkPhase += this.walkSpeed;
+                if (!this.isJumping) {
+                    this.headBob = Math.sin(this.walkPhase * 2) * 5;
+                    this.wingFlap = Math.sin(this.walkPhase * 3) * 0.15;
+                }
+
+                // Check distance to worm (use closest worm if multiple)
+                let wormDist = Infinity;
+                if (Array.isArray(worm)) {
+                    worm.forEach(w => {
+                        const dist = Math.abs(w.x - this.x);
+                        if (dist < wormDist) wormDist = dist;
+                    });
+                } else {
+                    wormDist = Math.abs(worm.x - this.x);
+                }
+                const dangerZone = 200;
+
+                if (wormDist < dangerZone && !this.hiding) {
+                    // Panic! Run to coop
+                    this.panicLevel = Math.min(1, this.panicLevel + 0.05);
+                    const currentSpeed = this.speed + (this.runSpeed - this.speed) * this.panicLevel;
+
+                    // JUMP when worm is very close! (Mars-style floaty jump)
+                    if (wormDist < 100 && !this.isJumping && this.jumpCooldown <= 0) {
+                        this.velocityY = this.jumpPower;
+                        this.isJumping = true;
+                        this.jumpCooldown = 60; // Can jump every second
+                        this.floatWiggle = 0;
+                    }
+
+                    // Run toward coop
+                    if (this.x < this.coop.x - 30) {
+                        this.direction = 1;
+                        this.x += currentSpeed;
+                    } else if (this.x > this.coop.x + 30) {
+                        this.direction = -1;
+                        this.x -= currentSpeed;
+                    }
+
+                    // Check if reached coop
+                    if (this.coop.isChickenInside(this) && !this.isJumping) {
+                        this.hiding = true;
+                        this.panicLevel = 0;
+                    }
+
+                    this.walkSpeed = 0.25; // Fast walk animation
+                } else if (this.hiding) {
+                    // Stay hidden until worm is far away
+                    if (wormDist > 350) {
+                        this.hiding = false;
+                    }
+                } else {
+                    // Normal wandering - occasional random jumps for fun
+                    this.panicLevel = Math.max(0, this.panicLevel - 0.02);
+                    this.x += this.speed * this.direction;
+                    this.walkSpeed = 0.12;
+
+                    // Random Mars jumps when calm
+                    if (Math.random() < 0.005 && !this.isJumping && this.jumpCooldown <= 0) {
+                        this.velocityY = this.jumpPower * 0.7; // Smaller happy hops
+                        this.isJumping = true;
+                        this.jumpCooldown = 90;
+                    }
+
+                    // Don't wander off screen too far, turn around
+                    if (this.x > canvas.width - 200) {
+                        this.direction = -1;
+                    } else if (this.x < 100) {
+                        this.direction = 1;
+                    }
+                }
+            }
+
+            onCaught() {
+                // 15% chance of death
+                if (Math.random() < 0.15) {
+                    this.alive = false;
+                    this.hiding = false;
+                    return true;
+                }
+                // Escaped! Run faster
+                this.panicLevel = 1;
+                return false;
+            }
+
+            draw() {
+                // Don't draw if hiding or dead
+                if (this.hiding) {
+                    // Draw eyes peeking from coop
+                    ctx.save();
+                    ctx.translate(this.coop.x, this.coop.y + this.coop.height * 0.35);
+                    // Scared eyes peeking
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath();
+                    ctx.arc(-8, 0, 5, 0, Math.PI * 2);
+                    ctx.arc(8, 0, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(-6, -1, 2, 0, Math.PI * 2);
+                    ctx.arc(10, -1, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    return;
+                }
+
+                if (!this.alive) {
+                    // Draw death effect (feathers floating up)
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    const deathProgress = this.deathTimer / 180;
+                    ctx.globalAlpha = 1 - deathProgress;
+
+                    // Floating feathers
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i / 8) * Math.PI * 2 + this.deathTimer * 0.05;
+                        const radius = 30 + deathProgress * 100;
+                        const featherX = Math.cos(angle) * radius;
+                        const featherY = -deathProgress * 150 + Math.sin(angle * 2) * 20;
+
+                        ctx.fillStyle = i % 2 === 0 ? '#FFFFFF' : '#FFA500';
+                        ctx.save();
+                        ctx.translate(featherX, featherY);
+                        ctx.rotate(angle + this.deathTimer * 0.1);
+                        ctx.beginPath();
+                        ctx.ellipse(0, 0, 8, 4, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+
+                    // Ghost chicken rising
+                    ctx.fillStyle = `rgba(255, 255, 255, ${0.5 - deathProgress * 0.5})`;
+                    ctx.beginPath();
+                    ctx.arc(0, -deathProgress * 100, 25, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Halo
+                    ctx.strokeStyle = `rgba(255, 215, 0, ${0.8 - deathProgress * 0.8})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -deathProgress * 100 - 35, 15, 5, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.restore();
+                    return;
+                }
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                if (this.direction < 0) ctx.scale(-1, 1);
+
+                const s = this.size;
+                const legSwing = Math.sin(this.walkPhase) * 0.4;
+
+                // Panic effect - chicken turns slightly red and shakes
+                if (this.panicLevel > 0.5) {
+                    ctx.translate(Math.sin(this.walkPhase * 10) * 3, 0);
+                }
+
+                // MANGO SHOES! (bright orange-yellow mangos)
+                // Left shoe
+                ctx.save();
+                ctx.translate(-s * 0.15, s * 0.35 + Math.sin(this.walkPhase) * 3);
+                ctx.rotate(legSwing * 0.3);
+                // Mango shape
+                const mangoGradient1 = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 0.18);
+                mangoGradient1.addColorStop(0, '#FFD700');
+                mangoGradient1.addColorStop(0.5, '#FFA500');
+                mangoGradient1.addColorStop(1, '#FF8C00');
+                ctx.fillStyle = mangoGradient1;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, s * 0.18, s * 0.12, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                // Mango stem
+                ctx.fillStyle = '#228B22';
+                ctx.beginPath();
+                ctx.ellipse(-s * 0.15, -s * 0.05, s * 0.04, s * 0.025, 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Mango blush
+                ctx.fillStyle = 'rgba(255, 100, 100, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.05, -s * 0.03, s * 0.08, s * 0.06, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // Right shoe
+                ctx.save();
+                ctx.translate(s * 0.15, s * 0.35 + Math.sin(this.walkPhase + Math.PI) * 3);
+                ctx.rotate(-legSwing * 0.3);
+                // Mango shape
+                const mangoGradient2 = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 0.18);
+                mangoGradient2.addColorStop(0, '#FFD700');
+                mangoGradient2.addColorStop(0.5, '#FFA500');
+                mangoGradient2.addColorStop(1, '#FF8C00');
+                ctx.fillStyle = mangoGradient2;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, s * 0.18, s * 0.12, -0.3, 0, Math.PI * 2);
+                ctx.fill();
+                // Mango stem
+                ctx.fillStyle = '#228B22';
+                ctx.beginPath();
+                ctx.ellipse(-s * 0.15, -s * 0.05, s * 0.04, s * 0.025, 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Mango blush
+                ctx.fillStyle = 'rgba(255, 100, 100, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.05, -s * 0.03, s * 0.08, s * 0.06, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // Chicken legs (orange/yellow)
+                ctx.strokeStyle = '#FFA500';
+                ctx.lineWidth = s * 0.06;
+                ctx.lineCap = 'round';
+                // Left leg
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.12, s * 0.1);
+                ctx.lineTo(-s * 0.15, s * 0.28 + Math.sin(this.walkPhase) * 3);
+                ctx.stroke();
+                // Right leg
+                ctx.beginPath();
+                ctx.moveTo(s * 0.12, s * 0.1);
+                ctx.lineTo(s * 0.15, s * 0.28 + Math.sin(this.walkPhase + Math.PI) * 3);
+                ctx.stroke();
+
+                // Tail feathers
+                ctx.fillStyle = '#8B4513';
+                for (let i = 0; i < 5; i++) {
+                    ctx.save();
+                    ctx.translate(-s * 0.3, -s * 0.1);
+                    ctx.rotate(-0.4 + i * 0.2 + Math.sin(this.walkPhase) * 0.05);
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, s * 0.08, s * 0.25, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Body (big fluffy white)
+                const bodyGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, s * 0.4);
+                bodyGradient.addColorStop(0, '#FFFFFF');
+                bodyGradient.addColorStop(0.7, '#F5F5DC');
+                bodyGradient.addColorStop(1, '#DEB887');
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, s * 0.35, s * 0.3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Wing
+                ctx.save();
+                ctx.translate(0, -s * 0.05);
+                ctx.rotate(this.wingFlap);
+                ctx.fillStyle = '#F5DEB3';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.15, s * 0.05, s * 0.2, s * 0.15, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                // Wing feather lines
+                ctx.strokeStyle = '#DEB887';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(s * 0.08, s * 0.1);
+                ctx.lineTo(s * 0.28, s * 0.12);
+                ctx.moveTo(s * 0.1, s * 0.05);
+                ctx.lineTo(s * 0.3, s * 0.05);
+                ctx.stroke();
+                ctx.restore();
+
+                // Neck
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.15, -s * 0.25, s * 0.12, s * 0.15, 0.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Head
+                ctx.save();
+                ctx.translate(s * 0.22, -s * 0.4 + this.headBob);
+
+                // Head shape
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(0, 0, s * 0.15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Comb (red wiggly top)
+                ctx.fillStyle = '#FF0000';
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.08, -s * 0.12);
+                ctx.quadraticCurveTo(-s * 0.06, -s * 0.22, -s * 0.02, -s * 0.18);
+                ctx.quadraticCurveTo(0, -s * 0.25, s * 0.04, -s * 0.18);
+                ctx.quadraticCurveTo(s * 0.08, -s * 0.24, s * 0.1, -s * 0.15);
+                ctx.quadraticCurveTo(s * 0.08, -s * 0.1, s * 0.05, -s * 0.1);
+                ctx.lineTo(-s * 0.08, -s * 0.12);
+                ctx.fill();
+
+                // Wattle (red dangly thing)
+                ctx.fillStyle = '#FF0000';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.05, s * 0.12, s * 0.04, s * 0.07, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Beak
+                ctx.fillStyle = '#FFA500';
+                ctx.beginPath();
+                ctx.moveTo(s * 0.12, -s * 0.02);
+                ctx.lineTo(s * 0.25, s * 0.02);
+                ctx.lineTo(s * 0.12, s * 0.06);
+                ctx.closePath();
+                ctx.fill();
+                // Beak line
+                ctx.strokeStyle = '#CC8400';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(s * 0.12, s * 0.02);
+                ctx.lineTo(s * 0.23, s * 0.02);
+                ctx.stroke();
+
+                // Eye
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(s * 0.05, -s * 0.03, s * 0.04, 0, Math.PI * 2);
+                ctx.fill();
+                // Eye shine
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(s * 0.06, -s * 0.045, s * 0.015, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore(); // Head
+
+                ctx.restore(); // Main transform
+            }
+        }
+
+        // Person class (walking people)
+        class Person {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height - 30 - Math.random() * 20;
+                this.size = Math.random() * 8 + 12;
+                this.speed = Math.random() * 0.8 + 0.3;
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+                this.walkPhase = Math.random() * Math.PI * 2;
+                this.walkSpeed = Math.random() * 0.1 + 0.08;
+                // Random colors for variety
+                const shirtColors = ['#E53935', '#1E88E5', '#43A047', '#FB8C00', '#8E24AA', '#00ACC1'];
+                const pantsColors = ['#37474F', '#5D4037', '#1565C0', '#2E7D32'];
+                const skinTones = ['#FFDBAC', '#F1C27D', '#E0AC69', '#C68642', '#8D5524'];
+                this.shirtColor = shirtColors[Math.floor(Math.random() * shirtColors.length)];
+                this.pantsColor = pantsColors[Math.floor(Math.random() * pantsColors.length)];
+                this.skinColor = skinTones[Math.floor(Math.random() * skinTones.length)];
+            }
+
+            update() {
+                this.x += this.speed * this.direction;
+                this.walkPhase += this.walkSpeed;
+                if (this.x > canvas.width + 30) this.x = -30;
+                if (this.x < -30) this.x = canvas.width + 30;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                if (this.direction < 0) ctx.scale(-1, 1);
+
+                const legSwing = Math.sin(this.walkPhase) * 0.3;
+                const armSwing = Math.sin(this.walkPhase) * 0.4;
+                const bounce = Math.abs(Math.sin(this.walkPhase * 2)) * 2;
+
+                // Legs
+                ctx.strokeStyle = this.pantsColor;
+                ctx.lineWidth = this.size * 0.2;
+                ctx.lineCap = 'round';
+                // Left leg
+                ctx.beginPath();
+                ctx.moveTo(-this.size * 0.1, -this.size * 0.4 - bounce);
+                ctx.lineTo(-this.size * 0.15 + legSwing * this.size * 0.3, 0);
+                ctx.stroke();
+                // Right leg
+                ctx.beginPath();
+                ctx.moveTo(this.size * 0.1, -this.size * 0.4 - bounce);
+                ctx.lineTo(this.size * 0.15 - legSwing * this.size * 0.3, 0);
+                ctx.stroke();
+
+                // Body
+                ctx.fillStyle = this.shirtColor;
+                ctx.beginPath();
+                ctx.ellipse(0, -this.size * 0.6 - bounce, this.size * 0.2, this.size * 0.25, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Arms
+                ctx.strokeStyle = this.shirtColor;
+                ctx.lineWidth = this.size * 0.12;
+                // Left arm
+                ctx.beginPath();
+                ctx.moveTo(-this.size * 0.2, -this.size * 0.7 - bounce);
+                ctx.lineTo(-this.size * 0.35 - armSwing * this.size * 0.2, -this.size * 0.4 - bounce);
+                ctx.stroke();
+                // Right arm
+                ctx.beginPath();
+                ctx.moveTo(this.size * 0.2, -this.size * 0.7 - bounce);
+                ctx.lineTo(this.size * 0.35 + armSwing * this.size * 0.2, -this.size * 0.4 - bounce);
+                ctx.stroke();
+
+                // Head
+                ctx.fillStyle = this.skinColor;
+                ctx.beginPath();
+                ctx.arc(0, -this.size * 0.95 - bounce, this.size * 0.18, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // Skier class - skiing down mountains
+        class Skier {
+            constructor() {
+                // Pick a random mountain to ski on
+                const mountainPeaks = [
+                    { x: 0.15, peakY: 0.35, baseY: 0.6 },   // Back mountain 1
+                    { x: 0.45, peakY: 0.30, baseY: 0.6 },   // Back mountain 2 (tallest)
+                    { x: 0.75, peakY: 0.38, baseY: 0.6 },   // Back mountain 3
+                    { x: 0.1,  peakY: 0.55, baseY: 0.7 },   // Front mountain 1
+                    { x: 0.4,  peakY: 0.50, baseY: 0.7 },   // Front mountain 2
+                    { x: 0.7,  peakY: 0.52, baseY: 0.7 }    // Front mountain 3
+                ];
+                const peak = mountainPeaks[Math.floor(Math.random() * mountainPeaks.length)];
+
+                this.startX = canvas.width * peak.x;
+                this.startY = canvas.height * peak.peakY + 20;
+                this.endY = canvas.height * peak.baseY - 20;
+                this.x = this.startX;
+                this.y = this.startY;
+
+                this.size = 8 + Math.random() * 4;
+                this.speed = 1.5 + Math.random() * 1;
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+                this.wobble = 0;
+                this.wobbleSpeed = 0.15 + Math.random() * 0.1;
+
+                // Skier outfit colors
+                const jacketColors = ['#FF4444', '#4444FF', '#44FF44', '#FF44FF', '#FFFF44', '#44FFFF'];
+                this.jacketColor = jacketColors[Math.floor(Math.random() * jacketColors.length)];
+                this.pantsColor = '#222222';
+            }
+
+            update() {
+                this.y += this.speed;
+                this.x += this.direction * 0.5;
+                this.wobble += this.wobbleSpeed;
+
+                // Slalom movement
+                if (Math.sin(this.wobble) > 0.9) {
+                    this.direction *= -1;
+                }
+
+                // Reset when reaching bottom
+                if (this.y > this.endY) {
+                    this.y = this.startY;
+                    this.x = this.startX + (Math.random() - 0.5) * 50;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                const lean = Math.sin(this.wobble) * 0.2;
+                ctx.rotate(lean);
+
+                const s = this.size;
+
+                // Skis
+                ctx.fillStyle = '#8B4513';
+                ctx.save();
+                ctx.rotate(-0.1);
+                ctx.fillRect(-s * 0.8, s * 0.3, s * 1.2, s * 0.12);
+                ctx.restore();
+                ctx.save();
+                ctx.rotate(0.1);
+                ctx.fillRect(-s * 0.4, s * 0.3, s * 1.2, s * 0.12);
+                ctx.restore();
+
+                // Legs
+                ctx.strokeStyle = this.pantsColor;
+                ctx.lineWidth = s * 0.15;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.1, 0);
+                ctx.lineTo(-s * 0.15, s * 0.3);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s * 0.1, 0);
+                ctx.lineTo(s * 0.15, s * 0.3);
+                ctx.stroke();
+
+                // Body
+                ctx.fillStyle = this.jacketColor;
+                ctx.beginPath();
+                ctx.ellipse(0, -s * 0.15, s * 0.2, s * 0.22, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Arms with ski poles
+                ctx.strokeStyle = this.jacketColor;
+                ctx.lineWidth = s * 0.1;
+                const armAngle = Math.sin(this.wobble * 2) * 0.3;
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.2, -s * 0.1);
+                ctx.lineTo(-s * 0.4 - armAngle * s * 0.2, s * 0.1);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s * 0.2, -s * 0.1);
+                ctx.lineTo(s * 0.4 + armAngle * s * 0.2, s * 0.1);
+                ctx.stroke();
+
+                // Ski poles
+                ctx.strokeStyle = '#888888';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.4 - armAngle * s * 0.2, s * 0.1);
+                ctx.lineTo(-s * 0.5, s * 0.5);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s * 0.4 + armAngle * s * 0.2, s * 0.1);
+                ctx.lineTo(s * 0.5, s * 0.5);
+                ctx.stroke();
+
+                // Head with helmet
+                ctx.fillStyle = '#FFDBAC';
+                ctx.beginPath();
+                ctx.arc(0, -s * 0.45, s * 0.15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Helmet
+                ctx.fillStyle = this.jacketColor;
+                ctx.beginPath();
+                ctx.arc(0, -s * 0.48, s * 0.16, Math.PI, 0);
+                ctx.fill();
+
+                // Goggles
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(-s * 0.12, -s * 0.48, s * 0.24, s * 0.08);
+                ctx.fillStyle = 'rgba(100, 200, 255, 0.5)';
+                ctx.fillRect(-s * 0.1, -s * 0.47, s * 0.08, s * 0.06);
+                ctx.fillRect(s * 0.02, -s * 0.47, s * 0.08, s * 0.06);
+
+                ctx.restore();
+            }
+        }
+
+        // Hot Air Balloon class
+        class HotAirBalloon {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * (canvas.height * 0.3) + 80;
+                this.size = 50 + Math.random() * 30;
+                this.speed = 0.3 + Math.random() * 0.3;
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+                this.bobPhase = Math.random() * Math.PI * 2;
+                this.bobSpeed = 0.02 + Math.random() * 0.01;
+                this.swayPhase = Math.random() * Math.PI * 2;
+
+                // Random balloon colors - striped pattern
+                const colorSets = [
+                    ['#FF6B6B', '#FFFFFF', '#FF6B6B'],
+                    ['#4ECDC4', '#FFFFFF', '#4ECDC4'],
+                    ['#FFE66D', '#FF6B6B', '#FFE66D'],
+                    ['#95E1D3', '#F38181', '#95E1D3'],
+                    ['#AA96DA', '#FCBAD3', '#AA96DA'],
+                    ['#FF9F43', '#FFFFFF', '#FF9F43']
+                ];
+                this.colors = colorSets[Math.floor(Math.random() * colorSets.length)];
+            }
+
+            update() {
+                this.x += this.speed * this.direction;
+                this.bobPhase += this.bobSpeed;
+                this.swayPhase += 0.015;
+
+                // Wrap around screen
+                if (this.x > canvas.width + this.size * 2) {
+                    this.x = -this.size * 2;
+                }
+                if (this.x < -this.size * 2) {
+                    this.x = canvas.width + this.size * 2;
+                }
+            }
+
+            draw() {
+                const bobY = Math.sin(this.bobPhase) * 8;
+                const sway = Math.sin(this.swayPhase) * 3;
+
+                ctx.save();
+                ctx.translate(this.x + sway, this.y + bobY);
+
+                const s = this.size;
+
+                // Ropes connecting balloon to basket
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.3, s * 0.4);
+                ctx.lineTo(-s * 0.15, s * 0.8);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s * 0.3, s * 0.4);
+                ctx.lineTo(s * 0.15, s * 0.8);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.15, s * 0.5);
+                ctx.lineTo(-s * 0.1, s * 0.8);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s * 0.15, s * 0.5);
+                ctx.lineTo(s * 0.1, s * 0.8);
+                ctx.stroke();
+
+                // Balloon envelope (the big part)
+                // Draw stripes
+                for (let i = 0; i < 3; i++) {
+                    ctx.fillStyle = this.colors[i];
+                    ctx.beginPath();
+                    const startAngle = -Math.PI/2 + (i * Math.PI / 3) - Math.PI/6;
+                    const endAngle = -Math.PI/2 + ((i + 1) * Math.PI / 3) - Math.PI/6;
+                    ctx.moveTo(0, -s * 0.3);
+                    ctx.arc(0, 0, s * 0.5, startAngle, endAngle);
+                    ctx.lineTo(0, -s * 0.3);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                // Main balloon shape overlay
+                const balloonGradient = ctx.createRadialGradient(-s * 0.15, -s * 0.15, 0, 0, 0, s * 0.5);
+                balloonGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+                balloonGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+                balloonGradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+                ctx.fillStyle = balloonGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, s * 0.5, s * 0.55, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Balloon top knot
+                ctx.fillStyle = this.colors[0];
+                ctx.beginPath();
+                ctx.ellipse(0, -s * 0.5, s * 0.08, s * 0.05, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Balloon bottom opening (skirt)
+                ctx.fillStyle = this.colors[2];
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.45, s * 0.2, s * 0.08, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.45, s * 0.12, s * 0.04, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Basket
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(-s * 0.18, s * 0.8, s * 0.36, s * 0.25);
+
+                // Basket weave pattern
+                ctx.strokeStyle = '#654321';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 4; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(-s * 0.18, s * 0.83 + i * s * 0.06);
+                    ctx.lineTo(s * 0.18, s * 0.83 + i * s * 0.06);
+                    ctx.stroke();
+                }
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(-s * 0.15 + i * s * 0.075, s * 0.8);
+                    ctx.lineTo(-s * 0.15 + i * s * 0.075, s * 1.05);
+                    ctx.stroke();
+                }
+
+                // Basket rim
+                ctx.fillStyle = '#654321';
+                ctx.fillRect(-s * 0.2, s * 0.78, s * 0.4, s * 0.04);
+
+                // Little person waving in basket
+                ctx.fillStyle = '#FFDBAC';
+                ctx.beginPath();
+                ctx.arc(0, s * 0.88, s * 0.06, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Waving arm
+                const waveAngle = Math.sin(this.bobPhase * 3) * 0.4;
+                ctx.strokeStyle = '#FFDBAC';
+                ctx.lineWidth = s * 0.04;
+                ctx.beginPath();
+                ctx.moveTo(s * 0.05, s * 0.9);
+                ctx.lineTo(s * 0.12 + Math.sin(this.bobPhase * 3) * s * 0.05, s * 0.82 + Math.cos(this.bobPhase * 3) * s * 0.03);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        // Rainbow class - colorful arcs across the sky
+        class Rainbow {
+            constructor(x, y) {
+                this.x = x || Math.random() * canvas.width;
+                this.y = y || 100 + Math.random() * 150;
+                this.width = 200 + Math.random() * 150;
+                this.height = 80 + Math.random() * 60;
+                this.opacity = 0.7 + Math.random() * 0.3;
+                this.sparklePhase = Math.random() * Math.PI * 2;
+            }
+
+            update() {
+                this.sparklePhase += 0.05;
+            }
+
+            draw() {
+                const colors = ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'];
+                const bandWidth = 8;
+
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+
+                // Draw rainbow bands
+                for (let i = 0; i < colors.length; i++) {
+                    ctx.strokeStyle = colors[i];
+                    ctx.lineWidth = bandWidth;
+                    ctx.beginPath();
+                    const radius = this.height - (i * bandWidth);
+                    ctx.arc(this.x, this.y + this.height, this.width / 2, Math.PI, 0, false);
+                    ctx.stroke();
+
+                    // Adjust for next band
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y + this.height, (this.width / 2) - ((i + 1) * bandWidth * 0.8), Math.PI, 0, false);
+                }
+
+                // Add sparkles
+                for (let i = 0; i < 8; i++) {
+                    const sparkleAngle = (Math.PI / 7) * i + Math.PI;
+                    const sparkleRadius = this.width / 2 - 20;
+                    const sx = this.x + Math.cos(sparkleAngle) * sparkleRadius;
+                    const sy = this.y + this.height + Math.sin(sparkleAngle) * sparkleRadius * 0.6;
+                    const sparkleSize = 3 + Math.sin(this.sparklePhase + i) * 2;
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.globalAlpha = 0.5 + Math.sin(this.sparklePhase + i * 0.5) * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, sparkleSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            getPositionOnRainbow(t) {
+                // t from 0 to 1, returns position on the rainbow arc
+                const angle = Math.PI + (Math.PI * t);
+                const radius = this.width / 2 - 30;
+                return {
+                    x: this.x + Math.cos(angle) * radius,
+                    y: this.y + this.height + Math.sin(angle) * radius * 0.6
+                };
+            }
+        }
+
+        // Pink Puffy Unicorn class - dances on rainbows!
+        class PinkPuffyUnicorn {
+            constructor(rainbow) {
+                this.rainbow = rainbow;
+                this.t = Math.random(); // Position on rainbow (0-1)
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+                this.speed = 0.003 + Math.random() * 0.003;
+                this.size = 25 + Math.random() * 15;
+                this.bouncePhase = Math.random() * Math.PI * 2;
+                this.dancePhase = Math.random() * Math.PI * 2;
+                this.legPhase = Math.random() * Math.PI * 2;
+                this.sparkles = [];
+                this.puffiness = 1.2 + Math.random() * 0.3; // Extra puffy!
+
+                // Pink color variations
+                const pinkShades = ['#FF69B4', '#FF1493', '#FFB6C1', '#FF85A2', '#FFC0CB'];
+                this.bodyColor = pinkShades[Math.floor(Math.random() * pinkShades.length)];
+                this.maneColor = pinkShades[Math.floor(Math.random() * pinkShades.length)];
+            }
+
+            update() {
+                // Dance along the rainbow
+                this.t += this.speed * this.direction;
+                if (this.t > 0.95 || this.t < 0.05) {
+                    this.direction *= -1;
+                }
+
+                this.bouncePhase += 0.15;
+                this.dancePhase += 0.1;
+                this.legPhase += 0.2;
+
+                // Create sparkle trail
+                if (Math.random() < 0.3) {
+                    const pos = this.rainbow.getPositionOnRainbow(this.t);
+                    this.sparkles.push({
+                        x: pos.x + (Math.random() - 0.5) * 20,
+                        y: pos.y + (Math.random() - 0.5) * 20,
+                        life: 30,
+                        size: 2 + Math.random() * 3,
+                        color: Math.random() > 0.5 ? '#FFD700' : '#FF69B4'
+                    });
+                }
+
+                // Update sparkles
+                this.sparkles = this.sparkles.filter(s => {
+                    s.life--;
+                    s.y -= 0.5;
+                    s.size *= 0.95;
+                    return s.life > 0;
+                });
+            }
+
+            draw() {
+                const pos = this.rainbow.getPositionOnRainbow(this.t);
+                const bounce = Math.sin(this.bouncePhase) * 8;
+                const x = pos.x;
+                const y = pos.y - this.size - bounce;
+                const s = this.size * this.puffiness;
+
+                ctx.save();
+                ctx.translate(x, y);
+
+                // Flip based on direction
+                if (this.direction < 0) {
+                    ctx.scale(-1, 1);
+                }
+
+                // Draw sparkle trail
+                this.sparkles.forEach(sparkle => {
+                    ctx.fillStyle = sparkle.color;
+                    ctx.globalAlpha = sparkle.life / 30;
+                    ctx.beginPath();
+                    // Star shape
+                    for (let i = 0; i < 5; i++) {
+                        const angle = (i * Math.PI * 2 / 5) - Math.PI / 2;
+                        const outerX = (this.direction < 0 ? -1 : 1) * (sparkle.x - x) + Math.cos(angle) * sparkle.size;
+                        const outerY = sparkle.y - y + Math.sin(angle) * sparkle.size;
+                        const innerX = (this.direction < 0 ? -1 : 1) * (sparkle.x - x) + Math.cos(angle + Math.PI / 5) * sparkle.size * 0.4;
+                        const innerY = sparkle.y - y + Math.sin(angle + Math.PI / 5) * sparkle.size * 0.4;
+                        if (i === 0) ctx.moveTo(outerX, outerY);
+                        else ctx.lineTo(outerX, outerY);
+                        ctx.lineTo(innerX, innerY);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                });
+                ctx.globalAlpha = 1;
+
+                // Dancing legs (4 puffy legs)
+                const legKick = Math.sin(this.legPhase) * 0.3;
+                ctx.fillStyle = this.bodyColor;
+                // Back legs
+                ctx.beginPath();
+                ctx.ellipse(-s * 0.25, s * 0.4 + Math.sin(this.legPhase) * 3, s * 0.12, s * 0.25, legKick, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(-s * 0.05, s * 0.4 + Math.sin(this.legPhase + 1) * 3, s * 0.12, s * 0.25, -legKick, 0, Math.PI * 2);
+                ctx.fill();
+                // Front legs
+                ctx.beginPath();
+                ctx.ellipse(s * 0.2, s * 0.4 + Math.sin(this.legPhase + 2) * 3, s * 0.12, s * 0.25, legKick, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(s * 0.4, s * 0.4 + Math.sin(this.legPhase + 3) * 3, s * 0.12, s * 0.25, -legKick, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Puffy body (extra round and fluffy!)
+                const bodyGradient = ctx.createRadialGradient(-s * 0.1, -s * 0.1, 0, 0, 0, s * 0.6);
+                bodyGradient.addColorStop(0, '#FFFFFF');
+                bodyGradient.addColorStop(0.3, this.bodyColor);
+                bodyGradient.addColorStop(1, this.bodyColor);
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, s * 0.5, s * 0.4, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Fluffy chest tuft
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.3, 0, s * 0.15, s * 0.2, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Head
+                const headBob = Math.sin(this.dancePhase) * 3;
+                ctx.fillStyle = this.bodyColor;
+                ctx.beginPath();
+                ctx.ellipse(s * 0.45, -s * 0.2 + headBob, s * 0.28, s * 0.25, 0.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Snout
+                ctx.fillStyle = '#FFE4E1';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.65, -s * 0.1 + headBob, s * 0.12, s * 0.1, 0.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eye
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(s * 0.5, -s * 0.25 + headBob, s * 0.1, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#4B0082';
+                ctx.beginPath();
+                ctx.arc(s * 0.52, -s * 0.25 + headBob, s * 0.06, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(s * 0.54, -s * 0.27 + headBob, s * 0.025, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Rosy cheek
+                ctx.fillStyle = 'rgba(255, 105, 180, 0.5)';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.58, -s * 0.12 + headBob, s * 0.06, s * 0.04, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Magical horn (spiraling, sparkly)
+                const hornGradient = ctx.createLinearGradient(s * 0.5, -s * 0.5 + headBob, s * 0.6, -s * 0.8 + headBob);
+                hornGradient.addColorStop(0, '#FFD700');
+                hornGradient.addColorStop(0.5, '#FFF8DC');
+                hornGradient.addColorStop(1, '#FFD700');
+                ctx.fillStyle = hornGradient;
+                ctx.beginPath();
+                ctx.moveTo(s * 0.45, -s * 0.4 + headBob);
+                ctx.lineTo(s * 0.55, -s * 0.8 + headBob);
+                ctx.lineTo(s * 0.52, -s * 0.4 + headBob);
+                ctx.closePath();
+                ctx.fill();
+
+                // Horn spiral lines
+                ctx.strokeStyle = '#DAA520';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 4; i++) {
+                    const hy = -s * 0.45 - i * s * 0.08 + headBob;
+                    ctx.beginPath();
+                    ctx.moveTo(s * 0.46 + i * 0.015, hy);
+                    ctx.lineTo(s * 0.52 - i * 0.015, hy);
+                    ctx.stroke();
+                }
+
+                // Fluffy mane
+                ctx.fillStyle = this.maneColor;
+                for (let i = 0; i < 6; i++) {
+                    const maneX = s * 0.3 - i * s * 0.08;
+                    const maneY = -s * 0.35 + Math.sin(this.dancePhase + i * 0.5) * 5 + headBob * 0.5;
+                    const maneSize = s * 0.12 - i * 0.01;
+                    ctx.beginPath();
+                    ctx.arc(maneX, maneY, maneSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Fluffy ear
+                ctx.fillStyle = this.bodyColor;
+                ctx.beginPath();
+                ctx.ellipse(s * 0.35, -s * 0.45 + headBob, s * 0.06, s * 0.1, -0.3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#FFB6C1';
+                ctx.beginPath();
+                ctx.ellipse(s * 0.35, -s * 0.43 + headBob, s * 0.03, s * 0.06, -0.3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Fluffy tail
+                ctx.fillStyle = this.maneColor;
+                for (let i = 0; i < 5; i++) {
+                    const tailX = -s * 0.45 - i * s * 0.06;
+                    const tailY = -s * 0.1 + Math.sin(this.dancePhase * 1.5 + i * 0.7) * 8;
+                    ctx.beginPath();
+                    ctx.arc(tailX, tailY, s * 0.1 - i * 0.01, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Happy smile
+                ctx.strokeStyle = '#FF1493';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(s * 0.6, -s * 0.08 + headBob, s * 0.06, 0.2, Math.PI - 0.2);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        // Flying Walrus class - majestic walrus with wings and a 67 shirt!
+        class FlyingWalrus {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = 100 + Math.random() * 150;
+                this.size = 60 + Math.random() * 20;
+                this.speed = 0.8 + Math.random() * 0.5;
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+                this.wingPhase = Math.random() * Math.PI * 2;
+                this.bobPhase = Math.random() * Math.PI * 2;
+                this.flipperPhase = Math.random() * Math.PI * 2;
+            }
+
+            update() {
+                this.x += this.speed * this.direction;
+
+                // Wrap around screen
+                if (this.x > canvas.width + 100) {
+                    this.x = -100;
+                }
+                if (this.x < -100) {
+                    this.x = canvas.width + 100;
+                }
+
+                this.wingPhase += 0.15;
+                this.bobPhase += 0.05;
+                this.flipperPhase += 0.1;
+            }
+
+            draw() {
+                const s = this.size;
+                const bob = Math.sin(this.bobPhase) * 5;
+
+                ctx.save();
+                ctx.translate(this.x, this.y + bob);
+
+                // Flip based on direction
+                if (this.direction < 0) {
+                    ctx.scale(-1, 1);
+                }
+
+                // Wings (behind body)
+                const wingFlap = Math.sin(this.wingPhase) * 0.4;
+                ctx.fillStyle = '#E8E8E8';
+                ctx.strokeStyle = '#CCCCCC';
+                ctx.lineWidth = 2;
+
+                // Left wing
+                ctx.save();
+                ctx.translate(-s * 0.3, -s * 0.1);
+                ctx.rotate(-0.5 - wingFlap);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, s * 0.5, s * 0.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                // Wing feathers
+                ctx.fillStyle = '#FFFFFF';
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.ellipse(-s * 0.15 - i * s * 0.07, 0, s * 0.08, s * 0.15, 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // Right wing
+                ctx.save();
+                ctx.translate(s * 0.3, -s * 0.1);
+                ctx.rotate(0.5 + wingFlap);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, s * 0.5, s * 0.2, 0, 0, Math.PI * 2);
+                ctx.fillStyle = '#E8E8E8';
+                ctx.fill();
+                ctx.stroke();
+                // Wing feathers
+                ctx.fillStyle = '#FFFFFF';
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.ellipse(s * 0.15 + i * s * 0.07, 0, s * 0.08, s * 0.15, -0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // Body (big blubbery walrus body)
+                const bodyGradient = ctx.createRadialGradient(-s * 0.1, -s * 0.1, 0, 0, 0, s * 0.5);
+                bodyGradient.addColorStop(0, '#C4A484');
+                bodyGradient.addColorStop(0.7, '#8B7355');
+                bodyGradient.addColorStop(1, '#6B5344');
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.1, s * 0.45, s * 0.35, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Shirt with 67!
+                ctx.fillStyle = '#FF4444';
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.15, s * 0.38, s * 0.28, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Shirt collar
+                ctx.fillStyle = '#CC3333';
+                ctx.beginPath();
+                ctx.ellipse(0, -s * 0.1, s * 0.2, s * 0.08, 0, 0, Math.PI);
+                ctx.fill();
+
+                // Number 67 on shirt
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = `bold ${s * 0.35}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('67', 0, s * 0.18);
+
+                // Flippers (arms)
+                const flipperWave = Math.sin(this.flipperPhase) * 0.2;
+                ctx.fillStyle = '#8B7355';
+                // Left flipper
+                ctx.save();
+                ctx.translate(-s * 0.35, s * 0.15);
+                ctx.rotate(-0.5 + flipperWave);
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.15, s * 0.1, s * 0.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                // Right flipper
+                ctx.save();
+                ctx.translate(s * 0.35, s * 0.15);
+                ctx.rotate(0.5 - flipperWave);
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.15, s * 0.1, s * 0.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // Head
+                ctx.fillStyle = '#C4A484';
+                ctx.beginPath();
+                ctx.ellipse(0, -s * 0.25, s * 0.32, s * 0.28, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Snout/nose area (big walrus snout)
+                ctx.fillStyle = '#D4B494';
+                ctx.beginPath();
+                ctx.ellipse(0, -s * 0.1, s * 0.25, s * 0.18, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Whisker dots
+                ctx.fillStyle = '#6B5344';
+                for (let row = 0; row < 3; row++) {
+                    for (let col = 0; col < 4; col++) {
+                        ctx.beginPath();
+                        ctx.arc(-s * 0.12 + col * s * 0.08, -s * 0.12 + row * s * 0.05, s * 0.02, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                // Tusks! (iconic walrus tusks)
+                ctx.fillStyle = '#FFFFF0';
+                ctx.strokeStyle = '#E8E8D0';
+                ctx.lineWidth = 1;
+                // Left tusk
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.1, -s * 0.02);
+                ctx.quadraticCurveTo(-s * 0.15, s * 0.15, -s * 0.08, s * 0.35);
+                ctx.quadraticCurveTo(-s * 0.05, s * 0.15, -s * 0.05, -s * 0.02);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                // Right tusk
+                ctx.beginPath();
+                ctx.moveTo(s * 0.1, -s * 0.02);
+                ctx.quadraticCurveTo(s * 0.15, s * 0.15, s * 0.08, s * 0.35);
+                ctx.quadraticCurveTo(s * 0.05, s * 0.15, s * 0.05, -s * 0.02);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Nose
+                ctx.fillStyle = '#5C4434';
+                ctx.beginPath();
+                ctx.ellipse(0, -s * 0.18, s * 0.08, s * 0.05, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eyes
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(-s * 0.12, -s * 0.32, s * 0.08, 0, Math.PI * 2);
+                ctx.arc(s * 0.12, -s * 0.32, s * 0.08, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#2C1810';
+                ctx.beginPath();
+                ctx.arc(-s * 0.11, -s * 0.32, s * 0.05, 0, Math.PI * 2);
+                ctx.arc(s * 0.13, -s * 0.32, s * 0.05, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(-s * 0.1, -s * 0.34, s * 0.02, 0, Math.PI * 2);
+                ctx.arc(s * 0.14, -s * 0.34, s * 0.02, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eyebrows (friendly)
+                ctx.strokeStyle = '#5C4434';
+                ctx.lineWidth = s * 0.03;
+                ctx.beginPath();
+                ctx.arc(-s * 0.12, -s * 0.38, s * 0.06, Math.PI * 0.2, Math.PI * 0.8);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(s * 0.12, -s * 0.38, s * 0.06, Math.PI * 0.2, Math.PI * 0.8);
+                ctx.stroke();
+
+                // Tail flipper (back)
+                ctx.fillStyle = '#8B7355';
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.4, s * 0.2, s * 0.08, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // Mountain face data for expressions
+        const mountainFaces = [
+            { x: 0.15, y: 0.42, size: 25, winkTimer: 0, smileTimer: 0, isWinking: false, isSmiling: true },
+            { x: 0.45, y: 0.38, size: 35, winkTimer: 0, smileTimer: 0, isWinking: false, isSmiling: true },
+            { x: 0.75, y: 0.44, size: 25, winkTimer: 0, smileTimer: 0, isWinking: false, isSmiling: true },
+            { x: 0.1,  y: 0.58, size: 20, winkTimer: 0, smileTimer: 0, isWinking: false, isSmiling: true },
+            { x: 0.4,  y: 0.54, size: 22, winkTimer: 0, smileTimer: 0, isWinking: false, isSmiling: true },
+            { x: 0.7,  y: 0.56, size: 20, winkTimer: 0, smileTimer: 0, isWinking: false, isSmiling: true }
+        ];
+
+        function updateMountainFaces() {
+            mountainFaces.forEach(face => {
+                // Random winking
+                if (!face.isWinking && Math.random() < 0.003) {
+                    face.isWinking = true;
+                    face.winkTimer = 30; // Wink for half a second
+                }
+                if (face.isWinking) {
+                    face.winkTimer--;
+                    if (face.winkTimer <= 0) {
+                        face.isWinking = false;
+                    }
+                }
+
+                // Random smile changes
+                if (Math.random() < 0.002) {
+                    face.isSmiling = !face.isSmiling;
+                    face.smileTimer = 120; // Hold expression for 2 seconds
+                }
+                if (face.smileTimer > 0) {
+                    face.smileTimer--;
+                }
+            });
+        }
+
+        function drawMountainFace(face) {
+            const x = canvas.width * face.x;
+            const y = canvas.height * face.y;
+            const s = face.size;
+
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Eyes
+            ctx.fillStyle = '#333';
+            // Left eye
+            if (face.isWinking) {
+                // Winking eye (closed arc)
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(-s * 0.3, 0, s * 0.15, 0.2, Math.PI - 0.2);
+                ctx.stroke();
+            } else {
+                ctx.beginPath();
+                ctx.arc(-s * 0.3, 0, s * 0.15, 0, Math.PI * 2);
+                ctx.fill();
+                // Eye shine
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(-s * 0.25, -s * 0.05, s * 0.05, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Right eye (always open)
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(s * 0.3, 0, s * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            // Eye shine
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(s * 0.35, -s * 0.05, s * 0.05, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rosy cheeks
+            ctx.fillStyle = 'rgba(255, 150, 150, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(-s * 0.5, s * 0.2, s * 0.12, s * 0.08, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(s * 0.5, s * 0.2, s * 0.12, s * 0.08, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Mouth
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            if (face.isSmiling) {
+                // Happy smile
+                ctx.beginPath();
+                ctx.arc(0, s * 0.15, s * 0.25, 0.2, Math.PI - 0.2);
+                ctx.stroke();
+            } else {
+                // Neutral/surprised O mouth
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.25, s * 0.1, s * 0.12, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // Draw scenic background
+        function drawScenery() {
+            // Sky gradient
+            const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            skyGradient.addColorStop(0, '#87CEEB');
+            skyGradient.addColorStop(0.5, '#B0E0E6');
+            skyGradient.addColorStop(1, '#90EE90');
+            ctx.fillStyle = skyGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Sun
+            ctx.save();
+            ctx.fillStyle = '#FFD700';
+            ctx.shadowBlur = 40;
+            ctx.shadowColor = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(canvas.width - 120, 100, 50, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Mountains (back layer - bluish)
+            ctx.fillStyle = '#7B9EBF';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height * 0.6);
+            ctx.lineTo(canvas.width * 0.15, canvas.height * 0.35);
+            ctx.lineTo(canvas.width * 0.3, canvas.height * 0.5);
+            ctx.lineTo(canvas.width * 0.45, canvas.height * 0.3);
+            ctx.lineTo(canvas.width * 0.6, canvas.height * 0.55);
+            ctx.lineTo(canvas.width * 0.75, canvas.height * 0.38);
+            ctx.lineTo(canvas.width * 0.9, canvas.height * 0.48);
+            ctx.lineTo(canvas.width, canvas.height * 0.4);
+            ctx.lineTo(canvas.width, canvas.height * 0.6);
+            ctx.closePath();
+            ctx.fill();
+
+            // Snow caps on back mountains
+            ctx.fillStyle = '#FFFFFF';
+            // Peak 1 snow cap
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.15, canvas.height * 0.35);
+            ctx.lineTo(canvas.width * 0.12, canvas.height * 0.42);
+            ctx.lineTo(canvas.width * 0.18, canvas.height * 0.42);
+            ctx.closePath();
+            ctx.fill();
+            // Peak 2 snow cap (tallest)
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.45, canvas.height * 0.3);
+            ctx.lineTo(canvas.width * 0.40, canvas.height * 0.40);
+            ctx.lineTo(canvas.width * 0.50, canvas.height * 0.40);
+            ctx.closePath();
+            ctx.fill();
+            // Peak 3 snow cap
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.75, canvas.height * 0.38);
+            ctx.lineTo(canvas.width * 0.72, canvas.height * 0.45);
+            ctx.lineTo(canvas.width * 0.78, canvas.height * 0.45);
+            ctx.closePath();
+            ctx.fill();
+
+            // Mountains (front layer - greenish)
+            ctx.fillStyle = '#6B8E6B';
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height * 0.7);
+            ctx.lineTo(canvas.width * 0.1, canvas.height * 0.55);
+            ctx.lineTo(canvas.width * 0.25, canvas.height * 0.65);
+            ctx.lineTo(canvas.width * 0.4, canvas.height * 0.5);
+            ctx.lineTo(canvas.width * 0.55, canvas.height * 0.62);
+            ctx.lineTo(canvas.width * 0.7, canvas.height * 0.52);
+            ctx.lineTo(canvas.width * 0.85, canvas.height * 0.6);
+            ctx.lineTo(canvas.width, canvas.height * 0.55);
+            ctx.lineTo(canvas.width, canvas.height * 0.7);
+            ctx.closePath();
+            ctx.fill();
+
+            // Snow caps on front mountains
+            ctx.fillStyle = '#F0F8FF';
+            // Front peak 1
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.1, canvas.height * 0.55);
+            ctx.lineTo(canvas.width * 0.07, canvas.height * 0.60);
+            ctx.lineTo(canvas.width * 0.13, canvas.height * 0.60);
+            ctx.closePath();
+            ctx.fill();
+            // Front peak 2
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.4, canvas.height * 0.5);
+            ctx.lineTo(canvas.width * 0.36, canvas.height * 0.57);
+            ctx.lineTo(canvas.width * 0.44, canvas.height * 0.57);
+            ctx.closePath();
+            ctx.fill();
+            // Front peak 3
+            ctx.beginPath();
+            ctx.moveTo(canvas.width * 0.7, canvas.height * 0.52);
+            ctx.lineTo(canvas.width * 0.67, canvas.height * 0.58);
+            ctx.lineTo(canvas.width * 0.73, canvas.height * 0.58);
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw mountain faces (smiley faces that wink and smile)
+            updateMountainFaces();
+            mountainFaces.forEach(face => {
+                drawMountainFace(face);
+            });
+
+            // Grass field
+            ctx.fillStyle = '#7CCD7C';
+            ctx.fillRect(0, canvas.height * 0.7, canvas.width, canvas.height * 0.3);
+
+            // Stream
+            ctx.save();
+            const streamY = canvas.height * 0.82;
+            const streamGradient = ctx.createLinearGradient(0, streamY - 15, 0, streamY + 15);
+            streamGradient.addColorStop(0, '#4A90D9');
+            streamGradient.addColorStop(0.5, '#5BA3E8');
+            streamGradient.addColorStop(1, '#4A90D9');
+            ctx.fillStyle = streamGradient;
+            ctx.beginPath();
+            ctx.moveTo(0, streamY);
+            for (let x = 0; x <= canvas.width; x += 50) {
+                ctx.quadraticCurveTo(x + 25, streamY + Math.sin(x * 0.02 + Date.now() * 0.001) * 8, x + 50, streamY);
+            }
+            ctx.lineTo(canvas.width, streamY + 25);
+            ctx.lineTo(0, streamY + 25);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Meteor class
+        class Meteor {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = -50;
+                this.length = Math.random() * 80 + 40;
+                this.speed = Math.random() * 6 + 4;
+                this.angle = Math.random() * 0.5 + 0.3;
+                this.life = 1;
+            }
+
+            update() {
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+                this.life -= 0.01;
+                return this.life > 0 && this.y < canvas.height + 50;
+            }
+
+            draw() {
+                ctx.beginPath();
+                const gradient = ctx.createLinearGradient(
+                    this.x, this.y,
+                    this.x - Math.cos(this.angle) * this.length,
+                    this.y - Math.sin(this.angle) * this.length
+                );
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${this.life * 0.9})`);
+                gradient.addColorStop(0.5, `rgba(138, 124, 255, ${this.life * 0.5})`);
+                gradient.addColorStop(1, 'rgba(138, 124, 255, 0)');
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 2;
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(
+                    this.x - Math.cos(this.angle) * this.length,
+                    this.y - Math.sin(this.angle) * this.length
+                );
+                ctx.stroke();
+            }
+        }
+
+        // Laser class
+        class Laser {
+            constructor(x, y, targetX, targetY, color, shooter = null) {
+                this.x = x;
+                this.y = y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.color = color;
+                this.shooter = shooter;
+                this.speed = 8;
+
+                const dx = targetX - x;
+                const dy = targetY - y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                this.vx = (dx / distance) * this.speed;
+                this.vy = (dy / distance) * this.speed;
+
+                this.life = 100;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                return this.life > 0 &&
+                       this.x > -50 && this.x < canvas.width + 50 &&
+                       this.y > -50 && this.y < canvas.height + 50;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.vx * 3, this.y - this.vy * 3);
+                ctx.lineTo(this.x, this.y);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        // Base locations for teams - centered at bottom
+        let redBaseX = canvas.width / 2 - 100;
+        let redBaseY = canvas.height - 80;
+        let blueBaseX = canvas.width / 2 + 100;
+        let blueBaseY = canvas.height - 80;
+
+        // Team kill counters
+        let redTeamKills = 0;
+        let blueTeamKills = 0;
+
+        // User prediction tracking
+        let userPrediction = null;
+        let gameWinner = null;
+        const WIN_THRESHOLD = 10;
+
+        // Team selection function
+        window.selectTeam = function(team) {
+            if (gameWinner) return;
+
+            userPrediction = team;
+
+            // Hide the team selection UI
+            document.querySelector('.game-ui').style.display = 'none';
+
+            // Show the "your pick" indicator
+            const yourPick = document.getElementById('your-pick');
+            const pickTeam = document.getElementById('pick-team');
+            yourPick.classList.remove('red', 'blue');
+            yourPick.classList.add(team);
+            pickTeam.textContent = team.toUpperCase() + ' TEAM';
+            yourPick.style.display = 'block';
+        }
+
+        // Restart game function
+        window.restartGame = function() {
+            redTeamKills = 0;
+            blueTeamKills = 0;
+            userPrediction = null;
+            gameWinner = null;
+
+            // Show the team selection UI again
+            document.querySelector('.game-ui').style.display = 'block';
+            document.getElementById('your-pick').style.display = 'none';
+
+            document.getElementById('red-btn').disabled = false;
+            document.getElementById('blue-btn').disabled = false;
+            document.getElementById('red-btn').classList.remove('selected');
+            document.getElementById('blue-btn').classList.remove('selected');
+            document.getElementById('prediction-status').textContent = 'Make your prediction!';
+            document.getElementById('restart-btn').style.display = 'none';
+
+            // Clear game entities
+            spaceships.length = 0;
+            aliens.length = 0;
+            lasers.length = 0;
+            explosions.length = 0;
+            spacemen.length = 0;
+        }
+
+        function checkGameWinner() {
+            if (gameWinner) return;
+
+            if (redTeamKills >= WIN_THRESHOLD) {
+                gameWinner = 'red';
+                announceWinner('red');
+            } else if (blueTeamKills >= WIN_THRESHOLD) {
+                gameWinner = 'blue';
+                announceWinner('blue');
+            }
+        }
+
+        function announceWinner(winner) {
+            // Show the game UI again for the result
+            document.querySelector('.game-ui').style.display = 'block';
+            document.getElementById('your-pick').style.display = 'none';
+
+            document.getElementById('red-btn').disabled = true;
+            document.getElementById('blue-btn').disabled = true;
+
+            const winnerTeamName = winner.toUpperCase();
+
+            if (userPrediction === winner) {
+                document.getElementById('prediction-status').innerHTML =
+                    `<span style="color: #2E7D32;">🎉 ${winnerTeamName} TEAM WON! YOU PREDICTED CORRECTLY! 🎉</span><br>✋ HIGH FIVE! ✋`;
+                triggerVictoryGlow();
+            } else if (userPrediction) {
+                document.getElementById('prediction-status').textContent =
+                    `${winnerTeamName} TEAM WON! Better luck next time!`;
+            } else {
+                document.getElementById('prediction-status').textContent =
+                    `${winnerTeamName} TEAM WON! You didn't make a prediction.`;
+            }
+
+            document.getElementById('restart-btn').style.display = 'inline-block';
+        }
+
+        function triggerVictoryGlow() {
+            const glowOverlay = document.getElementById('victory-glow');
+            glowOverlay.classList.add('active');
+            setTimeout(() => {
+                glowOverlay.classList.remove('active');
+            }, 3000);
+        }
+
+        function updateBasePositions() {
+            redBaseX = canvas.width / 2 - 100;
+            redBaseY = canvas.height - 80;
+            blueBaseX = canvas.width / 2 + 100;
+            blueBaseY = canvas.height - 80;
+        }
+
+        // Draw futuristic launch platforms
+        function drawLaunchPlatforms() {
+            // Red team platform
+            drawPlatform(redBaseX, canvas.height - 30, '#ff4444', 'RED');
+
+            // Blue team platform
+            drawPlatform(blueBaseX, canvas.height - 30, '#4444ff', 'BLUE');
+        }
+
+        function drawPlatform(x, y, color, label) {
+            ctx.save();
+
+            // Platform base - metallic gradient
+            const platformWidth = 80;
+            const platformHeight = 25;
+
+            // Outer glow
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = color;
+
+            // Main platform body
+            const gradient = ctx.createLinearGradient(x - platformWidth/2, y - platformHeight, x - platformWidth/2, y);
+            gradient.addColorStop(0, '#4a4a6c');
+            gradient.addColorStop(0.5, '#6a6a8c');
+            gradient.addColorStop(1, '#3a3a5c');
+            ctx.fillStyle = gradient;
+
+            // Platform shape - futuristic with angled edges
+            ctx.beginPath();
+            ctx.moveTo(x - platformWidth/2 - 10, y);
+            ctx.lineTo(x - platformWidth/2, y - platformHeight);
+            ctx.lineTo(x + platformWidth/2, y - platformHeight);
+            ctx.lineTo(x + platformWidth/2 + 10, y);
+            ctx.closePath();
+            ctx.fill();
+
+            // Top surface
+            ctx.fillStyle = '#5a5a7c';
+            ctx.fillRect(x - platformWidth/2, y - platformHeight, platformWidth, 3);
+
+            // Team color accent strip
+            ctx.fillStyle = color;
+            ctx.fillRect(x - platformWidth/2 + 5, y - platformHeight + 5, platformWidth - 10, 4);
+
+            // Glowing lights on platform
+            const lightPhase = Date.now() / 500;
+            const lightBrightness = 0.5 + Math.sin(lightPhase) * 0.5;
+
+            ctx.fillStyle = `rgba(${color === '#ff4444' ? '255, 68, 68' : '68, 68, 255'}, ${lightBrightness})`;
+            ctx.beginPath();
+            ctx.arc(x - 25, y - 10, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + 25, y - 10, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Center light
+            ctx.fillStyle = `rgba(255, 255, 255, ${lightBrightness * 0.8})`;
+            ctx.beginPath();
+            ctx.arc(x, y - 12, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Platform label
+            ctx.fillStyle = color;
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, x, y + 12);
+
+            // Support pillars
+            ctx.fillStyle = '#3a3a5c';
+            ctx.fillRect(x - 30, y, 8, 15);
+            ctx.fillRect(x + 22, y, 8, 15);
+
+            // Pillar lights
+            ctx.fillStyle = `rgba(138, 124, 255, ${lightBrightness * 0.6})`;
+            ctx.fillRect(x - 28, y + 3, 4, 2);
+            ctx.fillRect(x + 24, y + 3, 4, 2);
+
+            ctx.restore();
+        }
+
+        // Spaceship class - Detailed fighter ships
+        class Spaceship {
+            constructor(team) {
+                this.team = team;
+                this.baseX = team === 'red' ? redBaseX : blueBaseX;
+                this.baseY = team === 'red' ? redBaseY : blueBaseY;
+
+                this.x = this.baseX;
+                this.y = this.baseY - 30; // Start above the platform
+                this.startY = Math.random() * (canvas.height * 0.4) + 150;
+                this.size = 35 + Math.random() * 10; // Larger ships
+                this.speed = team === 'red' ? 2.5 : -2.5;
+                this.baseSpeed = this.speed;
+                this.blink = 0;
+                this.shootCooldown = 0;
+                this.kills = 0;
+                this.upgradeLevel = 0;
+
+                this.state = 'standing';
+                this.stateTimer = 0;
+
+                // Rotation: 0 = nose pointing UP, Math.PI/2 = nose pointing RIGHT
+                this.rotation = 0; // Start pointing up
+                this.flyingRotation = team === 'red' ? Math.PI / 2 : -Math.PI / 2; // Red flies right, Blue flies left
+
+                this.boosted = false;
+                this.boostTimer = 0;
+                this.boostDuration = 3600;
+
+                this.movementPattern = Math.random();
+                this.patternPhase = 0;
+                this.pursuing = null;
+
+                this.spacemen = [];
+                this.engineParticles = [];
+
+                // Thruster animation
+                this.thrusterPhase = Math.random() * Math.PI * 2;
+            }
+
+            update(aliens, lasers, spacemen) {
+                this.blink += 0.1;
+                this.patternPhase += 0.02;
+                this.thrusterPhase += 0.3;
+                this.shootCooldown--;
+                this.stateTimer++;
+
+                if (this.boosted) {
+                    this.boostTimer--;
+                    if (this.boostTimer <= 0) {
+                        this.boosted = false;
+                    }
+                }
+
+                // Update engine particles
+                for (let i = this.engineParticles.length - 1; i >= 0; i--) {
+                    this.engineParticles[i].life--;
+                    this.engineParticles[i].y += this.engineParticles[i].vy;
+                    this.engineParticles[i].x += this.engineParticles[i].vx;
+                    this.engineParticles[i].size *= 0.95;
+                    if (this.engineParticles[i].life <= 0) {
+                        this.engineParticles.splice(i, 1);
+                    }
+                }
+
+                if (this.state === 'standing') {
+                    this.rotation = 0; // Nose pointing up
+                    if (this.stateTimer > 60) {
+                        this.state = 'boarding';
+                        this.stateTimer = 0;
+                        for (let i = 0; i < 2; i++) {
+                            spacemen.push(new Spaceman(this.baseX + (i - 0.5) * 50, this.baseY + 20, this.team, this));
+                        }
+                    }
+                    return true;
+                }
+
+                if (this.state === 'boarding') {
+                    if (this.stateTimer > 120) {
+                        this.state = 'ignition';
+                        this.stateTimer = 0;
+                        for (let i = spacemen.length - 1; i >= 0; i--) {
+                            if (spacemen[i].ship === this) {
+                                spacemen.splice(i, 1);
+                            }
+                        }
+                    }
+                    return true;
+                }
+
+                if (this.state === 'ignition') {
+                    // Brief ignition phase - no visible exhaust yet
+                    if (this.stateTimer > 60) {
+                        this.state = 'taking_off';
+                        this.stateTimer = 0;
+                    }
+                    return true;
+                }
+
+                if (this.state === 'taking_off') {
+                    // Rotate toward flying direction
+                    const rotationStep = 0.04;
+                    if (Math.abs(this.rotation - this.flyingRotation) > rotationStep) {
+                        if (this.flyingRotation > this.rotation) {
+                            this.rotation += rotationStep;
+                        } else {
+                            this.rotation -= rotationStep;
+                        }
+                    } else {
+                        this.rotation = this.flyingRotation;
+                    }
+
+                    // Move up and slightly toward flying direction
+                    this.y -= 3;
+                    this.x += this.speed * 0.3;
+
+                    if (this.y < this.startY && Math.abs(this.rotation - this.flyingRotation) < 0.1) {
+                        this.state = 'flying';
+                        this.stateTimer = 0;
+                    }
+                    return true;
+                }
+
+                if (this.state === 'flying') {
+                    this.rotation = this.flyingRotation;
+                    this.x += this.speed;
+
+                    // Movement patterns
+                    if (this.movementPattern < 0.33) {
+                        this.y = this.startY + Math.sin(this.patternPhase) * 40;
+                    } else if (this.movementPattern < 0.66) {
+                        if (this.pursuing && this.pursuing.health > 0) {
+                            const dy = this.pursuing.y - this.y;
+                            this.y += dy * 0.015;
+                        }
+                    } else {
+                        this.y = this.startY + Math.cos(this.patternPhase) * 35;
+                    }
+
+                    // Subtle exhaust ONLY during turbo boost
+                    if (this.boosted && this.stateTimer % 5 === 0) {
+                        this.engineParticles.push({
+                            x: this.x - Math.cos(this.rotation) * this.size * 0.5,
+                            y: this.y - Math.sin(this.rotation) * this.size * 0.5,
+                            vx: -Math.cos(this.rotation) * (Math.random() * 1.5 + 1),
+                            vy: -Math.sin(this.rotation) * (Math.random() * 1.5 + 1),
+                            life: 10,
+                            size: Math.random() * 2 + 1,
+                            color: this.team === 'red' ? '#ff6600' : '#0066ff'
+                        });
+                    }
+
+                    // Shooting
+                    if (this.shootCooldown <= 0 && aliens.length > 0) {
+                        let nearestAlien = null;
+                        let nearestDistance = Infinity;
+
+                        aliens.forEach(alien => {
+                            const dx = alien.x - this.x;
+                            const dy = alien.y - this.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            if (distance < nearestDistance && distance < 600) {
+                                nearestDistance = distance;
+                                nearestAlien = alien;
+                            }
+                        });
+
+                        if (nearestAlien) {
+                            if (Math.random() < 0.3) {
+                                this.pursuing = nearestAlien;
+                            }
+
+                            const color = this.team === 'red' ? '#ff4444' : '#4444ff';
+                            // Fire from nose
+                            const noseX = this.x + Math.cos(this.rotation) * this.size * 0.6;
+                            const noseY = this.y + Math.sin(this.rotation) * this.size * 0.6;
+                            lasers.push(new Laser(noseX, noseY, nearestAlien.x, nearestAlien.y, color, this));
+
+                            const cooldownReduction = this.upgradeLevel * 5;
+                            const boostReduction = this.boosted ? 5 : 0;
+                            this.shootCooldown = (20 + Math.random() * 15) - cooldownReduction - boostReduction;
+                        }
+                    }
+
+                    if (this.kills > 0 && this.kills % 3 === 0 && this.stateTimer > 600 && Math.random() < 0.01) {
+                        this.state = 'landing';
+                        this.stateTimer = 0;
+                    }
+
+                    if (this.x > canvas.width + 50) {
+                        this.x = -50;
+                    } else if (this.x < -50) {
+                        this.x = canvas.width + 50;
+                    }
+
+                    return true;
+                }
+
+                if (this.state === 'landing') {
+                    const dx = this.baseX - this.x;
+                    const dy = (this.baseY - 30) - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // Rotate back to vertical
+                    const rotationStep = 0.04;
+                    if (Math.abs(this.rotation) > rotationStep) {
+                        if (this.rotation > 0) {
+                            this.rotation -= rotationStep;
+                        } else {
+                            this.rotation += rotationStep;
+                        }
+                    } else {
+                        this.rotation = 0;
+                    }
+
+                    if (distance < 10) {
+                        this.state = 'landed';
+                        this.stateTimer = 0;
+                        this.x = this.baseX;
+                        this.y = this.baseY - 30;
+                        this.rotation = 0;
+
+                        for (let i = 0; i < 2; i++) {
+                            spacemen.push(new Spaceman(this.baseX + (i - 0.5) * 30, this.baseY + 20, this.team, this));
+                        }
+                    } else {
+                        this.x += (dx / distance) * 2.5;
+                        this.y += (dy / distance) * 2.5;
+                    }
+                    return true;
+                }
+
+                if (this.state === 'landed') {
+                    this.rotation = 0;
+                    if (this.stateTimer > 120) {
+                        this.state = 'ignition';
+                        this.stateTimer = 0;
+                        this.boosted = true;
+                        this.boostTimer = this.boostDuration;
+                        for (let i = spacemen.length - 1; i >= 0; i--) {
+                            if (spacemen[i].ship === this) {
+                                spacemen.splice(i, 1);
+                            }
+                        }
+                    }
+                    return true;
+                }
+
+                return true;
+            }
+
+            registerKill() {
+                this.kills++;
+                if (this.kills % 2 === 0 && this.upgradeLevel < 3) {
+                    this.upgradeLevel++;
+                    this.size = Math.min(this.size * 1.15, 50);
+                    const speedMultiplier = 1 + (this.upgradeLevel * 0.1);
+                    this.speed = this.baseSpeed * speedMultiplier;
+                }
+            }
+
+            draw() {
+                // Draw subtle engine particles (only visible during turbo boost)
+                this.engineParticles.forEach(p => {
+                    ctx.save();
+                    const lifeRatio = p.life / 10;
+                    ctx.fillStyle = `rgba(255, 200, 100, ${lifeRatio * 0.6})`;
+                    ctx.shadowBlur = 5;
+                    ctx.shadowColor = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size || 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+
+                const s = this.size;
+
+                // Boost glow effect
+                if (this.boosted) {
+                    ctx.shadowBlur = 30;
+                    ctx.shadowColor = this.team === 'red' ? '#ff4444' : '#4444ff';
+                }
+
+                // === DETAILED FIGHTER SHIP DESIGN ===
+                // Ship points UP when rotation = 0
+
+                // Main body gradient
+                const bodyGradient = ctx.createLinearGradient(-s * 0.3, 0, s * 0.3, 0);
+                if (this.team === 'red') {
+                    bodyGradient.addColorStop(0, '#8a2222');
+                    bodyGradient.addColorStop(0.3, '#cc3333');
+                    bodyGradient.addColorStop(0.5, '#ff4444');
+                    bodyGradient.addColorStop(0.7, '#cc3333');
+                    bodyGradient.addColorStop(1, '#8a2222');
+                } else {
+                    bodyGradient.addColorStop(0, '#22228a');
+                    bodyGradient.addColorStop(0.3, '#3333cc');
+                    bodyGradient.addColorStop(0.5, '#4444ff');
+                    bodyGradient.addColorStop(0.7, '#3333cc');
+                    bodyGradient.addColorStop(1, '#22228a');
+                }
+
+                // Main fuselage (sleek fighter shape)
+                ctx.fillStyle = bodyGradient;
+                ctx.beginPath();
+                ctx.moveTo(0, -s * 0.7);  // Nose tip
+                ctx.lineTo(s * 0.15, -s * 0.4);  // Right nose
+                ctx.lineTo(s * 0.2, s * 0.1);   // Right body
+                ctx.lineTo(s * 0.15, s * 0.5);  // Right rear
+                ctx.lineTo(-s * 0.15, s * 0.5); // Left rear
+                ctx.lineTo(-s * 0.2, s * 0.1);  // Left body
+                ctx.lineTo(-s * 0.15, -s * 0.4); // Left nose
+                ctx.closePath();
+                ctx.fill();
+
+                // Wings
+                ctx.fillStyle = this.team === 'red' ? '#aa3333' : '#3333aa';
+                // Right wing
+                ctx.beginPath();
+                ctx.moveTo(s * 0.15, -s * 0.1);
+                ctx.lineTo(s * 0.5, s * 0.2);
+                ctx.lineTo(s * 0.45, s * 0.35);
+                ctx.lineTo(s * 0.15, s * 0.3);
+                ctx.closePath();
+                ctx.fill();
+                // Left wing
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.15, -s * 0.1);
+                ctx.lineTo(-s * 0.5, s * 0.2);
+                ctx.lineTo(-s * 0.45, s * 0.35);
+                ctx.lineTo(-s * 0.15, s * 0.3);
+                ctx.closePath();
+                ctx.fill();
+
+                // Wing stripes (detail)
+                ctx.strokeStyle = this.team === 'red' ? '#ff6666' : '#6666ff';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(s * 0.2, s * 0.05);
+                ctx.lineTo(s * 0.4, s * 0.25);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(-s * 0.2, s * 0.05);
+                ctx.lineTo(-s * 0.4, s * 0.25);
+                ctx.stroke();
+
+                // Cockpit canopy (glass dome)
+                const cockpitGradient = ctx.createRadialGradient(0, -s * 0.2, 0, 0, -s * 0.2, s * 0.2);
+                cockpitGradient.addColorStop(0, 'rgba(200, 230, 255, 0.9)');
+                cockpitGradient.addColorStop(0.5, 'rgba(100, 180, 255, 0.6)');
+                cockpitGradient.addColorStop(1, 'rgba(50, 100, 200, 0.4)');
+                ctx.fillStyle = cockpitGradient;
+                ctx.beginPath();
+                ctx.ellipse(0, -s * 0.25, s * 0.1, s * 0.18, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Cockpit frame
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Engine housing
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.45, s * 0.12, s * 0.08, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Engine glow (animated)
+                const thrusterIntensity = 0.5 + Math.sin(this.thrusterPhase) * 0.3;
+                const engineColor = this.team === 'red' ?
+                    `rgba(255, 150, 50, ${thrusterIntensity})` :
+                    `rgba(50, 150, 255, ${thrusterIntensity})`;
+                ctx.fillStyle = engineColor;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.team === 'red' ? '#ff6600' : '#0066ff';
+                ctx.beginPath();
+                ctx.ellipse(0, s * 0.48, s * 0.08, s * 0.05, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Blinking lights
+                const lightBrightness = Math.abs(Math.sin(this.blink));
+
+                // Nose light
+                ctx.fillStyle = `rgba(255, 255, 255, ${lightBrightness})`;
+                ctx.beginPath();
+                ctx.arc(0, -s * 0.65, s * 0.04, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Wing tip lights
+                ctx.fillStyle = this.team === 'red' ?
+                    `rgba(255, 100, 100, ${lightBrightness})` :
+                    `rgba(100, 100, 255, ${lightBrightness})`;
+                ctx.beginPath();
+                ctx.arc(s * 0.48, s * 0.28, s * 0.03, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(-s * 0.48, s * 0.28, s * 0.03, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Upgrade indicators (additional weapons/equipment)
+                if (this.upgradeLevel >= 1) {
+                    // Side cannons
+                    ctx.fillStyle = '#555';
+                    ctx.fillRect(s * 0.22, -s * 0.3, s * 0.08, s * 0.25);
+                    ctx.fillRect(-s * 0.3, -s * 0.3, s * 0.08, s * 0.25);
+                    ctx.fillStyle = `rgba(0, 255, 255, ${lightBrightness * 0.8})`;
+                    ctx.beginPath();
+                    ctx.arc(s * 0.26, -s * 0.32, s * 0.025, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(-s * 0.26, -s * 0.32, s * 0.025, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                if (this.upgradeLevel >= 2) {
+                    // Tail fins
+                    ctx.fillStyle = this.team === 'red' ? '#cc2222' : '#2222cc';
+                    ctx.beginPath();
+                    ctx.moveTo(s * 0.1, s * 0.4);
+                    ctx.lineTo(s * 0.25, s * 0.55);
+                    ctx.lineTo(s * 0.08, s * 0.5);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(-s * 0.1, s * 0.4);
+                    ctx.lineTo(-s * 0.25, s * 0.55);
+                    ctx.lineTo(-s * 0.08, s * 0.5);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                if (this.upgradeLevel >= 3) {
+                    // Dorsal fin
+                    ctx.fillStyle = this.team === 'red' ? '#ff5555' : '#5555ff';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -s * 0.4);
+                    ctx.lineTo(s * 0.05, s * 0.1);
+                    ctx.lineTo(-s * 0.05, s * 0.1);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                ctx.restore();
+
+                // Boost indicator (outside rotation)
+                if (this.boosted) {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.fillStyle = '#ffff00';
+                    ctx.shadowBlur = 5;
+                    ctx.shadowColor = '#ffff00';
+                    ctx.font = 'bold 10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`⚡ BOOST ${Math.ceil(this.boostTimer / 60)}s`, 0, -this.size - 20);
+                    ctx.restore();
+                }
+
+                // Kill count indicator
+                if (this.kills > 0) {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.fillStyle = '#ffd700';
+                    ctx.font = 'bold 9px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`★${this.kills}`, 0, this.size + 15);
+                    ctx.restore();
+                }
+            }
+        }
+
+        // Spaceman class
+        class Spaceman {
+            constructor(x, y, team, ship) {
+                this.x = x;
+                this.y = y;
+                this.team = team;
+                this.ship = ship;
+                this.size = 8;
+                this.walkPhase = Math.random() * Math.PI * 2;
+                this.targetX = x + (Math.random() - 0.5) * 50;
+                this.celebrating = false;
+                this.celebrateTimer = 0;
+                this.partner = null;
+            }
+
+            update(spacemen) {
+                if (this.ship && this.ship.kills > 0 && !this.celebrating && Math.random() < 0.05) {
+                    const teammates = spacemen.filter(s => s.team === this.team && s !== this && !s.celebrating);
+                    if (teammates.length > 0) {
+                        this.partner = teammates[0];
+                        this.celebrating = true;
+                        this.celebrateTimer = 60;
+                        if (this.partner) {
+                            this.partner.celebrating = true;
+                            this.partner.celebrateTimer = 60;
+                            this.partner.partner = this;
+                        }
+                    }
+                }
+
+                if (this.celebrating) {
+                    this.celebrateTimer--;
+                    if (this.celebrateTimer <= 0) {
+                        this.celebrating = false;
+                        this.partner = null;
+                    } else if (this.partner) {
+                        const dx = this.partner.x - this.x;
+                        if (Math.abs(dx) > 5) {
+                            this.x += dx * 0.1;
+                        }
+                    }
+                    return true;
+                }
+
+                this.walkPhase += 0.1;
+                const dx = this.targetX - this.x;
+                if (Math.abs(dx) < 2) {
+                    this.targetX = this.ship.baseX + (Math.random() - 0.5) * 50;
+                } else {
+                    this.x += dx * 0.05;
+                }
+
+                return true;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                ctx.fillStyle = this.team === 'red' ? '#ff4444' : '#4444ff';
+
+                ctx.fillRect(-this.size * 0.3, -this.size * 0.5, this.size * 0.6, this.size * 0.8);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(0, -this.size * 0.7, this.size * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#333333';
+                ctx.beginPath();
+                ctx.arc(0, -this.size * 0.7, this.size * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = this.team === 'red' ? '#ff4444' : '#4444ff';
+                const legOffset = Math.sin(this.walkPhase) * 3;
+                ctx.fillRect(-this.size * 0.25, this.size * 0.3, this.size * 0.2, this.size * 0.4 + legOffset);
+                ctx.fillRect(this.size * 0.05, this.size * 0.3, this.size * 0.2, this.size * 0.4 - legOffset);
+
+                if (this.celebrating && this.celebrateTimer > 30) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('✋', 0, -this.size * 1.5);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // Alien class (UFO)
+        class Alien {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * (canvas.height * 0.4) + 200;
+                this.size = Math.random() * 25 + 30; // Bigger aliens (30-55)
+                this.wobbleSpeed = Math.random() * 0.03 + 0.02;
+                this.wobblePhase = Math.random() * Math.PI * 2;
+                this.moveX = (Math.random() - 0.5) * 0.5;
+                this.moveY = (Math.random() - 0.5) * 0.3;
+                this.life = Math.random() * 300 + 200;
+                this.health = 50;
+                this.maxHealth = 50;
+                this.timewarpCooldown = 100 + Math.random() * 100;
+                this.teleporting = false;
+                this.teleportPhase = 0;
+
+                // Random ship types
+                const shipTypes = ['saucer', 'triangle', 'diamond', 'crescent'];
+                this.shipType = shipTypes[Math.floor(Math.random() * shipTypes.length)];
+
+                const alienColors = ['#9933ff', '#33ff99', '#ff9933', '#3399ff', '#ff3399'];
+                this.pilotColor = alienColors[Math.floor(Math.random() * alienColors.length)];
+            }
+
+            update() {
+                this.wobblePhase += this.wobbleSpeed;
+                this.timewarpCooldown--;
+
+                if (this.teleporting) {
+                    this.teleportPhase++;
+                    if (this.teleportPhase > 30) {
+                        this.teleporting = false;
+                        this.teleportPhase = 0;
+                        this.timewarpCooldown = 150 + Math.random() * 150;
+                    }
+                    return true;
+                }
+
+                if (this.timewarpCooldown <= 0 && Math.random() < 0.02) {
+                    this.initiateTeleport();
+                }
+
+                this.x += this.moveX + Math.sin(this.wobblePhase) * 0.5;
+                this.y += this.moveY + Math.cos(this.wobblePhase * 0.7) * 0.3;
+                this.life--;
+                return this.health > 0 && this.life > 0 && this.x > -100 && this.x < canvas.width + 100;
+            }
+
+            initiateTeleport() {
+                this.teleporting = true;
+                this.teleportPhase = 0;
+
+                setTimeout(() => {
+                    if (this.teleporting) {
+                        this.x = Math.random() * canvas.width;
+                        this.y = Math.random() * (canvas.height * 0.4) + 200;
+                        if (Math.random() < 0.5) {
+                            this.moveX = (Math.random() - 0.5) * 0.6;
+                            this.moveY = (Math.random() - 0.5) * 0.4;
+                        }
+                    }
+                }, 15 * 16.67);
+            }
+
+            checkHit(laser) {
+                const dx = laser.x - this.x;
+                const dy = laser.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance < this.size;
+            }
+
+            onHit() {
+                this.health--;
+                if (this.health <= 0) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y + Math.sin(this.wobblePhase) * 3);
+
+                if (this.teleporting) {
+                    const phase = this.teleportPhase / 30;
+                    const opacity = phase < 0.5 ? (1 - phase * 2) : ((phase - 0.5) * 2);
+                    ctx.globalAlpha = opacity;
+                    ctx.shadowBlur = 20 * (1 - Math.abs(phase - 0.5) * 2);
+                    ctx.shadowColor = '#00ffff';
+                    if (phase > 0.4 && phase < 0.6) {
+                        ctx.scale(1 + Math.sin(phase * Math.PI * 10) * 0.2, 1 + Math.cos(phase * Math.PI * 10) * 0.2);
+                    }
+                }
+
+                const barWidth = this.size * 2;
+                const barHeight = 4;
+                const barY = -this.size - 15;
+                const healthPercent = this.health / this.maxHealth;
+
+                ctx.fillStyle = 'rgba(50, 50, 50, 0.7)';
+                ctx.fillRect(-barWidth / 2, barY, barWidth, barHeight);
+
+                let healthColor = healthPercent > 0.6 ? '#5edf89' : healthPercent > 0.3 ? '#ffaa00' : '#ff4444';
+                ctx.fillStyle = healthColor;
+                ctx.fillRect(-barWidth / 2, barY, barWidth * healthPercent, barHeight);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${this.health}/${this.maxHealth}`, 0, barY - 2);
+
+                // Draw ship based on type
+                if (this.shipType === 'saucer') {
+                    // Classic UFO saucer
+                    ctx.fillStyle = '#8a8a9f';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, this.size, this.size * 0.3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = 'rgba(150, 200, 255, 0.3)';
+                    ctx.strokeStyle = 'rgba(150, 200, 255, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(0, -this.size * 0.2, this.size * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                } else if (this.shipType === 'triangle') {
+                    // Angular triangle ship
+                    ctx.fillStyle = '#6a6a8f';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.size * 0.6);
+                    ctx.lineTo(this.size * 0.7, this.size * 0.4);
+                    ctx.lineTo(-this.size * 0.7, this.size * 0.4);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = 'rgba(255, 150, 150, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 0.25, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.shipType === 'diamond') {
+                    // Diamond shaped craft
+                    ctx.fillStyle = '#7a7aaf';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.size * 0.5);
+                    ctx.lineTo(this.size * 0.5, 0);
+                    ctx.lineTo(0, this.size * 0.5);
+                    ctx.lineTo(-this.size * 0.5, 0);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = 'rgba(150, 255, 200, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (this.shipType === 'crescent') {
+                    // Crescent moon ship
+                    ctx.fillStyle = '#5a5a9f';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#0a0a1f';
+                    ctx.beginPath();
+                    ctx.arc(this.size * 0.2, -this.size * 0.1, this.size * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = 'rgba(200, 150, 255, 0.5)';
+                    ctx.beginPath();
+                    ctx.arc(-this.size * 0.15, this.size * 0.1, this.size * 0.15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Alien pilot (all ship types)
+                ctx.fillStyle = this.pilotColor;
+                ctx.beginPath();
+                ctx.arc(0, -this.size * 0.1, this.size * 0.12, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Alien eyes
+                ctx.fillStyle = '#000000';
+                ctx.beginPath();
+                ctx.arc(-this.size * 0.05, -this.size * 0.1, this.size * 0.04, 0, Math.PI * 2);
+                ctx.arc(this.size * 0.05, -this.size * 0.1, this.size * 0.04, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Tractor beam (random)
+                if (!this.teleporting && Math.random() > 0.95) {
+                    const gradient = ctx.createLinearGradient(0, 0, 0, this.size * 3);
+                    gradient.addColorStop(0, 'rgba(94, 223, 137, 0.3)');
+                    gradient.addColorStop(1, 'rgba(94, 223, 137, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.moveTo(-this.size * 0.3, this.size * 0.3);
+                    ctx.lineTo(-this.size * 0.8, this.size * 3);
+                    ctx.lineTo(this.size * 0.8, this.size * 3);
+                    ctx.lineTo(this.size * 0.3, this.size * 0.3);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // Fire Explosion class
+        class FireExplosion {
+            constructor(x, y, size) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.particles = [];
+                this.life = 60;
+                this.maxLife = 60;
+
+                for (let i = 0; i < 30; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 3 + 1;
+                    this.particles.push({
+                        x: 0,
+                        y: 0,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        size: Math.random() * size * 0.3 + size * 0.1,
+                        life: 1.0
+                    });
+                }
+            }
+
+            update() {
+                this.life--;
+
+                this.particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.1;
+                    p.vx *= 0.98;
+                    p.life -= 0.02;
+                });
+
+                return this.life > 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                this.particles.forEach(p => {
+                    if (p.life > 0) {
+                        const lifePercent = p.life;
+                        let color;
+
+                        if (lifePercent > 0.75) {
+                            const t = (lifePercent - 0.75) / 0.25;
+                            color = `rgba(${128 + 127 * (1 - t)}, ${0}, ${128 * t}, ${p.life})`;
+                        } else if (lifePercent > 0.5) {
+                            const t = (lifePercent - 0.5) / 0.25;
+                            color = `rgba(255, ${128 * (1 - t)}, 0, ${p.life})`;
+                        } else if (lifePercent > 0.25) {
+                            const t = (lifePercent - 0.25) / 0.25;
+                            color = `rgba(255, ${128 + 127 * (1 - t)}, ${255 * (1 - t)}, ${p.life})`;
+                        } else {
+                            color = `rgba(255, 255, 255, ${p.life})`;
+                        }
+
+                        ctx.fillStyle = color;
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = color;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+
+                ctx.restore();
+            }
+        }
+
+        // Create birds
+        const birds = [];
+        for (let i = 0; i < 15; i++) {
+            birds.push(new Bird());
+        }
+
+        // Create dancing cats on clouds
+        const dancingCats = [];
+        for (let i = 0; i < 6; i++) {
+            dancingCats.push(new CloudWithCat());
+        }
+
+        // Create walking people
+        const people = [];
+        for (let i = 0; i < 8; i++) {
+            people.push(new Person());
+        }
+
+        // Create the chicken coop
+        const chickenCoop = new ChickenCoop();
+
+        // Create the big mango chicken (needs coop reference)
+        const mangoChicken = new MangoChicken(chickenCoop);
+
+        // Create the colorful worms that chase the chicken (starts with 1)
+        const worms = [new ColorfulWorm()];
+        let chickenSurvivalTime = 0;
+        let lastWormSpawnTime = 0;
+        const WORM_SPAWN_INTERVAL = 900; // Spawn new worm every 15 seconds (60fps * 15)
+        const MAX_WORMS = 5;
+
+        // Create skiers on the mountains
+        const skiers = [];
+        for (let i = 0; i < 6; i++) {
+            skiers.push(new Skier());
+        }
+
+        // Create hot air balloons
+        const hotAirBalloons = [];
+        for (let i = 0; i < 3; i++) {
+            hotAirBalloons.push(new HotAirBalloon());
+        }
+
+        // Create rainbows with dancing unicorns
+        const rainbows = [];
+        const unicorns = [];
+        // Create 3 rainbows at different positions
+        const rainbowPositions = [
+            { x: 150, y: 80 },
+            { x: canvas.width / 2, y: 120 },
+            { x: canvas.width - 180, y: 90 }
+        ];
+        rainbowPositions.forEach(pos => {
+            const rainbow = new Rainbow(pos.x, pos.y);
+            rainbows.push(rainbow);
+            // Add 1-2 unicorns per rainbow
+            const numUnicorns = 1 + Math.floor(Math.random() * 2);
+            for (let i = 0; i < numUnicorns; i++) {
+                unicorns.push(new PinkPuffyUnicorn(rainbow));
+            }
+        });
+
+        // Create the flying walrus with 67 shirt
+        const flyingWalrus = new FlyingWalrus();
+
+        const meteors = [];
+        const spaceships = [];
+        const aliens = [];
+        const lasers = [];
+        const explosions = [];
+        const spacemen = [];
+
+        // Spawn initial spaceships for both teams
+        spaceships.push(new Spaceship('red'));
+        spaceships.push(new Spaceship('blue'));
+
+        updateBasePositions();
+
+        // Animation loop
+        function animate() {
+            // Draw sunny outdoor scenery
+            drawScenery();
+
+            // Update and draw birds
+            birds.forEach(bird => {
+                bird.update();
+                bird.draw();
+            });
+
+            // Update and draw dancing cats on clouds
+            dancingCats.forEach(cat => {
+                cat.update();
+                cat.draw();
+            });
+
+            // Update and draw walking people
+            people.forEach(person => {
+                person.update();
+                person.draw();
+            });
+
+            // Update and draw skiers on mountains
+            skiers.forEach(skier => {
+                skier.update();
+                skier.draw();
+            });
+
+            // Update and draw rainbows (behind everything else in sky)
+            rainbows.forEach(rainbow => {
+                rainbow.update();
+                rainbow.draw();
+            });
+
+            // Update and draw pink puffy unicorns dancing on rainbows
+            unicorns.forEach(unicorn => {
+                unicorn.update();
+                unicorn.draw();
+            });
+
+            // Update and draw hot air balloons
+            hotAirBalloons.forEach(balloon => {
+                balloon.update();
+                balloon.draw();
+            });
+
+            // Update and draw flying walrus with 67 shirt
+            flyingWalrus.update();
+            flyingWalrus.draw();
+
+            // Draw the chicken coop (behind chicken)
+            chickenCoop.draw();
+
+            // Chicken survival timer and worm spawning
+            if (mangoChicken.alive && !mangoChicken.hiding) {
+                chickenSurvivalTime++;
+                // Spawn more worms if chicken survives too long
+                if (chickenSurvivalTime - lastWormSpawnTime > WORM_SPAWN_INTERVAL && worms.length < MAX_WORMS) {
+                    worms.push(new ColorfulWorm(Math.random() * canvas.width * 0.3));
+                    lastWormSpawnTime = chickenSurvivalTime;
+                }
+            }
+
+            // Update and draw all worms
+            worms.forEach(worm => {
+                worm.update(mangoChicken, chickenCoop);
+                worm.draw();
+            });
+
+            // Update and draw the big mango chicken (pass all worms)
+            mangoChicken.update(worms);
+            mangoChicken.draw();
+
+            // Check if any worm catches chicken
+            worms.forEach(worm => {
+                if (worm.checkCatch(mangoChicken)) {
+                    const died = mangoChicken.onCaught();
+                    if (died) {
+                        // Reset survival timer and remove extra worms on death
+                        chickenSurvivalTime = 0;
+                        lastWormSpawnTime = 0;
+                        while (worms.length > 1) {
+                            worms.pop();
+                        }
+                    }
+                }
+            });
+
+            updateBasePositions();
+
+            // Draw the futuristic launch platforms
+            drawLaunchPlatforms();
+
+            // Draw team kill counters (scoreboard above platforms)
+            ctx.save();
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 10;
+
+            const scoreboardY = canvas.height - 120;
+            const centerX = canvas.width / 2;
+
+            ctx.fillStyle = '#ff4444';
+            ctx.shadowColor = '#ff4444';
+            ctx.fillText(`RED: ${redTeamKills}`, centerX - 100, scoreboardY);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = '#ffffff';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText('VS', centerX, scoreboardY);
+
+            ctx.fillStyle = '#4444ff';
+            ctx.shadowColor = '#4444ff';
+            ctx.font = 'bold 24px Arial';
+            ctx.fillText(`BLUE: ${blueTeamKills}`, centerX + 100, scoreboardY);
+
+            ctx.restore();
+
+            // Add meteors randomly (rare)
+            if (Math.random() > 0.99) {
+                meteors.push(new Meteor());
+            }
+
+            // Add spaceships for both teams
+            if (Math.random() > 0.995 && spaceships.filter(s => s.team === 'red').length < 5) {
+                spaceships.push(new Spaceship('red'));
+            }
+            if (Math.random() > 0.995 && spaceships.filter(s => s.team === 'blue').length < 5) {
+                spaceships.push(new Spaceship('blue'));
+            }
+
+            // Add aliens VERY rarely
+            if (Math.random() > 0.9985) {
+                aliens.push(new Alien());
+            }
+
+            // Update and draw meteors
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                if (meteors[i].update()) {
+                    meteors[i].draw();
+                } else {
+                    meteors.splice(i, 1);
+                }
+            }
+
+            // Update and draw spaceships
+            for (let i = spaceships.length - 1; i >= 0; i--) {
+                if (spaceships[i].update(aliens, lasers, spacemen)) {
+                    spaceships[i].draw();
+                } else {
+                    spaceships.splice(i, 1);
+                }
+            }
+
+            // Update and draw spacemen
+            for (let i = spacemen.length - 1; i >= 0; i--) {
+                if (spacemen[i].update(spacemen)) {
+                    spacemen[i].draw();
+                } else {
+                    spacemen.splice(i, 1);
+                }
+            }
+
+            // Update and draw lasers
+            for (let i = lasers.length - 1; i >= 0; i--) {
+                if (lasers[i].update()) {
+                    lasers[i].draw();
+
+                    // Check for hits on aliens
+                    for (let j = aliens.length - 1; j >= 0; j--) {
+                        if (aliens[j].checkHit(lasers[i])) {
+                            const wasDestroyed = aliens[j].onHit();
+                            const shooter = lasers[i].shooter;
+                            lasers.splice(i, 1);
+
+                            if (wasDestroyed) {
+                                if (shooter) {
+                                    shooter.registerKill();
+                                    if (shooter.team === 'red') {
+                                        redTeamKills++;
+                                    } else if (shooter.team === 'blue') {
+                                        blueTeamKills++;
+                                    }
+                                    checkGameWinner();
+                                }
+
+                                explosions.push(new FireExplosion(aliens[j].x, aliens[j].y, aliens[j].size));
+
+                                aliens.splice(j, 1);
+
+                                setTimeout(() => {
+                                    if (!gameWinner) {
+                                        aliens.push(new Alien());
+                                    }
+                                }, 1000 + Math.random() * 2000);
+                            }
+                            break;
+                        }
+                    }
+                } else {
+                    lasers.splice(i, 1);
+                }
+            }
+
+            // Update and draw aliens
+            for (let i = aliens.length - 1; i >= 0; i--) {
+                if (aliens[i].update()) {
+                    aliens[i].draw();
+                } else {
+                    aliens.splice(i, 1);
+                }
+            }
+
+            // Update and draw explosions
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                if (explosions[i].update()) {
+                    explosions[i].draw();
+                } else {
+                    explosions.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        console.log('🚀 BMS Space Battle: Game initialized!');
+    </script>
+</body>
+</html>
