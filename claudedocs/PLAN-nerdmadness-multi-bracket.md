@@ -2,7 +2,8 @@
 
 **Branch**: `feature/nerds-play-basketball-too`
 **Created**: 2026-02-24
-**Status**: PLANNING
+**Status**: IMPLEMENTED ✅
+**Commit**: `ee5f173`
 
 ---
 
@@ -78,7 +79,7 @@ Path: artifacts/nerdbasketball/pools/nerdmadness_2026/metadata/settings
 ### Epic 1: Data Layer Changes
 
 #### Task 1.1: Update Settings Metadata
-- [ ] Add `lockTime` field to settings document
+- [x] Add `lockTime` field to settings document
 - [ ] Value: `2026-03-19T12:00:00-05:00` (noon EST)
 - [ ] Create helper function `isLocked()` that checks current time vs lockTime
 
