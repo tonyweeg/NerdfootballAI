@@ -617,6 +617,66 @@
             background: var(--slate-600);
         }
 
+        /* Bracket Switcher */
+        .bracket-switcher {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .bracket-switcher-label {
+            font-size: 10px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .bracket-select {
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-family: inherit;
+            color: var(--slate-100);
+            cursor: pointer;
+            min-width: 160px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        .bracket-select:hover {
+            border-color: var(--accent-blue);
+        }
+        .bracket-select:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .bracket-select option {
+            background: var(--slate-800);
+            color: var(--slate-100);
+            padding: 8px;
+        }
+        .new-bracket-btn {
+            background: var(--accent-green);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .new-bracket-btn:hover {
+            background: #16a34a;
+            transform: translateY(-1px);
+        }
+        .new-bracket-btn:disabled {
+            background: var(--slate-600);
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .stats-bar {
             position: fixed;
             top: 50px;
@@ -1103,6 +1163,15 @@
     </div>
 
     <div class="stats-bar" id="stats-bar" style="display:none;">
+        <div class="bracket-switcher">
+            <span class="bracket-switcher-label">Bracket:</span>
+            <select class="bracket-select" id="bracket-select" onchange="switchBracket(this.value)">
+                <option value="">Loading...</option>
+            </select>
+            <button class="new-bracket-btn" id="new-bracket-btn" onclick="createNewBracket()">+ New</button>
+        </div>
+        <div class="stat-divider"></div>
+
         <div class="stat">Picks: <strong id="picks-made">0</strong>/63</div>
         <div class="stat-divider"></div>
 
@@ -1287,6 +1356,125 @@
         modal.style.display = 'none';
     }
 
+    // Bracket Switcher Functions
+    async function populateBracketSwitcher() {
+        if (!app) return;
+
+        const select = document.getElementById('bracket-select');
+        const newBtn = document.getElementById('new-bracket-btn');
+        const isTournamentLocked = isLocked(app.settings);
+
+        // Disable new bracket button if locked
+        if (isTournamentLocked) {
+            newBtn.disabled = true;
+            newBtn.title = 'Tournament is locked';
+        }
+
+        try {
+            const brackets = await app.loadUserBrackets();
+
+            select.innerHTML = '';
+
+            // Add "New Bracket" option if not locked
+            if (!isTournamentLocked) {
+                const newOption = document.createElement('option');
+                newOption.value = 'new';
+                newOption.textContent = '+ Create New Bracket';
+                select.appendChild(newOption);
+            }
+
+            // Add user's brackets
+            brackets.forEach(b => {
+                const option = document.createElement('option');
+                option.value = b.id;
+                const name = b.bracketName || 'Unnamed Bracket';
+                const status = b.isComplete ? '✓' : `(${b.totalPicks}/63)`;
+                const inactive = !b.active ? ' [Inactive]' : '';
+                option.textContent = `${name} ${status}${inactive}`;
+                option.disabled = !b.active && isTournamentLocked;
+                select.appendChild(option);
+            });
+
+            // Select current bracket
+            if (app.currentBracketId) {
+                select.value = app.currentBracketId;
+            } else {
+                select.value = 'new';
+            }
+
+            console.log('🏀 BRACKET_LOAD', 'Bracket switcher populated with', brackets.length, 'brackets');
+        } catch (e) {
+            console.error('🏀 BRACKET_LOAD', 'Error populating switcher:', e);
+            select.innerHTML = '<option value="">Error loading brackets</option>';
+        }
+    }
+
+    async function switchBracket(bracketId) {
+        if (!bracketId) return;
+
+        if (bracketId === 'new') {
+            createNewBracket();
+            return;
+        }
+
+        // Check if there are unsaved changes
+        if (app && app.hasUnsavedChanges) {
+            if (!confirm('You have unsaved changes. Switch bracket anyway?')) {
+                // Reset select to current bracket
+                document.getElementById('bracket-select').value = app.currentBracketId || 'new';
+                return;
+            }
+        }
+
+        console.log('🏀 BRACKET_LOAD', 'Switching to bracket:', bracketId);
+
+        // Update URL without reload
+        const url = new URL(window.location);
+        url.searchParams.set('bracketId', bracketId);
+        window.history.pushState({}, '', url);
+
+        // Reinitialize app with new bracket
+        const user = auth.currentUser;
+        if (user) {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            app = new BracketCanvasApp(user, bracketId);
+            await app.init();
+            await populateBracketSwitcher();
+        }
+    }
+
+    function createNewBracket() {
+        if (app && isLocked(app.settings)) {
+            showToast('Tournament is locked! Cannot create new brackets.', true);
+            return;
+        }
+
+        // Check if there are unsaved changes
+        if (app && app.hasUnsavedChanges) {
+            if (!confirm('You have unsaved changes. Create new bracket anyway?')) {
+                return;
+            }
+        }
+
+        console.log('🏀 BRACKET_CREATE', 'Creating new bracket');
+
+        // Update URL without bracketId
+        const url = new URL(window.location);
+        url.searchParams.delete('bracketId');
+        window.history.pushState({}, '', url);
+
+        // Reinitialize app with no bracket (new)
+        const user = auth.currentUser;
+        if (user) {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            app = new BracketCanvasApp(user, null);
+            app.init().then(() => {
+                populateBracketSwitcher();
+                showToast('New bracket started! Make your picks.');
+            });
+        }
+    }
+
     const REGIONS = ['south', 'west', 'midwest', 'east'];
     const REGION_ROUNDS = ['round_of_64', 'round_of_32', 'sweet_16', 'elite_eight'];
     const ROUND_NAMES = {
@@ -1339,6 +1527,7 @@
             this.bracketName = null;
             this.userBrackets = [];
             this.hasShownNamingPrompt = false;
+            this.hasUnsavedChanges = false;
 
             this.scale = 0.45;
             this.panX = 0;
@@ -1734,6 +1923,7 @@
                 console.log('🏀 BRACKET_CREATE', 'Created new bracket:', this.currentBracketId);
             }
 
+            this.hasUnsavedChanges = false;
             showToast(`Bracket saved! (${pickCount}/63 picks)`);
 
             // If bracket is complete and not yet named, prompt for name
@@ -2177,6 +2367,7 @@
             if (oldPick === teamId) return;
 
             this.picks[matchupId] = teamId;
+            this.hasUnsavedChanges = true;
 
             if (oldPick && oldPick !== teamId) {
                 this.cascadeClear(matchupId, oldPick);
@@ -2964,6 +3155,7 @@
             if (oldPick === teamId) return;
 
             this.picks[matchupId] = teamId;
+            this.hasUnsavedChanges = true;
 
             // Clear downstream picks if changed
             if (oldPick && oldPick !== teamId) {
@@ -3009,6 +3201,7 @@
             loginOverlay.style.display = 'none';
             app = new BracketCanvasApp(user, bracketId);
             await app.init();
+            await populateBracketSwitcher();
         } else {
             authEl.innerHTML = `
                 <a href="nerdmadness-bracket.html" class="list-view-btn">
