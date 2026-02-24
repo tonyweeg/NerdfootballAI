@@ -532,6 +532,91 @@
             font-weight: 600;
         }
 
+        /* Naming Modal */
+        .naming-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+        .naming-modal {
+            background: var(--slate-800);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .naming-modal h2 {
+            color: var(--slate-100);
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+        .naming-modal p {
+            color: var(--slate-400);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        .naming-modal input {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 16px;
+            font-family: inherit;
+            background: var(--slate-700);
+            border: 2px solid var(--slate-600);
+            border-radius: 12px;
+            color: var(--slate-100);
+            outline: none;
+            transition: border-color 0.2s ease;
+            margin-bottom: 24px;
+        }
+        .naming-modal input:focus {
+            border-color: var(--accent-blue);
+        }
+        .naming-modal input::placeholder {
+            color: var(--slate-500);
+        }
+        .naming-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .naming-btn {
+            padding: 12px 24px;
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 600;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+        .naming-btn.primary {
+            background: linear-gradient(135deg, var(--accent-green), #16a34a);
+            color: white;
+        }
+        .naming-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+        }
+        .naming-btn.secondary {
+            background: var(--slate-700);
+            color: var(--slate-300);
+            border: 1px solid var(--slate-600);
+        }
+        .naming-btn.secondary:hover {
+            background: var(--slate-600);
+        }
+
         .stats-bar {
             position: fixed;
             top: 50px;
@@ -1113,6 +1198,19 @@
 
     <div class="toast" id="toast"></div>
 
+    <!-- Bracket Naming Modal -->
+    <div class="naming-modal-overlay" id="naming-modal" style="display: none;">
+        <div class="naming-modal">
+            <h2>🏀 Name Your Bracket</h2>
+            <p>Your bracket is complete! Give it a name to finalize.</p>
+            <input type="text" id="bracket-name-input" placeholder="e.g., Tony's Upset Special" maxlength="50">
+            <div class="naming-modal-actions">
+                <button class="naming-btn secondary" onclick="closeNamingModal()">Save Without Name</button>
+                <button class="naming-btn primary" onclick="saveBracketName()">Save & Finalize</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Region Popup Overlay -->
     <div class="region-popup-overlay" id="region-popup-overlay">
         <div class="region-popup-container">
@@ -1137,6 +1235,57 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
     const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+    // Lock time: March 19, 2026 at noon EST (fallback if not in settings)
+    const LOCK_TIME_FALLBACK = new Date('2026-03-19T12:00:00-05:00');
+
+    function isLocked(settings) {
+        const now = new Date();
+        if (settings && settings.lockTime) {
+            const lockTime = settings.lockTime.toDate ? settings.lockTime.toDate() : new Date(settings.lockTime);
+            console.log('🏀 BRACKET_LOCK', 'Checking lock:', { now: now.toISOString(), lockTime: lockTime.toISOString(), isLocked: now >= lockTime });
+            return now >= lockTime;
+        }
+        console.log('🏀 BRACKET_LOCK', 'Using fallback lock time:', LOCK_TIME_FALLBACK.toISOString());
+        return now >= LOCK_TIME_FALLBACK;
+    }
+
+    // Naming Modal Functions
+    function showNamingModal(existingName = '') {
+        const modal = document.getElementById('naming-modal');
+        const input = document.getElementById('bracket-name-input');
+        input.value = existingName || '';
+        modal.style.display = 'flex';
+        input.focus();
+        console.log('🏀 BRACKET_SAVE', 'Showing naming modal');
+    }
+
+    function closeNamingModal() {
+        const modal = document.getElementById('naming-modal');
+        modal.style.display = 'none';
+        // Save without a name
+        if (app) {
+            app.savePicks();
+        }
+    }
+
+    async function saveBracketName() {
+        const input = document.getElementById('bracket-name-input');
+        const name = input.value.trim();
+
+        if (!name) {
+            showToast('Please enter a bracket name', true);
+            return;
+        }
+
+        if (app) {
+            app.bracketName = name;
+            await app.finalizeBracket();
+        }
+
+        const modal = document.getElementById('naming-modal');
+        modal.style.display = 'none';
+    }
 
     const REGIONS = ['south', 'west', 'midwest', 'east'];
     const REGION_ROUNDS = ['round_of_64', 'round_of_32', 'sweet_16', 'elite_eight'];
@@ -1173,7 +1322,7 @@
     }
 
     class BracketCanvasApp {
-        constructor(user) {
+        constructor(user, bracketId = null) {
             this.user = user;
             this.teams = {};
             this.matchups = {};
@@ -1184,6 +1333,12 @@
             this.settings = {};
             this.tiebreakerScores = { higher: null, lower: null };
             this.allBrackets = [];
+
+            // Multi-bracket support
+            this.currentBracketId = bracketId;
+            this.bracketName = null;
+            this.userBrackets = [];
+            this.hasShownNamingPrompt = false;
 
             this.scale = 0.45;
             this.panX = 0;
@@ -1220,7 +1375,7 @@
             document.getElementById('stats-bar').style.display = 'flex';
             document.getElementById('bottom-controls').style.display = 'flex';
 
-            const isBracketLocked = this.settings.bracket_locked === true;
+            const isBracketLocked = isLocked(this.settings);
 
             if (isBracketLocked) {
                 this.setZoomLevel('full');
@@ -1257,32 +1412,96 @@
         }
 
         async loadUserPicks() {
-            const snap = await db.doc(`${BASE}/brackets/${this.user.uid}`).get();
-            if (snap.exists) {
-                const data = snap.data();
-                this.picks = data.picks || {};
-                this.tiebreakerScores = {
-                    higher: data.tiebreaker_higher_score || null,
-                    lower: data.tiebreaker_lower_score || null
-                };
+            if (this.currentBracketId) {
+                // Load specific bracket by ID
+                const snap = await db.doc(`${BASE}/brackets/${this.currentBracketId}`).get();
+                if (snap.exists) {
+                    const data = snap.data();
+                    // Verify this bracket belongs to the user
+                    if (data.userId !== this.user.uid) {
+                        console.error('🏀 BRACKET_LOAD', 'Bracket does not belong to user');
+                        showToast('Access denied: This bracket belongs to another user', true);
+                        return;
+                    }
+                    this.picks = data.picks || {};
+                    this.bracketName = data.bracketName || null;
+                    this.tiebreakerScores = {
+                        higher: data.tiebreakerHigherScore || null,
+                        lower: data.tiebreakerLowerScore || null
+                    };
+                    console.log('🏀 BRACKET_LOAD', 'Loaded bracket:', this.currentBracketId, 'Name:', this.bracketName);
+                } else {
+                    console.warn('🏀 BRACKET_LOAD', 'Bracket not found:', this.currentBracketId);
+                    this.currentBracketId = null;
+                }
+            } else {
+                // New bracket - start with empty picks
+                console.log('🏀 BRACKET_LOAD', 'Starting new bracket');
+                this.picks = {};
+                this.bracketName = null;
             }
         }
 
         async loadAllBrackets() {
             try {
-                const bracketsSnap = await db.collection(`${BASE}/brackets`).get();
+                // Load all active brackets for uniqueness/comparison calculations
+                const bracketsSnap = await db.collection(`${BASE}/brackets`)
+                    .where('active', '==', true)
+                    .get();
                 this.allBrackets = [];
                 bracketsSnap.forEach(doc => {
-                    if (doc.id !== this.user.uid) {
+                    // Exclude current bracket being edited
+                    if (doc.id !== this.currentBracketId) {
                         const data = doc.data();
                         if (data.picks) {
-                            this.allBrackets.push({ id: doc.id, picks: data.picks });
+                            this.allBrackets.push({
+                                id: doc.id,
+                                userId: data.userId,
+                                picks: data.picks
+                            });
                         }
                     }
                 });
+                console.log('🏀 BRACKET_LOAD', 'Loaded', this.allBrackets.length, 'other brackets for comparison');
             } catch (e) {
                 console.warn('Could not load pool brackets for uniqueness calc:', e);
                 this.allBrackets = [];
+            }
+        }
+
+        async loadUserBrackets() {
+            try {
+                const isTournamentLocked = isLocked(this.settings);
+                let query = db.collection(`${BASE}/brackets`)
+                    .where('userId', '==', this.user.uid)
+                    .orderBy('createdAt', 'desc');
+
+                // After lock, only show active brackets to user
+                if (isTournamentLocked) {
+                    query = query.where('active', '==', true);
+                }
+
+                const bracketsSnap = await query.get();
+                this.userBrackets = [];
+                bracketsSnap.forEach(doc => {
+                    const data = doc.data();
+                    this.userBrackets.push({
+                        id: doc.id,
+                        bracketName: data.bracketName,
+                        totalPicks: data.totalPicks || 0,
+                        isComplete: data.isComplete || false,
+                        active: data.active !== false,
+                        createdAt: data.createdAt,
+                        updatedAt: data.updatedAt,
+                        submittedAt: data.submittedAt
+                    });
+                });
+                console.log('🏀 BRACKET_LOAD', 'User has', this.userBrackets.length, 'brackets');
+                return this.userBrackets;
+            } catch (e) {
+                console.warn('Could not load user brackets:', e);
+                this.userBrackets = [];
+                return [];
             }
         }
 
@@ -1377,7 +1596,7 @@
         }
 
         calculateWinChances() {
-            const isBracketLocked = this.settings.bracket_locked === true;
+            const isBracketLocked = isLocked(this.settings);
             const scoring = this.settings.scoring_system || {
                 round_of_64: 1, round_of_32: 2, sweet_16: 4,
                 elite_eight: 8, final_four: 16, championship: 32
@@ -1465,8 +1684,14 @@
         }
 
         async savePicks() {
+            if (isLocked(this.settings)) {
+                showToast('Tournament is locked! No changes allowed.', true);
+                return;
+            }
+
             const championPick = this.picks['R6_G01'] || null;
             const pickCount = Object.keys(this.picks).length;
+            const isComplete = pickCount === 63;
 
             const tiebreakerHigher = this.tiebreakerScores?.higher || null;
             const tiebreakerLower = this.tiebreakerScores?.lower || null;
@@ -1474,23 +1699,112 @@
                 ? tiebreakerHigher + tiebreakerLower
                 : null;
 
-            await db.doc(`${BASE}/brackets/${this.user.uid}`).set({
-                user_id: this.user.uid,
-                display_name: this.user.displayName || this.user.email,
+            const bracketData = {
+                userId: this.user.uid,
+                displayName: this.user.displayName || this.user.email,
+                bracketName: this.bracketName,
                 picks: this.picks,
-                champion_pick: championPick,
-                total_picks: pickCount,
-                submitted_at: firebase.firestore.FieldValue.serverTimestamp(),
-                locked: false,
-                total_points: this.calculatePoints(),
-                correct_picks: 0,
-                max_possible_points: 192,
-                tiebreaker_higher_score: tiebreakerHigher,
-                tiebreaker_lower_score: tiebreakerLower,
-                tiebreaker_total: tiebreakerTotal
-            }, { merge: true });
+                championPick: championPick,
+                totalPicks: pickCount,
+                isComplete: isComplete,
+                active: true,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                totalPoints: this.calculatePoints(),
+                correctPicks: 0,
+                maxPossiblePoints: 192,
+                tiebreakerHigherScore: tiebreakerHigher,
+                tiebreakerLowerScore: tiebreakerLower,
+                tiebreakerTotal: tiebreakerTotal
+            };
+
+            let bracketRef;
+            if (this.currentBracketId) {
+                // Update existing bracket
+                bracketRef = db.doc(`${BASE}/brackets/${this.currentBracketId}`);
+                await bracketRef.update(bracketData);
+                console.log('🏀 BRACKET_SAVE', 'Updated bracket:', this.currentBracketId);
+            } else {
+                // Create new bracket with auto-generated ID
+                bracketRef = db.collection(`${BASE}/brackets`).doc();
+                this.currentBracketId = bracketRef.id;
+                bracketData.bracketId = bracketRef.id;
+                bracketData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                bracketData.submittedAt = null;
+                await bracketRef.set(bracketData);
+                console.log('🏀 BRACKET_CREATE', 'Created new bracket:', this.currentBracketId);
+            }
 
             showToast(`Bracket saved! (${pickCount}/63 picks)`);
+
+            // If bracket is complete and not yet named, prompt for name
+            if (isComplete && !this.bracketName && !this.hasShownNamingPrompt) {
+                this.hasShownNamingPrompt = true;
+                showNamingModal();
+            }
+        }
+
+        async finalizeBracket() {
+            if (isLocked(this.settings)) {
+                showToast('Tournament is locked! No changes allowed.', true);
+                return;
+            }
+
+            if (!this.bracketName) {
+                showToast('Please enter a bracket name to finalize', true);
+                return;
+            }
+
+            const pickCount = Object.keys(this.picks).length;
+            if (pickCount < 63) {
+                showToast('Please complete all 63 picks before finalizing', true);
+                return;
+            }
+
+            const championPick = this.picks['R6_G01'] || null;
+            const tiebreakerHigher = this.tiebreakerScores?.higher || null;
+            const tiebreakerLower = this.tiebreakerScores?.lower || null;
+            const tiebreakerTotal = (tiebreakerHigher !== null && tiebreakerLower !== null)
+                ? tiebreakerHigher + tiebreakerLower
+                : null;
+
+            const bracketData = {
+                userId: this.user.uid,
+                displayName: this.user.displayName || this.user.email,
+                bracketName: this.bracketName,
+                picks: this.picks,
+                championPick: championPick,
+                totalPicks: pickCount,
+                isComplete: true,
+                active: true,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                totalPoints: this.calculatePoints(),
+                correctPicks: 0,
+                maxPossiblePoints: 192,
+                tiebreakerHigherScore: tiebreakerHigher,
+                tiebreakerLowerScore: tiebreakerLower,
+                tiebreakerTotal: tiebreakerTotal
+            };
+
+            let bracketRef;
+            if (this.currentBracketId) {
+                bracketRef = db.doc(`${BASE}/brackets/${this.currentBracketId}`);
+                await bracketRef.update(bracketData);
+            } else {
+                bracketRef = db.collection(`${BASE}/brackets`).doc();
+                this.currentBracketId = bracketRef.id;
+                bracketData.bracketId = bracketRef.id;
+                bracketData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                await bracketRef.set(bracketData);
+            }
+
+            console.log('🏀 BRACKET_SAVE', 'Bracket finalized:', this.currentBracketId, 'Name:', this.bracketName);
+            showToast(`🏆 Bracket "${this.bracketName}" finalized!`);
+
+            // Redirect to brackets list after short delay
+            setTimeout(() => {
+                window.location.href = 'nerdmadness.html';
+            }, 1500);
         }
 
         calculatePoints() {
@@ -2641,8 +2955,8 @@
             const teamId = this.getTeamForSlot(matchupId, slot);
             if (!teamId) return;
 
-            if (this.settings.bracket_locked) {
-                showToast('Bracket is locked!', true);
+            if (isLocked(this.settings)) {
+                showToast('Tournament is locked! No changes allowed.', true);
                 return;
             }
 
@@ -2681,14 +2995,19 @@
         const loginOverlay = document.getElementById('login-overlay');
 
         if (user) {
+            // Get bracketId from URL if editing existing bracket
+            const urlParams = new URLSearchParams(window.location.search);
+            const bracketId = urlParams.get('bracketId');
+            console.log('🏀 BRACKET_LOAD', 'URL bracketId:', bracketId || 'NEW BRACKET');
+
             authEl.innerHTML = `
-                <a href="nerdmadness-bracket.html" class="list-view-btn">
-                    <span>📝</span> List View
+                <a href="nerdmadness.html" class="list-view-btn">
+                    <span>🏠</span> My Brackets
                 </a>
                 <span>${user.displayName || user.email}</span>
                 <button onclick="auth.signOut()">Sign Out</button>`;
             loginOverlay.style.display = 'none';
-            app = new BracketCanvasApp(user);
+            app = new BracketCanvasApp(user, bracketId);
             await app.init();
         } else {
             authEl.innerHTML = `

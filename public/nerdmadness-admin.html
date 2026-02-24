@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness Admin - Bracket Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-500: #64748b;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-100: #f1f5f9;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-gold: #eab308;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --glass-bg: rgba(30, 41, 59, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            color: var(--slate-100);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding: 80px 20px 20px 20px;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            height: 32px;
+            width: auto;
+        }
+
+        .header-title {
+            font-size: 16px;
+            color: var(--slate-100);
+            letter-spacing: 2px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .header-title span { color: var(--accent-gold); }
+
+        .header-link {
+            font-size: 12px;
+            color: var(--slate-400);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .header-link:hover {
+            color: var(--accent-blue);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .page-subtitle {
+            color: var(--slate-400);
+            margin-bottom: 30px;
+        }
+
+        .access-denied {
+            text-align: center;
+            padding: 100px 20px;
+        }
+
+        .access-denied-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .access-denied h2 {
+            color: var(--accent-red);
+            margin-bottom: 10px;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--accent-blue);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        .filters-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            font-size: 13px;
+            font-family: inherit;
+            font-weight: 600;
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            color: var(--slate-300);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            background: var(--slate-600);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .lock-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .lock-status.locked {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+
+        .lock-status.unlocked {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+        }
+
+        .brackets-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--glass-bg);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .brackets-table th,
+        .brackets-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .brackets-table th {
+            background: var(--slate-800);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--slate-400);
+            font-weight: 700;
+        }
+
+        .brackets-table tr:hover {
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .brackets-table tr.inactive {
+            opacity: 0.5;
+        }
+
+        .user-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: var(--slate-100);
+        }
+
+        .user-email {
+            font-size: 11px;
+            color: var(--slate-500);
+        }
+
+        .bracket-name-cell {
+            color: var(--slate-100);
+        }
+
+        .bracket-name-cell.unnamed {
+            color: var(--slate-500);
+            font-style: italic;
+        }
+
+        .status-badge {
+            display: inline-block;
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.complete {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+        }
+
+        .status-badge.incomplete {
+            background: rgba(234, 179, 8, 0.2);
+            color: var(--accent-gold);
+        }
+
+        .status-badge.active {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent-blue);
+        }
+
+        .status-badge.inactive {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            font-family: inherit;
+            font-weight: 600;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            margin-right: 6px;
+        }
+
+        .action-btn.view {
+            background: var(--slate-700);
+            color: var(--slate-300);
+        }
+
+        .action-btn.view:hover {
+            background: var(--slate-600);
+        }
+
+        .action-btn.toggle {
+            background: var(--accent-orange);
+            color: white;
+        }
+
+        .action-btn.toggle:hover {
+            background: #ea580c;
+        }
+
+        .action-btn.reactivate {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .action-btn.reactivate:hover {
+            background: #16a34a;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal {
+            background: var(--slate-800);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--slate-400);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: var(--slate-100);
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .detail-label {
+            color: var(--slate-400);
+            font-size: 13px;
+        }
+
+        .detail-value {
+            color: var(--slate-100);
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--slate-400);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--slate-700);
+            color: var(--slate-100);
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 3000;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .toast.error {
+            background: var(--accent-red);
+        }
+
+        @media (max-width: 768px) {
+            .brackets-table {
+                display: block;
+                overflow-x: auto;
+            }
+
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-brand">
+            <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdMadness" class="header-logo">
+            <span class="header-title"><span>NERD</span>MADNESS ADMIN</span>
+        </div>
+        <a href="nerdmadness.html" class="header-link">← Back to NerdMadness</a>
+    </div>
+
+    <div class="container">
+        <div id="content">
+            <div class="loading">Checking admin access...</div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Bracket Detail Modal -->
+    <div class="modal-overlay" id="detail-modal" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title" id="modal-title">Bracket Details</span>
+                <button class="modal-close" onclick="closeDetailModal()">×</button>
+            </div>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = window.getFirebaseConfig();
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+        const LOCK_TIME_FALLBACK = new Date('2026-03-19T12:00:00-05:00');
+
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2',
+            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'
+        ];
+
+        let settings = {};
+        let allBrackets = [];
+        let currentFilter = 'all';
+
+        function showToast(msg, isError = false) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = 'toast show' + (isError ? ' error' : '');
+            setTimeout(() => { el.className = 'toast'; }, 3000);
+        }
+
+        function isLocked() {
+            const now = new Date();
+            if (settings && settings.lockTime) {
+                const lockTime = settings.lockTime.toDate ? settings.lockTime.toDate() : new Date(settings.lockTime);
+                return now >= lockTime;
+            }
+            return now >= LOCK_TIME_FALLBACK;
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        }
+
+        async function loadSettings() {
+            try {
+                const snap = await db.doc(`${BASE}/metadata/settings`).get();
+                if (snap.exists) {
+                    settings = snap.data();
+                }
+            } catch (e) {
+                console.warn('🏀 ADMIN_ACTION', 'Could not load settings:', e);
+            }
+        }
+
+        async function loadAllBrackets() {
+            try {
+                const snap = await db.collection(`${BASE}/brackets`).orderBy('createdAt', 'desc').get();
+                allBrackets = [];
+                snap.forEach(doc => {
+                    allBrackets.push({ id: doc.id, ...doc.data() });
+                });
+                console.log('🏀 ADMIN_ACTION', 'Loaded', allBrackets.length, 'brackets');
+                return allBrackets;
+            } catch (e) {
+                console.error('🏀 ADMIN_ACTION', 'Error loading brackets:', e);
+                return [];
+            }
+        }
+
+        function filterBrackets(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+            renderBracketsTable();
+        }
+
+        function getFilteredBrackets() {
+            switch (currentFilter) {
+                case 'active':
+                    return allBrackets.filter(b => b.active !== false);
+                case 'inactive':
+                    return allBrackets.filter(b => b.active === false);
+                case 'complete':
+                    return allBrackets.filter(b => b.isComplete === true);
+                case 'incomplete':
+                    return allBrackets.filter(b => b.isComplete !== true);
+                default:
+                    return allBrackets;
+            }
+        }
+
+        function renderBracketsTable() {
+            const brackets = getFilteredBrackets();
+            const tbody = document.getElementById('brackets-tbody');
+
+            if (brackets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--slate-400);">No brackets found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = brackets.map(b => {
+                const isActive = b.active !== false;
+                const isComplete = b.isComplete === true;
+                const isTournamentLocked = isLocked();
+                const pickCount = b.totalPicks || 0;
+
+                const completeBadge = isComplete
+                    ? '<span class="status-badge complete">Complete</span>'
+                    : `<span class="status-badge incomplete">${pickCount}/63</span>`;
+
+                const activeBadge = isActive
+                    ? '<span class="status-badge active">Active</span>'
+                    : '<span class="status-badge inactive">Inactive</span>';
+
+                const canReactivate = !isActive && !isTournamentLocked;
+                const canDeactivate = isActive;
+
+                let actionButtons = `<button class="action-btn view" onclick="viewBracket('${b.id}')">View</button>`;
+
+                if (canDeactivate) {
+                    actionButtons += `<button class="action-btn toggle" onclick="toggleActive('${b.id}', false)">Deactivate</button>`;
+                }
+
+                if (canReactivate) {
+                    actionButtons += `<button class="action-btn reactivate" onclick="toggleActive('${b.id}', true)">Reactivate</button>`;
+                }
+
+                if (!isActive && isTournamentLocked) {
+                    actionButtons += `<button class="action-btn" disabled title="Cannot reactivate after lock">Locked</button>`;
+                }
+
+                return `
+                    <tr class="${isActive ? '' : 'inactive'}">
+                        <td>
+                            <div class="user-cell">
+                                <span class="user-name">${b.displayName || 'Unknown'}</span>
+                                <span class="user-email">${b.userId?.substring(0, 12)}...</span>
+                            </div>
+                        </td>
+                        <td class="${b.bracketName ? 'bracket-name-cell' : 'bracket-name-cell unnamed'}">
+                            ${b.bracketName || 'Unnamed'}
+                        </td>
+                        <td>${completeBadge}</td>
+                        <td>${activeBadge}</td>
+                        <td>${formatDate(b.createdAt)}</td>
+                        <td>${formatDate(b.submittedAt)}</td>
+                        <td>${actionButtons}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function toggleActive(bracketId, newActiveState) {
+            const action = newActiveState ? 'reactivate' : 'deactivate';
+            if (!confirm(`Are you sure you want to ${action} this bracket?`)) return;
+
+            try {
+                await db.doc(`${BASE}/brackets/${bracketId}`).update({
+                    active: newActiveState,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                console.log('🏀 ADMIN_ACTION', action, 'bracket:', bracketId);
+                showToast(`Bracket ${action}d successfully`);
+
+                // Refresh data
+                await loadAllBrackets();
+                renderBracketsTable();
+                updateStats();
+            } catch (e) {
+                console.error('🏀 ADMIN_ACTION', 'Error toggling active:', e);
+                showToast('Error updating bracket', true);
+            }
+        }
+
+        function viewBracket(bracketId) {
+            const bracket = allBrackets.find(b => b.id === bracketId);
+            if (!bracket) return;
+
+            document.getElementById('modal-title').textContent = bracket.bracketName || 'Unnamed Bracket';
+
+            const pickCount = bracket.totalPicks || 0;
+            const championTeam = bracket.championPick || 'Not selected';
+
+            document.getElementById('modal-content').innerHTML = `
+                <div class="detail-row">
+                    <span class="detail-label">User</span>
+                    <span class="detail-value">${bracket.displayName || 'Unknown'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">User ID</span>
+                    <span class="detail-value">${bracket.userId}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Bracket ID</span>
+                    <span class="detail-value">${bracket.id}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Status</span>
+                    <span class="detail-value">${bracket.isComplete ? 'Complete' : 'Incomplete'} (${pickCount}/63 picks)</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Active</span>
+                    <span class="detail-value">${bracket.active !== false ? 'Yes' : 'No'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Champion Pick</span>
+                    <span class="detail-value">${championTeam}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Tiebreaker Total</span>
+                    <span class="detail-value">${bracket.tiebreakerTotal || 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Points</span>
+                    <span class="detail-value">${bracket.totalPoints || 0} / ${bracket.maxPossiblePoints || 192}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Created</span>
+                    <span class="detail-value">${formatDate(bracket.createdAt)}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Last Updated</span>
+                    <span class="detail-value">${formatDate(bracket.updatedAt)}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Finalized</span>
+                    <span class="detail-value">${formatDate(bracket.submittedAt)}</span>
+                </div>
+            `;
+
+            document.getElementById('detail-modal').style.display = 'flex';
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detail-modal').style.display = 'none';
+        }
+
+        function updateStats() {
+            const total = allBrackets.length;
+            const active = allBrackets.filter(b => b.active !== false).length;
+            const complete = allBrackets.filter(b => b.isComplete === true).length;
+            const uniqueUsers = new Set(allBrackets.map(b => b.userId)).size;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-active').textContent = active;
+            document.getElementById('stat-complete').textContent = complete;
+            document.getElementById('stat-users').textContent = uniqueUsers;
+        }
+
+        function renderAdminUI() {
+            const isTournamentLocked = isLocked();
+            const lockStatus = isTournamentLocked
+                ? '<span class="lock-status locked">🔒 Tournament Locked</span>'
+                : '<span class="lock-status unlocked">🔓 Tournament Open</span>';
+
+            document.getElementById('content').innerHTML = `
+                <h1 class="page-title">Bracket Management</h1>
+                <p class="page-subtitle">Manage all NerdMadness 2026 brackets ${lockStatus}</p>
+
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total">0</div>
+                        <div class="stat-label">Total Brackets</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-active">0</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-complete">0</div>
+                        <div class="stat-label">Complete</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-users">0</div>
+                        <div class="stat-label">Unique Users</div>
+                    </div>
+                </div>
+
+                <div class="filters-row">
+                    <button class="filter-btn active" data-filter="all" onclick="filterBrackets('all')">All</button>
+                    <button class="filter-btn" data-filter="active" onclick="filterBrackets('active')">Active</button>
+                    <button class="filter-btn" data-filter="inactive" onclick="filterBrackets('inactive')">Inactive</button>
+                    <button class="filter-btn" data-filter="complete" onclick="filterBrackets('complete')">Complete</button>
+                    <button class="filter-btn" data-filter="incomplete" onclick="filterBrackets('incomplete')">Incomplete</button>
+                </div>
+
+                <table class="brackets-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Bracket Name</th>
+                            <th>Progress</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Finalized</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="brackets-tbody">
+                        <tr><td colspan="7" class="loading">Loading brackets...</td></tr>
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderAccessDenied() {
+            document.getElementById('content').innerHTML = `
+                <div class="access-denied">
+                    <div class="access-denied-icon">🚫</div>
+                    <h2>Admin Access Required</h2>
+                    <p>You don't have permission to access this page.</p>
+                    <p style="margin-top: 20px;">
+                        <a href="nerdmadness.html" style="color: var(--accent-blue);">Return to NerdMadness</a>
+                    </p>
+                </div>
+            `;
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user || !ADMIN_UIDS.includes(user.uid)) {
+                console.log('🏀 ADMIN_ACTION', 'Access denied for user:', user?.uid);
+                renderAccessDenied();
+                return;
+            }
+
+            console.log('🏀 ADMIN_ACTION', 'Admin access granted for:', user.email);
+
+            await loadSettings();
+            renderAdminUI();
+            await loadAllBrackets();
+            renderBracketsTable();
+            updateStats();
+        });
+    </script>
+</body>
+</html>
