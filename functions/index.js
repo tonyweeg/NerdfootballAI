@@ -1549,3 +1549,19 @@ const { generateAdminToken, generateAdminTokenHTTP } = require('./adminAuth');
 // Export admin authentication functions
 exports.generateAdminToken = generateAdminToken;
 exports.generateAdminTokenHTTP = generateAdminTokenHTTP;
+
+// ============================================
+// 🏀 NERDMADNESS - NCAA TOURNAMENT SYSTEM
+// ============================================
+
+// Import NerdMadness update functions
+const {
+    updateNerdMadnessResults,
+    scheduledNerdMadnessUpdate,
+    testNerdMadnessUpdate
+} = require('./updateNerdMadnessResults');
+
+// Export NerdMadness functions
+exports.updateNerdMadnessResults = updateNerdMadnessResults;
+exports.scheduledNerdMadnessUpdate = scheduledNerdMadnessUpdate;
+exports.testNerdMadnessUpdate = testNerdMadnessUpdate;
