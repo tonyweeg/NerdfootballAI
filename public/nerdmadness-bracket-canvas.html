@@ -1298,6 +1298,20 @@
         </div>
     </div>
 
+    <!-- Text Picks View Modal -->
+    <div class="naming-modal-overlay" id="text-picks-modal" style="display: none;">
+        <div class="naming-modal" style="max-width: 700px; max-height: 85vh; overflow-y: auto;">
+            <h2 id="text-picks-title">📝 Bracket Picks</h2>
+            <div id="text-picks-content" style="text-align: left; font-family: monospace; font-size: 13px; line-height: 1.6;">
+                <div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading picks...</div>
+            </div>
+            <div class="naming-modal-actions" style="margin-top: 20px;">
+                <button class="naming-btn secondary" onclick="closeTextPicksModal()">Close</button>
+                <button class="naming-btn primary" onclick="copyTextPicks()" style="background: var(--accent-purple);">📋 Copy</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Region Popup Overlay -->
     <div class="region-popup-overlay" id="region-popup-overlay">
         <div class="region-popup-container">
@@ -1416,20 +1430,23 @@
             // Sort by pick count descending
             brackets.sort((a, b) => b.pickCount - a.pickCount);
 
-            // Render list
+            // Store brackets globally for text view
+            window.allBracketsData = brackets;
+
+            // Render list with two view options
             let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
             for (const b of brackets) {
                 const isComplete = b.pickCount === 63;
                 const userName = b.userEmail.split('@')[0];
                 html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--slate-700); border-radius: 8px; cursor: pointer;" onclick="viewBracket('${b.id}')">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--slate-700); border-radius: 8px;">
                         <div>
                             <div style="color: var(--slate-100); font-weight: 600;">${b.name}</div>
-                            <div style="color: var(--slate-400); font-size: 12px;">${userName}</div>
+                            <div style="color: var(--slate-400); font-size: 12px;">${userName} • ${b.pickCount}/63 ${isComplete ? '✅' : '⏳'}</div>
                         </div>
-                        <div style="text-align: right;">
-                            <div style="color: ${isComplete ? 'var(--accent-green)' : 'var(--accent-yellow)'}; font-weight: 600;">${b.pickCount}/63</div>
-                            <div style="color: var(--slate-500); font-size: 10px;">${isComplete ? '✅ Complete' : '⏳ In Progress'}</div>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="viewBracketText('${b.id}')" style="padding: 6px 12px; background: var(--accent-purple); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">📝 Text</button>
+                            <button onclick="viewBracket('${b.id}')" style="padding: 6px 12px; background: var(--accent-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">🏀 Bracket</button>
                         </div>
                     </div>
                 `;
@@ -1451,6 +1468,169 @@
         closeViewBracketsModal();
         // Reload page with the selected bracket
         window.location.href = `nerdmadness-bracket-canvas.html?bracket=${bracketId}`;
+    }
+
+    // Text Picks View Functions
+    let currentTextPicks = '';
+
+    async function viewBracketText(bracketId) {
+        const modal = document.getElementById('text-picks-modal');
+        const titleEl = document.getElementById('text-picks-title');
+        const contentEl = document.getElementById('text-picks-content');
+
+        modal.style.display = 'flex';
+        contentEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading picks...</div>';
+
+        try {
+            // Load the bracket data
+            const bracketDoc = await db.doc(`${BASE}/brackets/${bracketId}`).get();
+            if (!bracketDoc.exists) {
+                contentEl.innerHTML = '<div style="color: var(--accent-red);">Bracket not found</div>';
+                return;
+            }
+
+            const bracketData = bracketDoc.data();
+            const picks = bracketData.picks || {};
+            const bracketName = bracketData.bracketName || 'Unnamed Bracket';
+            const userName = (bracketData.userEmail || 'Unknown').split('@')[0];
+
+            titleEl.textContent = `📝 ${bracketName} (${userName})`;
+
+            // Load teams and matchups if not already loaded
+            if (!app || Object.keys(app.teams).length === 0) {
+                const [teamsSnap, matchupsSnap] = await Promise.all([
+                    db.collection(`${BASE}/teams`).get(),
+                    db.collection(`${BASE}/matchups`).get()
+                ]);
+                window.textViewTeams = {};
+                window.textViewMatchups = {};
+                teamsSnap.forEach(doc => { window.textViewTeams[doc.id] = doc.data(); });
+                matchupsSnap.forEach(doc => { window.textViewMatchups[doc.id] = doc.data(); });
+            }
+
+            const teams = app?.teams || window.textViewTeams;
+            const matchups = app?.matchups || window.textViewMatchups;
+
+            // Build text output by region and round
+            const regions = ['east', 'south', 'west', 'midwest'];
+            const rounds = [
+                { id: 'round_of_64', name: 'Round of 64', games: 8 },
+                { id: 'round_of_32', name: 'Round of 32', games: 4 },
+                { id: 'sweet_16', name: 'Sweet 16', games: 2 },
+                { id: 'elite_eight', name: 'Elite Eight', games: 1 }
+            ];
+
+            let textOutput = `🏀 ${bracketName}\n`;
+            textOutput += `👤 ${userName}\n`;
+            textOutput += `📊 ${Object.keys(picks).length}/63 picks\n`;
+            textOutput += `${'═'.repeat(50)}\n\n`;
+
+            // Regional picks
+            for (const region of regions) {
+                textOutput += `${'─'.repeat(50)}\n`;
+                textOutput += `🏆 ${region.toUpperCase()} REGION\n`;
+                textOutput += `${'─'.repeat(50)}\n`;
+
+                for (const round of rounds) {
+                    const regionMatchups = Object.values(matchups)
+                        .filter(m => m.region_id === region && m.round_id === round.id)
+                        .sort((a, b) => (a.bracket_position || 0) - (b.bracket_position || 0));
+
+                    if (regionMatchups.length === 0) continue;
+
+                    textOutput += `\n  ${round.name}:\n`;
+
+                    for (const m of regionMatchups) {
+                        const pickedTeamId = picks[m.matchup_id];
+                        if (pickedTeamId) {
+                            const team = teams[pickedTeamId];
+                            const seed = team?.seed || team?.team_seed || '?';
+                            textOutput += `    ✓ (${seed}) ${team?.team_name || 'Unknown'}\n`;
+                        } else {
+                            textOutput += `    ○ TBD\n`;
+                        }
+                    }
+                }
+                textOutput += '\n';
+            }
+
+            // Final Four and Championship
+            textOutput += `${'─'.repeat(50)}\n`;
+            textOutput += `🏆 FINAL FOUR & CHAMPIONSHIP\n`;
+            textOutput += `${'─'.repeat(50)}\n`;
+
+            // Final Four
+            const ffMatchups = Object.values(matchups)
+                .filter(m => m.round_id === 'final_four')
+                .sort((a, b) => (a.bracket_position || 0) - (b.bracket_position || 0));
+
+            textOutput += `\n  Final Four:\n`;
+            textOutput += `    Semifinal 1 (East vs South):\n`;
+            if (ffMatchups[0]) {
+                const pick1 = picks[ffMatchups[0].matchup_id];
+                if (pick1) {
+                    const team = teams[pick1];
+                    textOutput += `      ✓ (${team?.seed || '?'}) ${team?.team_name || 'Unknown'}\n`;
+                } else {
+                    textOutput += `      ○ TBD\n`;
+                }
+            }
+
+            textOutput += `    Semifinal 2 (West vs Midwest):\n`;
+            if (ffMatchups[1]) {
+                const pick2 = picks[ffMatchups[1].matchup_id];
+                if (pick2) {
+                    const team = teams[pick2];
+                    textOutput += `      ✓ (${team?.seed || '?'}) ${team?.team_name || 'Unknown'}\n`;
+                } else {
+                    textOutput += `      ○ TBD\n`;
+                }
+            }
+
+            // Championship
+            textOutput += `\n  Championship:\n`;
+            const champPick = picks['R6_G01'];
+            if (champPick) {
+                const team = teams[champPick];
+                textOutput += `    🏆 (${team?.seed || '?'}) ${team?.team_name || 'Unknown'} 🏆\n`;
+            } else {
+                textOutput += `    ○ TBD\n`;
+            }
+
+            // Tiebreaker
+            if (bracketData.tiebreakerScores) {
+                textOutput += `\n  Tiebreaker Total: ${(bracketData.tiebreakerScores.higher || 0) + (bracketData.tiebreakerScores.lower || 0)}\n`;
+            }
+
+            currentTextPicks = textOutput;
+
+            // Display with styling
+            contentEl.innerHTML = `<pre style="white-space: pre-wrap; color: var(--slate-200); background: var(--slate-900); padding: 16px; border-radius: 8px; overflow-x: auto;">${escapeHtml(textOutput)}</pre>`;
+
+        } catch (error) {
+            console.error('Error loading bracket for text view:', error);
+            contentEl.innerHTML = '<div style="color: var(--accent-red);">Error loading bracket</div>';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function closeTextPicksModal() {
+        document.getElementById('text-picks-modal').style.display = 'none';
+    }
+
+    function copyTextPicks() {
+        if (currentTextPicks) {
+            navigator.clipboard.writeText(currentTextPicks).then(() => {
+                showToast('Picks copied to clipboard!');
+            }).catch(() => {
+                showToast('Failed to copy', true);
+            });
+        }
     }
 
     // Delete Bracket Functions
