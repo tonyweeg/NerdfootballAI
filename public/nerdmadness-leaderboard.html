@@ -619,16 +619,23 @@
             'championship': 32
         };
 
-        const GAME_TO_ROUND = {};
-        for (let i = 1; i <= 32; i++) GAME_TO_ROUND[`game${i}`] = 'round_of_64';
-        for (let i = 33; i <= 48; i++) GAME_TO_ROUND[`game${i}`] = 'round_of_32';
-        for (let i = 49; i <= 56; i++) GAME_TO_ROUND[`game${i}`] = 'sweet_16';
-        for (let i = 57; i <= 60; i++) GAME_TO_ROUND[`game${i}`] = 'elite_8';
-        for (let i = 61; i <= 62; i++) GAME_TO_ROUND[`game${i}`] = 'final_four';
-        GAME_TO_ROUND['game63'] = 'championship';
+        const MATCHUP_ID_TO_ROUND = {
+            'R1': 'round_of_64',
+            'R2': 'round_of_32',
+            'R3': 'sweet_16',
+            'R4': 'elite_8',
+            'R5': 'final_four',
+            'R6': 'championship'
+        };
+
+        function getMatchupRound(matchupId) {
+            const prefix = matchupId.substring(0, 2);
+            return MATCHUP_ID_TO_ROUND[prefix] || 'round_of_64';
+        }
 
         let allBrackets = [];
-        let actualResults = {};
+        let matchups = {};
+        let teams = {};
         let userCache = {};
         let currentRoundFilter = 'all';
 
@@ -644,23 +651,26 @@
 
             if (!bracket.picks) return { score: 0, correct: 0, possible: 0 };
 
-            for (const [gameId, pick] of Object.entries(bracket.picks)) {
-                const round = GAME_TO_ROUND[gameId];
+            for (const [matchupId, pickedTeamId] of Object.entries(bracket.picks)) {
+                const round = getMatchupRound(matchupId);
                 if (!round) continue;
 
                 if (roundFilter !== 'all' && round !== roundFilter) continue;
 
-                const actual = actualResults[gameId];
+                const matchup = matchups[matchupId];
+                if (!matchup) continue;
 
-                if (actual && actual.winner) {
-                    if (pick.winner === actual.winner) {
-                        const pts = calculatePoints(actual.seed, round);
+                const pickedTeam = teams[pickedTeamId];
+                const pickedSeed = pickedTeam?.seed || 1;
+
+                if (matchup.winner_team_id && matchup.status === 'FINAL') {
+                    if (pickedTeamId === matchup.winner_team_id) {
+                        const pts = calculatePoints(pickedSeed, round);
                         totalScore += pts;
                         correctPicks++;
                     }
                 } else {
-                    const pickSeed = pick.seed || 1;
-                    possiblePoints += calculatePoints(pickSeed, round);
+                    possiblePoints += calculatePoints(pickedSeed, round);
                 }
             }
 
@@ -669,17 +679,26 @@
             return { score: totalScore, correct: correctPicks, possible: possiblePoints };
         }
 
-        async function loadActualResults() {
+        async function loadMatchupsAndTeams() {
             try {
-                const snap = await db.doc(`${BASE}/results/actual`).get();
-                if (snap.exists) {
-                    actualResults = snap.data().games || {};
-                    console.log('🏀 LEADERBOARD', 'Loaded actual results:', Object.keys(actualResults).length, 'games');
-                } else {
-                    console.log('🏀 LEADERBOARD', 'No results yet - tournament not started');
-                }
+                const [matchupsSnap, teamsSnap] = await Promise.all([
+                    db.collection(`${BASE}/matchups`).get(),
+                    db.collection(`${BASE}/teams`).get()
+                ]);
+
+                matchupsSnap.forEach(doc => {
+                    matchups[doc.id] = doc.data();
+                });
+
+                teamsSnap.forEach(doc => {
+                    teams[doc.id] = doc.data();
+                });
+
+                const finishedGames = Object.values(matchups).filter(m => m.status === 'FINAL').length;
+                console.log('🏀 LEADERBOARD', 'Loaded', Object.keys(matchups).length, 'matchups,', finishedGames, 'finished');
+                console.log('🏀 LEADERBOARD', 'Loaded', Object.keys(teams).length, 'teams');
             } catch (e) {
-                console.warn('🏀 LEADERBOARD', 'Could not load results:', e);
+                console.warn('🏀 LEADERBOARD', 'Could not load matchups/teams:', e);
             }
         }
 
@@ -817,7 +836,7 @@
         }
 
         async function init() {
-            await loadActualResults();
+            await loadMatchupsAndTeams();
             await loadAllBrackets();
         }
 
