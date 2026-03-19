@@ -642,6 +642,31 @@
             text-transform: uppercase;
         }
 
+        .upset-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-gold));
+            color: var(--slate-900);
+            font-size: 9px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .modal-pick.upset {
+            border-left-color: var(--accent-orange);
+        }
+
+        .modal-pick.upset.correct {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(249, 115, 22, 0.1));
+        }
+
+        .modal-pick.upset.pending {
+            background: rgba(249, 115, 22, 0.1);
+        }
+
         .view-bracket-btn {
             display: inline-block;
             margin-top: 16px;
@@ -1189,6 +1214,18 @@
                     possiblePoints += pts;
                 }
 
+                let isUpset = false;
+                const topTeam = teams[matchup.top_team_id];
+                const bottomTeam = teams[matchup.bottom_team_id];
+                const topSeed = topTeam?.seed || 1;
+                const bottomSeed = bottomTeam?.seed || 16;
+
+                if (pickedTeamId === matchup.top_team_id && topSeed > bottomSeed) {
+                    isUpset = true;
+                } else if (pickedTeamId === matchup.bottom_team_id && bottomSeed > topSeed) {
+                    isUpset = true;
+                }
+
                 let regionKey = matchup.region_id || 'east';
                 if (round === 'final_four') regionKey = 'final_four';
                 if (round === 'championship') regionKey = 'championship';
@@ -1203,7 +1240,8 @@
                     earnedPts,
                     potentialPts: pts,
                     actualWinner,
-                    seed
+                    seed,
+                    isUpset
                 });
             }
 
@@ -1250,6 +1288,8 @@
                 for (const pick of picks) {
                     const icon = pick.status === 'correct' ? '✅' : (pick.status === 'wrong' ? '❌' : '⏳');
                     const teamName = pick.pickedTeam?.team_name || 'Unknown';
+                    const upsetBadge = pick.isUpset ? '<span class="upset-badge">🔥 Upset</span>' : '';
+                    const upsetClass = pick.isUpset ? ' upset' : '';
 
                     let pointsHtml = '';
                     if (pick.status === 'correct') {
@@ -1262,10 +1302,10 @@
                     }
 
                     html += `
-                        <div class="modal-pick ${pick.status}">
+                        <div class="modal-pick ${pick.status}${upsetClass}">
                             <div class="modal-pick-icon">${icon}</div>
                             <div class="modal-pick-team">
-                                <span class="seed">#${pick.seed}</span> ${teamName}
+                                <span class="seed">#${pick.seed}</span> ${teamName}${upsetBadge}
                                 <div class="modal-pick-round">${pick.roundName}</div>
                             </div>
                             ${pointsHtml}
