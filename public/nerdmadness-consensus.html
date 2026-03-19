@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness 2026 - Pick Consensus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-100: #f1f5f9;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-gold: #eab308;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --accent-purple: #a855f7;
+            --glass-bg: rgba(30, 41, 59, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            color: var(--slate-100);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding: 80px 20px 40px 20px;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            height: 32px;
+            width: auto;
+        }
+
+        .header-title {
+            font-size: 16px;
+            color: var(--slate-100);
+            letter-spacing: 2px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .header-title span { color: var(--accent-gold); }
+
+        .header-link {
+            font-size: 12px;
+            color: var(--slate-400);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .header-link:hover {
+            color: var(--accent-blue);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .page-title {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .page-title h1 {
+            font-size: 32px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .page-title p {
+            color: var(--slate-400);
+            font-size: 14px;
+        }
+
+        .bracket-selector {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .bracket-selector label {
+            font-size: 13px;
+            color: var(--slate-300);
+            font-weight: 600;
+        }
+
+        .bracket-selector select {
+            flex: 1;
+            min-width: 200px;
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            color: var(--slate-100);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .bracket-selector select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .summary-stat {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .summary-stat-value {
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--accent-gold);
+        }
+
+        .summary-stat-value.green { color: var(--accent-green); }
+        .summary-stat-value.blue { color: var(--accent-blue); }
+        .summary-stat-value.purple { color: var(--accent-purple); }
+
+        .summary-stat-label {
+            font-size: 10px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .filter-btn {
+            background: var(--slate-700);
+            color: var(--slate-300);
+            border: 1px solid var(--slate-600);
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .picks-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .pick-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: grid;
+            grid-template-columns: 1fr 140px 100px;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .pick-card.decided {
+            opacity: 0.6;
+        }
+
+        .pick-card.correct {
+            border-left: 4px solid var(--accent-green);
+            opacity: 1;
+        }
+
+        .pick-card.wrong {
+            border-left: 4px solid var(--accent-red);
+            opacity: 0.5;
+        }
+
+        .pick-info {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .pick-matchup {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--slate-100);
+        }
+
+        .pick-matchup .seed {
+            color: var(--slate-400);
+            font-weight: 400;
+            font-size: 12px;
+        }
+
+        .pick-matchup .your-pick {
+            color: var(--accent-gold);
+        }
+
+        .pick-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 11px;
+            color: var(--slate-500);
+        }
+
+        .pick-meta .round {
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .pick-meta .status {
+            font-weight: 600;
+        }
+
+        .pick-meta .status.correct { color: var(--accent-green); }
+        .pick-meta .status.wrong { color: var(--accent-red); }
+        .pick-meta .status.pending { color: var(--slate-400); }
+
+        .consensus-bar {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .consensus-label {
+            font-size: 10px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .consensus-track {
+            height: 24px;
+            background: var(--slate-700);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            position: relative;
+        }
+
+        .consensus-fill {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            min-width: 36px;
+            transition: width 0.3s;
+        }
+
+        .consensus-fill.with-you {
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+        }
+
+        .consensus-fill.against-you {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+        }
+
+        .upside-points {
+            text-align: right;
+        }
+
+        .upside-value {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--accent-purple);
+        }
+
+        .upside-value.zero {
+            color: var(--slate-500);
+        }
+
+        .upside-label {
+            font-size: 10px;
+            color: var(--slate-500);
+            text-transform: uppercase;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--slate-400);
+        }
+
+        .no-data-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--slate-400);
+        }
+
+        .login-prompt {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .login-prompt h2 {
+            color: var(--slate-100);
+            margin-bottom: 12px;
+        }
+
+        .login-prompt p {
+            color: var(--slate-400);
+            margin-bottom: 20px;
+        }
+
+        .login-btn {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 25px;
+            transition: all 0.2s;
+        }
+
+        .login-btn:hover {
+            background: #2563eb;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--slate-400);
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.with { background: linear-gradient(135deg, var(--accent-green), var(--accent-blue)); }
+        .legend-dot.against { background: linear-gradient(135deg, var(--accent-red), var(--accent-orange)); }
+
+        @media (max-width: 768px) {
+            .summary-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .pick-card {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .consensus-bar {
+                order: 2;
+            }
+            .upside-points {
+                text-align: left;
+                order: 3;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-brand">
+            <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdMadness" class="header-logo">
+            <span class="header-title"><span>NERD</span>MADNESS</span>
+        </div>
+        <a href="nerdmadness.html" class="header-link">← Back to Brackets</a>
+    </div>
+
+    <div class="container">
+        <div class="page-title">
+            <h1>📊 Pick Consensus</h1>
+            <p>Your picks vs. the field • Sorted by upside potential</p>
+        </div>
+
+        <div id="content-area">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = window.getFirebaseConfig();
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+        const ROUND_MULTIPLIERS = {
+            'round_of_64': 1,
+            'round_of_32': 2,
+            'sweet_16': 4,
+            'elite_8': 8,
+            'final_four': 16,
+            'championship': 32
+        };
+
+        const MATCHUP_ID_TO_ROUND = {
+            'R1': 'round_of_64',
+            'R2': 'round_of_32',
+            'R3': 'sweet_16',
+            'R4': 'elite_8',
+            'R5': 'final_four',
+            'R6': 'championship'
+        };
+
+        const ROUND_DISPLAY_NAMES = {
+            'round_of_64': 'Rd 64',
+            'round_of_32': 'Rd 32',
+            'sweet_16': 'Sweet 16',
+            'elite_8': 'Elite 8',
+            'final_four': 'Final 4',
+            'championship': 'Champ'
+        };
+
+        function getMatchupRound(matchupId) {
+            const prefix = matchupId.substring(0, 2);
+            return MATCHUP_ID_TO_ROUND[prefix] || 'round_of_64';
+        }
+
+        let allBrackets = [];
+        let matchups = {};
+        let teams = {};
+        let userBrackets = [];
+        let selectedBracketId = null;
+        let consensusData = [];
+        let currentFilter = 'pending';
+
+        async function loadMatchupsAndTeams() {
+            const [matchupsSnap, teamsSnap] = await Promise.all([
+                db.collection(`${BASE}/matchups`).get(),
+                db.collection(`${BASE}/teams`).get()
+            ]);
+
+            matchupsSnap.forEach(doc => { matchups[doc.id] = doc.data(); });
+            teamsSnap.forEach(doc => { teams[doc.id] = doc.data(); });
+        }
+
+        async function loadAllBrackets() {
+            const bracketsSnap = await db.collection(`${BASE}/brackets`)
+                .where('active', '==', true)
+                .get();
+
+            allBrackets = [];
+            bracketsSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.isComplete) {
+                    allBrackets.push({ id: doc.id, ...data });
+                }
+            });
+        }
+
+        function loadUserBrackets(userId) {
+            userBrackets = allBrackets.filter(b => b.userId === userId);
+        }
+
+        function buildConsensusData(myBracket) {
+            consensusData = [];
+            const totalBrackets = allBrackets.length;
+
+            if (!myBracket.picks) return;
+
+            for (const [matchupId, myPickedTeamId] of Object.entries(myBracket.picks)) {
+                const matchup = matchups[matchupId];
+                if (!matchup) continue;
+
+                const myTeam = teams[myPickedTeamId];
+                const round = getMatchupRound(matchupId);
+                const multiplier = ROUND_MULTIPLIERS[round] || 1;
+                const mySeed = myTeam?.seed || 1;
+                const potentialPoints = multiplier * mySeed;
+
+                let samePickCount = 0;
+                for (const bracket of allBrackets) {
+                    if (bracket.picks && bracket.picks[matchupId] === myPickedTeamId) {
+                        samePickCount++;
+                    }
+                }
+
+                const withYouPct = Math.round((samePickCount / totalBrackets) * 100);
+                const againstYouPct = 100 - withYouPct;
+
+                let status = 'pending';
+                let upsidePoints = potentialPoints;
+
+                if (matchup.winner_team_id && matchup.status === 'FINAL') {
+                    if (myPickedTeamId === matchup.winner_team_id) {
+                        status = 'correct';
+                        upsidePoints = 0;
+                    } else {
+                        status = 'wrong';
+                        upsidePoints = 0;
+                    }
+                }
+
+                const topTeam = teams[matchup.top_team_id];
+                const bottomTeam = teams[matchup.bottom_team_id];
+
+                consensusData.push({
+                    matchupId,
+                    myPickedTeamId,
+                    myTeam,
+                    mySeed,
+                    topTeam,
+                    bottomTeam,
+                    round,
+                    roundName: ROUND_DISPLAY_NAMES[round] || round,
+                    region: matchup.region_id,
+                    status,
+                    potentialPoints,
+                    upsidePoints,
+                    withYouPct,
+                    againstYouPct,
+                    samePickCount,
+                    totalBrackets
+                });
+            }
+
+            consensusData.sort((a, b) => b.upsidePoints - a.upsidePoints);
+        }
+
+        function renderUI() {
+            const contentArea = document.getElementById('content-area');
+
+            if (userBrackets.length === 0) {
+                contentArea.innerHTML = `
+                    <div class="login-prompt">
+                        <h2>No Brackets Found</h2>
+                        <p>You don't have any completed brackets yet, or you need to sign in.</p>
+                        <button class="login-btn" onclick="signIn()">Sign In with Google</button>
+                    </div>
+                `;
+                return;
+            }
+
+            const totalPending = consensusData.filter(c => c.status === 'pending').length;
+            const totalCorrect = consensusData.filter(c => c.status === 'correct').length;
+            const totalWrong = consensusData.filter(c => c.status === 'wrong').length;
+            const totalUpside = consensusData.reduce((sum, c) => sum + c.upsidePoints, 0);
+
+            const avgWithYou = consensusData.length > 0
+                ? Math.round(consensusData.reduce((sum, c) => sum + c.withYouPct, 0) / consensusData.length)
+                : 0;
+
+            contentArea.innerHTML = `
+                <div class="bracket-selector">
+                    <label>Your Bracket:</label>
+                    <select id="bracket-select" onchange="onBracketChange()">
+                        ${userBrackets.map(b => `
+                            <option value="${b.id}" ${b.id === selectedBracketId ? 'selected' : ''}>
+                                ${b.bracketName || 'Unnamed Bracket'}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+
+                <div class="summary-stats">
+                    <div class="summary-stat">
+                        <div class="summary-stat-value purple">${totalUpside}</div>
+                        <div class="summary-stat-label">Upside Pts</div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="summary-stat-value blue">${avgWithYou}%</div>
+                        <div class="summary-stat-label">Avg Consensus</div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="summary-stat-value green">${totalCorrect}</div>
+                        <div class="summary-stat-label">Correct</div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="summary-stat-value">${totalPending}</div>
+                        <div class="summary-stat-label">Pending</div>
+                    </div>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-dot with"></div>
+                        <span>With You</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot against"></div>
+                        <span>Against You</span>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <button class="filter-btn ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">All Picks</button>
+                    <button class="filter-btn ${currentFilter === 'pending' ? 'active' : ''}" data-filter="pending">⏳ Pending</button>
+                    <button class="filter-btn ${currentFilter === 'correct' ? 'active' : ''}" data-filter="correct">✅ Correct</button>
+                    <button class="filter-btn ${currentFilter === 'wrong' ? 'active' : ''}" data-filter="wrong">❌ Wrong</button>
+                    <button class="filter-btn ${currentFilter === 'contrarian' ? 'active' : ''}" data-filter="contrarian">🎯 Contrarian</button>
+                </div>
+
+                <div class="picks-container" id="picks-container">
+                    ${renderPicks()}
+                </div>
+            `;
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentFilter = btn.dataset.filter;
+                    document.getElementById('picks-container').innerHTML = renderPicks();
+                });
+            });
+        }
+
+        function renderPicks() {
+            let filtered = consensusData;
+
+            if (currentFilter === 'pending') {
+                filtered = consensusData.filter(c => c.status === 'pending');
+            } else if (currentFilter === 'correct') {
+                filtered = consensusData.filter(c => c.status === 'correct');
+            } else if (currentFilter === 'wrong') {
+                filtered = consensusData.filter(c => c.status === 'wrong');
+            } else if (currentFilter === 'contrarian') {
+                filtered = consensusData.filter(c => c.withYouPct < 50);
+            }
+
+            if (filtered.length === 0) {
+                return `
+                    <div class="no-data">
+                        <div class="no-data-icon">📊</div>
+                        <p>No picks match this filter.</p>
+                    </div>
+                `;
+            }
+
+            return filtered.map(pick => {
+                const statusClass = pick.status !== 'pending' ? pick.status : '';
+                const decidedClass = pick.status !== 'pending' ? 'decided' : '';
+
+                const myTeamName = pick.myTeam?.team_name || 'Unknown';
+                const otherTeam = pick.myPickedTeamId === pick.topTeam?.id
+                    ? pick.bottomTeam
+                    : pick.topTeam;
+                const otherTeamName = otherTeam?.team_name || 'TBD';
+                const otherSeed = otherTeam?.seed || '?';
+
+                let statusText = '';
+                if (pick.status === 'correct') statusText = '✅ Won';
+                else if (pick.status === 'wrong') statusText = '❌ Lost';
+                else statusText = '⏳ Pending';
+
+                return `
+                    <div class="pick-card ${statusClass} ${decidedClass}">
+                        <div class="pick-info">
+                            <div class="pick-matchup">
+                                <span class="your-pick"><span class="seed">#${pick.mySeed}</span> ${myTeamName}</span>
+                                <span style="color: var(--slate-500); margin: 0 8px;">over</span>
+                                <span class="seed">#${otherSeed}</span> ${otherTeamName}
+                            </div>
+                            <div class="pick-meta">
+                                <span class="round">${pick.roundName} • ${pick.region || 'Finals'}</span>
+                                <span class="status ${pick.status}">${statusText}</span>
+                            </div>
+                        </div>
+                        <div class="consensus-bar">
+                            <div class="consensus-label">${pick.samePickCount}/${pick.totalBrackets} brackets</div>
+                            <div class="consensus-track">
+                                <div class="consensus-fill with-you" style="width: ${pick.withYouPct}%">${pick.withYouPct}%</div>
+                                <div class="consensus-fill against-you" style="width: ${pick.againstYouPct}%">${pick.againstYouPct > 15 ? pick.againstYouPct + '%' : ''}</div>
+                            </div>
+                        </div>
+                        <div class="upside-points">
+                            <div class="upside-value ${pick.upsidePoints === 0 ? 'zero' : ''}">${pick.upsidePoints}</div>
+                            <div class="upside-label">Upside</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function onBracketChange() {
+            const select = document.getElementById('bracket-select');
+            selectedBracketId = select.value;
+            const bracket = userBrackets.find(b => b.id === selectedBracketId);
+            if (bracket) {
+                buildConsensusData(bracket);
+                renderUI();
+            }
+        }
+
+        async function signIn() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            try {
+                await auth.signInWithPopup(provider);
+            } catch (e) {
+                console.error('Sign in error:', e);
+            }
+        }
+
+        auth.onAuthStateChanged(async (user) => {
+            const contentArea = document.getElementById('content-area');
+
+            if (!user) {
+                contentArea.innerHTML = `
+                    <div class="login-prompt">
+                        <h2>Sign In Required</h2>
+                        <p>Sign in to compare your picks against the field.</p>
+                        <button class="login-btn" onclick="signIn()">Sign In with Google</button>
+                    </div>
+                `;
+                return;
+            }
+
+            contentArea.innerHTML = '<div class="loading">Loading bracket data...</div>';
+
+            try {
+                await loadMatchupsAndTeams();
+                await loadAllBrackets();
+                loadUserBrackets(user.uid);
+
+                if (userBrackets.length > 0) {
+                    selectedBracketId = userBrackets[0].id;
+                    buildConsensusData(userBrackets[0]);
+                }
+
+                renderUI();
+            } catch (e) {
+                console.error('Error loading data:', e);
+                contentArea.innerHTML = `
+                    <div class="no-data">
+                        <div class="no-data-icon">⚠️</div>
+                        <p>Error loading data. Please try again.</p>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
