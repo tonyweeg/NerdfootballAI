@@ -444,6 +444,14 @@
             transform: scale(0.99);
         }
 
+        .table-row.my-bracket {
+            background: rgba(234, 179, 8, 0.12);
+        }
+
+        .table-row.my-bracket:hover {
+            background: rgba(234, 179, 8, 0.2);
+        }
+
         /* Bracket Picks Modal */
         .modal-overlay {
             position: fixed;
@@ -915,6 +923,7 @@
         let teams = {};
         let userCache = {};
         let currentRoundFilter = 'all';
+        let currentUserId = null;
 
         function calculatePoints(winnerSeed, roundName) {
             const multiplier = ROUND_MULTIPLIERS[roundName] || 0;
@@ -953,6 +962,11 @@
 
             possiblePoints += totalScore;
 
+            // Debug first bracket
+            if (bracket.bracketName && totalScore > 0) {
+                console.log('🏀 SCORE:', bracket.bracketName, '=', totalScore, 'pts,', correctPicks, 'correct');
+            }
+
             return { score: totalScore, correct: correctPicks, possible: possiblePoints };
         }
 
@@ -974,6 +988,14 @@
                 const finishedGames = Object.values(matchups).filter(m => m.status === 'FINAL').length;
                 console.log('🏀 LEADERBOARD', 'Loaded', Object.keys(matchups).length, 'matchups,', finishedGames, 'finished');
                 console.log('🏀 LEADERBOARD', 'Loaded', Object.keys(teams).length, 'teams');
+
+                // Debug: Show finished games
+                for (const [id, m] of Object.entries(matchups)) {
+                    if (m.status === 'FINAL' && m.winner_team_id) {
+                        const winner = teams[m.winner_team_id];
+                        console.log('🏀 FINAL:', id, '→ winner:', m.winner_team_id, `(${winner?.team_name}, seed ${winner?.seed})`);
+                    }
+                }
             } catch (e) {
                 console.warn('🏀 LEADERBOARD', 'Could not load matchups/teams:', e);
             }
@@ -1075,9 +1097,10 @@
                 else if (currentRank === 3) rankClass = 'bronze';
 
                 const displayName = b.bracketName || 'Unnamed Bracket';
+                const isMyBracket = currentUserId && b.userId === currentUserId;
 
                 return `
-                    <div class="table-row" onclick="openBracketModal('${b.id}')" title="Click to view picks">
+                    <div class="table-row${isMyBracket ? ' my-bracket' : ''}" onclick="openBracketModal('${b.id}')" title="Click to view picks">
                         <div class="rank ${rankClass}">${currentRank}</div>
                         <div class="bracket-info">
                             <div class="bracket-name">${displayName}</div>
@@ -1331,6 +1354,15 @@
         }
 
         async function init() {
+            auth.onAuthStateChanged((user) => {
+                const wasNull = currentUserId === null;
+                currentUserId = user ? user.uid : null;
+                console.log('🏀 AUTH', 'User:', currentUserId || 'not signed in');
+                if (!wasNull && allBrackets.length > 0) {
+                    renderLeaderboard();
+                }
+            });
+
             await loadMatchupsAndTeams();
             await loadAllBrackets();
         }
