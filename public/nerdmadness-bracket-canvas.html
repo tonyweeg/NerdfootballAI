@@ -1253,6 +1253,7 @@
         <div class="footer-group">
             <button class="footer-save-btn" id="footer-save-btn" onclick="openSaveModal()">💾 Save</button>
             <button class="footer-save-btn" id="footer-delete-btn" onclick="confirmDeleteBracket()" style="background: var(--accent-red); display: none;">🗑️ Delete</button>
+            <button class="footer-save-btn" id="view-brackets-btn" onclick="openViewBracketsModal()" style="background: var(--accent-blue); display: none;">👀 View All Brackets</button>
         </div>
     </div>
 
@@ -1279,6 +1280,20 @@
             <div class="naming-modal-actions">
                 <button class="naming-btn secondary" onclick="closeNamingModal()">Cancel</button>
                 <button class="naming-btn primary" onclick="saveBracketWithName()">💾 Save Bracket</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View All Brackets Modal -->
+    <div class="naming-modal-overlay" id="view-brackets-modal" style="display: none;">
+        <div class="naming-modal" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+            <h2>👀 All Brackets</h2>
+            <p>View everyone's bracket picks</p>
+            <div id="brackets-list" style="max-height: 400px; overflow-y: auto;">
+                <div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading brackets...</div>
+            </div>
+            <div class="naming-modal-actions" style="margin-top: 20px;">
+                <button class="naming-btn secondary" onclick="closeViewBracketsModal()">Close</button>
             </div>
         </div>
     </div>
@@ -1312,14 +1327,8 @@
     const LOCK_TIME_FALLBACK = new Date('2026-03-19T12:00:00-05:00');
 
     function isLocked(settings) {
-        const now = new Date();
-        if (settings && settings.lockTime) {
-            const lockTime = settings.lockTime.toDate ? settings.lockTime.toDate() : new Date(settings.lockTime);
-            console.log('🏀 BRACKET_LOCK', 'Checking lock:', { now: now.toISOString(), lockTime: lockTime.toISOString(), isLocked: now >= lockTime });
-            return now >= lockTime;
-        }
-        console.log('🏀 BRACKET_LOCK', 'Using fallback lock time:', LOCK_TIME_FALLBACK.toISOString());
-        return now >= LOCK_TIME_FALLBACK;
+        // TOURNAMENT LOCKED - All picks disabled, view-only mode
+        return true;
     }
 
     // Save Modal Functions
@@ -1374,6 +1383,74 @@
     function showNamingModal(existingName = '') {
         if (app) app.bracketName = existingName;
         openSaveModal();
+    }
+
+    // View All Brackets Functions
+    async function openViewBracketsModal() {
+        const modal = document.getElementById('view-brackets-modal');
+        const listEl = document.getElementById('brackets-list');
+        modal.style.display = 'flex';
+        listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading brackets...</div>';
+
+        try {
+            // Load all brackets from all users
+            const bracketsSnap = await db.collection(`${BASE}/brackets`).get();
+            const brackets = [];
+            bracketsSnap.forEach(doc => {
+                const data = doc.data();
+                brackets.push({
+                    id: doc.id,
+                    name: data.bracketName || 'Unnamed Bracket',
+                    userId: data.userId,
+                    userEmail: data.userEmail || 'Unknown',
+                    pickCount: data.picks ? Object.keys(data.picks).length : 0,
+                    updatedAt: data.updatedAt?.toDate() || new Date()
+                });
+            });
+
+            if (brackets.length === 0) {
+                listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--slate-400);">No brackets found.</div>';
+                return;
+            }
+
+            // Sort by pick count descending
+            brackets.sort((a, b) => b.pickCount - a.pickCount);
+
+            // Render list
+            let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+            for (const b of brackets) {
+                const isComplete = b.pickCount === 63;
+                const userName = b.userEmail.split('@')[0];
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--slate-700); border-radius: 8px; cursor: pointer;" onclick="viewBracket('${b.id}')">
+                        <div>
+                            <div style="color: var(--slate-100); font-weight: 600;">${b.name}</div>
+                            <div style="color: var(--slate-400); font-size: 12px;">${userName}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: ${isComplete ? 'var(--accent-green)' : 'var(--accent-yellow)'}; font-weight: 600;">${b.pickCount}/63</div>
+                            <div style="color: var(--slate-500); font-size: 10px;">${isComplete ? '✅ Complete' : '⏳ In Progress'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            listEl.innerHTML = html;
+
+        } catch (error) {
+            console.error('Error loading brackets:', error);
+            listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--accent-red);">Error loading brackets</div>';
+        }
+    }
+
+    function closeViewBracketsModal() {
+        document.getElementById('view-brackets-modal').style.display = 'none';
+    }
+
+    function viewBracket(bracketId) {
+        closeViewBracketsModal();
+        // Reload page with the selected bracket
+        window.location.href = `nerdmadness-bracket-canvas.html?bracket=${bracketId}`;
     }
 
     // Delete Bracket Functions
@@ -1621,6 +1698,11 @@
 
             if (isBracketLocked) {
                 this.setZoomLevel('full');
+                // Hide save buttons when locked
+                document.getElementById('footer-save-btn').style.display = 'none';
+                document.getElementById('save-btn').style.display = 'none';
+                // Show view brackets button
+                document.getElementById('view-brackets-btn').style.display = 'inline-flex';
             } else {
                 this.currentRegionIndex = 0;
                 this.setZoomLevel('region');
