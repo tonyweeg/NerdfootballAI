@@ -284,6 +284,16 @@ exports.scheduledNerdMadnessUpdate = onSchedule('every 15 minutes', async (event
 
 // HTTP endpoint for testing
 exports.testNerdMadnessUpdate = functions.https.onRequest(async (req, res) => {
+    // CORS headers
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
+
     try {
         const result = await fetchAndUpdateResults();
         res.json({ success: true, ...result });
