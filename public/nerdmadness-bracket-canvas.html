@@ -1481,6 +1481,16 @@
         modal.style.display = 'flex';
         contentEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading picks...</div>';
 
+        // Scoring multipliers by round
+        const ROUND_MULTIPLIERS = {
+            'round_of_64': 1,
+            'round_of_32': 2,
+            'sweet_16': 4,
+            'elite_eight': 8,
+            'final_four': 16,
+            'championship': 32
+        };
+
         try {
             // Load the bracket data
             const bracketDoc = await db.doc(`${BASE}/brackets/${bracketId}`).get();
@@ -1496,40 +1506,69 @@
 
             titleEl.textContent = `📝 ${bracketName} (${userName})`;
 
-            // Load teams and matchups if not already loaded
-            if (!app || Object.keys(app.teams).length === 0) {
-                const [teamsSnap, matchupsSnap] = await Promise.all([
-                    db.collection(`${BASE}/teams`).get(),
-                    db.collection(`${BASE}/matchups`).get()
-                ]);
-                window.textViewTeams = {};
-                window.textViewMatchups = {};
-                teamsSnap.forEach(doc => { window.textViewTeams[doc.id] = doc.data(); });
-                matchupsSnap.forEach(doc => { window.textViewMatchups[doc.id] = doc.data(); });
-            }
+            // Load teams and matchups
+            const [teamsSnap, matchupsSnap] = await Promise.all([
+                db.collection(`${BASE}/teams`).get(),
+                db.collection(`${BASE}/matchups`).get()
+            ]);
+            const teams = {};
+            const matchups = {};
+            teamsSnap.forEach(doc => { teams[doc.id] = doc.data(); });
+            matchupsSnap.forEach(doc => { matchups[doc.id] = doc.data(); });
 
-            const teams = app?.teams || window.textViewTeams;
-            const matchups = app?.matchups || window.textViewMatchups;
+            // Calculate totals
+            let totalPoints = 0;
+            let correctPicks = 0;
+            let wrongPicks = 0;
+            let pendingPicks = 0;
+            let possiblePoints = 0;
+
+            // Helper to format a pick line
+            function formatPick(matchup, pickedTeamId, roundId, indent = '    ') {
+                if (!pickedTeamId) {
+                    return `${indent}○ No pick\n`;
+                }
+
+                const team = teams[pickedTeamId];
+                const seed = team?.seed || '?';
+                const teamName = team?.team_name || 'Unknown';
+                const multiplier = ROUND_MULTIPLIERS[roundId] || 1;
+                const potentialPts = multiplier * seed;
+
+                // Check if game is final
+                if (matchup.status === 'FINAL' && matchup.winner_team_id) {
+                    if (pickedTeamId === matchup.winner_team_id) {
+                        totalPoints += potentialPts;
+                        correctPicks++;
+                        return `${indent}✅ (${seed}) ${teamName} → +${potentialPts} pts\n`;
+                    } else {
+                        wrongPicks++;
+                        const actualWinner = teams[matchup.winner_team_id];
+                        return `${indent}❌ (${seed}) ${teamName} [Lost to ${actualWinner?.team_name || '?'}]\n`;
+                    }
+                } else {
+                    pendingPicks++;
+                    possiblePoints += potentialPts;
+                    return `${indent}⏳ (${seed}) ${teamName} [${potentialPts} pts possible]\n`;
+                }
+            }
 
             // Build text output by region and round
             const regions = ['east', 'south', 'west', 'midwest'];
             const rounds = [
-                { id: 'round_of_64', name: 'Round of 64', games: 8 },
-                { id: 'round_of_32', name: 'Round of 32', games: 4 },
-                { id: 'sweet_16', name: 'Sweet 16', games: 2 },
-                { id: 'elite_eight', name: 'Elite Eight', games: 1 }
+                { id: 'round_of_64', name: 'Round of 64', mult: '1×' },
+                { id: 'round_of_32', name: 'Round of 32', mult: '2×' },
+                { id: 'sweet_16', name: 'Sweet 16', mult: '4×' },
+                { id: 'elite_eight', name: 'Elite Eight', mult: '8×' }
             ];
 
-            let textOutput = `🏀 ${bracketName}\n`;
-            textOutput += `👤 ${userName}\n`;
-            textOutput += `📊 ${Object.keys(picks).length}/63 picks\n`;
-            textOutput += `${'═'.repeat(50)}\n\n`;
+            let textOutput = '';
 
             // Regional picks
             for (const region of regions) {
-                textOutput += `${'─'.repeat(50)}\n`;
-                textOutput += `🏆 ${region.toUpperCase()} REGION\n`;
-                textOutput += `${'─'.repeat(50)}\n`;
+                let regionPoints = 0;
+                let regionCorrect = 0;
+                let regionText = '';
 
                 for (const round of rounds) {
                     const regionMatchups = Object.values(matchups)
@@ -1538,19 +1577,25 @@
 
                     if (regionMatchups.length === 0) continue;
 
-                    textOutput += `\n  ${round.name}:\n`;
+                    regionText += `\n  ${round.name} (${round.mult}):\n`;
 
                     for (const m of regionMatchups) {
                         const pickedTeamId = picks[m.matchup_id];
-                        if (pickedTeamId) {
-                            const team = teams[pickedTeamId];
-                            const seed = team?.seed || team?.team_seed || '?';
-                            textOutput += `    ✓ (${seed}) ${team?.team_name || 'Unknown'}\n`;
-                        } else {
-                            textOutput += `    ○ TBD\n`;
-                        }
+                        const beforePts = totalPoints;
+                        const beforeCorrect = correctPicks;
+                        regionText += formatPick(m, pickedTeamId, round.id);
+                        regionPoints += (totalPoints - beforePts);
+                        regionCorrect += (correctPicks - beforeCorrect);
                     }
                 }
+
+                textOutput += `${'─'.repeat(50)}\n`;
+                textOutput += `🏆 ${region.toUpperCase()} REGION`;
+                if (regionPoints > 0) {
+                    textOutput += ` → ${regionPoints} pts (${regionCorrect} correct)`;
+                }
+                textOutput += `\n${'─'.repeat(50)}\n`;
+                textOutput += regionText;
                 textOutput += '\n';
             }
 
@@ -1564,37 +1609,25 @@
                 .filter(m => m.round_id === 'final_four')
                 .sort((a, b) => (a.bracket_position || 0) - (b.bracket_position || 0));
 
-            textOutput += `\n  Final Four:\n`;
+            textOutput += `\n  Final Four (16×):\n`;
             textOutput += `    Semifinal 1 (East vs South):\n`;
             if (ffMatchups[0]) {
-                const pick1 = picks[ffMatchups[0].matchup_id];
-                if (pick1) {
-                    const team = teams[pick1];
-                    textOutput += `      ✓ (${team?.seed || '?'}) ${team?.team_name || 'Unknown'}\n`;
-                } else {
-                    textOutput += `      ○ TBD\n`;
-                }
+                textOutput += formatPick(ffMatchups[0], picks[ffMatchups[0].matchup_id], 'final_four', '      ');
             }
 
             textOutput += `    Semifinal 2 (West vs Midwest):\n`;
             if (ffMatchups[1]) {
-                const pick2 = picks[ffMatchups[1].matchup_id];
-                if (pick2) {
-                    const team = teams[pick2];
-                    textOutput += `      ✓ (${team?.seed || '?'}) ${team?.team_name || 'Unknown'}\n`;
-                } else {
-                    textOutput += `      ○ TBD\n`;
-                }
+                textOutput += formatPick(ffMatchups[1], picks[ffMatchups[1].matchup_id], 'final_four', '      ');
             }
 
             // Championship
-            textOutput += `\n  Championship:\n`;
+            const champMatchup = matchups['R6_G01'];
+            textOutput += `\n  Championship (32×):\n`;
             const champPick = picks['R6_G01'];
             if (champPick) {
-                const team = teams[champPick];
-                textOutput += `    🏆 (${team?.seed || '?'}) ${team?.team_name || 'Unknown'} 🏆\n`;
+                textOutput += formatPick(champMatchup || {}, champPick, 'championship', '    🏆 ').replace('    🏆 ', '    🏆 ').replace('\n', ' 🏆\n');
             } else {
-                textOutput += `    ○ TBD\n`;
+                textOutput += `    ○ No pick\n`;
             }
 
             // Tiebreaker
@@ -1602,10 +1635,21 @@
                 textOutput += `\n  Tiebreaker Total: ${(bracketData.tiebreakerScores.higher || 0) + (bracketData.tiebreakerScores.lower || 0)}\n`;
             }
 
-            currentTextPicks = textOutput;
+            // Build header with totals
+            possiblePoints += totalPoints;
+            let headerOutput = `🏀 ${bracketName}\n`;
+            headerOutput += `👤 ${userName}\n`;
+            headerOutput += `📊 ${Object.keys(picks).length}/63 picks\n`;
+            headerOutput += `${'═'.repeat(50)}\n`;
+            headerOutput += `\n💰 TOTAL POINTS: ${totalPoints}\n`;
+            headerOutput += `✅ Correct: ${correctPicks}  ❌ Wrong: ${wrongPicks}  ⏳ Pending: ${pendingPicks}\n`;
+            headerOutput += `📈 Max Possible: ${possiblePoints}\n`;
+            headerOutput += `${'═'.repeat(50)}\n`;
+
+            currentTextPicks = headerOutput + textOutput;
 
             // Display with styling
-            contentEl.innerHTML = `<pre style="white-space: pre-wrap; color: var(--slate-200); background: var(--slate-900); padding: 16px; border-radius: 8px; overflow-x: auto;">${escapeHtml(textOutput)}</pre>`;
+            contentEl.innerHTML = `<pre style="white-space: pre-wrap; color: var(--slate-200); background: var(--slate-900); padding: 16px; border-radius: 8px; overflow-x: auto;">${escapeHtml(currentTextPicks)}</pre>`;
 
         } catch (error) {
             console.error('Error loading bracket for text view:', error);
