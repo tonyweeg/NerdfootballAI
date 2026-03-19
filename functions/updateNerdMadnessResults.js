@@ -93,6 +93,9 @@ async function fetchAndUpdateResults() {
 function buildTeamNameMap(teams) {
     const map = {};
 
+    // Teams with name conflicts - need full name matching, not first-word
+    const conflictingFirstWords = new Set(['miami', 'michigan', 'north', 'saint', 'texas']);
+
     for (const [teamId, team] of Object.entries(teams)) {
         const name = team.team_name || '';
         const normalizedName = normalizeName(name);
@@ -100,30 +103,46 @@ function buildTeamNameMap(teams) {
         // Map full name
         map[normalizedName] = teamId;
 
-        // Map common variations
-        // "Duke Blue Devils" -> "duke"
-        const firstName = name.split(' ')[0].toLowerCase();
-        if (!map[firstName]) map[firstName] = teamId;
+        // Map first two words for multi-word schools (e.g., "michigan state" -> T11)
+        const words = normalizedName.split(' ');
+        if (words.length >= 2) {
+            const twoWords = words.slice(0, 2).join(' ');
+            if (!map[twoWords]) map[twoWords] = teamId;
+        }
+
+        // Map first word ONLY if it's not a conflicting name
+        const firstName = words[0];
+        if (!conflictingFirstWords.has(firstName) && !map[firstName]) {
+            map[firstName] = teamId;
+        }
 
         // Handle special cases
         const specialMappings = {
             'uconn': 'connecticut',
             'uconn huskies': 'connecticut',
             'connecticut huskies': 'connecticut',
-            'miami (fl)': 'miami',
+            'miami fl': 'miami',
             'miami hurricanes': 'miami',
-            'st. john\'s': 'st johns',
-            'saint john\'s': 'st johns',
+            'st johns': 'st johns',
+            'saint johns': 'st johns',
             'vcu': 'virginia commonwealth',
             'vcu rams': 'virginia commonwealth',
             'ucf': 'central florida',
             'ucf knights': 'central florida',
             'byu': 'brigham young',
-            'byu cougars': 'brigham young'
+            'byu cougars': 'brigham young',
+            'michigan state': 'michigan state',
+            'michigan state spartans': 'michigan state',
+            'north carolina': 'north carolina',
+            'north carolina tar heels': 'north carolina',
+            'north dakota state': 'north dakota state',
+            'texas am': 'texas am',
+            'texas a m': 'texas am',
+            'texas tech': 'texas tech'
         };
 
         for (const [variant, canonical] of Object.entries(specialMappings)) {
-            if (normalizedName.includes(canonical) || normalizedName.includes(variant)) {
+            if (normalizedName.includes(canonical) || normalizedName === variant.replace(/[^a-z0-9\s]/g, '')) {
                 map[variant] = teamId;
             }
         }
@@ -144,18 +163,35 @@ function normalizeName(name) {
  */
 function findTeamId(espnTeamName, teamNameMap, teams) {
     const normalized = normalizeName(espnTeamName);
+    const words = normalized.split(' ');
 
-    // Direct match
+    // Direct full match (e.g., "michigan state spartans" or "michigan state")
     if (teamNameMap[normalized]) return teamNameMap[normalized];
 
-    // Try first word match
-    const firstName = normalized.split(' ')[0];
+    // Try first two words (e.g., "michigan state" from "michigan state spartans")
+    if (words.length >= 2) {
+        const twoWords = words.slice(0, 2).join(' ');
+        if (teamNameMap[twoWords]) return teamNameMap[twoWords];
+    }
+
+    // Try first word match (only for non-conflicting names)
+    const firstName = words[0];
     if (teamNameMap[firstName]) return teamNameMap[firstName];
 
-    // Fuzzy match - find team whose name contains the ESPN name or vice versa
+    // Fuzzy match - find team whose normalized name starts with same words
     for (const [teamId, team] of Object.entries(teams)) {
         const ourName = normalizeName(team.team_name || '');
-        if (ourName.includes(firstName) || firstName.includes(ourName.split(' ')[0])) {
+        const ourWords = ourName.split(' ');
+
+        // Check if first two words match
+        if (words.length >= 2 && ourWords.length >= 2) {
+            if (words[0] === ourWords[0] && words[1] === ourWords[1]) {
+                return teamId;
+            }
+        }
+
+        // Check if our full name is contained in ESPN name or vice versa
+        if (normalized.includes(ourName) || ourName.includes(normalized.split(' ').slice(0, 2).join(' '))) {
             return teamId;
         }
     }
