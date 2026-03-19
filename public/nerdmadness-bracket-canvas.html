@@ -3530,6 +3530,7 @@
 
         renderRegionPopupContent(regionId) {
             let html = '';
+            const locked = isLocked(this.settings);
 
             for (const roundId of REGION_ROUNDS) {
                 const matchups = this.getMatchupsForRegionRound(regionId, roundId);
@@ -3554,19 +3555,36 @@
                     const topUpset = topPicked && this.isUpsetPick(m.matchup_id, topTeamId);
                     const bottomUpset = bottomPicked && this.isUpsetPick(m.matchup_id, bottomTeamId);
 
-                    html += `<div class="popup-matchup">
-                        <div class="popup-team-row${topTeam ? '' : ' tbd'}${topPicked ? ' picked' : ''}${topUpset ? ' upset' : ''}"
+                    // Check if game is final and determine winner/loser status
+                    const isFinal = m.status === 'FINAL' && m.winner_team_id;
+                    const topIsWinner = isFinal && m.winner_team_id === topTeamId;
+                    const bottomIsWinner = isFinal && m.winner_team_id === bottomTeamId;
+                    const topIsLoser = isFinal && topTeamId && m.winner_team_id !== topTeamId;
+                    const bottomIsLoser = isFinal && bottomTeamId && m.winner_team_id !== bottomTeamId;
+
+                    // Score display
+                    const topScore = isFinal ? (m.top_team_score || '') : '';
+                    const bottomScore = isFinal ? (m.bottom_team_score || '') : '';
+
+                    html += `<div class="popup-matchup${isFinal ? ' final' : ''}">
+                        <div class="popup-team-row${topTeam ? '' : ' tbd'}${topPicked ? ' picked' : ''}${topUpset ? ' upset' : ''}${topIsWinner ? ' winner' : ''}${topIsLoser ? ' loser' : ''}${locked ? ' locked' : ''}"
                              data-matchup="${m.matchup_id}" data-slot="top">
                             <div class="popup-seed${topTeam ? '' : ' tbd'}">${topSeed || '?'}</div>
                             <div class="popup-team-name">${topTeam ? topTeam.team_name : 'TBD'}</div>
-                            ${topPicked ? '<span style="font-size:10px;">✓</span>' : ''}
-                            ${topUpset ? '<span style="font-size:10px;">🔥</span>' : ''}
+                            ${topScore ? `<span class="popup-score">${topScore}</span>` : ''}
+                            ${topIsWinner ? '<span class="winner-badge">✓ W</span>' : ''}
+                            ${topIsLoser ? '<span class="loser-badge">L</span>' : ''}
+                            ${!isFinal && topPicked ? '<span style="font-size:10px;">✓</span>' : ''}
+                            ${!isFinal && topUpset ? '<span style="font-size:10px;">🔥</span>' : ''}
                         </div>
-                        <div class="popup-team-row${bottomTeam ? '' : ' tbd'}${bottomPicked ? ' picked' : ''}${bottomUpset ? ' upset' : ''}"
+                        <div class="popup-team-row${bottomTeam ? '' : ' tbd'}${bottomPicked ? ' picked' : ''}${bottomUpset ? ' upset' : ''}${bottomIsWinner ? ' winner' : ''}${bottomIsLoser ? ' loser' : ''}${locked ? ' locked' : ''}"
                              data-matchup="${m.matchup_id}" data-slot="bottom">
                             <div class="popup-seed${bottomTeam ? '' : ' tbd'}">${bottomSeed || '?'}</div>
                             <div class="popup-team-name">${bottomTeam ? bottomTeam.team_name : 'TBD'}</div>
-                            ${bottomPicked ? '<span style="font-size:10px;">✓</span>' : ''}
+                            ${bottomScore ? `<span class="popup-score">${bottomScore}</span>` : ''}
+                            ${bottomIsWinner ? '<span class="winner-badge">✓ W</span>' : ''}
+                            ${bottomIsLoser ? '<span class="loser-badge">L</span>' : ''}
+                            ${!isFinal && bottomPicked ? '<span style="font-size:10px;">✓</span>' : ''}
                             ${bottomUpset ? '<span style="font-size:10px;">🔥</span>' : ''}
                         </div>
                     </div>`;
