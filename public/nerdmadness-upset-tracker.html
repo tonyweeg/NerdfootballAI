@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness 2026 - Upset Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-100: #f1f5f9;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-gold: #eab308;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --glass-bg: rgba(30, 41, 59, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            color: var(--slate-100);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding: 80px 20px 40px 20px;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            height: 32px;
+            width: auto;
+        }
+
+        .header-title {
+            font-size: 16px;
+            color: var(--slate-100);
+            letter-spacing: 2px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .header-title span { color: var(--accent-gold); }
+
+        .header-link {
+            font-size: 12px;
+            color: var(--slate-400);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .header-link:hover {
+            color: var(--accent-blue);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .page-title {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .page-title h1 {
+            font-size: 36px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .page-title p {
+            color: var(--slate-400);
+            font-size: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--accent-orange);
+        }
+
+        .stat-value.correct { color: var(--accent-green); }
+        .stat-value.wrong { color: var(--accent-red); }
+        .stat-value.pending { color: var(--slate-400); }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .filter-btn {
+            background: var(--slate-700);
+            color: var(--slate-300);
+            border: 1px solid var(--slate-600);
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--accent-orange);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-orange);
+            border-color: var(--accent-orange);
+            color: white;
+        }
+
+        .bracket-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .bracket-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .bracket-header:hover {
+            background: rgba(249, 115, 22, 0.1);
+        }
+
+        .bracket-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .bracket-name {
+            font-weight: 700;
+            color: var(--slate-100);
+            font-size: 16px;
+        }
+
+        .bracket-user {
+            font-size: 12px;
+            color: var(--slate-400);
+        }
+
+        .bracket-stats {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .bracket-stat {
+            text-align: center;
+        }
+
+        .bracket-stat-value {
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .bracket-stat-value.correct { color: var(--accent-green); }
+        .bracket-stat-value.wrong { color: var(--accent-red); }
+        .bracket-stat-value.pending { color: var(--slate-400); }
+
+        .bracket-stat-label {
+            font-size: 9px;
+            color: var(--slate-500);
+            text-transform: uppercase;
+        }
+
+        .upset-list {
+            padding: 16px 20px;
+        }
+
+        .upset-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--accent-orange);
+        }
+
+        .upset-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .upset-item.correct {
+            background: rgba(34, 197, 94, 0.15);
+            border-left-color: var(--accent-green);
+        }
+
+        .upset-item.wrong {
+            background: rgba(239, 68, 68, 0.15);
+            border-left-color: var(--accent-red);
+        }
+
+        .upset-item.pending {
+            background: rgba(249, 115, 22, 0.1);
+        }
+
+        .upset-icon {
+            font-size: 20px;
+            width: 28px;
+            text-align: center;
+        }
+
+        .upset-details {
+            flex: 1;
+        }
+
+        .upset-matchup {
+            font-size: 14px;
+            color: var(--slate-100);
+            font-weight: 600;
+        }
+
+        .upset-matchup .seed {
+            color: var(--slate-400);
+            font-weight: 400;
+        }
+
+        .upset-matchup .vs {
+            color: var(--slate-500);
+            font-size: 12px;
+            margin: 0 6px;
+        }
+
+        .upset-round {
+            font-size: 11px;
+            color: var(--slate-500);
+            margin-top: 2px;
+        }
+
+        .upset-result {
+            text-align: right;
+        }
+
+        .upset-points {
+            font-size: 16px;
+            font-weight: 800;
+        }
+
+        .upset-points.earned { color: var(--accent-green); }
+        .upset-points.lost { color: var(--accent-red); }
+        .upset-points.potential { color: var(--slate-400); }
+
+        .upset-status {
+            font-size: 10px;
+            color: var(--slate-500);
+            text-transform: uppercase;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--slate-400);
+        }
+
+        .no-data-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--slate-400);
+        }
+
+        .view-bracket-link {
+            display: inline-block;
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--accent-blue);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .view-bracket-link:hover {
+            color: var(--accent-gold);
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .bracket-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .bracket-stats {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .upset-item {
+                flex-wrap: wrap;
+            }
+            .upset-result {
+                width: 100%;
+                text-align: left;
+                margin-top: 8px;
+                padding-left: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-brand">
+            <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdMadness" class="header-logo">
+            <span class="header-title"><span>NERD</span>MADNESS</span>
+        </div>
+        <a href="nerdmadness.html" class="header-link">← Back to Brackets</a>
+    </div>
+
+    <div class="container">
+        <div class="page-title">
+            <h1>🔥 Upset Tracker</h1>
+            <p>Who's picking Cinderellas?</p>
+        </div>
+
+        <div class="stats-grid" id="global-stats">
+            <div class="stat-card">
+                <div class="stat-value" id="total-upsets">0</div>
+                <div class="stat-label">Total Upsets</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value correct" id="correct-upsets">0</div>
+                <div class="stat-label">Correct</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value wrong" id="wrong-upsets">0</div>
+                <div class="stat-label">Wrong</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value pending" id="pending-upsets">0</div>
+                <div class="stat-label">Pending</div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <button class="filter-btn active" data-filter="all">All Upsets</button>
+            <button class="filter-btn" data-filter="correct">✅ Correct</button>
+            <button class="filter-btn" data-filter="wrong">❌ Wrong</button>
+            <button class="filter-btn" data-filter="pending">⏳ Pending</button>
+        </div>
+
+        <div id="brackets-container">
+            <div class="loading">Loading upset picks...</div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = window.getFirebaseConfig();
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+        const ROUND_MULTIPLIERS = {
+            'round_of_64': 1,
+            'round_of_32': 2,
+            'sweet_16': 4,
+            'elite_8': 8,
+            'final_four': 16,
+            'championship': 32
+        };
+
+        const MATCHUP_ID_TO_ROUND = {
+            'R1': 'round_of_64',
+            'R2': 'round_of_32',
+            'R3': 'sweet_16',
+            'R4': 'elite_8',
+            'R5': 'final_four',
+            'R6': 'championship'
+        };
+
+        const ROUND_DISPLAY_NAMES = {
+            'round_of_64': 'Round of 64',
+            'round_of_32': 'Round of 32',
+            'sweet_16': 'Sweet 16',
+            'elite_8': 'Elite 8',
+            'final_four': 'Final Four',
+            'championship': 'Championship'
+        };
+
+        function getMatchupRound(matchupId) {
+            const prefix = matchupId.substring(0, 2);
+            return MATCHUP_ID_TO_ROUND[prefix] || 'round_of_64';
+        }
+
+        let allBrackets = [];
+        let matchups = {};
+        let teams = {};
+        let userCache = {};
+        let bracketUpsets = [];
+        let currentFilter = 'all';
+
+        async function loadMatchupsAndTeams() {
+            const [matchupsSnap, teamsSnap] = await Promise.all([
+                db.collection(`${BASE}/matchups`).get(),
+                db.collection(`${BASE}/teams`).get()
+            ]);
+
+            matchupsSnap.forEach(doc => { matchups[doc.id] = doc.data(); });
+            teamsSnap.forEach(doc => { teams[doc.id] = doc.data(); });
+
+            console.log('🔥 UPSET_TRACKER', 'Loaded', Object.keys(matchups).length, 'matchups,', Object.keys(teams).length, 'teams');
+        }
+
+        async function loadUserDisplayName(userId) {
+            if (userCache[userId]) return userCache[userId];
+            try {
+                const userDoc = await db.doc(`artifacts/nerdfootball/public/data/nerdfootball_users/${userId}`).get();
+                if (userDoc.exists) {
+                    const data = userDoc.data();
+                    userCache[userId] = data.displayName || data.email || 'Unknown';
+                } else {
+                    userCache[userId] = 'Unknown';
+                }
+            } catch (e) {
+                userCache[userId] = 'Unknown';
+            }
+            return userCache[userId];
+        }
+
+        async function loadAllBrackets() {
+            const bracketsSnap = await db.collection(`${BASE}/brackets`)
+                .where('active', '==', true)
+                .get();
+
+            allBrackets = [];
+            const userPromises = [];
+
+            bracketsSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.isComplete) {
+                    allBrackets.push({ id: doc.id, ...data });
+                    userPromises.push(loadUserDisplayName(data.userId));
+                }
+            });
+
+            await Promise.all(userPromises);
+            console.log('🔥 UPSET_TRACKER', 'Loaded', allBrackets.length, 'complete brackets');
+        }
+
+        function analyzeUpsets() {
+            bracketUpsets = [];
+
+            let totalUpsets = 0;
+            let correctUpsets = 0;
+            let wrongUpsets = 0;
+            let pendingUpsets = 0;
+
+            for (const bracket of allBrackets) {
+                if (!bracket.picks) continue;
+
+                const upsets = [];
+
+                for (const [matchupId, pickedTeamId] of Object.entries(bracket.picks)) {
+                    const matchup = matchups[matchupId];
+                    if (!matchup) continue;
+
+                    const pickedTeam = teams[pickedTeamId];
+                    const topTeam = teams[matchup.top_team_id];
+                    const bottomTeam = teams[matchup.bottom_team_id];
+
+                    const pickedSeed = pickedTeam?.seed || 1;
+                    const topSeed = topTeam?.seed || 1;
+                    const bottomSeed = bottomTeam?.seed || 16;
+
+                    let isUpset = false;
+                    let opponentTeam = null;
+
+                    if (pickedTeamId === matchup.top_team_id && topSeed > bottomSeed) {
+                        isUpset = true;
+                        opponentTeam = bottomTeam;
+                    } else if (pickedTeamId === matchup.bottom_team_id && bottomSeed > topSeed) {
+                        isUpset = true;
+                        opponentTeam = topTeam;
+                    }
+
+                    if (!isUpset) continue;
+
+                    const round = getMatchupRound(matchupId);
+                    const multiplier = ROUND_MULTIPLIERS[round] || 1;
+                    const pts = multiplier * pickedSeed;
+
+                    let status = 'pending';
+                    if (matchup.winner_team_id && matchup.status === 'FINAL') {
+                        status = (pickedTeamId === matchup.winner_team_id) ? 'correct' : 'wrong';
+                    }
+
+                    upsets.push({
+                        matchupId,
+                        pickedTeam,
+                        pickedTeamId,
+                        opponentTeam,
+                        round,
+                        roundName: ROUND_DISPLAY_NAMES[round] || round,
+                        region: matchup.region_id,
+                        status,
+                        points: pts,
+                        pickedSeed,
+                        opponentSeed: opponentTeam?.seed || 1
+                    });
+
+                    totalUpsets++;
+                    if (status === 'correct') correctUpsets++;
+                    else if (status === 'wrong') wrongUpsets++;
+                    else pendingUpsets++;
+                }
+
+                if (upsets.length > 0) {
+                    const correctCount = upsets.filter(u => u.status === 'correct').length;
+                    const wrongCount = upsets.filter(u => u.status === 'wrong').length;
+                    const pendingCount = upsets.filter(u => u.status === 'pending').length;
+                    const earnedPoints = upsets.filter(u => u.status === 'correct').reduce((sum, u) => sum + u.points, 0);
+
+                    bracketUpsets.push({
+                        bracket,
+                        userName: userCache[bracket.userId] || 'Unknown',
+                        upsets,
+                        correctCount,
+                        wrongCount,
+                        pendingCount,
+                        earnedPoints
+                    });
+                }
+            }
+
+            bracketUpsets.sort((a, b) => {
+                if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
+                return b.earnedPoints - a.earnedPoints;
+            });
+
+            document.getElementById('total-upsets').textContent = totalUpsets;
+            document.getElementById('correct-upsets').textContent = correctUpsets;
+            document.getElementById('wrong-upsets').textContent = wrongUpsets;
+            document.getElementById('pending-upsets').textContent = pendingUpsets;
+        }
+
+        function renderBrackets() {
+            const container = document.getElementById('brackets-container');
+
+            const filteredBrackets = bracketUpsets.filter(b => {
+                if (currentFilter === 'all') return true;
+                return b.upsets.some(u => u.status === currentFilter);
+            });
+
+            if (filteredBrackets.length === 0) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <div class="no-data-icon">🔥</div>
+                        <p>No upset picks found${currentFilter !== 'all' ? ' with this filter' : ''}.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filteredBrackets.map(b => {
+                const filteredUpsets = currentFilter === 'all'
+                    ? b.upsets
+                    : b.upsets.filter(u => u.status === currentFilter);
+
+                return `
+                    <div class="bracket-card">
+                        <div class="bracket-header" onclick="window.location.href='nerdmadness-bracket-canvas.html?bracketId=${b.bracket.id}'">
+                            <div class="bracket-info">
+                                <div class="bracket-name">${b.bracket.bracketName || 'Unnamed Bracket'}</div>
+                                <div class="bracket-user">${b.userName}</div>
+                            </div>
+                            <div class="bracket-stats">
+                                <div class="bracket-stat">
+                                    <div class="bracket-stat-value correct">${b.correctCount}</div>
+                                    <div class="bracket-stat-label">Correct</div>
+                                </div>
+                                <div class="bracket-stat">
+                                    <div class="bracket-stat-value wrong">${b.wrongCount}</div>
+                                    <div class="bracket-stat-label">Wrong</div>
+                                </div>
+                                <div class="bracket-stat">
+                                    <div class="bracket-stat-value pending">${b.pendingCount}</div>
+                                    <div class="bracket-stat-label">Pending</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="upset-list">
+                            ${filteredUpsets.map(u => renderUpsetItem(u)).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderUpsetItem(upset) {
+            const icon = upset.status === 'correct' ? '✅' : (upset.status === 'wrong' ? '❌' : '🔥');
+            const pickedName = upset.pickedTeam?.team_name || 'Unknown';
+            const opponentName = upset.opponentTeam?.team_name || 'Unknown';
+
+            let pointsHtml = '';
+            let statusText = '';
+            if (upset.status === 'correct') {
+                pointsHtml = `<div class="upset-points earned">+${upset.points}</div>`;
+                statusText = 'Nailed it!';
+            } else if (upset.status === 'wrong') {
+                pointsHtml = `<div class="upset-points lost">0</div>`;
+                statusText = 'Busted';
+            } else {
+                pointsHtml = `<div class="upset-points potential">(${upset.points})</div>`;
+                statusText = 'Waiting...';
+            }
+
+            return `
+                <div class="upset-item ${upset.status}">
+                    <div class="upset-icon">${icon}</div>
+                    <div class="upset-details">
+                        <div class="upset-matchup">
+                            <span class="seed">#${upset.pickedSeed}</span> ${pickedName}
+                            <span class="vs">over</span>
+                            <span class="seed">#${upset.opponentSeed}</span> ${opponentName}
+                        </div>
+                        <div class="upset-round">${upset.roundName} • ${upset.region || 'Final Four'}</div>
+                    </div>
+                    <div class="upset-result">
+                        ${pointsHtml}
+                        <div class="upset-status">${statusText}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                renderBrackets();
+            });
+        });
+
+        async function init() {
+            try {
+                await loadMatchupsAndTeams();
+                await loadAllBrackets();
+                analyzeUpsets();
+                renderBrackets();
+            } catch (e) {
+                console.error('🔥 UPSET_TRACKER', 'Error:', e);
+                document.getElementById('brackets-container').innerHTML = `
+                    <div class="no-data">
+                        <div class="no-data-icon">⚠️</div>
+                        <p>Error loading upset data. Please try again.</p>
+                    </div>
+                `;
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
