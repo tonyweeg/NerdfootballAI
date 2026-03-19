@@ -5,7 +5,7 @@ const fetch = require('node-fetch');
 
 const db = admin.firestore();
 const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
-const ESPN_API = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard';
+const ESPN_API = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?groups=100';
 
 /**
  * Fetches NCAA Tournament results from ESPN and updates Firestore matchups
@@ -26,14 +26,10 @@ async function fetchAndUpdateResults() {
 
         console.log(`🏀 ESPN returned ${events.length} games`);
 
-        // Filter for NCAA tournament games that are FINAL
+        // Filter for games that are FINAL (groups=100 already filters for NCAA tournament)
         const tournamentGames = events.filter(event => {
-            const notes = event.notes || [];
-            const isTournament = notes.some(n =>
-                n.headline && n.headline.includes('NCAA Men\'s Basketball Championship')
-            );
             const isFinal = event.status?.type?.name === 'STATUS_FINAL';
-            return isTournament && isFinal;
+            return isFinal;
         });
 
         console.log(`🏀 Found ${tournamentGames.length} completed tournament games`);
