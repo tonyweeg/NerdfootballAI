@@ -487,6 +487,34 @@
             color: var(--accent-red);
             text-align: center;
         }
+
+        .admin-btn {
+            background: linear-gradient(135deg, var(--accent-orange), #ea580c);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .admin-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
+        }
+
+        .admin-section {
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -517,10 +545,10 @@
                 <div class="feature-icon">🔥</div>
                 <div class="feature-title">Upset Tracker</div>
             </div>
-            <div class="feature">
+            <a href="nerdmadness-leaderboard.html" class="feature" style="text-decoration: none; color: inherit;">
                 <div class="feature-icon">🏆</div>
                 <div class="feature-title">Leaderboard</div>
-            </div>
+            </a>
         </div>
 
         <div class="deadline">
@@ -545,6 +573,12 @@
             </div>
         </div>
 
+        <div class="admin-section" id="admin-section">
+            <a href="nerdmadness-admin.html" class="admin-btn">
+                <span>⚙️</span> Admin Dashboard
+            </a>
+        </div>
+
         <div class="footer">
             Part of the <a href="nerd-universe.html">NerdFootball Universe</a>
         </div>
@@ -558,6 +592,10 @@
 
         const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
         const LOCK_TIME_FALLBACK = new Date('2026-03-19T12:00:00-05:00');
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2',
+            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'
+        ];
 
         let settings = {};
 
@@ -692,6 +730,7 @@
         auth.onAuthStateChanged(async (user) => {
             const authEl = document.getElementById('auth-section');
             const bracketsSection = document.getElementById('brackets-section');
+            const adminSection = document.getElementById('admin-section');
 
             if (user) {
                 authEl.innerHTML = `
@@ -702,6 +741,14 @@
                 `;
                 bracketsSection.style.display = 'block';
 
+                // Show admin button for admin users
+                if (ADMIN_UIDS.includes(user.uid)) {
+                    adminSection.style.display = 'block';
+                    console.log('🏀 ADMIN', 'Admin access granted for', user.displayName || user.email);
+                } else {
+                    adminSection.style.display = 'none';
+                }
+
                 await loadSettings();
                 await loadUserBrackets(user.uid);
             } else {
@@ -709,6 +756,7 @@
                     <button class="sign-in-btn" onclick="signIn()">Sign In with Google</button>
                 `;
                 bracketsSection.style.display = 'none';
+                adminSection.style.display = 'none';
             }
         });
     </script>

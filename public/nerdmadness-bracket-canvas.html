@@ -1202,6 +1202,8 @@
 
         <div class="stat">Pts: <strong id="points-earned">0</strong></div>
         <div class="stat champ">🏆 <strong id="champion-pick">---</strong></div>
+        <div class="stat-divider"></div>
+        <div class="stat" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">📝 <strong id="bracket-name-display" style="color: var(--accent-blue);">Unnamed</strong></div>
     </div>
     <button class="save-btn-fixed" id="save-btn" style="display:none;" onclick="app.savePicks()">💾 Save</button>
 
@@ -1249,7 +1251,8 @@
         <div class="footer-divider"></div>
 
         <div class="footer-group">
-            <button class="footer-save-btn" id="footer-save-btn" onclick="app.savePicks()">💾 Save</button>
+            <button class="footer-save-btn" id="footer-save-btn" onclick="openSaveModal()">💾 Save</button>
+            <button class="footer-save-btn" id="footer-delete-btn" onclick="confirmDeleteBracket()" style="background: var(--accent-red); display: none;">🗑️ Delete</button>
         </div>
     </div>
 
@@ -1270,12 +1273,12 @@
     <!-- Bracket Naming Modal -->
     <div class="naming-modal-overlay" id="naming-modal" style="display: none;">
         <div class="naming-modal">
-            <h2>🏀 Name Your Bracket</h2>
-            <p>Your bracket is complete! Give it a name to finalize.</p>
+            <h2>🏀 Save Your Bracket</h2>
+            <p id="naming-modal-message">Name your bracket to save your picks.</p>
             <input type="text" id="bracket-name-input" placeholder="e.g., Tony's Upset Special" maxlength="50">
             <div class="naming-modal-actions">
-                <button class="naming-btn secondary" onclick="closeNamingModal()">Save Without Name</button>
-                <button class="naming-btn primary" onclick="saveBracketName()">Save & Finalize</button>
+                <button class="naming-btn secondary" onclick="closeNamingModal()">Cancel</button>
+                <button class="naming-btn primary" onclick="saveBracketWithName()">💾 Save Bracket</button>
             </div>
         </div>
     </div>
@@ -1319,26 +1322,36 @@
         return now >= LOCK_TIME_FALLBACK;
     }
 
-    // Naming Modal Functions
-    function showNamingModal(existingName = '') {
+    // Save Modal Functions
+    function openSaveModal() {
+        if (!app) return;
+
         const modal = document.getElementById('naming-modal');
         const input = document.getElementById('bracket-name-input');
-        input.value = existingName || '';
+        const messageEl = document.getElementById('naming-modal-message');
+
+        // Pre-fill with existing bracket name
+        input.value = app.bracketName || '';
+
+        // Update message based on pick count
+        const pickCount = Object.keys(app.picks).length;
+        if (pickCount === 63) {
+            messageEl.textContent = 'Your bracket is complete! Name it to save.';
+        } else {
+            messageEl.textContent = `You have ${pickCount}/63 picks. Name your bracket to save progress.`;
+        }
+
         modal.style.display = 'flex';
         input.focus();
-        console.log('🏀 BRACKET_SAVE', 'Showing naming modal');
+        console.log('🏀 BRACKET_SAVE', 'Showing save modal, picks:', pickCount);
     }
 
     function closeNamingModal() {
         const modal = document.getElementById('naming-modal');
         modal.style.display = 'none';
-        // Save without a name
-        if (app) {
-            app.savePicks();
-        }
     }
 
-    async function saveBracketName() {
+    async function saveBracketWithName() {
         const input = document.getElementById('bracket-name-input');
         const name = input.value.trim();
 
@@ -1349,11 +1362,51 @@
 
         if (app) {
             app.bracketName = name;
-            await app.finalizeBracket();
+            app.updateBracketNameDisplay();
+            await app.savePicks();
         }
 
         const modal = document.getElementById('naming-modal');
         modal.style.display = 'none';
+    }
+
+    // Legacy function for compatibility
+    function showNamingModal(existingName = '') {
+        if (app) app.bracketName = existingName;
+        openSaveModal();
+    }
+
+    // Delete Bracket Functions
+    function confirmDeleteBracket() {
+        if (!app || !app.currentBracketId) {
+            showToast('No bracket to delete', true);
+            return;
+        }
+
+        const bracketName = app.bracketName || 'this bracket';
+        const confirmed = confirm(`Are you sure you want to delete "${bracketName}"?\n\nThis action cannot be undone.`);
+
+        if (confirmed) {
+            deleteBracket();
+        }
+    }
+
+    async function deleteBracket() {
+        if (!app || !app.currentBracketId) return;
+
+        try {
+            const bracketRef = db.doc(`${BASE}/brackets/${app.currentBracketId}`);
+            await bracketRef.delete();
+
+            console.log('🏀 BRACKET_DELETE', 'Deleted bracket:', app.currentBracketId);
+            showToast('Bracket deleted successfully');
+
+            // Redirect to main NerdMadness page
+            window.location.href = 'nerdmadness.html';
+        } catch (error) {
+            console.error('🏀 BRACKET_DELETE', 'Error deleting bracket:', error);
+            showToast('Error deleting bracket: ' + error.message, true);
+        }
     }
 
     // Bracket Switcher Functions
@@ -1575,12 +1628,14 @@
         }
 
         async loadTournamentData() {
+            // Force server fetch to bypass IndexedDB cache
+            const serverOptions = { source: 'server' };
             const [teamsSnap, matchupsSnap, roundsSnap, regionsSnap, settingsSnap] = await Promise.all([
-                db.collection(`${BASE}/teams`).get(),
-                db.collection(`${BASE}/matchups`).get(),
-                db.collection(`${BASE}/rounds`).get(),
-                db.collection(`${BASE}/regions`).get(),
-                db.doc(`${BASE}/metadata/settings`).get()
+                db.collection(`${BASE}/teams`).get(serverOptions),
+                db.collection(`${BASE}/matchups`).get(serverOptions),
+                db.collection(`${BASE}/rounds`).get(serverOptions),
+                db.collection(`${BASE}/regions`).get(serverOptions),
+                db.doc(`${BASE}/metadata/settings`).get(serverOptions)
             ]);
 
             teamsSnap.forEach(doc => { this.teams[doc.id] = doc.data(); });
@@ -1588,6 +1643,11 @@
             roundsSnap.forEach(doc => { this.rounds[doc.id] = doc.data(); });
             regionsSnap.forEach(doc => { this.regions[doc.id] = doc.data(); });
             if (settingsSnap.exists) this.settings = settingsSnap.data();
+
+            // DEBUG: Log team data to verify correct data is loaded
+            console.log('🏀 DEBUG_TEAMS', 'Total teams loaded:', Object.keys(this.teams).length);
+            console.log('🏀 DEBUG_TEAMS', 'All team IDs:', Object.keys(this.teams));
+            console.log('🏀 DEBUG_TEAMS', 'First 3 teams:', Object.entries(this.teams).slice(0, 3).map(([id, t]) => ({ id, name: t.team_name, region: t.region_id })));
         }
 
         buildFeedersMap() {
@@ -1618,6 +1678,8 @@
                         higher: data.tiebreakerHigherScore || null,
                         lower: data.tiebreakerLowerScore || null
                     };
+                    this.updateBracketNameDisplay();
+                    this.showDeleteButton(true);
                     console.log('🏀 BRACKET_LOAD', 'Loaded bracket:', this.currentBracketId, 'Name:', this.bracketName);
                 } else {
                     console.warn('🏀 BRACKET_LOAD', 'Bracket not found:', this.currentBracketId);
@@ -1920,17 +1982,12 @@
                 bracketData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
                 bracketData.submittedAt = null;
                 await bracketRef.set(bracketData);
+                this.showDeleteButton(true);
                 console.log('🏀 BRACKET_CREATE', 'Created new bracket:', this.currentBracketId);
             }
 
             this.hasUnsavedChanges = false;
-            showToast(`Bracket saved! (${pickCount}/63 picks)`);
-
-            // If bracket is complete and not yet named, prompt for name
-            if (isComplete && !this.bracketName && !this.hasShownNamingPrompt) {
-                this.hasShownNamingPrompt = true;
-                showNamingModal();
-            }
+            showToast(`Bracket "${this.bracketName}" saved! (${pickCount}/63 picks)`);
         }
 
         async finalizeBracket() {
@@ -2020,26 +2077,28 @@
             const REGION_HEIGHT = BASE_SPACING * 8;
             const HALF_HEIGHT = REGION_HEIGHT + 80;
 
+            // Official NCAA bracket layout:
+            // Top-Left: EAST, Bottom-Left: SOUTH, Top-Right: WEST, Bottom-Right: MIDWEST
             const regionConfig = {
-                south: {
+                east: {
                     startX: MARGIN,
                     startY: MARGIN + 40,
                     direction: 1,
                     flowsRight: true
                 },
-                west: {
+                south: {
                     startX: MARGIN,
                     startY: CENTER_Y + 40,
                     direction: 1,
                     flowsRight: true
                 },
-                midwest: {
+                west: {
                     startX: CANVAS_WIDTH - MARGIN - MATCHUP_WIDTH,
                     startY: MARGIN + 40,
                     direction: -1,
                     flowsRight: false
                 },
-                east: {
+                midwest: {
                     startX: CANVAS_WIDTH - MARGIN - MATCHUP_WIDTH,
                     startY: CENTER_Y + 40,
                     direction: -1,
@@ -2077,6 +2136,15 @@
                 .filter(m => m.round_id === 'final_four')
                 .sort((a, b) => a.bracket_position - b.bracket_position);
 
+            console.log('🏀 FF_DEBUG: Total matchups loaded:', Object.keys(this.matchups).length);
+            console.log('🏀 FF_DEBUG: R5_G01 exists?', !!this.matchups['R5_G01'], this.matchups['R5_G01']);
+            console.log('🏀 FF_DEBUG: R5_G02 exists?', !!this.matchups['R5_G02'], this.matchups['R5_G02']);
+            console.log('🏀 FF_DEBUG: R6_G01 exists?', !!this.matchups['R6_G01'], this.matchups['R6_G01']);
+            console.log('🏀 FF_DEBUG: ffGames found:', ffGames.length, ffGames.map(g => g.matchup_id));
+            console.log('🏀 FF_DEBUG: feeders for R5_G01:', this.feeders['R5_G01']);
+            console.log('🏀 FF_DEBUG: feeders for R5_G02:', this.feeders['R5_G02']);
+            console.log('🏀 FF_DEBUG: feeders for R6_G01:', this.feeders['R6_G01']);
+
             // Final Four games are 150px wide, Championship is 360px wide (4x normal)
             const FF_WIDTH = 150;
             const CHAMP_WIDTH = 360;
@@ -2085,11 +2153,13 @@
             const ffX = CENTER_X - (FF_WIDTH / 2);
             const champX = CENTER_X - (CHAMP_WIDTH / 2);
 
-            const southE8 = this.matchupPositions[this.getMatchupsForRegionRound('south', 'elite_eight')[0]?.matchup_id];
-            const westE8 = this.matchupPositions[this.getMatchupsForRegionRound('west', 'elite_eight')[0]?.matchup_id];
+            // FF1: EAST vs SOUTH - position in upper-center
+            // FF2: WEST vs MIDWEST - position in lower-center
+            // Fixed positions to avoid overlap issues
+            const ff1Y = MARGIN + 180;  // Upper center area
+            const ff2Y = CENTER_Y + 180; // Lower center area
 
-            const ff1Y = southE8 ? southE8.y : MARGIN + REGION_HEIGHT / 2;
-            const ff2Y = westE8 ? westE8.y : CENTER_Y + REGION_HEIGHT / 2;
+            console.log('🏀 FF_DEBUG: ff1Y:', ff1Y, 'ff2Y:', ff2Y, 'ffX:', ffX, 'CENTER_Y:', CENTER_Y);
 
             if (ffGames[0]) {
                 this.matchupPositions[ffGames[0].matchup_id] = {
@@ -2098,6 +2168,9 @@
                     roundIdx: 4,
                     region: 'final_four'
                 };
+                console.log('🏀 FF_DEBUG: Set position for', ffGames[0].matchup_id, 'at', ffX, ff1Y);
+            } else {
+                console.log('🏀 FF_DEBUG: ffGames[0] is undefined!');
             }
             if (ffGames[1]) {
                 this.matchupPositions[ffGames[1].matchup_id] = {
@@ -2106,6 +2179,9 @@
                     roundIdx: 4,
                     region: 'final_four'
                 };
+                console.log('🏀 FF_DEBUG: Set position for', ffGames[1].matchup_id, 'at', ffX, ff2Y);
+            } else {
+                console.log('🏀 FF_DEBUG: ffGames[1] is undefined!');
             }
 
             const champY = (ff1Y + ff2Y + MATCHUP_HEIGHT) / 2 - CHAMP_HEIGHT / 2;
@@ -2131,11 +2207,12 @@
             const CENTER_Y = CANVAS_HEIGHT / 2;
             const MARGIN = 50;
 
+            // Region labels matching official bracket layout
             const regionLabels = {
-                south: { x: MARGIN, y: MARGIN + 10 },
-                west: { x: MARGIN, y: CENTER_Y + 10 },
-                midwest: { x: CANVAS_WIDTH - MARGIN - 120, y: MARGIN + 10 },
-                east: { x: CANVAS_WIDTH - MARGIN - 60, y: CENTER_Y + 10 }
+                east: { x: MARGIN, y: MARGIN + 10 },
+                south: { x: MARGIN, y: CENTER_Y + 10 },
+                west: { x: CANVAS_WIDTH - MARGIN - 80, y: MARGIN + 10 },
+                midwest: { x: CANVAS_WIDTH - MARGIN - 120, y: CENTER_Y + 10 }
             };
 
             for (const [regionId, pos] of Object.entries(regionLabels)) {
@@ -2178,9 +2255,15 @@
                 canvas.appendChild(champLabel);
             }
 
+            let ffRendered = 0;
             for (const [matchupId, pos] of Object.entries(this.matchupPositions)) {
                 const m = this.matchups[matchupId];
                 if (!m) continue;
+
+                if (m.round_id === 'final_four' || m.round_id === 'championship') {
+                    console.log('🏀 RENDER_DEBUG:', matchupId, 'round:', m.round_id, 'pos:', pos.x, pos.y);
+                    ffRendered++;
+                }
 
                 const el = this.createMatchupElement(m);
                 el.style.left = pos.x + 'px';
@@ -2188,6 +2271,7 @@
                 canvas.appendChild(el);
                 this.matchupElements[matchupId] = el;
             }
+            console.log('🏀 RENDER_DEBUG: Total FF/Champ rendered:', ffRendered);
         }
 
         createMatchupElement(m) {
@@ -2338,7 +2422,11 @@
                 return slot === 'top' ? m.top_team_id : m.bottom_team_id;
             }
             const feederId = this.feeders[matchupId]?.[slot];
-            return feederId ? (this.picks[feederId] || null) : null;
+            const result = feederId ? (this.picks[feederId] || null) : null;
+            if (matchupId.startsWith('R5') || matchupId.startsWith('R6')) {
+                console.log('🏀 SLOT_DEBUG:', matchupId, slot, '-> feeder:', feederId, '-> pick:', this.picks[feederId], '-> result:', result);
+            }
+            return result;
         }
 
         getSeedForSlot(matchupId, slot) {
@@ -2405,12 +2493,49 @@
             const topTeamId = this.getTeamForSlot(matchupId, 'top');
             const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
             const picked = this.picks[matchupId];
+            const isChampionship = m.round_id === 'championship' || matchupId === 'R6_G01';
 
-            el.className = 'matchup' + (picked ? ' decided' : '');
-            el.innerHTML = `
+            el.className = 'matchup' + (picked ? ' decided' : '') + (isChampionship ? ' championship-game' : '') + (m.round_id === 'final_four' ? ' final-four-game' : '');
+
+            let html = `
                 ${this.renderTeamRow(matchupId, topTeamId, 'top', picked)}
                 ${this.renderTeamRow(matchupId, bottomTeamId, 'bottom', picked)}
             `;
+
+            if (isChampionship) {
+                const topTeam = topTeamId ? this.teams[topTeamId] : null;
+                const bottomTeam = bottomTeamId ? this.teams[bottomTeamId] : null;
+                const topName = topTeam?.team_name || 'Team 1';
+                const bottomName = bottomTeam?.team_name || 'Team 2';
+                const topScore = this.tiebreakerScores?.higher || '';
+                const bottomScore = this.tiebreakerScores?.lower || '';
+                const total = (topScore && bottomScore) ? (parseInt(topScore) + parseInt(bottomScore)) : '---';
+
+                html += `
+                    <div class="tiebreaker-section">
+                        <div class="tiebreaker-label">🎯 Tiebreaker: Predict Final Score</div>
+                        <div class="tiebreaker-inputs">
+                            <div class="tiebreaker-team">
+                                <span class="tiebreaker-team-name">${topName}</span>
+                                <input type="number" class="tiebreaker-input" id="tiebreaker-higher"
+                                    placeholder="0" min="0" max="200" value="${topScore}"
+                                    onchange="app.updateTiebreaker()" onclick="event.stopPropagation()">
+                            </div>
+                            <span class="tiebreaker-plus">+</span>
+                            <div class="tiebreaker-team">
+                                <span class="tiebreaker-team-name">${bottomName}</span>
+                                <input type="number" class="tiebreaker-input" id="tiebreaker-lower"
+                                    placeholder="0" min="0" max="200" value="${bottomScore}"
+                                    onchange="app.updateTiebreaker()" onclick="event.stopPropagation()">
+                            </div>
+                            <span class="tiebreaker-equals">=</span>
+                            <div class="tiebreaker-total" id="tiebreaker-total">${total}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            el.innerHTML = html;
         }
 
         advanceToNextPick(currentMatchupId) {
@@ -2465,8 +2590,8 @@
             svg.setAttribute('width', CANVAS_WIDTH);
             svg.setAttribute('height', CANVAS_HEIGHT);
 
-            const leftRegions = ['south', 'west'];
-            const rightRegions = ['midwest', 'east'];
+            const leftRegions = ['east', 'south'];
+            const rightRegions = ['west', 'midwest'];
 
             for (const [matchupId, m] of Object.entries(this.matchups)) {
                 if (!m.next_matchup_id) continue;
@@ -2898,6 +3023,20 @@
                 chanceEl.classList.add('medium');
             } else {
                 chanceEl.classList.add('low');
+            }
+        }
+
+        updateBracketNameDisplay() {
+            const nameEl = document.getElementById('bracket-name-display');
+            if (nameEl) {
+                nameEl.textContent = this.bracketName || 'Unnamed';
+            }
+        }
+
+        showDeleteButton(show) {
+            const deleteBtn = document.getElementById('footer-delete-btn');
+            if (deleteBtn) {
+                deleteBtn.style.display = show ? 'inline-flex' : 'none';
             }
         }
 
