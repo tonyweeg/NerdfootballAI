@@ -340,4 +340,75 @@ If session ends, resume by:
 
 ---
 
+## 11. Scoring System
+
+### 11.1 Formula
+**Points = Round Multiplier × Seed of Winner**
+
+### 11.2 Round Multipliers
+| Round | Multiplier |
+|-------|------------|
+| Round of 64 | 1× |
+| Round of 32 | 2× |
+| Sweet 16 | 4× |
+| Elite 8 | 8× |
+| Final Four | 16× |
+| Championship | 32× |
+
+### 11.3 Complete Scoring Matrix
+| Seed | Rd 64 (1×) | Rd 32 (2×) | Sweet 16 (4×) | Elite 8 (8×) | Final 4 (16×) | Champ (32×) | Max Total |
+|------|------------|------------|---------------|--------------|---------------|-------------|-----------|
+| 1 | 1 | 2 | 4 | 8 | 16 | 32 | **63** |
+| 2 | 2 | 4 | 8 | 16 | 32 | 64 | **126** |
+| 3 | 3 | 6 | 12 | 24 | 48 | 96 | **189** |
+| 4 | 4 | 8 | 16 | 32 | 64 | 128 | **252** |
+| 5 | 5 | 10 | 20 | 40 | 80 | 160 | **315** |
+| 6 | 6 | 12 | 24 | 48 | 96 | 192 | **378** |
+| 7 | 7 | 14 | 28 | 56 | 112 | 224 | **441** |
+| 8 | 8 | 16 | 32 | 64 | 128 | 256 | **504** |
+| 9 | 9 | 18 | 36 | 72 | 144 | 288 | **567** |
+| 10 | 10 | 20 | 40 | 80 | 160 | 320 | **630** |
+| 11 | 11 | 22 | 44 | 88 | 176 | 352 | **693** |
+| 12 | 12 | 24 | 48 | 96 | 192 | 384 | **756** |
+| 13 | 13 | 26 | 52 | 104 | 208 | 416 | **819** |
+| 14 | 14 | 28 | 56 | 112 | 224 | 448 | **882** |
+| 15 | 15 | 30 | 60 | 120 | 240 | 480 | **945** |
+| 16 | 16 | 32 | 64 | 128 | 256 | 512 | **1008** |
+
+### 11.4 Scoring Logic Implementation
+```javascript
+const ROUND_MULTIPLIERS = {
+    'round_of_64': 1,
+    'round_of_32': 2,
+    'sweet_16': 4,
+    'elite_8': 8,
+    'final_four': 16,
+    'championship': 32
+};
+
+function calculatePoints(winnerSeed, roundName) {
+    const multiplier = ROUND_MULTIPLIERS[roundName] || 0;
+    return multiplier * winnerSeed;
+}
+
+function calculateBracketScore(bracket, actualResults) {
+    let totalScore = 0;
+    for (const [gameId, pick] of Object.entries(bracket.picks)) {
+        const actualWinner = actualResults[gameId];
+        if (pick.winner === actualWinner?.winner) {
+            totalScore += calculatePoints(actualWinner.seed, actualWinner.round);
+        }
+    }
+    return totalScore;
+}
+```
+
+### 11.5 Key Scoring Insights
+- **Rewards upsets**: Picking a 12-seed over a 5-seed = 12 pts vs 5 pts
+- **Late-round value**: Championship game worth 32× the seed
+- **Max possible** (16-seed wins all 6 games): 1,008 pts
+- **Chalk bracket** (all 1-seeds win): 63 pts per region × 4 = 252 pts max
+
+---
+
 **Status**: Ready for approval before implementation

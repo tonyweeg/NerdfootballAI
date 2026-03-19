@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness 2026 - Leaderboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-100: #f1f5f9;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-gold: #eab308;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --glass-bg: rgba(30, 41, 59, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            color: var(--slate-100);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding: 80px 20px 40px 20px;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            height: 32px;
+            width: auto;
+        }
+
+        .header-title {
+            font-size: 16px;
+            color: var(--slate-100);
+            letter-spacing: 2px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .header-title span { color: var(--accent-gold); }
+
+        .header-link {
+            font-size: 12px;
+            color: var(--slate-400);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .header-link:hover {
+            color: var(--accent-blue);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .page-title {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .page-title h1 {
+            font-size: 36px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .page-title p {
+            color: var(--slate-400);
+            font-size: 14px;
+        }
+
+        .scoring-info {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .scoring-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .scoring-formula {
+            font-size: 16px;
+            color: var(--slate-100);
+            margin-bottom: 16px;
+            text-align: center;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+
+        .scoring-formula code {
+            color: var(--accent-green);
+            font-weight: 700;
+        }
+
+        .multipliers-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            text-align: center;
+        }
+
+        .multiplier-item {
+            background: rgba(0,0,0,0.2);
+            padding: 10px 8px;
+            border-radius: 8px;
+        }
+
+        .multiplier-round {
+            font-size: 10px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .multiplier-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--accent-blue);
+        }
+
+        .leaderboard-table {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 60px 1fr 120px 100px 100px;
+            padding: 16px 20px;
+            background: rgba(0,0,0,0.3);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--slate-400);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 60px 1fr 120px 100px 100px;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--glass-border);
+            transition: background 0.2s;
+        }
+
+        .table-row:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .rank {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--slate-300);
+        }
+
+        .rank.gold { color: #ffd700; }
+        .rank.silver { color: #c0c0c0; }
+        .rank.bronze { color: #cd7f32; }
+
+        .bracket-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .bracket-name {
+            font-weight: 600;
+            color: var(--slate-100);
+        }
+
+        .bracket-user {
+            font-size: 12px;
+            color: var(--slate-400);
+        }
+
+        .score {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--accent-green);
+        }
+
+        .correct-picks {
+            font-size: 14px;
+            color: var(--slate-300);
+        }
+
+        .possible-pts {
+            font-size: 14px;
+            color: var(--slate-400);
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--slate-400);
+        }
+
+        .no-data-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--slate-400);
+        }
+
+        .round-filter {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .round-btn {
+            background: var(--slate-700);
+            color: var(--slate-300);
+            border: 1px solid var(--slate-600);
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: all 0.2s;
+        }
+
+        .round-btn:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .round-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .toggle-matrix-btn {
+            display: block;
+            margin: 20px auto 0;
+            background: var(--slate-700);
+            color: var(--slate-100);
+            border: 1px solid var(--slate-600);
+            padding: 12px 24px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 25px;
+            transition: all 0.2s;
+        }
+
+        .toggle-matrix-btn:hover {
+            background: var(--slate-600);
+            border-color: var(--accent-blue);
+        }
+
+        .scoring-matrix {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-bottom: 24px;
+        }
+
+        .matrix-table th {
+            background: rgba(0,0,0,0.3);
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--slate-300);
+            border-bottom: 2px solid var(--accent-blue);
+        }
+
+        .matrix-table th .th-mult {
+            display: block;
+            color: var(--accent-blue);
+            font-size: 10px;
+        }
+
+        .matrix-table td {
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--slate-300);
+        }
+
+        .matrix-table .seed-cell {
+            font-weight: 700;
+            color: var(--slate-100);
+            background: rgba(0,0,0,0.2);
+        }
+
+        .matrix-table .total-cell {
+            font-weight: 800;
+            color: var(--accent-gold);
+            background: rgba(234, 179, 8, 0.1);
+        }
+
+        .matrix-table .highlight-row td {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .matrix-table .cinderella td {
+            background: rgba(249, 115, 22, 0.15);
+        }
+
+        .matrix-table .cinderella .total-cell {
+            color: var(--accent-orange);
+            background: rgba(249, 115, 22, 0.25);
+        }
+
+        .examples-section {
+            margin-top: 20px;
+        }
+
+        .example-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .example-card {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 16px 12px;
+            text-align: center;
+            border: 1px solid var(--glass-border);
+        }
+
+        .example-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .example-scenario {
+            font-size: 12px;
+            color: var(--slate-300);
+            margin-bottom: 8px;
+        }
+
+        .example-calc {
+            font-size: 14px;
+            color: var(--slate-400);
+        }
+
+        .example-calc strong {
+            color: var(--slate-100);
+            font-size: 16px;
+        }
+
+        .example-card.boring .example-label { color: var(--slate-400); }
+        .example-card.nice .example-label { color: var(--accent-green); }
+        .example-card.nice { border-color: rgba(34, 197, 94, 0.3); }
+        .example-card.hot .example-label { color: var(--accent-gold); }
+        .example-card.hot { border-color: rgba(234, 179, 8, 0.3); }
+        .example-card.legendary .example-label { color: var(--accent-orange); }
+        .example-card.legendary { border-color: rgba(249, 115, 22, 0.4); background: rgba(249, 115, 22, 0.1); }
+
+        @media (max-width: 768px) {
+            .table-header,
+            .table-row {
+                grid-template-columns: 50px 1fr 80px;
+            }
+            .table-header > *:nth-child(4),
+            .table-header > *:nth-child(5),
+            .table-row > *:nth-child(4),
+            .table-row > *:nth-child(5) {
+                display: none;
+            }
+            .multipliers-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .examples-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .matrix-table {
+                font-size: 11px;
+            }
+            .matrix-table th, .matrix-table td {
+                padding: 6px 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-brand">
+            <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdMadness" class="header-logo">
+            <span class="header-title"><span>NERD</span>MADNESS</span>
+        </div>
+        <a href="nerdmadness.html" class="header-link">← Back to Brackets</a>
+    </div>
+
+    <div class="container">
+        <div class="page-title">
+            <h1>🏆 Leaderboard</h1>
+            <p>NerdMadness 2026 Standings</p>
+        </div>
+
+        <div class="scoring-info">
+            <div class="scoring-title">How Scoring Works</div>
+            <div class="scoring-formula">
+                <code>Points = Round Multiplier × Seed of Winner</code>
+            </div>
+            <p style="text-align: center; color: var(--slate-300); margin-bottom: 16px; font-size: 14px;">
+                Pick upsets to score big! Higher seeds = more points. Later rounds = bigger multipliers.
+            </p>
+            <div class="multipliers-grid">
+                <div class="multiplier-item">
+                    <div class="multiplier-round">Rd 64</div>
+                    <div class="multiplier-value">1×</div>
+                </div>
+                <div class="multiplier-item">
+                    <div class="multiplier-round">Rd 32</div>
+                    <div class="multiplier-value">2×</div>
+                </div>
+                <div class="multiplier-item">
+                    <div class="multiplier-round">Sweet 16</div>
+                    <div class="multiplier-value">4×</div>
+                </div>
+                <div class="multiplier-item">
+                    <div class="multiplier-round">Elite 8</div>
+                    <div class="multiplier-value">8×</div>
+                </div>
+                <div class="multiplier-item">
+                    <div class="multiplier-round">Final 4</div>
+                    <div class="multiplier-value">16×</div>
+                </div>
+                <div class="multiplier-item">
+                    <div class="multiplier-round">Champ</div>
+                    <div class="multiplier-value">32×</div>
+                </div>
+            </div>
+
+            <button class="toggle-matrix-btn" id="toggle-matrix-btn" onclick="toggleMatrix()">
+                📊 Show Full Scoring Matrix
+            </button>
+
+            <div class="scoring-matrix" id="scoring-matrix" style="display: none;">
+                <table class="matrix-table">
+                    <thead>
+                        <tr>
+                            <th>Seed</th>
+                            <th>Rd 64<br><span class="th-mult">1×</span></th>
+                            <th>Rd 32<br><span class="th-mult">2×</span></th>
+                            <th>Sweet 16<br><span class="th-mult">4×</span></th>
+                            <th>Elite 8<br><span class="th-mult">8×</span></th>
+                            <th>Final 4<br><span class="th-mult">16×</span></th>
+                            <th>Champ<br><span class="th-mult">32×</span></th>
+                            <th>Max Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td class="seed-cell">1</td><td>1</td><td>2</td><td>4</td><td>8</td><td>16</td><td>32</td><td class="total-cell">63</td></tr>
+                        <tr><td class="seed-cell">2</td><td>2</td><td>4</td><td>8</td><td>16</td><td>32</td><td>64</td><td class="total-cell">126</td></tr>
+                        <tr><td class="seed-cell">3</td><td>3</td><td>6</td><td>12</td><td>24</td><td>48</td><td>96</td><td class="total-cell">189</td></tr>
+                        <tr><td class="seed-cell">4</td><td>4</td><td>8</td><td>16</td><td>32</td><td>64</td><td>128</td><td class="total-cell">252</td></tr>
+                        <tr><td class="seed-cell">5</td><td>5</td><td>10</td><td>20</td><td>40</td><td>80</td><td>160</td><td class="total-cell">315</td></tr>
+                        <tr><td class="seed-cell">6</td><td>6</td><td>12</td><td>24</td><td>48</td><td>96</td><td>192</td><td class="total-cell">378</td></tr>
+                        <tr><td class="seed-cell">7</td><td>7</td><td>14</td><td>28</td><td>56</td><td>112</td><td>224</td><td class="total-cell">441</td></tr>
+                        <tr class="highlight-row"><td class="seed-cell">8</td><td>8</td><td>16</td><td>32</td><td>64</td><td>128</td><td>256</td><td class="total-cell">504</td></tr>
+                        <tr><td class="seed-cell">9</td><td>9</td><td>18</td><td>36</td><td>72</td><td>144</td><td>288</td><td class="total-cell">567</td></tr>
+                        <tr><td class="seed-cell">10</td><td>10</td><td>20</td><td>40</td><td>80</td><td>160</td><td>320</td><td class="total-cell">630</td></tr>
+                        <tr><td class="seed-cell">11</td><td>11</td><td>22</td><td>44</td><td>88</td><td>176</td><td>352</td><td class="total-cell">693</td></tr>
+                        <tr class="highlight-row"><td class="seed-cell">12</td><td>12</td><td>24</td><td>48</td><td>96</td><td>192</td><td>384</td><td class="total-cell">756</td></tr>
+                        <tr><td class="seed-cell">13</td><td>13</td><td>26</td><td>52</td><td>104</td><td>208</td><td>416</td><td class="total-cell">819</td></tr>
+                        <tr><td class="seed-cell">14</td><td>14</td><td>28</td><td>56</td><td>112</td><td>224</td><td>448</td><td class="total-cell">882</td></tr>
+                        <tr><td class="seed-cell">15</td><td>15</td><td>30</td><td>60</td><td>120</td><td>240</td><td>480</td><td class="total-cell">945</td></tr>
+                        <tr class="highlight-row cinderella"><td class="seed-cell">16</td><td>16</td><td>32</td><td>64</td><td>128</td><td>256</td><td>512</td><td class="total-cell">1008</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="examples-section">
+                    <div class="example-title">Quick Examples</div>
+                    <div class="examples-grid">
+                        <div class="example-card boring">
+                            <div class="example-label">Chalk Pick</div>
+                            <div class="example-scenario">#1 seed wins Rd 64</div>
+                            <div class="example-calc">1 × 1 = <strong>1 pt</strong></div>
+                        </div>
+                        <div class="example-card nice">
+                            <div class="example-label">Nice Upset</div>
+                            <div class="example-scenario">#12 beats #5 in Rd 64</div>
+                            <div class="example-calc">1 × 12 = <strong>12 pts</strong></div>
+                        </div>
+                        <div class="example-card hot">
+                            <div class="example-label">Hot Streak</div>
+                            <div class="example-scenario">#12 wins Sweet 16</div>
+                            <div class="example-calc">4 × 12 = <strong>48 pts</strong></div>
+                        </div>
+                        <div class="example-card legendary">
+                            <div class="example-label">Legendary</div>
+                            <div class="example-scenario">#8 wins Championship</div>
+                            <div class="example-calc">32 × 8 = <strong>256 pts</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="round-filter">
+            <button class="round-btn active" data-round="all">All Rounds</button>
+            <button class="round-btn" data-round="round_of_64">Rd 64</button>
+            <button class="round-btn" data-round="round_of_32">Rd 32</button>
+            <button class="round-btn" data-round="sweet_16">Sweet 16</button>
+            <button class="round-btn" data-round="elite_8">Elite 8</button>
+            <button class="round-btn" data-round="final_four">Final 4</button>
+            <button class="round-btn" data-round="championship">Champ</button>
+        </div>
+
+        <div class="leaderboard-table">
+            <div class="table-header">
+                <div>Rank</div>
+                <div>Bracket</div>
+                <div>Score</div>
+                <div>Correct</div>
+                <div>Possible</div>
+            </div>
+            <div id="leaderboard-body">
+                <div class="loading">Loading leaderboard...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = window.getFirebaseConfig();
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+        const ROUND_MULTIPLIERS = {
+            'round_of_64': 1,
+            'round_of_32': 2,
+            'sweet_16': 4,
+            'elite_8': 8,
+            'final_four': 16,
+            'championship': 32
+        };
+
+        const GAME_TO_ROUND = {};
+        for (let i = 1; i <= 32; i++) GAME_TO_ROUND[`game${i}`] = 'round_of_64';
+        for (let i = 33; i <= 48; i++) GAME_TO_ROUND[`game${i}`] = 'round_of_32';
+        for (let i = 49; i <= 56; i++) GAME_TO_ROUND[`game${i}`] = 'sweet_16';
+        for (let i = 57; i <= 60; i++) GAME_TO_ROUND[`game${i}`] = 'elite_8';
+        for (let i = 61; i <= 62; i++) GAME_TO_ROUND[`game${i}`] = 'final_four';
+        GAME_TO_ROUND['game63'] = 'championship';
+
+        let allBrackets = [];
+        let actualResults = {};
+        let userCache = {};
+        let currentRoundFilter = 'all';
+
+        function calculatePoints(winnerSeed, roundName) {
+            const multiplier = ROUND_MULTIPLIERS[roundName] || 0;
+            return multiplier * winnerSeed;
+        }
+
+        function calculateBracketScore(bracket, roundFilter = 'all') {
+            let totalScore = 0;
+            let correctPicks = 0;
+            let possiblePoints = 0;
+
+            if (!bracket.picks) return { score: 0, correct: 0, possible: 0 };
+
+            for (const [gameId, pick] of Object.entries(bracket.picks)) {
+                const round = GAME_TO_ROUND[gameId];
+                if (!round) continue;
+
+                if (roundFilter !== 'all' && round !== roundFilter) continue;
+
+                const actual = actualResults[gameId];
+
+                if (actual && actual.winner) {
+                    if (pick.winner === actual.winner) {
+                        const pts = calculatePoints(actual.seed, round);
+                        totalScore += pts;
+                        correctPicks++;
+                    }
+                } else {
+                    const pickSeed = pick.seed || 1;
+                    possiblePoints += calculatePoints(pickSeed, round);
+                }
+            }
+
+            possiblePoints += totalScore;
+
+            return { score: totalScore, correct: correctPicks, possible: possiblePoints };
+        }
+
+        async function loadActualResults() {
+            try {
+                const snap = await db.doc(`${BASE}/results/actual`).get();
+                if (snap.exists) {
+                    actualResults = snap.data().games || {};
+                    console.log('🏀 LEADERBOARD', 'Loaded actual results:', Object.keys(actualResults).length, 'games');
+                } else {
+                    console.log('🏀 LEADERBOARD', 'No results yet - tournament not started');
+                }
+            } catch (e) {
+                console.warn('🏀 LEADERBOARD', 'Could not load results:', e);
+            }
+        }
+
+        async function loadUserDisplayName(userId) {
+            if (userCache[userId]) return userCache[userId];
+
+            try {
+                const userDoc = await db.doc(`artifacts/nerdfootball/public/data/nerdfootball_users/${userId}`).get();
+                if (userDoc.exists) {
+                    const data = userDoc.data();
+                    userCache[userId] = data.displayName || data.email || 'Unknown';
+                } else {
+                    userCache[userId] = 'Unknown';
+                }
+            } catch (e) {
+                userCache[userId] = 'Unknown';
+            }
+            return userCache[userId];
+        }
+
+        async function loadAllBrackets() {
+            const bodyEl = document.getElementById('leaderboard-body');
+
+            try {
+                const bracketsSnap = await db.collection(`${BASE}/brackets`)
+                    .where('active', '==', true)
+                    .get();
+
+                allBrackets = [];
+                const userPromises = [];
+
+                bracketsSnap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.isComplete) {
+                        allBrackets.push({ id: doc.id, ...data });
+                        userPromises.push(loadUserDisplayName(data.userId));
+                    }
+                });
+
+                await Promise.all(userPromises);
+
+                console.log('🏀 LEADERBOARD', 'Loaded', allBrackets.length, 'complete brackets');
+
+                renderLeaderboard();
+
+            } catch (e) {
+                console.error('🏀 LEADERBOARD', 'Error loading brackets:', e);
+                bodyEl.innerHTML = `
+                    <div class="no-data">
+                        <div class="no-data-icon">⚠️</div>
+                        <p>Error loading leaderboard. Please try again.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderLeaderboard() {
+            const bodyEl = document.getElementById('leaderboard-body');
+
+            if (allBrackets.length === 0) {
+                bodyEl.innerHTML = `
+                    <div class="no-data">
+                        <div class="no-data-icon">📋</div>
+                        <p>No completed brackets yet.</p>
+                        <p style="margin-top: 8px; font-size: 13px;">Check back once the tournament begins!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const scored = allBrackets.map(bracket => {
+                const { score, correct, possible } = calculateBracketScore(bracket, currentRoundFilter);
+                return {
+                    ...bracket,
+                    score,
+                    correct,
+                    possible,
+                    userName: userCache[bracket.userId] || 'Unknown'
+                };
+            });
+
+            scored.sort((a, b) => b.score - a.score);
+
+            let currentRank = 0;
+            let lastScore = null;
+            let skipCount = 0;
+
+            bodyEl.innerHTML = scored.map((b, index) => {
+                if (b.score !== lastScore) {
+                    currentRank = index + 1;
+                    lastScore = b.score;
+                }
+
+                let rankClass = '';
+                if (currentRank === 1) rankClass = 'gold';
+                else if (currentRank === 2) rankClass = 'silver';
+                else if (currentRank === 3) rankClass = 'bronze';
+
+                const displayName = b.bracketName || 'Unnamed Bracket';
+
+                return `
+                    <div class="table-row">
+                        <div class="rank ${rankClass}">${currentRank}</div>
+                        <div class="bracket-info">
+                            <div class="bracket-name">${displayName}</div>
+                            <div class="bracket-user">${b.userName}</div>
+                        </div>
+                        <div class="score">${b.score}</div>
+                        <div class="correct-picks">${b.correct}</div>
+                        <div class="possible-pts">${b.possible}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        document.querySelectorAll('.round-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.round-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentRoundFilter = btn.dataset.round;
+                renderLeaderboard();
+            });
+        });
+
+        function toggleMatrix() {
+            const matrix = document.getElementById('scoring-matrix');
+            const btn = document.getElementById('toggle-matrix-btn');
+            if (matrix.style.display === 'none') {
+                matrix.style.display = 'block';
+                btn.textContent = '📊 Hide Scoring Matrix';
+            } else {
+                matrix.style.display = 'none';
+                btn.textContent = '📊 Show Full Scoring Matrix';
+            }
+        }
+
+        async function init() {
+            await loadActualResults();
+            await loadAllBrackets();
+        }
+
+        init();
+    </script>
+</body>
+</html>

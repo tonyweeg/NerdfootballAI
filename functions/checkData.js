@@ -31,6 +31,20 @@ async function check() {
         }
     });
 
+    // Check a Round of 64 game to see team field names
+    console.log('\nSAMPLE R64 GAME (first one):');
+    const r64Games = Object.entries(matchups).filter(([id, m]) => m.round_id === 'round_of_64');
+    if (r64Games.length > 0) {
+        console.log(`  ${r64Games[0][0]}:`, JSON.stringify(r64Games[0][1], null, 4));
+    }
+
+    // Check a team to see field names
+    console.log('\nSAMPLE TEAM:');
+    const teamsSnap = await db.collection(`${BASE}/teams`).limit(1).get();
+    teamsSnap.forEach(doc => {
+        console.log(`  ${doc.id}:`, JSON.stringify(doc.data(), null, 4));
+    });
+
     console.log('\nCHAMPIONSHIP:');
     const champ = matchups['R6_G01'];
     if (champ) {
