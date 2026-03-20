@@ -1,0 +1,3972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness 2026 - ADMIN Bracket Editor</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-500: #64748b;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-200: #e2e8f0;
+            --slate-100: #f1f5f9;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-gold: #eab308;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            color: var(--slate-100);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            height: 50px;
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-logo {
+            height: 32px;
+            width: auto;
+        }
+        .header h1 {
+            font-size: 20px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 2px;
+            font-weight: 800;
+        }
+        .auth-section { font-size: 12px; color: var(--slate-300); display: flex; align-items: center; gap: 10px; }
+        .auth-section button {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: var(--slate-100);
+            border: 1px solid var(--glass-border);
+            padding: 6px 16px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            border-radius: 20px;
+            font-size: 11px;
+            transition: all 0.3s ease;
+        }
+        .auth-section button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: var(--accent-blue);
+            transform: translateY(-1px);
+        }
+
+        .viewport {
+            position: fixed;
+            top: 94px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            cursor: grab;
+            background: transparent;
+        }
+        .viewport:active { cursor: grabbing; }
+        .viewport.dragging { cursor: grabbing; }
+        .viewport.blurred .canvas { filter: blur(8px); opacity: 0.3; pointer-events: none; }
+
+        .canvas {
+            position: absolute;
+            transform-origin: 0 0;
+            transition: transform 0.3s ease-out;
+            width: 2400px;
+            height: 1800px;
+        }
+        .canvas.no-transition { transition: none; }
+
+        .bottom-controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            z-index: 500;
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 12px 20px;
+            border-top: 1px solid var(--glass-border);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .footer-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .footer-divider {
+            width: 1px;
+            height: 32px;
+            background: var(--glass-border);
+            margin: 0 4px;
+        }
+
+        .minimap {
+            width: 80px;
+            height: 45px;
+            background: var(--slate-900);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .minimap-content {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        .minimap-bracket {
+            width: 100%;
+            height: 100%;
+            opacity: 0.8;
+        }
+        .minimap-viewport {
+            position: absolute;
+            border: 2px solid var(--accent-blue);
+            background: rgba(59, 130, 246, 0.3);
+            cursor: move;
+            border-radius: 2px;
+        }
+
+        .zoom-controls {
+            display: flex;
+            flex-direction: row;
+            gap: 4px;
+        }
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            color: var(--slate-100);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .zoom-btn:hover { background: var(--accent-blue); border-color: var(--accent-blue); }
+        .zoom-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .zoom-level-btns {
+            display: flex;
+            flex-direction: row;
+            gap: 4px;
+        }
+        .zoom-level-btn {
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            color: var(--slate-300);
+            padding: 8px 14px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+        .zoom-level-btn:hover { background: var(--slate-600); color: var(--slate-100); }
+        .zoom-level-btn.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+
+        .nav-btn {
+            width: 32px;
+            height: 32px;
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            color: var(--slate-100);
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .nav-btn.active { opacity: 1; pointer-events: auto; }
+        .nav-btn:hover { background: var(--accent-blue); border-color: var(--accent-blue); transform: scale(1.05); }
+
+        .region-label {
+            position: absolute;
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            white-space: nowrap;
+            text-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .region-label:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: scale(1.05);
+        }
+
+        .matchup {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            width: 120px;
+            overflow: hidden;
+            position: absolute;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .matchup:hover { border-color: var(--accent-blue); box-shadow: 0 8px 30px rgba(59,130,246,0.3); transform: translateY(-2px); }
+        .matchup.decided { border-color: var(--accent-green); }
+        .matchup.highlight { border-color: var(--accent-gold); box-shadow: 0 0 20px rgba(234,179,8,0.5); }
+
+        .matchup.championship-game {
+            width: 360px;
+            border: 3px solid var(--accent-gold);
+            border-radius: 20px;
+            box-shadow: 0 0 60px rgba(234, 179, 8, 0.5), 0 12px 40px rgba(0,0,0,0.5);
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.98), rgba(51, 65, 85, 0.95));
+        }
+        .matchup.championship-game:hover {
+            box-shadow: 0 0 80px rgba(234, 179, 8, 0.7), 0 16px 50px rgba(0,0,0,0.6);
+            transform: translateY(-4px);
+        }
+        .matchup.championship-game .team-row {
+            padding: 20px 24px;
+            gap: 16px;
+        }
+        .matchup.championship-game .seed-badge {
+            min-width: 48px;
+            height: 48px;
+            font-size: 18px;
+            background: linear-gradient(135deg, var(--accent-gold), #fbbf24);
+        }
+        .matchup.championship-game .team-name {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .tiebreaker-section {
+            border-top: 2px solid rgba(234, 179, 8, 0.3);
+            padding: 16px 20px;
+            background: rgba(234, 179, 8, 0.1);
+            border-radius: 0 0 17px 17px;
+        }
+        .tiebreaker-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-gold);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .tiebreaker-inputs {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .tiebreaker-team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .tiebreaker-team-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--slate-300);
+            max-width: 100px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tiebreaker-input {
+            width: 60px;
+            padding: 8px 10px;
+            border: 2px solid var(--slate-600);
+            border-radius: 8px;
+            background: var(--slate-800);
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            transition: all 0.2s ease;
+            -moz-appearance: textfield;
+        }
+        .tiebreaker-input::-webkit-outer-spin-button,
+        .tiebreaker-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .tiebreaker-input:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 15px rgba(234, 179, 8, 0.3);
+        }
+        .tiebreaker-input::placeholder {
+            color: var(--slate-500);
+            font-size: 14px;
+        }
+        .tiebreaker-plus {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--slate-400);
+        }
+        .tiebreaker-equals {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--slate-400);
+        }
+        .tiebreaker-total {
+            min-width: 70px;
+            padding: 8px 12px;
+            background: linear-gradient(135deg, var(--accent-gold), #fbbf24);
+            color: var(--slate-900);
+            font-size: 20px;
+            font-weight: 800;
+            text-align: center;
+            border-radius: 8px;
+        }
+
+        .matchup.final-four-game {
+            width: 150px;
+            border: 2px solid var(--accent-green);
+            border-radius: 14px;
+            box-shadow: 0 0 25px rgba(34, 197, 94, 0.3), 0 6px 25px rgba(0,0,0,0.3);
+        }
+        .matchup.final-four-game .team-row {
+            padding: 8px 10px;
+        }
+        .matchup.final-four-game .seed-badge {
+            min-width: 26px;
+            height: 26px;
+            font-size: 11px;
+        }
+        .matchup.final-four-game .team-name {
+            font-size: 12px;
+        }
+
+        .team-row {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 1px solid var(--slate-700);
+            gap: 8px;
+        }
+        .team-row:last-child { border-bottom: none; }
+        .team-row:hover { background: rgba(59, 130, 246, 0.15); }
+        .team-row.picked { background: rgba(34, 197, 94, 0.2); border-left: 3px solid var(--accent-green); }
+        .team-row.picked.upset { background: rgba(239, 68, 68, 0.2); border-left: 3px solid var(--accent-red); position: relative; }
+        .team-row.picked.upset::after { content: '🔥'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; }
+        .team-row.eliminated { opacity: 0.35; text-decoration: line-through; }
+        .team-row.tbd { cursor: default; opacity: 0.3; }
+        .team-row.locked { cursor: default; pointer-events: none; }
+        .team-row.locked:hover { background: transparent; }
+        .team-row.actual-winner {
+            background: rgba(34, 197, 94, 0.35) !important;
+            border-left: 4px solid var(--accent-green) !important;
+        }
+        .team-row.actual-loser {
+            background: rgba(100, 100, 100, 0.15);
+            opacity: 0.5;
+        }
+        .team-row.actual-loser .team-name {
+            text-decoration: line-through;
+            color: var(--slate-400);
+        }
+        .team-score {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--slate-200);
+            margin-left: auto;
+            padding: 2px 6px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        .winner-indicator {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent-green);
+            margin-left: 4px;
+        }
+
+        .seed-badge {
+            background: var(--accent-blue);
+            color: #fff;
+            min-width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+        }
+        .seed-badge.tbd { background: var(--slate-600); color: var(--slate-400); box-shadow: none; }
+
+        .team-name {
+            flex: 1;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--slate-100);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        svg.bracket-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        svg.bracket-lines path {
+            fill: none;
+            stroke: var(--slate-600);
+            stroke-width: 2;
+        }
+        svg.bracket-lines path.active {
+            stroke: var(--accent-green);
+            stroke-width: 3;
+        }
+
+        .login-overlay {
+            position: fixed;
+            top: 94px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .login-box {
+            text-align: center;
+            padding: 50px;
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: var(--glass-shadow);
+        }
+        .login-box h2 {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 32px;
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+        }
+        .login-box p {
+            color: var(--slate-400);
+            margin-bottom: 30px;
+        }
+        .login-box button {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+            color: #fff;
+            border: none;
+            padding: 16px 48px;
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 30px;
+            box-shadow: 0 8px 30px rgba(59,130,246,0.4);
+            transition: all 0.3s ease;
+        }
+        .login-box button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(59,130,246,0.5);
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 94px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .loading-text {
+            color: var(--accent-blue);
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Naming Modal */
+        .naming-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+        .naming-modal {
+            background: var(--slate-800);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .naming-modal h2 {
+            color: var(--slate-100);
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+        .naming-modal p {
+            color: var(--slate-400);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        .naming-modal input {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 16px;
+            font-family: inherit;
+            background: var(--slate-700);
+            border: 2px solid var(--slate-600);
+            border-radius: 12px;
+            color: var(--slate-100);
+            outline: none;
+            transition: border-color 0.2s ease;
+            margin-bottom: 24px;
+        }
+        .naming-modal input:focus {
+            border-color: var(--accent-blue);
+        }
+        .naming-modal input::placeholder {
+            color: var(--slate-500);
+        }
+        .naming-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .naming-btn {
+            padding: 12px 24px;
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 600;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+        .naming-btn.primary {
+            background: linear-gradient(135deg, var(--accent-green), #16a34a);
+            color: white;
+        }
+        .naming-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+        }
+        .naming-btn.secondary {
+            background: var(--slate-700);
+            color: var(--slate-300);
+            border: 1px solid var(--slate-600);
+        }
+        .naming-btn.secondary:hover {
+            background: var(--slate-600);
+        }
+
+        /* Bracket Switcher */
+        .bracket-switcher {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .bracket-switcher-label {
+            font-size: 10px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .bracket-select {
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-family: inherit;
+            color: var(--slate-100);
+            cursor: pointer;
+            min-width: 160px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        .bracket-select:hover {
+            border-color: var(--accent-blue);
+        }
+        .bracket-select:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .bracket-select option {
+            background: var(--slate-800);
+            color: var(--slate-100);
+            padding: 8px;
+        }
+        .new-bracket-btn {
+            background: var(--accent-green);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .new-bracket-btn:hover {
+            background: #16a34a;
+            transform: translateY(-1px);
+        }
+        .new-bracket-btn:disabled {
+            background: var(--slate-600);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats-bar {
+            position: fixed;
+            top: 50px;
+            left: 0;
+            right: 0;
+            height: 44px;
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            font-size: 11px;
+            z-index: 400;
+            border-bottom: 1px solid var(--glass-border);
+            padding: 0 20px;
+        }
+        .stat { color: var(--slate-400); display: flex; align-items: center; gap: 4px; }
+        .stat strong { color: var(--accent-blue); }
+        .stat.champ strong { color: var(--accent-gold); }
+        .stat-divider { width: 1px; height: 24px; background: var(--slate-600); }
+
+        .upset-chalk-meter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .meter-bar {
+            width: 60px;
+            height: 8px;
+            background: var(--slate-700);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .meter-fill-upset {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-red), #f87171);
+            border-radius: 4px 0 0 4px;
+            transition: width 0.3s;
+        }
+        .meter-fill-chalk {
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #60a5fa, var(--accent-blue));
+            border-radius: 0 4px 4px 0;
+            transition: width 0.3s;
+        }
+        .upset-label { color: var(--accent-red); font-weight: 600; font-size: 10px; }
+        .chalk-label { color: var(--accent-blue); font-weight: 600; font-size: 10px; }
+
+        .uniqueness-meter {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .unique-bar {
+            width: 50px;
+            height: 8px;
+            background: var(--slate-700);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .unique-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-green), #86efac);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .unique-pct { color: var(--accent-green); font-weight: 700; font-size: 10px; min-width: 28px; }
+
+        .win-chances {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .chances-value {
+            font-weight: 700;
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 6px;
+        }
+        .chances-value.high { background: rgba(34,197,94,0.2); color: var(--accent-green); }
+        .chances-value.medium { background: rgba(234,179,8,0.2); color: var(--accent-gold); }
+        .chances-value.low { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+        .chances-value.theoretical { background: rgba(59,130,246,0.2); color: var(--accent-blue); }
+
+        .footer-save-btn {
+            background: var(--accent-green);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 10px rgba(34, 197, 94, 0.3);
+        }
+        .footer-save-btn:hover {
+            background: #16a34a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+        }
+        .footer-save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .save-btn-fixed {
+            display: none !important;
+            background: linear-gradient(135deg, var(--accent-green), #22d968);
+            color: #fff;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            padding: 8px 20px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 20px;
+            z-index: 450;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+        }
+        .save-btn-fixed:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, var(--accent-green), #22d968);
+            color: #fff;
+            padding: 12px 32px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 2000;
+            display: none;
+            border-radius: 30px;
+            box-shadow: 0 8px 30px rgba(34, 197, 94, 0.4);
+            backdrop-filter: blur(10px);
+        }
+        .toast.error {
+            background: linear-gradient(135deg, var(--accent-red), #f87171);
+            box-shadow: 0 8px 30px rgba(239, 68, 68, 0.4);
+        }
+        .toast.show { display: block; animation: toast-in 0.3s ease; }
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        .final-four-label {
+            position: absolute;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 10px rgba(34, 197, 94, 0.4);
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .final-four-label:hover {
+            background: rgba(34, 197, 94, 0.2);
+            transform: scale(1.05);
+        }
+        .championship-label {
+            position: absolute;
+            font-size: 16px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-gold), #fbbf24);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-align: center;
+            filter: drop-shadow(0 2px 10px rgba(234, 179, 8, 0.4));
+        }
+
+        /* Region Popup Overlay */
+        .region-popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .region-popup-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+        .region-popup-container {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 30px;
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow: auto;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+        .region-popup-overlay.show .region-popup-container {
+            transform: scale(1);
+        }
+        .region-popup-header {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 15px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .region-popup-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .region-popup-title {
+            font-size: 20px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .region-popup-close {
+            width: 32px;
+            height: 32px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            color: var(--slate-100);
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        .region-popup-close:hover {
+            background: var(--accent-red);
+            border-color: var(--accent-red);
+            transform: rotate(90deg);
+        }
+        .popup-nav {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .region-popup-content {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .popup-round {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .popup-matchup {
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 6px;
+            min-width: 140px;
+            transition: all 0.2s ease;
+        }
+        .popup-matchup:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
+        }
+        .popup-round-label {
+            font-size: 9px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        /* Final Four Bracket Layout */
+        .ff-bracket-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            padding: 10px 0;
+        }
+        .ff-bracket-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 0;
+        }
+        .ff-bracket-game {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .ff-game-label {
+            font-size: 10px;
+            color: var(--accent-green);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+        .ff-bracket-connector {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            margin: 0 -10px;
+        }
+        .ff-bracket-connector svg {
+            margin-top: 30px;
+        }
+        .ff-bracket-champ {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 0;
+        }
+        .ff-champ-label {
+            font-size: 12px;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+        .ff-bracket-champ .popup-matchup {
+            min-width: 180px;
+            border: 2px solid var(--accent-gold);
+            box-shadow: 0 0 20px rgba(234, 179, 8, 0.3);
+        }
+        .ff-bracket-champ .popup-team-row {
+            padding: 8px 12px;
+        }
+        .ff-bracket-champ .popup-seed {
+            min-width: 26px;
+            height: 26px;
+            font-size: 11px;
+            background: linear-gradient(135deg, var(--accent-gold), #fbbf24);
+        }
+        .ff-bracket-champ .popup-team-name {
+            font-size: 14px;
+        }
+
+        .popup-team-row {
+            display: flex;
+            align-items: center;
+            padding: 4px 6px;
+            cursor: pointer;
+            border-radius: 6px;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .popup-team-row:hover { background: rgba(59, 130, 246, 0.15); }
+        .popup-team-row.locked { cursor: default; pointer-events: none; }
+        .popup-team-row.locked:hover { background: transparent; }
+        .popup-team-row.picked { background: rgba(34, 197, 94, 0.25); border: 1px solid var(--accent-green); }
+        .popup-team-row.picked.upset { background: rgba(239, 68, 68, 0.25); border: 1px solid var(--accent-red); }
+        .popup-team-row.winner {
+            background: rgba(34, 197, 94, 0.35) !important;
+            border: 2px solid var(--accent-green) !important;
+        }
+        .popup-team-row.loser {
+            background: rgba(100, 100, 100, 0.2);
+            opacity: 0.6;
+        }
+        .popup-team-row.loser .popup-team-name {
+            text-decoration: line-through;
+            color: var(--slate-400);
+        }
+        .popup-matchup.final {
+            border: 1px solid var(--accent-green);
+            border-radius: 8px;
+            padding: 2px;
+        }
+        .popup-score {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--slate-300);
+            margin-left: auto;
+        }
+        .winner-badge {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--accent-green);
+            background: rgba(34, 197, 94, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .loser-badge {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--slate-400);
+            background: rgba(100, 100, 100, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .popup-seed {
+            background: var(--accent-blue);
+            color: #fff;
+            min-width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 700;
+            border-radius: 50%;
+        }
+        .popup-seed.tbd { background: var(--slate-600); }
+        .popup-team-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--slate-100);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 90px;
+        }
+
+        /* View Toggle Button */
+        .view-toggle-btn {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            color: var(--slate-100);
+            padding: 6px 14px;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .view-toggle-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+        .view-toggle-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #fff;
+        }
+
+        .list-view-btn {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--accent-gold);
+            color: var(--accent-gold);
+            padding: 6px 14px;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            text-decoration: none;
+        }
+        .list-view-btn:hover {
+            background: var(--accent-gold);
+            color: var(--slate-900);
+        }
+    </style>
+</head>
+<body>
+    <div class="header" style="border-bottom: 2px solid var(--accent-red);">
+        <div class="header-brand">
+            <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdMadness" class="header-logo">
+            <h1 style="background: linear-gradient(135deg, var(--accent-red), var(--accent-gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">🔐 ADMIN BRACKET EDITOR</h1>
+        </div>
+        <div class="auth-section" id="auth-section">
+            <span id="editing-user-label" style="color: var(--accent-gold); font-weight: 600; display: none;">Editing: ---</span>
+            <a href="nerdmadness-admin.html" class="list-view-btn" style="border-color: var(--accent-red); color: var(--accent-red);">
+                <span>⬅️</span> Admin Home
+            </a>
+            <button onclick="signIn()">Sign In</button>
+        </div>
+    </div>
+
+    <div class="stats-bar" id="stats-bar" style="display:none;">
+        <div class="bracket-switcher">
+            <span class="bracket-switcher-label">Bracket:</span>
+            <select class="bracket-select" id="bracket-select" onchange="switchBracket(this.value)">
+                <option value="">Loading...</option>
+            </select>
+            <button class="new-bracket-btn" id="new-bracket-btn" onclick="createNewBracket()">+ New</button>
+        </div>
+        <div class="stat-divider"></div>
+
+        <div class="stat">Picks: <strong id="picks-made">0</strong>/63</div>
+        <div class="stat-divider"></div>
+
+        <div class="upset-chalk-meter">
+            <span class="upset-label" id="upset-count">0</span>
+            <div class="meter-bar">
+                <div class="meter-fill-upset" id="upset-fill" style="width:0%"></div>
+                <div class="meter-fill-chalk" id="chalk-fill" style="width:0%"></div>
+            </div>
+            <span class="chalk-label" id="chalk-count">0</span>
+        </div>
+        <div class="stat-divider"></div>
+
+        <div class="uniqueness-meter">
+            <span style="color:var(--slate-400);font-size:10px;">Unique:</span>
+            <div class="unique-bar">
+                <div class="unique-fill" id="unique-fill" style="width:0%"></div>
+            </div>
+            <span class="unique-pct" id="unique-pct">--%</span>
+        </div>
+        <div class="stat-divider"></div>
+
+        <div class="win-chances">
+            <span style="color:var(--slate-400);font-size:10px;">Win:</span>
+            <span class="chances-value theoretical" id="win-chances">--%</span>
+        </div>
+        <div class="stat-divider"></div>
+
+        <div class="stat">Pts: <strong id="points-earned">0</strong></div>
+        <div class="stat champ">🏆 <strong id="champion-pick">---</strong></div>
+        <div class="stat-divider"></div>
+        <div class="stat" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">📝 <strong id="bracket-name-display" style="color: var(--accent-blue);">Unnamed</strong></div>
+    </div>
+    <button class="save-btn-fixed" id="save-btn" style="display:none;" onclick="app.savePicks()">💾 Save</button>
+
+    <div class="viewport" id="viewport">
+        <div class="canvas" id="canvas">
+            <svg class="bracket-lines" id="bracket-lines"></svg>
+        </div>
+    </div>
+
+    <div class="bottom-controls" id="bottom-controls" style="display:none;">
+        <div class="footer-group">
+            <button class="zoom-btn" id="zoom-out-btn" onclick="app.zoomOut()">−</button>
+            <button class="zoom-btn" id="zoom-in-btn" onclick="app.zoomIn()">+</button>
+        </div>
+
+        <div class="footer-divider"></div>
+
+        <div class="footer-group">
+            <div class="zoom-level-btns" id="zoom-level-btns">
+                <button class="zoom-level-btn" data-level="full" onclick="app.setZoomLevel('full')">Full</button>
+                <button class="zoom-level-btn" data-level="region" onclick="app.setZoomLevel('region')">Region</button>
+                <button class="zoom-level-btn" data-level="finals" onclick="app.setZoomLevel('finals')">16→</button>
+            </div>
+        </div>
+
+        <div class="footer-divider"></div>
+
+        <div class="footer-group">
+            <button class="nav-btn" id="nav-prev-btn" onclick="app.navPrev()">←</button>
+            <div class="minimap" id="minimap">
+                <div class="minimap-content">
+                    <canvas class="minimap-bracket" id="minimap-canvas"></canvas>
+                    <div class="minimap-viewport" id="minimap-viewport"></div>
+                </div>
+            </div>
+            <button class="nav-btn" id="nav-next-btn" onclick="app.navNext()">→</button>
+        </div>
+
+        <div class="footer-divider"></div>
+
+        <div class="footer-group">
+            <button class="zoom-level-btn" id="view-toggle-btn" onclick="app.toggleViewMode()">📋 Pop-up</button>
+        </div>
+
+        <div class="footer-divider"></div>
+
+        <div class="footer-group">
+            <button class="footer-save-btn" id="footer-save-btn" onclick="openSaveModal()">💾 Save</button>
+            <button class="footer-save-btn" id="footer-delete-btn" onclick="confirmDeleteBracket()" style="background: var(--accent-red); display: none;">🗑️ Delete</button>
+            <button class="footer-save-btn" id="view-brackets-btn" onclick="openViewBracketsModal()" style="background: var(--accent-blue); display: none;">👀 View All Brackets</button>
+            <button class="footer-save-btn" id="view-text-btn" onclick="viewCurrentBracketAsText()" style="background: var(--accent-purple);">📝 Text View</button>
+        </div>
+    </div>
+
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-box">
+            <h2>NERDMADNESS</h2>
+            <p>Sign in to fill out your 2026 bracket</p>
+            <button onclick="signIn()">Sign In with Google</button>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading-overlay" style="display:none;">
+        <div class="loading-text">Loading bracket data...</div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Bracket Naming Modal -->
+    <div class="naming-modal-overlay" id="naming-modal" style="display: none;">
+        <div class="naming-modal">
+            <h2>🏀 Save Your Bracket</h2>
+            <p id="naming-modal-message">Name your bracket to save your picks.</p>
+            <input type="text" id="bracket-name-input" placeholder="e.g., Tony's Upset Special" maxlength="50">
+            <div class="naming-modal-actions">
+                <button class="naming-btn secondary" onclick="closeNamingModal()">Cancel</button>
+                <button class="naming-btn primary" onclick="saveBracketWithName()">💾 Save Bracket</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View All Brackets Modal -->
+    <div class="naming-modal-overlay" id="view-brackets-modal" style="display: none;">
+        <div class="naming-modal" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+            <h2>👀 All Brackets</h2>
+            <p>View everyone's bracket picks</p>
+            <div id="brackets-list" style="max-height: 400px; overflow-y: auto;">
+                <div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading brackets...</div>
+            </div>
+            <div class="naming-modal-actions" style="margin-top: 20px;">
+                <button class="naming-btn secondary" onclick="closeViewBracketsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Text Picks View Modal -->
+    <div class="naming-modal-overlay" id="text-picks-modal" style="display: none;">
+        <div class="naming-modal" style="max-width: 700px; max-height: 85vh; overflow-y: auto;">
+            <h2 id="text-picks-title">📝 Bracket Picks</h2>
+            <div id="text-picks-content" style="text-align: left; font-family: monospace; font-size: 13px; line-height: 1.6;">
+                <div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading picks...</div>
+            </div>
+            <div class="naming-modal-actions" style="margin-top: 20px;">
+                <button class="naming-btn secondary" onclick="closeTextPicksModal()">Close</button>
+                <button class="naming-btn primary" onclick="copyTextPicks()" style="background: var(--accent-purple);">📋 Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Region Popup Overlay -->
+    <div class="region-popup-overlay" id="region-popup-overlay">
+        <div class="region-popup-container">
+            <div class="region-popup-header">
+                <div class="region-popup-top-row">
+                    <div class="region-popup-title" id="region-popup-title">Region</div>
+                    <button class="region-popup-close" onclick="app.closeRegionPopup()">✕</button>
+                </div>
+                <div class="popup-nav" id="popup-nav">
+                    <!-- Navigation buttons populated here -->
+                </div>
+            </div>
+            <div class="region-popup-content" id="region-popup-content">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const firebaseConfig = window.getFirebaseConfig();
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+    // ADMIN MODE - Global admins who can edit any bracket
+    const GLOBAL_ADMINS = [
+        'WxSPmEildJdqs6T5hIpBUZrscwt2',  // Tony
+        'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2'   // Second admin
+    ];
+
+    let isAdminMode = false;
+    let originalBracketUserId = null; // Store original bracket owner's userId
+
+    function isGlobalAdmin(uid) {
+        return GLOBAL_ADMINS.includes(uid);
+    }
+
+    // Lock time: March 19, 2026 at noon EST (fallback if not in settings)
+    const LOCK_TIME_FALLBACK = new Date('2026-03-19T12:00:00-05:00');
+
+    function isLocked(settings) {
+        // ADMIN MODE: Never locked - admins can always edit
+        if (isAdminMode) return false;
+        // Normal users: Tournament is locked
+        return true;
+    }
+
+    // Save Modal Functions
+    function openSaveModal() {
+        if (!app) return;
+
+        const modal = document.getElementById('naming-modal');
+        const input = document.getElementById('bracket-name-input');
+        const messageEl = document.getElementById('naming-modal-message');
+
+        // Pre-fill with existing bracket name
+        input.value = app.bracketName || '';
+
+        // Update message based on pick count
+        const pickCount = Object.keys(app.picks).length;
+        if (pickCount === 63) {
+            messageEl.textContent = 'Your bracket is complete! Name it to save.';
+        } else {
+            messageEl.textContent = `You have ${pickCount}/63 picks. Name your bracket to save progress.`;
+        }
+
+        modal.style.display = 'flex';
+        input.focus();
+        console.log('🏀 BRACKET_SAVE', 'Showing save modal, picks:', pickCount);
+    }
+
+    function closeNamingModal() {
+        const modal = document.getElementById('naming-modal');
+        modal.style.display = 'none';
+    }
+
+    async function saveBracketWithName() {
+        const input = document.getElementById('bracket-name-input');
+        const name = input.value.trim();
+
+        if (!name) {
+            showToast('Please enter a bracket name', true);
+            return;
+        }
+
+        if (app) {
+            app.bracketName = name;
+            app.updateBracketNameDisplay();
+            await app.savePicks();
+        }
+
+        const modal = document.getElementById('naming-modal');
+        modal.style.display = 'none';
+    }
+
+    // Legacy function for compatibility
+    function showNamingModal(existingName = '') {
+        if (app) app.bracketName = existingName;
+        openSaveModal();
+    }
+
+    // View All Brackets Functions
+    async function openViewBracketsModal() {
+        const modal = document.getElementById('view-brackets-modal');
+        const listEl = document.getElementById('brackets-list');
+        modal.style.display = 'flex';
+        listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading brackets...</div>';
+
+        try {
+            // Load all brackets from all users
+            const bracketsSnap = await db.collection(`${BASE}/brackets`).get();
+            const brackets = [];
+            bracketsSnap.forEach(doc => {
+                const data = doc.data();
+                brackets.push({
+                    id: doc.id,
+                    name: data.bracketName || 'Unnamed Bracket',
+                    userId: data.userId,
+                    userEmail: data.userEmail || 'Unknown',
+                    pickCount: data.picks ? Object.keys(data.picks).length : 0,
+                    updatedAt: data.updatedAt?.toDate() || new Date()
+                });
+            });
+
+            if (brackets.length === 0) {
+                listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--slate-400);">No brackets found.</div>';
+                return;
+            }
+
+            // Sort by pick count descending
+            brackets.sort((a, b) => b.pickCount - a.pickCount);
+
+            // Store brackets globally for text view
+            window.allBracketsData = brackets;
+
+            // Render list with two view options
+            let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+            for (const b of brackets) {
+                const isComplete = b.pickCount === 63;
+                const userName = b.userEmail.split('@')[0];
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--slate-700); border-radius: 8px;">
+                        <div>
+                            <div style="color: var(--slate-100); font-weight: 600;">${b.name}</div>
+                            <div style="color: var(--slate-400); font-size: 12px;">${userName} • ${b.pickCount}/63 ${isComplete ? '✅' : '⏳'}</div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="viewBracketText('${b.id}')" style="padding: 6px 12px; background: var(--accent-purple); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">📝 Text</button>
+                            <button onclick="viewBracket('${b.id}')" style="padding: 6px 12px; background: var(--accent-blue); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">🏀 Bracket</button>
+                        </div>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            listEl.innerHTML = html;
+
+        } catch (error) {
+            console.error('Error loading brackets:', error);
+            listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--accent-red);">Error loading brackets</div>';
+        }
+    }
+
+    function closeViewBracketsModal() {
+        document.getElementById('view-brackets-modal').style.display = 'none';
+    }
+
+    function viewBracket(bracketId) {
+        closeViewBracketsModal();
+        // Reload page with the selected bracket
+        window.location.href = `nerdmadness-bracket-canvas.html?bracket=${bracketId}`;
+    }
+
+    // Text Picks View Functions
+    let currentTextPicks = '';
+
+    function viewCurrentBracketAsText() {
+        // Get bracket ID from URL or current app state
+        const urlParams = new URLSearchParams(window.location.search);
+        const bracketId = urlParams.get('bracketId') || app?.currentBracketId;
+
+        if (!bracketId) {
+            showToast('No bracket loaded to view', true);
+            return;
+        }
+
+        viewBracketText(bracketId);
+    }
+
+    async function viewBracketText(bracketId) {
+        const modal = document.getElementById('text-picks-modal');
+        const titleEl = document.getElementById('text-picks-title');
+        const contentEl = document.getElementById('text-picks-content');
+
+        modal.style.display = 'flex';
+        contentEl.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--slate-400);">Loading picks...</div>';
+
+        // Scoring multipliers by round
+        const ROUND_MULTIPLIERS = {
+            'round_of_64': 1,
+            'round_of_32': 2,
+            'sweet_16': 4,
+            'elite_eight': 8,
+            'final_four': 16,
+            'championship': 32
+        };
+
+        try {
+            // Load the bracket data
+            const bracketDoc = await db.doc(`${BASE}/brackets/${bracketId}`).get();
+            if (!bracketDoc.exists) {
+                contentEl.innerHTML = '<div style="color: var(--accent-red);">Bracket not found</div>';
+                return;
+            }
+
+            const bracketData = bracketDoc.data();
+            const picks = bracketData.picks || {};
+            const bracketName = bracketData.bracketName || 'Unnamed Bracket';
+            const userName = (bracketData.userEmail || 'Unknown').split('@')[0];
+
+            titleEl.textContent = `📝 ${bracketName} (${userName})`;
+
+            // Load teams and matchups
+            const [teamsSnap, matchupsSnap] = await Promise.all([
+                db.collection(`${BASE}/teams`).get(),
+                db.collection(`${BASE}/matchups`).get()
+            ]);
+            const teams = {};
+            const matchups = {};
+            teamsSnap.forEach(doc => { teams[doc.id] = doc.data(); });
+            matchupsSnap.forEach(doc => { matchups[doc.id] = doc.data(); });
+
+            // Calculate totals
+            let totalPoints = 0;
+            let correctPicks = 0;
+            let wrongPicks = 0;
+            let pendingPicks = 0;
+            let possiblePoints = 0;
+
+            // Helper to format a pick line
+            function formatPick(matchup, pickedTeamId, roundId, indent = '    ') {
+                if (!pickedTeamId) {
+                    return `${indent}○ No pick\n`;
+                }
+
+                const team = teams[pickedTeamId];
+                const seed = team?.seed || '?';
+                const teamName = team?.team_name || 'Unknown';
+                const multiplier = ROUND_MULTIPLIERS[roundId] || 1;
+                const potentialPts = multiplier * seed;
+
+                // Check if game is final
+                if (matchup.status === 'FINAL' && matchup.winner_team_id) {
+                    if (pickedTeamId === matchup.winner_team_id) {
+                        totalPoints += potentialPts;
+                        correctPicks++;
+                        return `${indent}✅ (${seed}) ${teamName} → +${potentialPts} pts\n`;
+                    } else {
+                        wrongPicks++;
+                        const actualWinner = teams[matchup.winner_team_id];
+                        return `${indent}❌ (${seed}) ${teamName} [Lost to ${actualWinner?.team_name || '?'}]\n`;
+                    }
+                } else {
+                    pendingPicks++;
+                    possiblePoints += potentialPts;
+                    return `${indent}⏳ (${seed}) ${teamName} [${potentialPts} pts possible]\n`;
+                }
+            }
+
+            // Build text output by region and round
+            const regions = ['east', 'south', 'west', 'midwest'];
+            const rounds = [
+                { id: 'round_of_64', name: 'Round of 64', mult: '1×' },
+                { id: 'round_of_32', name: 'Round of 32', mult: '2×' },
+                { id: 'sweet_16', name: 'Sweet 16', mult: '4×' },
+                { id: 'elite_eight', name: 'Elite Eight', mult: '8×' }
+            ];
+
+            let textOutput = '';
+
+            // Regional picks
+            for (const region of regions) {
+                let regionPoints = 0;
+                let regionCorrect = 0;
+                let regionText = '';
+
+                for (const round of rounds) {
+                    const regionMatchups = Object.values(matchups)
+                        .filter(m => m.region_id === region && m.round_id === round.id)
+                        .sort((a, b) => (a.bracket_position || 0) - (b.bracket_position || 0));
+
+                    if (regionMatchups.length === 0) continue;
+
+                    regionText += `\n  ${round.name} (${round.mult}):\n`;
+
+                    for (const m of regionMatchups) {
+                        const pickedTeamId = picks[m.matchup_id];
+                        const beforePts = totalPoints;
+                        const beforeCorrect = correctPicks;
+                        regionText += formatPick(m, pickedTeamId, round.id);
+                        regionPoints += (totalPoints - beforePts);
+                        regionCorrect += (correctPicks - beforeCorrect);
+                    }
+                }
+
+                textOutput += `${'─'.repeat(50)}\n`;
+                textOutput += `🏆 ${region.toUpperCase()} REGION`;
+                if (regionPoints > 0) {
+                    textOutput += ` → ${regionPoints} pts (${regionCorrect} correct)`;
+                }
+                textOutput += `\n${'─'.repeat(50)}\n`;
+                textOutput += regionText;
+                textOutput += '\n';
+            }
+
+            // Final Four and Championship
+            textOutput += `${'─'.repeat(50)}\n`;
+            textOutput += `🏆 FINAL FOUR & CHAMPIONSHIP\n`;
+            textOutput += `${'─'.repeat(50)}\n`;
+
+            // Final Four
+            const ffMatchups = Object.values(matchups)
+                .filter(m => m.round_id === 'final_four')
+                .sort((a, b) => (a.bracket_position || 0) - (b.bracket_position || 0));
+
+            textOutput += `\n  Final Four (16×):\n`;
+            textOutput += `    Semifinal 1 (East vs South):\n`;
+            if (ffMatchups[0]) {
+                textOutput += formatPick(ffMatchups[0], picks[ffMatchups[0].matchup_id], 'final_four', '      ');
+            }
+
+            textOutput += `    Semifinal 2 (West vs Midwest):\n`;
+            if (ffMatchups[1]) {
+                textOutput += formatPick(ffMatchups[1], picks[ffMatchups[1].matchup_id], 'final_four', '      ');
+            }
+
+            // Championship
+            const champMatchup = matchups['R6_G01'];
+            textOutput += `\n  Championship (32×):\n`;
+            const champPick = picks['R6_G01'];
+            if (champPick) {
+                textOutput += formatPick(champMatchup || {}, champPick, 'championship', '    🏆 ').replace('    🏆 ', '    🏆 ').replace('\n', ' 🏆\n');
+            } else {
+                textOutput += `    ○ No pick\n`;
+            }
+
+            // Tiebreaker
+            if (bracketData.tiebreakerScores) {
+                textOutput += `\n  Tiebreaker Total: ${(bracketData.tiebreakerScores.higher || 0) + (bracketData.tiebreakerScores.lower || 0)}\n`;
+            }
+
+            // Build header with totals
+            possiblePoints += totalPoints;
+            let headerOutput = `🏀 ${bracketName}\n`;
+            headerOutput += `👤 ${userName}\n`;
+            headerOutput += `📊 ${Object.keys(picks).length}/63 picks\n`;
+            headerOutput += `${'═'.repeat(50)}\n`;
+            headerOutput += `\n💰 TOTAL POINTS: ${totalPoints}\n`;
+            headerOutput += `✅ Correct: ${correctPicks}  ❌ Wrong: ${wrongPicks}  ⏳ Pending: ${pendingPicks}\n`;
+            headerOutput += `📈 Max Possible: ${possiblePoints}\n`;
+            headerOutput += `${'═'.repeat(50)}\n`;
+
+            currentTextPicks = headerOutput + textOutput;
+
+            // Display with styling
+            contentEl.innerHTML = `<pre style="white-space: pre-wrap; color: var(--slate-200); background: var(--slate-900); padding: 16px; border-radius: 8px; overflow-x: auto;">${escapeHtml(currentTextPicks)}</pre>`;
+
+        } catch (error) {
+            console.error('Error loading bracket for text view:', error);
+            contentEl.innerHTML = '<div style="color: var(--accent-red);">Error loading bracket</div>';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function closeTextPicksModal() {
+        document.getElementById('text-picks-modal').style.display = 'none';
+    }
+
+    function copyTextPicks() {
+        if (currentTextPicks) {
+            navigator.clipboard.writeText(currentTextPicks).then(() => {
+                showToast('Picks copied to clipboard!');
+            }).catch(() => {
+                showToast('Failed to copy', true);
+            });
+        }
+    }
+
+    // Delete Bracket Functions
+    function confirmDeleteBracket() {
+        if (!app || !app.currentBracketId) {
+            showToast('No bracket to delete', true);
+            return;
+        }
+
+        const bracketName = app.bracketName || 'this bracket';
+        const confirmed = confirm(`Are you sure you want to delete "${bracketName}"?\n\nThis action cannot be undone.`);
+
+        if (confirmed) {
+            deleteBracket();
+        }
+    }
+
+    async function deleteBracket() {
+        if (!app || !app.currentBracketId) return;
+
+        try {
+            const bracketRef = db.doc(`${BASE}/brackets/${app.currentBracketId}`);
+            await bracketRef.delete();
+
+            console.log('🏀 BRACKET_DELETE', 'Deleted bracket:', app.currentBracketId);
+            showToast('Bracket deleted successfully');
+
+            // Redirect to main NerdMadness page
+            window.location.href = 'nerdmadness.html';
+        } catch (error) {
+            console.error('🏀 BRACKET_DELETE', 'Error deleting bracket:', error);
+            showToast('Error deleting bracket: ' + error.message, true);
+        }
+    }
+
+    // Bracket Switcher Functions
+    async function populateBracketSwitcher() {
+        if (!app) return;
+
+        const select = document.getElementById('bracket-select');
+        const newBtn = document.getElementById('new-bracket-btn');
+        const isTournamentLocked = isLocked(app.settings);
+
+        // Disable new bracket button if locked
+        if (isTournamentLocked) {
+            newBtn.disabled = true;
+            newBtn.title = 'Tournament is locked';
+        }
+
+        try {
+            const brackets = await app.loadUserBrackets();
+
+            select.innerHTML = '';
+
+            // Add "New Bracket" option if not locked
+            if (!isTournamentLocked) {
+                const newOption = document.createElement('option');
+                newOption.value = 'new';
+                newOption.textContent = '+ Create New Bracket';
+                select.appendChild(newOption);
+            }
+
+            // Add user's brackets
+            brackets.forEach(b => {
+                const option = document.createElement('option');
+                option.value = b.id;
+                const name = b.bracketName || 'Unnamed Bracket';
+                const status = b.isComplete ? '✓' : `(${b.totalPicks}/63)`;
+                const inactive = !b.active ? ' [Inactive]' : '';
+                option.textContent = `${name} ${status}${inactive}`;
+                option.disabled = !b.active && isTournamentLocked;
+                select.appendChild(option);
+            });
+
+            // Select current bracket
+            if (app.currentBracketId) {
+                select.value = app.currentBracketId;
+            } else {
+                select.value = 'new';
+            }
+
+            console.log('🏀 BRACKET_LOAD', 'Bracket switcher populated with', brackets.length, 'brackets');
+        } catch (e) {
+            console.error('🏀 BRACKET_LOAD', 'Error populating switcher:', e);
+            select.innerHTML = '<option value="">Error loading brackets</option>';
+        }
+    }
+
+    // ADMIN VERSION: Load ALL brackets from ALL users
+    async function populateAdminBracketSwitcher() {
+        if (!app) return;
+
+        const select = document.getElementById('bracket-select');
+        const newBtn = document.getElementById('new-bracket-btn');
+
+        // Admin can always create new brackets - hide the new button since we want to edit existing
+        newBtn.style.display = 'none';
+
+        try {
+            // Load ALL brackets from ALL users
+            const bracketsSnap = await db.collection(`${BASE}/brackets`)
+                .orderBy('updatedAt', 'desc')
+                .get();
+
+            const brackets = [];
+            bracketsSnap.forEach(doc => {
+                const data = doc.data();
+                brackets.push({
+                    id: doc.id,
+                    bracketName: data.bracketName || 'Unnamed',
+                    displayName: data.displayName || 'Unknown User',
+                    userId: data.userId,
+                    totalPicks: data.totalPicks || (data.picks ? Object.keys(data.picks).length : 0),
+                    isComplete: data.isComplete || false,
+                    active: data.active !== false
+                });
+            });
+
+            select.innerHTML = '';
+
+            // Add "Select a bracket" placeholder
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = '-- Select a bracket to edit --';
+            placeholder.disabled = true;
+            placeholder.selected = !app.currentBracketId;
+            select.appendChild(placeholder);
+
+            // Group brackets by user for better organization
+            const userGroups = {};
+            brackets.forEach(b => {
+                if (!userGroups[b.displayName]) userGroups[b.displayName] = [];
+                userGroups[b.displayName].push(b);
+            });
+
+            // Add all brackets grouped by user
+            for (const [userName, userBrackets] of Object.entries(userGroups)) {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = `👤 ${userName}`;
+
+                userBrackets.forEach(b => {
+                    const option = document.createElement('option');
+                    option.value = b.id;
+                    const status = b.isComplete ? '✅' : `(${b.totalPicks}/63)`;
+                    const inactive = !b.active ? ' ❌' : '';
+                    option.textContent = `${b.bracketName} ${status}${inactive}`;
+                    optgroup.appendChild(option);
+                });
+
+                select.appendChild(optgroup);
+            }
+
+            // Select current bracket if editing one
+            if (app.currentBracketId) {
+                select.value = app.currentBracketId;
+                // Update the "Editing:" label
+                const currentBracket = brackets.find(b => b.id === app.currentBracketId);
+                if (currentBracket) {
+                    const editingLabel = document.getElementById('editing-user-label');
+                    if (editingLabel) {
+                        editingLabel.textContent = `🔐 Editing: ${currentBracket.displayName} - ${currentBracket.bracketName}`;
+                        editingLabel.style.display = 'inline';
+                    }
+                }
+            }
+
+            console.log('🔐 ADMIN_BRACKETS', 'Loaded', brackets.length, 'brackets from all users');
+        } catch (e) {
+            console.error('🔐 ADMIN_BRACKETS', 'Error loading brackets:', e);
+            select.innerHTML = '<option value="">Error loading brackets</option>';
+        }
+    }
+
+    async function switchBracket(bracketId) {
+        if (!bracketId) return;
+
+        if (bracketId === 'new') {
+            createNewBracket();
+            return;
+        }
+
+        // Check if there are unsaved changes
+        if (app && app.hasUnsavedChanges) {
+            if (!confirm('You have unsaved changes. Switch bracket anyway?')) {
+                // Reset select to current bracket
+                document.getElementById('bracket-select').value = app.currentBracketId || 'new';
+                return;
+            }
+        }
+
+        console.log('🏀 BRACKET_LOAD', 'Switching to bracket:', bracketId);
+
+        // Update URL without reload
+        const url = new URL(window.location);
+        url.searchParams.set('bracketId', bracketId);
+        window.history.pushState({}, '', url);
+
+        // Reinitialize app with new bracket
+        const user = auth.currentUser;
+        if (user) {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            app = new BracketCanvasApp(user, bracketId);
+            await app.init();
+            // ADMIN: Use admin switcher
+            await populateAdminBracketSwitcher();
+        }
+    }
+
+    function createNewBracket() {
+        if (app && isLocked(app.settings)) {
+            showToast('Tournament is locked! Cannot create new brackets.', true);
+            return;
+        }
+
+        // Check if there are unsaved changes
+        if (app && app.hasUnsavedChanges) {
+            if (!confirm('You have unsaved changes. Create new bracket anyway?')) {
+                return;
+            }
+        }
+
+        console.log('🏀 BRACKET_CREATE', 'Creating new bracket');
+
+        // Update URL without bracketId
+        const url = new URL(window.location);
+        url.searchParams.delete('bracketId');
+        window.history.pushState({}, '', url);
+
+        // Reinitialize app with no bracket (new)
+        const user = auth.currentUser;
+        if (user) {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            app = new BracketCanvasApp(user, null);
+            app.init().then(() => {
+                populateBracketSwitcher();
+                showToast('New bracket started! Make your picks.');
+            });
+        }
+    }
+
+    const REGIONS = ['south', 'west', 'midwest', 'east'];
+    const REGION_ROUNDS = ['round_of_64', 'round_of_32', 'sweet_16', 'elite_eight'];
+    const ROUND_NAMES = {
+        round_of_64: 'R64', round_of_32: 'R32',
+        sweet_16: 'S16', elite_eight: 'E8',
+        final_four: 'FF', championship: 'CHAMP'
+    };
+
+    const CANVAS_WIDTH = 2400;
+    const CANVAS_HEIGHT = 1800;
+    const MATCHUP_WIDTH = 120;
+    const MATCHUP_HEIGHT = 52;
+    const ROUND_GAP = 40;
+
+    const ZOOM_LEVELS = {
+        full: { scale: 0.32, name: 'Full Bracket' },
+        region: { scale: 1.1, name: 'Region' },
+        finals: { scale: 0.65, name: 'Final Rounds' }
+    };
+
+    let app = null;
+
+    function signIn() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider);
+    }
+
+    function showToast(msg, isError) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'toast show' + (isError ? ' error' : '');
+        setTimeout(() => { el.className = 'toast'; }, 3000);
+    }
+
+    class BracketCanvasApp {
+        constructor(user, bracketId = null) {
+            this.user = user;
+            this.teams = {};
+            this.matchups = {};
+            this.rounds = {};
+            this.regions = {};
+            this.picks = {};
+            this.feeders = {};
+            this.settings = {};
+            this.tiebreakerScores = { higher: null, lower: null };
+            this.allBrackets = [];
+
+            // Multi-bracket support
+            this.currentBracketId = bracketId;
+            this.bracketName = null;
+            this.userBrackets = [];
+            this.hasShownNamingPrompt = false;
+            this.hasUnsavedChanges = false;
+
+            this.scale = 0.45;
+            this.panX = 0;
+            this.panY = 0;
+            this.currentZoomLevel = 'full';
+            this.currentRegionIndex = 0;
+
+            this.isDragging = false;
+            this.dragStartX = 0;
+            this.dragStartY = 0;
+            this.lastPanX = 0;
+            this.lastPanY = 0;
+
+            this.matchupElements = {};
+            this.matchupPositions = {};
+        }
+
+        async init() {
+            document.getElementById('loading-overlay').style.display = 'flex';
+            await this.loadTournamentData();
+            this.buildFeedersMap();
+            await this.loadUserPicks();
+            await this.loadAllBrackets();
+
+            this.calculateLayout();
+            this.renderBracket();
+            this.renderBracketLines();
+            this.setupPanZoom();
+            this.updateMinimap();
+            this.updateStatsBar();
+            this.setupPopupListeners();
+
+            document.getElementById('loading-overlay').style.display = 'none';
+            document.getElementById('stats-bar').style.display = 'flex';
+            document.getElementById('bottom-controls').style.display = 'flex';
+
+            const isBracketLocked = isLocked(this.settings);
+
+            if (isBracketLocked) {
+                this.setZoomLevel('full');
+                // Hide save buttons when locked
+                document.getElementById('footer-save-btn').style.display = 'none';
+                document.getElementById('save-btn').style.display = 'none';
+                // Show view brackets button
+                document.getElementById('view-brackets-btn').style.display = 'inline-flex';
+            } else {
+                this.currentRegionIndex = 0;
+                this.setZoomLevel('region');
+            }
+        }
+
+        async loadTournamentData() {
+            // Force server fetch to bypass IndexedDB cache
+            const serverOptions = { source: 'server' };
+            const [teamsSnap, matchupsSnap, roundsSnap, regionsSnap, settingsSnap] = await Promise.all([
+                db.collection(`${BASE}/teams`).get(serverOptions),
+                db.collection(`${BASE}/matchups`).get(serverOptions),
+                db.collection(`${BASE}/rounds`).get(serverOptions),
+                db.collection(`${BASE}/regions`).get(serverOptions),
+                db.doc(`${BASE}/metadata/settings`).get(serverOptions)
+            ]);
+
+            teamsSnap.forEach(doc => { this.teams[doc.id] = doc.data(); });
+            matchupsSnap.forEach(doc => { this.matchups[doc.id] = doc.data(); });
+            roundsSnap.forEach(doc => { this.rounds[doc.id] = doc.data(); });
+            regionsSnap.forEach(doc => { this.regions[doc.id] = doc.data(); });
+            if (settingsSnap.exists) this.settings = settingsSnap.data();
+
+            // DEBUG: Log team data to verify correct data is loaded
+            console.log('🏀 DEBUG_TEAMS', 'Total teams loaded:', Object.keys(this.teams).length);
+            console.log('🏀 DEBUG_TEAMS', 'All team IDs:', Object.keys(this.teams));
+            console.log('🏀 DEBUG_TEAMS', 'First 3 teams:', Object.entries(this.teams).slice(0, 3).map(([id, t]) => ({ id, name: t.team_name, region: t.region_id })));
+        }
+
+        buildFeedersMap() {
+            this.feeders = {};
+            for (const [id, m] of Object.entries(this.matchups)) {
+                if (m.next_matchup_id) {
+                    if (!this.feeders[m.next_matchup_id]) this.feeders[m.next_matchup_id] = {};
+                    this.feeders[m.next_matchup_id][m.next_matchup_slot] = id;
+                }
+            }
+        }
+
+        async loadUserPicks() {
+            if (this.currentBracketId) {
+                // Load specific bracket by ID
+                const snap = await db.doc(`${BASE}/brackets/${this.currentBracketId}`).get();
+                if (snap.exists) {
+                    const data = snap.data();
+
+                    // ADMIN MODE: Store original bracket owner's userId and displayName
+                    if (isAdminMode) {
+                        originalBracketUserId = data.userId;
+                        this.originalDisplayName = data.displayName || 'Unknown User';
+                        console.log('🔐 ADMIN_LOAD', 'Loading bracket owned by:', data.displayName, '(', data.userId, ')');
+                    } else {
+                        // Normal mode: Verify ownership
+                        if (data.userId !== this.user.uid) {
+                            console.error('🏀 BRACKET_LOAD', 'Bracket does not belong to user');
+                            showToast('Access denied: This bracket belongs to another user', true);
+                            return;
+                        }
+                    }
+
+                    this.picks = data.picks || {};
+                    this.bracketName = data.bracketName || null;
+                    this.tiebreakerScores = {
+                        higher: data.tiebreakerHigherScore || null,
+                        lower: data.tiebreakerLowerScore || null
+                    };
+                    this.updateBracketNameDisplay();
+                    this.showDeleteButton(true);
+                    console.log('🏀 BRACKET_LOAD', 'Loaded bracket:', this.currentBracketId, 'Name:', this.bracketName);
+                } else {
+                    console.warn('🏀 BRACKET_LOAD', 'Bracket not found:', this.currentBracketId);
+                    this.currentBracketId = null;
+                }
+            } else {
+                // New bracket - start with empty picks
+                console.log('🏀 BRACKET_LOAD', 'Starting new bracket');
+                this.picks = {};
+                this.bracketName = null;
+                originalBracketUserId = null;
+            }
+        }
+
+        async loadAllBrackets() {
+            try {
+                // Load all active brackets for uniqueness/comparison calculations
+                const bracketsSnap = await db.collection(`${BASE}/brackets`)
+                    .where('active', '==', true)
+                    .get();
+                this.allBrackets = [];
+                bracketsSnap.forEach(doc => {
+                    // Exclude current bracket being edited
+                    if (doc.id !== this.currentBracketId) {
+                        const data = doc.data();
+                        if (data.picks) {
+                            this.allBrackets.push({
+                                id: doc.id,
+                                userId: data.userId,
+                                picks: data.picks
+                            });
+                        }
+                    }
+                });
+                console.log('🏀 BRACKET_LOAD', 'Loaded', this.allBrackets.length, 'other brackets for comparison');
+            } catch (e) {
+                console.warn('Could not load pool brackets for uniqueness calc:', e);
+                this.allBrackets = [];
+            }
+        }
+
+        async loadUserBrackets() {
+            try {
+                const isTournamentLocked = isLocked(this.settings);
+                let query = db.collection(`${BASE}/brackets`)
+                    .where('userId', '==', this.user.uid)
+                    .orderBy('createdAt', 'desc');
+
+                // After lock, only show active brackets to user
+                if (isTournamentLocked) {
+                    query = query.where('active', '==', true);
+                }
+
+                const bracketsSnap = await query.get();
+                this.userBrackets = [];
+                bracketsSnap.forEach(doc => {
+                    const data = doc.data();
+                    this.userBrackets.push({
+                        id: doc.id,
+                        bracketName: data.bracketName,
+                        totalPicks: data.totalPicks || 0,
+                        isComplete: data.isComplete || false,
+                        active: data.active !== false,
+                        createdAt: data.createdAt,
+                        updatedAt: data.updatedAt,
+                        submittedAt: data.submittedAt
+                    });
+                });
+                console.log('🏀 BRACKET_LOAD', 'User has', this.userBrackets.length, 'brackets');
+                return this.userBrackets;
+            } catch (e) {
+                console.warn('Could not load user brackets:', e);
+                this.userBrackets = [];
+                return [];
+            }
+        }
+
+        calculateUpsetChalk() {
+            let upsets = 0;
+            let chalk = 0;
+
+            for (const [matchupId, pickedTeamId] of Object.entries(this.picks)) {
+                const m = this.matchups[matchupId];
+                if (!m) continue;
+
+                const topTeamId = this.getTeamForSlot(matchupId, 'top');
+                const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
+                if (!topTeamId || !bottomTeamId) continue;
+
+                let topSeed, bottomSeed;
+                if (m.round_id === 'round_of_64') {
+                    topSeed = parseInt(m.top_seed) || 16;
+                    bottomSeed = parseInt(m.bottom_seed) || 16;
+                } else {
+                    const topTeam = this.teams[topTeamId];
+                    const bottomTeam = this.teams[bottomTeamId];
+                    topSeed = topTeam ? (parseInt(topTeam.team_seed) || parseInt(topTeam.seed) || 16) : 16;
+                    bottomSeed = bottomTeam ? (parseInt(bottomTeam.team_seed) || parseInt(bottomTeam.seed) || 16) : 16;
+                }
+
+                if (topSeed === bottomSeed) continue;
+
+                if (pickedTeamId === topTeamId) {
+                    topSeed > bottomSeed ? upsets++ : chalk++;
+                } else if (pickedTeamId === bottomTeamId) {
+                    bottomSeed > topSeed ? upsets++ : chalk++;
+                }
+            }
+
+            return { upsets, chalk };
+        }
+
+        isUpsetPick(matchupId, pickedTeamId) {
+            const m = this.matchups[matchupId];
+            if (!m) return false;
+
+            const topTeamId = this.getTeamForSlot(matchupId, 'top');
+            const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
+            if (!topTeamId || !bottomTeamId) return false;
+
+            let topSeed, bottomSeed;
+            if (m.round_id === 'round_of_64') {
+                topSeed = parseInt(m.top_seed) || 16;
+                bottomSeed = parseInt(m.bottom_seed) || 16;
+            } else {
+                const topTeam = this.teams[topTeamId];
+                const bottomTeam = this.teams[bottomTeamId];
+                topSeed = topTeam ? (parseInt(topTeam.team_seed) || parseInt(topTeam.seed) || 16) : 16;
+                bottomSeed = bottomTeam ? (parseInt(bottomTeam.team_seed) || parseInt(bottomTeam.seed) || 16) : 16;
+            }
+
+            if (topSeed === bottomSeed) return false;
+
+            if (pickedTeamId === topTeamId) {
+                return topSeed > bottomSeed;
+            } else if (pickedTeamId === bottomTeamId) {
+                return bottomSeed > topSeed;
+            }
+            return false;
+        }
+
+        calculateUniqueness() {
+            if (this.allBrackets.length === 0) return 0;
+
+            const myPicks = this.picks;
+            const myPickCount = Object.keys(myPicks).length;
+            if (myPickCount === 0) return 0;
+
+            let totalDifference = 0;
+
+            for (const bracket of this.allBrackets) {
+                let different = 0;
+                for (const [matchupId, myPick] of Object.entries(myPicks)) {
+                    const theirPick = bracket.picks[matchupId];
+                    if (theirPick && theirPick !== myPick) {
+                        different++;
+                    } else if (!theirPick) {
+                        different += 0.5;
+                    }
+                }
+                totalDifference += different / myPickCount;
+            }
+
+            const avgDifference = totalDifference / this.allBrackets.length;
+            return Math.round(avgDifference * 100);
+        }
+
+        calculateWinChances() {
+            const isBracketLocked = isLocked(this.settings);
+            const scoring = this.settings.scoring_system || {
+                round_of_64: 1, round_of_32: 2, sweet_16: 4,
+                elite_eight: 8, final_four: 16, championship: 32
+            };
+
+            const myPicks = this.picks;
+            const myPickCount = Object.keys(myPicks).length;
+            if (myPickCount === 0 || this.allBrackets.length === 0) {
+                return { chance: 0, mode: 'theoretical' };
+            }
+
+            if (!isBracketLocked) {
+                let myMaxPossible = 0;
+                for (const [matchupId, pickedTeamId] of Object.entries(myPicks)) {
+                    const m = this.matchups[matchupId];
+                    if (m) myMaxPossible += scoring[m.round_id] || 0;
+                }
+
+                let poolAvgMax = 0;
+                for (const bracket of this.allBrackets) {
+                    let bracketMax = 0;
+                    for (const [matchupId, pick] of Object.entries(bracket.picks)) {
+                        const m = this.matchups[matchupId];
+                        if (m) bracketMax += scoring[m.round_id] || 0;
+                    }
+                    poolAvgMax += bracketMax;
+                }
+                poolAvgMax = poolAvgMax / this.allBrackets.length;
+
+                const relativeStrength = poolAvgMax > 0 ? (myMaxPossible / poolAvgMax) : 1;
+                const baseChance = 100 / (this.allBrackets.length + 1);
+                const adjustedChance = Math.min(99, Math.max(1, baseChance * relativeStrength));
+
+                return { chance: Math.round(adjustedChance), mode: 'theoretical' };
+            }
+
+            let myPoints = 0;
+            let myMaxRemaining = 0;
+            let myEliminated = false;
+
+            for (const [matchupId, pickedTeamId] of Object.entries(myPicks)) {
+                const m = this.matchups[matchupId];
+                if (!m) continue;
+                const pts = scoring[m.round_id] || 0;
+
+                if (m.complete) {
+                    if (m.winning_team_id === pickedTeamId) {
+                        myPoints += pts;
+                    }
+                } else {
+                    const pickedTeam = this.teams[pickedTeamId];
+                    if (pickedTeam && !pickedTeam.eliminated) {
+                        myMaxRemaining += pts;
+                    }
+                }
+            }
+
+            const myMaxPossible = myPoints + myMaxRemaining;
+
+            let canWin = 0;
+            for (const bracket of this.allBrackets) {
+                let theirPoints = 0;
+                let theirMax = 0;
+
+                for (const [matchupId, pick] of Object.entries(bracket.picks)) {
+                    const m = this.matchups[matchupId];
+                    if (!m) continue;
+                    const pts = scoring[m.round_id] || 0;
+
+                    if (m.complete) {
+                        if (m.winning_team_id === pick) theirPoints += pts;
+                    } else {
+                        const team = this.teams[pick];
+                        if (team && !team.eliminated) theirMax += pts;
+                    }
+                }
+
+                if (myMaxPossible >= theirPoints + theirMax) {
+                    canWin++;
+                }
+            }
+
+            const chance = Math.round((canWin / this.allBrackets.length) * 100);
+            return { chance, mode: 'live' };
+        }
+
+        async savePicks() {
+            // ADMIN MODE: Never locked
+            if (!isAdminMode && isLocked(this.settings)) {
+                showToast('Tournament is locked! No changes allowed.', true);
+                return;
+            }
+
+            const championPick = this.picks['R6_G01'] || null;
+            const pickCount = Object.keys(this.picks).length;
+            const isComplete = pickCount === 63;
+
+            const tiebreakerHigher = this.tiebreakerScores?.higher || null;
+            const tiebreakerLower = this.tiebreakerScores?.lower || null;
+            const tiebreakerTotal = (tiebreakerHigher !== null && tiebreakerLower !== null)
+                ? tiebreakerHigher + tiebreakerLower
+                : null;
+
+            // ADMIN MODE: Preserve original bracket owner's userId, not the admin's
+            const saveUserId = (isAdminMode && originalBracketUserId) ? originalBracketUserId : this.user.uid;
+            const saveDisplayName = (isAdminMode && this.originalDisplayName) ? this.originalDisplayName : (this.user.displayName || this.user.email);
+
+            const bracketData = {
+                userId: saveUserId,
+                displayName: saveDisplayName,
+                bracketName: this.bracketName,
+                picks: this.picks,
+                championPick: championPick,
+                totalPicks: pickCount,
+                isComplete: isComplete,
+                active: true,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                totalPoints: this.calculatePoints(),
+                correctPicks: 0,
+                maxPossiblePoints: 192,
+                tiebreakerHigherScore: tiebreakerHigher,
+                tiebreakerLowerScore: tiebreakerLower,
+                tiebreakerTotal: tiebreakerTotal
+            };
+
+            // ADMIN MODE: Add edit tracking
+            if (isAdminMode) {
+                bracketData.lastEditedBy = this.user.uid;
+                bracketData.lastEditedByName = this.user.displayName || this.user.email;
+                bracketData.lastAdminEditAt = firebase.firestore.FieldValue.serverTimestamp();
+                console.log('🔐 ADMIN_SAVE', 'Preserving original owner:', saveDisplayName, '(', saveUserId, ')');
+            }
+
+            let bracketRef;
+            if (this.currentBracketId) {
+                // Update existing bracket
+                bracketRef = db.doc(`${BASE}/brackets/${this.currentBracketId}`);
+                await bracketRef.update(bracketData);
+                console.log('🏀 BRACKET_SAVE', 'Updated bracket:', this.currentBracketId);
+            } else {
+                // Create new bracket with auto-generated ID
+                bracketRef = db.collection(`${BASE}/brackets`).doc();
+                this.currentBracketId = bracketRef.id;
+                bracketData.bracketId = bracketRef.id;
+                bracketData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                bracketData.submittedAt = null;
+                await bracketRef.set(bracketData);
+                this.showDeleteButton(true);
+                console.log('🏀 BRACKET_CREATE', 'Created new bracket:', this.currentBracketId);
+            }
+
+            this.hasUnsavedChanges = false;
+            const adminPrefix = isAdminMode ? '🔐 ADMIN: ' : '';
+            showToast(`${adminPrefix}Bracket "${this.bracketName}" saved! (${pickCount}/63 picks)`);
+        }
+
+        async finalizeBracket() {
+            // ADMIN MODE: Never locked
+            if (!isAdminMode && isLocked(this.settings)) {
+                showToast('Tournament is locked! No changes allowed.', true);
+                return;
+            }
+
+            if (!this.bracketName) {
+                showToast('Please enter a bracket name to finalize', true);
+                return;
+            }
+
+            const pickCount = Object.keys(this.picks).length;
+            if (pickCount < 63) {
+                showToast('Please complete all 63 picks before finalizing', true);
+                return;
+            }
+
+            const championPick = this.picks['R6_G01'] || null;
+            const tiebreakerHigher = this.tiebreakerScores?.higher || null;
+            const tiebreakerLower = this.tiebreakerScores?.lower || null;
+            const tiebreakerTotal = (tiebreakerHigher !== null && tiebreakerLower !== null)
+                ? tiebreakerHigher + tiebreakerLower
+                : null;
+
+            // ADMIN MODE: Preserve original bracket owner's userId
+            const saveUserId = (isAdminMode && originalBracketUserId) ? originalBracketUserId : this.user.uid;
+            const saveDisplayName = (isAdminMode && this.originalDisplayName) ? this.originalDisplayName : (this.user.displayName || this.user.email);
+
+            const bracketData = {
+                userId: saveUserId,
+                displayName: saveDisplayName,
+                bracketName: this.bracketName,
+                picks: this.picks,
+                championPick: championPick,
+                totalPicks: pickCount,
+                isComplete: true,
+                active: true,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                totalPoints: this.calculatePoints(),
+                correctPicks: 0,
+                maxPossiblePoints: 192,
+                tiebreakerHigherScore: tiebreakerHigher,
+                tiebreakerLowerScore: tiebreakerLower,
+                tiebreakerTotal: tiebreakerTotal
+            };
+
+            // ADMIN MODE: Add edit tracking
+            if (isAdminMode) {
+                bracketData.lastEditedBy = this.user.uid;
+                bracketData.lastEditedByName = this.user.displayName || this.user.email;
+                bracketData.lastAdminEditAt = firebase.firestore.FieldValue.serverTimestamp();
+            }
+
+            let bracketRef;
+            if (this.currentBracketId) {
+                bracketRef = db.doc(`${BASE}/brackets/${this.currentBracketId}`);
+                await bracketRef.update(bracketData);
+            } else {
+                bracketRef = db.collection(`${BASE}/brackets`).doc();
+                this.currentBracketId = bracketRef.id;
+                bracketData.bracketId = bracketRef.id;
+                bracketData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                await bracketRef.set(bracketData);
+            }
+
+            console.log('🏀 BRACKET_SAVE', 'Bracket finalized:', this.currentBracketId, 'Name:', this.bracketName);
+            showToast(`🏆 Bracket "${this.bracketName}" finalized!`);
+
+            // Redirect to brackets list after short delay
+            setTimeout(() => {
+                window.location.href = 'nerdmadness.html';
+            }, 1500);
+        }
+
+        calculatePoints() {
+            let points = 0;
+            const scoring = this.settings.scoring_system || {};
+            for (const [matchupId, pickedTeamId] of Object.entries(this.picks)) {
+                const m = this.matchups[matchupId];
+                if (m && m.complete && m.winning_team_id === pickedTeamId) {
+                    points += scoring[m.round_id] || 0;
+                }
+            }
+            return points;
+        }
+
+        calculateLayout() {
+            const MARGIN = 50;
+            const CENTER_X = CANVAS_WIDTH / 2;
+            const CENTER_Y = CANVAS_HEIGHT / 2;
+
+            const BASE_SPACING = MATCHUP_HEIGHT + 38;
+            const ROUND_WIDTH = MATCHUP_WIDTH + ROUND_GAP;
+
+            const REGION_HEIGHT = BASE_SPACING * 8;
+            const HALF_HEIGHT = REGION_HEIGHT + 80;
+
+            // Official NCAA bracket layout:
+            // Top-Left: EAST, Bottom-Left: SOUTH, Top-Right: WEST, Bottom-Right: MIDWEST
+            const regionConfig = {
+                east: {
+                    startX: MARGIN,
+                    startY: MARGIN + 40,
+                    direction: 1,
+                    flowsRight: true
+                },
+                south: {
+                    startX: MARGIN,
+                    startY: CENTER_Y + 40,
+                    direction: 1,
+                    flowsRight: true
+                },
+                west: {
+                    startX: CANVAS_WIDTH - MARGIN - MATCHUP_WIDTH,
+                    startY: MARGIN + 40,
+                    direction: -1,
+                    flowsRight: false
+                },
+                midwest: {
+                    startX: CANVAS_WIDTH - MARGIN - MATCHUP_WIDTH,
+                    startY: CENTER_Y + 40,
+                    direction: -1,
+                    flowsRight: false
+                }
+            };
+
+            for (const regionId of REGIONS) {
+                const config = regionConfig[regionId];
+                const gamesPerRound = [8, 4, 2, 1];
+
+                for (let roundIdx = 0; roundIdx < 4; roundIdx++) {
+                    const roundId = REGION_ROUNDS[roundIdx];
+                    const matchups = this.getMatchupsForRegionRound(regionId, roundId);
+                    const numGames = gamesPerRound[roundIdx];
+
+                    const roundSpacing = BASE_SPACING * Math.pow(2, roundIdx);
+                    const roundOffset = (roundSpacing - BASE_SPACING) / 2;
+
+                    const x = config.startX + (config.direction * roundIdx * ROUND_WIDTH);
+
+                    matchups.forEach((m, gameIdx) => {
+                        const y = config.startY + roundOffset + (gameIdx * roundSpacing);
+                        this.matchupPositions[m.matchup_id] = {
+                            x,
+                            y,
+                            roundIdx,
+                            region: regionId
+                        };
+                    });
+                }
+            }
+
+            const ffGames = Object.values(this.matchups)
+                .filter(m => m.round_id === 'final_four')
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+
+            console.log('🏀 FF_DEBUG: Total matchups loaded:', Object.keys(this.matchups).length);
+            console.log('🏀 FF_DEBUG: R5_G01 exists?', !!this.matchups['R5_G01'], this.matchups['R5_G01']);
+            console.log('🏀 FF_DEBUG: R5_G02 exists?', !!this.matchups['R5_G02'], this.matchups['R5_G02']);
+            console.log('🏀 FF_DEBUG: R6_G01 exists?', !!this.matchups['R6_G01'], this.matchups['R6_G01']);
+            console.log('🏀 FF_DEBUG: ffGames found:', ffGames.length, ffGames.map(g => g.matchup_id));
+            console.log('🏀 FF_DEBUG: feeders for R5_G01:', this.feeders['R5_G01']);
+            console.log('🏀 FF_DEBUG: feeders for R5_G02:', this.feeders['R5_G02']);
+            console.log('🏀 FF_DEBUG: feeders for R6_G01:', this.feeders['R6_G01']);
+
+            // Final Four games are 150px wide, Championship is 360px wide (4x normal)
+            const FF_WIDTH = 150;
+            const CHAMP_WIDTH = 360;
+            const CHAMP_HEIGHT = 140;
+
+            const ffX = CENTER_X - (FF_WIDTH / 2);
+            const champX = CENTER_X - (CHAMP_WIDTH / 2);
+
+            // FF1: EAST vs SOUTH - position in upper-center
+            // FF2: WEST vs MIDWEST - position in lower-center
+            // Fixed positions to avoid overlap issues
+            const ff1Y = MARGIN + 180;  // Upper center area
+            const ff2Y = CENTER_Y + 180; // Lower center area
+
+            console.log('🏀 FF_DEBUG: ff1Y:', ff1Y, 'ff2Y:', ff2Y, 'ffX:', ffX, 'CENTER_Y:', CENTER_Y);
+
+            if (ffGames[0]) {
+                this.matchupPositions[ffGames[0].matchup_id] = {
+                    x: ffX,
+                    y: ff1Y,
+                    roundIdx: 4,
+                    region: 'final_four'
+                };
+                console.log('🏀 FF_DEBUG: Set position for', ffGames[0].matchup_id, 'at', ffX, ff1Y);
+            } else {
+                console.log('🏀 FF_DEBUG: ffGames[0] is undefined!');
+            }
+            if (ffGames[1]) {
+                this.matchupPositions[ffGames[1].matchup_id] = {
+                    x: ffX,
+                    y: ff2Y,
+                    roundIdx: 4,
+                    region: 'final_four'
+                };
+                console.log('🏀 FF_DEBUG: Set position for', ffGames[1].matchup_id, 'at', ffX, ff2Y);
+            } else {
+                console.log('🏀 FF_DEBUG: ffGames[1] is undefined!');
+            }
+
+            const champY = (ff1Y + ff2Y + MATCHUP_HEIGHT) / 2 - CHAMP_HEIGHT / 2;
+            this.matchupPositions['R6_G01'] = {
+                x: champX,
+                y: champY,
+                roundIdx: 5,
+                region: 'championship'
+            };
+        }
+
+        getMatchupsForRegionRound(regionId, roundId) {
+            return Object.values(this.matchups)
+                .filter(m => m.region_id === regionId && m.round_id === roundId)
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+        }
+
+        renderBracket() {
+            const canvas = document.getElementById('canvas');
+            canvas.innerHTML = '<svg class="bracket-lines" id="bracket-lines"></svg>';
+
+            const CENTER_X = CANVAS_WIDTH / 2;
+            const CENTER_Y = CANVAS_HEIGHT / 2;
+            const MARGIN = 50;
+
+            // Region labels matching official bracket layout
+            const regionLabels = {
+                east: { x: MARGIN, y: MARGIN + 10 },
+                south: { x: MARGIN, y: CENTER_Y + 10 },
+                west: { x: CANVAS_WIDTH - MARGIN - 80, y: MARGIN + 10 },
+                midwest: { x: CANVAS_WIDTH - MARGIN - 120, y: CENTER_Y + 10 }
+            };
+
+            for (const [regionId, pos] of Object.entries(regionLabels)) {
+                const label = document.createElement('div');
+                label.className = 'region-label';
+                label.style.left = pos.x + 'px';
+                label.style.top = pos.y + 'px';
+                label.textContent = regionId.toUpperCase();
+                label.title = 'Click to open ' + regionId + ' region in popup view';
+                label.onclick = (e) => {
+                    e.stopPropagation();
+                    this.openRegionPopup(regionId);
+                };
+                canvas.appendChild(label);
+            }
+
+            const ffLabel = document.createElement('div');
+            ffLabel.className = 'final-four-label';
+            ffLabel.style.left = (CENTER_X - 55) + 'px';
+            ffLabel.style.top = (MARGIN + 10) + 'px';
+            ffLabel.textContent = 'FINAL FOUR';
+            ffLabel.style.cursor = 'pointer';
+            ffLabel.title = 'Click to open Final Four in popup view';
+            ffLabel.onclick = (e) => {
+                e.stopPropagation();
+                this.openFinalFourPopup();
+            };
+            canvas.appendChild(ffLabel);
+
+            const champPos = this.matchupPositions['R6_G01'];
+            if (champPos) {
+                const CHAMP_WIDTH = 360;
+                const champLabel = document.createElement('div');
+                champLabel.className = 'championship-label';
+                champLabel.style.left = champPos.x + 'px';
+                champLabel.style.top = (champPos.y - 50) + 'px';
+                champLabel.style.width = CHAMP_WIDTH + 'px';
+                champLabel.style.fontSize = '20px';
+                champLabel.textContent = '🏆 CHAMPIONSHIP 🏆';
+                canvas.appendChild(champLabel);
+            }
+
+            let ffRendered = 0;
+            for (const [matchupId, pos] of Object.entries(this.matchupPositions)) {
+                const m = this.matchups[matchupId];
+                if (!m) continue;
+
+                if (m.round_id === 'final_four' || m.round_id === 'championship') {
+                    console.log('🏀 RENDER_DEBUG:', matchupId, 'round:', m.round_id, 'pos:', pos.x, pos.y);
+                    ffRendered++;
+                }
+
+                const el = this.createMatchupElement(m);
+                el.style.left = pos.x + 'px';
+                el.style.top = pos.y + 'px';
+                canvas.appendChild(el);
+                this.matchupElements[matchupId] = el;
+            }
+            console.log('🏀 RENDER_DEBUG: Total FF/Champ rendered:', ffRendered);
+        }
+
+        createMatchupElement(m) {
+            const el = document.createElement('div');
+            el.className = 'matchup';
+            el.dataset.matchupId = m.matchup_id;
+
+            const isChampionship = m.round_id === 'championship' || m.matchup_id === 'R6_G01';
+
+            // Add special classes for championship and final four
+            if (isChampionship) {
+                el.classList.add('championship-game');
+            } else if (m.round_id === 'final_four') {
+                el.classList.add('final-four-game');
+            }
+
+            const topTeamId = this.getTeamForSlot(m.matchup_id, 'top');
+            const bottomTeamId = this.getTeamForSlot(m.matchup_id, 'bottom');
+            const picked = this.picks[m.matchup_id];
+
+            if (picked) el.classList.add('decided');
+
+            let html = `
+                ${this.renderTeamRow(m.matchup_id, topTeamId, 'top', picked)}
+                ${this.renderTeamRow(m.matchup_id, bottomTeamId, 'bottom', picked)}
+            `;
+
+            // Add tiebreaker section for championship game
+            if (isChampionship) {
+                const topTeam = topTeamId ? this.teams[topTeamId] : null;
+                const bottomTeam = bottomTeamId ? this.teams[bottomTeamId] : null;
+                const topName = topTeam?.team_name || 'Team 1';
+                const bottomName = bottomTeam?.team_name || 'Team 2';
+                const topScore = this.tiebreakerScores?.higher || '';
+                const bottomScore = this.tiebreakerScores?.lower || '';
+                const total = (topScore && bottomScore) ? (parseInt(topScore) + parseInt(bottomScore)) : '---';
+
+                html += `
+                    <div class="tiebreaker-section">
+                        <div class="tiebreaker-label">🎯 Tiebreaker: Predict Final Score</div>
+                        <div class="tiebreaker-inputs">
+                            <div class="tiebreaker-team">
+                                <span class="tiebreaker-team-name">${topName}</span>
+                                <input type="number" class="tiebreaker-input" id="tiebreaker-higher"
+                                    placeholder="0" min="0" max="200" value="${topScore}"
+                                    onchange="app.updateTiebreaker()" onclick="event.stopPropagation()">
+                            </div>
+                            <span class="tiebreaker-plus">+</span>
+                            <div class="tiebreaker-team">
+                                <span class="tiebreaker-team-name">${bottomName}</span>
+                                <input type="number" class="tiebreaker-input" id="tiebreaker-lower"
+                                    placeholder="0" min="0" max="200" value="${bottomScore}"
+                                    onchange="app.updateTiebreaker()" onclick="event.stopPropagation()">
+                            </div>
+                            <span class="tiebreaker-equals">=</span>
+                            <div class="tiebreaker-total" id="tiebreaker-total">${total}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            el.innerHTML = html;
+            return el;
+        }
+
+        updateTiebreaker() {
+            const higherInput = document.getElementById('tiebreaker-higher');
+            const lowerInput = document.getElementById('tiebreaker-lower');
+            const totalDisplay = document.getElementById('tiebreaker-total');
+
+            const higher = parseInt(higherInput?.value) || 0;
+            const lower = parseInt(lowerInput?.value) || 0;
+
+            this.tiebreakerScores = { higher, lower };
+
+            if (higher || lower) {
+                totalDisplay.textContent = higher + lower;
+            } else {
+                totalDisplay.textContent = '---';
+            }
+
+            this.showSaveButton();
+        }
+
+        showSaveButton() {
+            // Footer save button is always visible when logged in
+        }
+
+        /**
+         * Resolve tiebreaker between brackets
+         * Rules: Closest to actual score WITHOUT going over wins
+         * If both go over: closest OVER wins
+         * @param {number} actualTotal - The real combined final score
+         * @param {Array} brackets - Array of {userId, tiebreakerTotal} objects
+         * @returns {Array} - Sorted array with tiebreaker results
+         */
+        static resolveTiebreaker(actualTotal, brackets) {
+            return brackets
+                .map(b => {
+                    const diff = actualTotal - b.tiebreakerTotal;
+                    const isUnder = diff >= 0;
+                    return {
+                        ...b,
+                        diff,
+                        isUnder,
+                        absDiff: Math.abs(diff)
+                    };
+                })
+                .sort((a, b) => {
+                    // Priority 1: Under beats over
+                    if (a.isUnder && !b.isUnder) return -1;
+                    if (!a.isUnder && b.isUnder) return 1;
+
+                    // Both under or both over: closest wins
+                    return a.absDiff - b.absDiff;
+                });
+        }
+
+        renderTeamRow(matchupId, teamId, slot, picked) {
+            const team = teamId ? this.teams[teamId] : null;
+            const seed = this.getSeedForSlot(matchupId, slot);
+            const m = this.matchups[matchupId];
+            const locked = isLocked(this.settings);
+
+            if (!teamId || !team) {
+                return `<div class="team-row tbd${locked ? ' locked' : ''}">
+                    <div class="seed-badge tbd">?</div>
+                    <div class="team-name">TBD</div>
+                </div>`;
+            }
+
+            const isPicked = picked === teamId;
+            const isEliminated = picked && picked !== teamId;
+            const isUpset = isPicked && this.isUpsetPick(matchupId, teamId);
+
+            // Check if game is final and determine winner/loser status
+            const isFinal = m && m.status === 'FINAL' && m.winner_team_id;
+            const isActualWinner = isFinal && m.winner_team_id === teamId;
+            const isActualLoser = isFinal && m.winner_team_id !== teamId;
+
+            const classes = ['team-row'];
+            if (isPicked) classes.push('picked');
+            if (isUpset) classes.push('upset');
+            if (isEliminated) classes.push('eliminated');
+            if (isActualWinner) classes.push('actual-winner');
+            if (isActualLoser) classes.push('actual-loser');
+            if (locked) classes.push('locked');
+
+            // Get score if final
+            const score = isFinal ? (slot === 'top' ? m.top_team_score : m.bottom_team_score) : null;
+
+            // Don't add onclick if locked
+            const onclick = locked ? '' : `onclick="app.pickWinner('${matchupId}','${teamId}')"`;
+
+            return `<div class="${classes.join(' ')}" ${onclick}>
+                <div class="seed-badge">${seed || '?'}</div>
+                <div class="team-name">${team.team_name}</div>
+                ${score ? `<div class="team-score">${score}</div>` : ''}
+                ${isActualWinner ? '<div class="winner-indicator">✓</div>' : ''}
+            </div>`;
+        }
+
+        getTeamForSlot(matchupId, slot) {
+            const m = this.matchups[matchupId];
+            if (!m) return null;
+            if (m.round_id === 'round_of_64') {
+                return slot === 'top' ? m.top_team_id : m.bottom_team_id;
+            }
+            const feederId = this.feeders[matchupId]?.[slot];
+            const result = feederId ? (this.picks[feederId] || null) : null;
+            if (matchupId.startsWith('R5') || matchupId.startsWith('R6')) {
+                console.log('🏀 SLOT_DEBUG:', matchupId, slot, '-> feeder:', feederId, '-> pick:', this.picks[feederId], '-> result:', result);
+            }
+            return result;
+        }
+
+        getSeedForSlot(matchupId, slot) {
+            const m = this.matchups[matchupId];
+            if (!m) return null;
+            if (m.round_id === 'round_of_64') {
+                return slot === 'top' ? m.top_seed : m.bottom_seed;
+            }
+            const feederId = this.feeders[matchupId]?.[slot];
+            if (!feederId) return null;
+            const pickedTeamId = this.picks[feederId];
+            if (!pickedTeamId) return null;
+            const team = this.teams[pickedTeamId];
+            return team ? team.team_seed : null;
+        }
+
+        pickWinner(matchupId, teamId) {
+            // Check if tournament is locked (admins can always pick)
+            if (isLocked(this.settings)) {
+                if (!isAdminMode) {
+                    showToast('Tournament is locked! View only mode.', true);
+                    return;
+                }
+            }
+
+            const m = this.matchups[matchupId];
+            if (!m) return;
+
+            const topTeamId = this.getTeamForSlot(matchupId, 'top');
+            const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
+            if (!topTeamId || !bottomTeamId) return;
+
+            const oldPick = this.picks[matchupId];
+            if (oldPick === teamId) return;
+
+            this.picks[matchupId] = teamId;
+            this.hasUnsavedChanges = true;
+
+            if (oldPick && oldPick !== teamId) {
+                this.cascadeClear(matchupId, oldPick);
+            }
+
+            this.refreshMatchup(matchupId);
+
+            if (m.next_matchup_id) {
+                this.refreshMatchup(m.next_matchup_id);
+            }
+
+            this.renderBracketLines();
+            this.updateStatsBar();
+            this.updateMinimap();
+
+            this.advanceToNextPick(matchupId);
+        }
+
+        cascadeClear(matchupId, eliminatedTeamId) {
+            const m = this.matchups[matchupId];
+            if (!m || !m.next_matchup_id) return;
+            const nextId = m.next_matchup_id;
+            if (this.picks[nextId] === eliminatedTeamId) {
+                delete this.picks[nextId];
+                this.refreshMatchup(nextId);
+                this.cascadeClear(nextId, eliminatedTeamId);
+            }
+        }
+
+        refreshMatchup(matchupId) {
+            const el = this.matchupElements[matchupId];
+            const m = this.matchups[matchupId];
+            if (!el || !m) return;
+
+            const topTeamId = this.getTeamForSlot(matchupId, 'top');
+            const bottomTeamId = this.getTeamForSlot(matchupId, 'bottom');
+            const picked = this.picks[matchupId];
+            const isChampionship = m.round_id === 'championship' || matchupId === 'R6_G01';
+
+            el.className = 'matchup' + (picked ? ' decided' : '') + (isChampionship ? ' championship-game' : '') + (m.round_id === 'final_four' ? ' final-four-game' : '');
+
+            let html = `
+                ${this.renderTeamRow(matchupId, topTeamId, 'top', picked)}
+                ${this.renderTeamRow(matchupId, bottomTeamId, 'bottom', picked)}
+            `;
+
+            if (isChampionship) {
+                const topTeam = topTeamId ? this.teams[topTeamId] : null;
+                const bottomTeam = bottomTeamId ? this.teams[bottomTeamId] : null;
+                const topName = topTeam?.team_name || 'Team 1';
+                const bottomName = bottomTeam?.team_name || 'Team 2';
+                const topScore = this.tiebreakerScores?.higher || '';
+                const bottomScore = this.tiebreakerScores?.lower || '';
+                const total = (topScore && bottomScore) ? (parseInt(topScore) + parseInt(bottomScore)) : '---';
+
+                html += `
+                    <div class="tiebreaker-section">
+                        <div class="tiebreaker-label">🎯 Tiebreaker: Predict Final Score</div>
+                        <div class="tiebreaker-inputs">
+                            <div class="tiebreaker-team">
+                                <span class="tiebreaker-team-name">${topName}</span>
+                                <input type="number" class="tiebreaker-input" id="tiebreaker-higher"
+                                    placeholder="0" min="0" max="200" value="${topScore}"
+                                    onchange="app.updateTiebreaker()" onclick="event.stopPropagation()">
+                            </div>
+                            <span class="tiebreaker-plus">+</span>
+                            <div class="tiebreaker-team">
+                                <span class="tiebreaker-team-name">${bottomName}</span>
+                                <input type="number" class="tiebreaker-input" id="tiebreaker-lower"
+                                    placeholder="0" min="0" max="200" value="${bottomScore}"
+                                    onchange="app.updateTiebreaker()" onclick="event.stopPropagation()">
+                            </div>
+                            <span class="tiebreaker-equals">=</span>
+                            <div class="tiebreaker-total" id="tiebreaker-total">${total}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            el.innerHTML = html;
+        }
+
+        advanceToNextPick(currentMatchupId) {
+            const current = this.matchups[currentMatchupId];
+            if (!current) return;
+
+            const sameRoundMatchups = Object.values(this.matchups)
+                .filter(m => m.region_id === current.region_id && m.round_id === current.round_id)
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+
+            const currentIdx = sameRoundMatchups.findIndex(m => m.matchup_id === currentMatchupId);
+
+            for (let i = currentIdx + 1; i < sameRoundMatchups.length; i++) {
+                const m = sameRoundMatchups[i];
+                if (!this.picks[m.matchup_id]) {
+                    const topTeam = this.getTeamForSlot(m.matchup_id, 'top');
+                    const bottomTeam = this.getTeamForSlot(m.matchup_id, 'bottom');
+                    if (topTeam && bottomTeam) {
+                        this.scrollToMatchup(m.matchup_id);
+                        return;
+                    }
+                }
+            }
+
+            for (let i = 0; i < currentIdx; i++) {
+                const m = sameRoundMatchups[i];
+                if (!this.picks[m.matchup_id]) {
+                    const topTeam = this.getTeamForSlot(m.matchup_id, 'top');
+                    const bottomTeam = this.getTeamForSlot(m.matchup_id, 'bottom');
+                    if (topTeam && bottomTeam) {
+                        this.scrollToMatchup(m.matchup_id);
+                        return;
+                    }
+                }
+            }
+        }
+
+        scrollToMatchup(matchupId) {
+            const pos = this.matchupPositions[matchupId];
+            if (!pos) return;
+
+            const el = this.matchupElements[matchupId];
+            if (el) {
+                el.classList.add('highlight');
+                setTimeout(() => el.classList.remove('highlight'), 1500);
+            }
+        }
+
+        renderBracketLines() {
+            const svg = document.getElementById('bracket-lines');
+            svg.innerHTML = '';
+            svg.setAttribute('width', CANVAS_WIDTH);
+            svg.setAttribute('height', CANVAS_HEIGHT);
+
+            const leftRegions = ['east', 'south'];
+            const rightRegions = ['west', 'midwest'];
+
+            for (const [matchupId, m] of Object.entries(this.matchups)) {
+                if (!m.next_matchup_id) continue;
+
+                const fromPos = this.matchupPositions[matchupId];
+                const toPos = this.matchupPositions[m.next_matchup_id];
+                if (!fromPos || !toPos) continue;
+
+                const isLeftRegion = leftRegions.includes(m.region_id);
+                const isRightRegion = rightRegions.includes(m.region_id);
+                const isFinalFour = m.round_id === 'final_four';
+
+                let x1, y1, x2, y2, midX;
+
+                if (isLeftRegion) {
+                    x1 = fromPos.x + MATCHUP_WIDTH;
+                    y1 = fromPos.y + MATCHUP_HEIGHT / 2;
+                    x2 = toPos.x;
+                    y2 = toPos.y + MATCHUP_HEIGHT / 2;
+                    midX = x1 + (x2 - x1) / 2;
+                } else if (isRightRegion) {
+                    x1 = fromPos.x;
+                    y1 = fromPos.y + MATCHUP_HEIGHT / 2;
+                    x2 = toPos.x + MATCHUP_WIDTH;
+                    y2 = toPos.y + MATCHUP_HEIGHT / 2;
+                    midX = x1 + (x2 - x1) / 2;
+                } else if (isFinalFour) {
+                    // Final Four to Championship - use straight diagonal lines
+                    const FF_WIDTH = 150;
+                    const CHAMP_WIDTH = 360;
+                    const CHAMP_HEIGHT = 140;
+
+                    x1 = fromPos.x + FF_WIDTH / 2;
+                    y1 = fromPos.y + MATCHUP_HEIGHT;
+                    x2 = toPos.x + CHAMP_WIDTH / 2;
+                    y2 = toPos.y;
+
+                    if (y1 > y2) {
+                        y1 = fromPos.y;
+                        y2 = toPos.y + CHAMP_HEIGHT;
+                    }
+
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    // Straight line from Final Four to Championship
+                    path.setAttribute('d', `M${x1},${y1} L${x2},${y2}`);
+                    if (this.picks[matchupId]) path.classList.add('active');
+                    svg.appendChild(path);
+                    continue;
+                } else {
+                    continue;
+                }
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M${x1},${y1} H${midX} V${y2} H${x2}`);
+
+                if (this.picks[matchupId]) {
+                    path.classList.add('active');
+                }
+
+                svg.appendChild(path);
+            }
+        }
+
+        setupPanZoom() {
+            const viewport = document.getElementById('viewport');
+            const canvas = document.getElementById('canvas');
+
+            viewport.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.matchup')) return;
+                this.isDragging = true;
+                this.dragStartX = e.clientX;
+                this.dragStartY = e.clientY;
+                this.lastPanX = this.panX;
+                this.lastPanY = this.panY;
+                viewport.classList.add('dragging');
+                canvas.classList.add('no-transition');
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!this.isDragging) return;
+                const dx = e.clientX - this.dragStartX;
+                const dy = e.clientY - this.dragStartY;
+                this.panX = this.lastPanX + dx;
+                this.panY = this.lastPanY + dy;
+                this.clampPan();
+                this.applyTransform();
+                this.updateMinimapViewport();
+            });
+
+            window.addEventListener('mouseup', () => {
+                this.isDragging = false;
+                viewport.classList.remove('dragging');
+                canvas.classList.remove('no-transition');
+            });
+
+            viewport.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    this.zoomIn();
+                } else {
+                    this.zoomOut();
+                }
+            }, { passive: false });
+
+            this.setupMinimapDrag();
+        }
+
+        setupMinimapDrag() {
+            const minimapViewport = document.getElementById('minimap-viewport');
+            const minimap = document.getElementById('minimap');
+            let isDraggingMinimap = false;
+
+            minimapViewport.addEventListener('mousedown', (e) => {
+                isDraggingMinimap = true;
+                e.stopPropagation();
+            });
+
+            minimap.addEventListener('click', (e) => {
+                if (e.target === minimapViewport) return;
+                const rect = minimap.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                const scaleX = CANVAS_WIDTH / rect.width;
+                const scaleY = CANVAS_HEIGHT / rect.height;
+
+                const canvasX = clickX * scaleX;
+                const canvasY = clickY * scaleY;
+
+                const viewportEl = document.getElementById('viewport');
+                const viewWidth = viewportEl.clientWidth / this.scale;
+                const viewHeight = viewportEl.clientHeight / this.scale;
+
+                this.panX = -(canvasX - viewWidth / 2) * this.scale;
+                this.panY = -(canvasY - viewHeight / 2) * this.scale;
+                this.clampPan();
+                this.applyTransform();
+                this.updateMinimapViewport();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDraggingMinimap) return;
+                const rect = minimap.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                const scaleX = CANVAS_WIDTH / rect.width;
+                const scaleY = CANVAS_HEIGHT / rect.height;
+
+                const canvasX = clickX * scaleX;
+                const canvasY = clickY * scaleY;
+
+                const viewportEl = document.getElementById('viewport');
+                const viewWidth = viewportEl.clientWidth / this.scale;
+                const viewHeight = viewportEl.clientHeight / this.scale;
+
+                this.panX = -(canvasX - viewWidth / 2) * this.scale;
+                this.panY = -(canvasY - viewHeight / 2) * this.scale;
+                this.clampPan();
+                this.applyTransform();
+                this.updateMinimapViewport();
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDraggingMinimap = false;
+            });
+        }
+
+        clampPan() {
+            const viewport = document.getElementById('viewport');
+            const viewW = viewport.clientWidth;
+            const viewH = viewport.clientHeight;
+
+            const canvasW = CANVAS_WIDTH * this.scale;
+            const canvasH = CANVAS_HEIGHT * this.scale;
+
+            const maxPanX = 0;
+            const minPanX = viewW - canvasW;
+            const maxPanY = 0;
+            const minPanY = viewH - canvasH;
+
+            if (canvasW <= viewW) {
+                this.panX = (viewW - canvasW) / 2;
+            } else {
+                this.panX = Math.min(maxPanX, Math.max(minPanX, this.panX));
+            }
+
+            if (canvasH <= viewH) {
+                this.panY = (viewH - canvasH) / 2;
+            } else {
+                this.panY = Math.min(maxPanY, Math.max(minPanY, this.panY));
+            }
+        }
+
+        applyTransform() {
+            const canvas = document.getElementById('canvas');
+            canvas.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+        }
+
+        zoomIn() {
+            const levels = Object.keys(ZOOM_LEVELS);
+            const currentIdx = levels.indexOf(this.currentZoomLevel);
+            if (currentIdx < levels.length - 1) {
+                this.setZoomLevel(levels[currentIdx + 1]);
+            }
+        }
+
+        zoomOut() {
+            const levels = Object.keys(ZOOM_LEVELS);
+            const currentIdx = levels.indexOf(this.currentZoomLevel);
+            if (currentIdx > 0) {
+                this.setZoomLevel(levels[currentIdx - 1]);
+            }
+        }
+
+        setZoomLevel(level) {
+            const config = ZOOM_LEVELS[level];
+            if (!config) return;
+
+            this.currentZoomLevel = level;
+
+            // For region mode, scale is calculated dynamically in centerOnRegion
+            if (level !== 'region') {
+                this.scale = config.scale;
+            }
+
+            document.querySelectorAll('.zoom-level-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.level === level);
+            });
+
+            const showArrows = (level === 'region');
+            document.getElementById('nav-prev-btn').classList.toggle('active', showArrows);
+            document.getElementById('nav-next-btn').classList.toggle('active', showArrows);
+
+            this.centerOnLevel(level);
+            if (level !== 'region') {
+                this.clampPan();
+            }
+            this.applyTransform();
+            this.updateMinimapViewport();
+        }
+
+        centerOnLevel(level) {
+            const viewport = document.getElementById('viewport');
+            const viewW = viewport.clientWidth;
+            const viewH = viewport.clientHeight;
+
+            switch(level) {
+                case 'full':
+                    this.panX = (viewW - CANVAS_WIDTH * this.scale) / 2;
+                    this.panY = (viewH - CANVAS_HEIGHT * this.scale) / 2;
+                    break;
+
+                case 'half-left':
+                    this.panX = 0;
+                    this.panY = (viewH - CANVAS_HEIGHT * this.scale) / 2;
+                    break;
+
+                case 'half-right':
+                    this.panX = viewW - CANVAS_WIDTH * this.scale;
+                    this.panY = (viewH - CANVAS_HEIGHT * this.scale) / 2;
+                    break;
+
+                case 'region':
+                    this.centerOnRegion(REGIONS[this.currentRegionIndex]);
+                    break;
+
+                case 'finals':
+                    const champPos = this.matchupPositions['R6_G01'];
+                    if (champPos) {
+                        const centerX = champPos.x + MATCHUP_WIDTH / 2;
+                        const centerY = champPos.y + MATCHUP_HEIGHT / 2;
+                        this.panX = viewW / 2 - centerX * this.scale;
+                        this.panY = viewH / 2 - centerY * this.scale;
+                    }
+                    this.updateControlsPosition('finals');
+                    break;
+            }
+
+            // Default to right side for full view
+            if (level === 'full') {
+                this.updateControlsPosition('full');
+            }
+        }
+
+        centerOnRegion(regionId) {
+            const viewport = document.getElementById('viewport');
+            const viewW = viewport.clientWidth;
+            const viewH = viewport.clientHeight;
+
+            const regionMatchups = Object.entries(this.matchupPositions)
+                .filter(([id]) => {
+                    const m = this.matchups[id];
+                    return m && m.region_id === regionId;
+                });
+
+            if (regionMatchups.length === 0) return;
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for (const [id, pos] of regionMatchups) {
+                minX = Math.min(minX, pos.x);
+                maxX = Math.max(maxX, pos.x + MATCHUP_WIDTH);
+                minY = Math.min(minY, pos.y);
+                maxY = Math.max(maxY, pos.y + MATCHUP_HEIGHT);
+            }
+
+            // Calculate region dimensions with padding for title and margins
+            const titlePadding = 60;
+            const bottomPadding = 80; // Account for footer
+            const sidePadding = 40;
+
+            const regionW = (maxX - minX) + (sidePadding * 2);
+            const regionH = (maxY - minY) + titlePadding + bottomPadding;
+
+            // Calculate scale to fit region in viewport
+            const availableH = viewH - 60; // Account for stats bar and footer
+            const scaleX = viewW / regionW;
+            const scaleY = availableH / regionH;
+            this.scale = Math.min(scaleX, scaleY) * 0.92; // 92% to add some breathing room
+
+            const regionCenterX = (minX + maxX) / 2;
+
+            // Position region near top of viewport (below stats bar)
+            const topMargin = 80; // Space below stats bar
+            this.panX = (viewW / 2) - (regionCenterX * this.scale);
+            this.panY = topMargin - (minY * this.scale);
+
+            this.updateControlsPosition(regionId);
+        }
+
+        updateControlsPosition(regionId) {
+            // Footer is fixed at bottom - no position changes needed
+        }
+
+        navPrev() {
+            this.currentRegionIndex = (this.currentRegionIndex - 1 + REGIONS.length) % REGIONS.length;
+            this.centerOnRegion(REGIONS[this.currentRegionIndex]);
+            this.applyTransform();
+            this.updateMinimapViewport();
+        }
+
+        navNext() {
+            this.currentRegionIndex = (this.currentRegionIndex + 1) % REGIONS.length;
+            this.centerOnRegion(REGIONS[this.currentRegionIndex]);
+            this.applyTransform();
+            this.updateMinimapViewport();
+        }
+
+        updateMinimap() {
+            const canvas = document.getElementById('minimap-canvas');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            ctx.scale(2, 2);
+
+            const scaleX = rect.width / CANVAS_WIDTH;
+            const scaleY = rect.height / CANVAS_HEIGHT;
+
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+
+            for (const [matchupId, pos] of Object.entries(this.matchupPositions)) {
+                const x = pos.x * scaleX;
+                const y = pos.y * scaleY;
+                const w = MATCHUP_WIDTH * scaleX;
+                const h = MATCHUP_HEIGHT * scaleY;
+
+                ctx.fillStyle = this.picks[matchupId] ? '#4ade80' : '#3d3d5c';
+                ctx.fillRect(x, y, w, h);
+            }
+
+            this.updateMinimapViewport();
+        }
+
+        updateMinimapViewport() {
+            const minimapEl = document.getElementById('minimap');
+            const viewportEl = document.getElementById('minimap-viewport');
+            const mainViewport = document.getElementById('viewport');
+
+            const mmRect = minimapEl.getBoundingClientRect();
+            const scaleX = mmRect.width / CANVAS_WIDTH;
+            const scaleY = mmRect.height / CANVAS_HEIGHT;
+
+            const viewW = mainViewport.clientWidth / this.scale;
+            const viewH = mainViewport.clientHeight / this.scale;
+            const viewX = -this.panX / this.scale;
+            const viewY = -this.panY / this.scale;
+
+            viewportEl.style.left = (viewX * scaleX) + 'px';
+            viewportEl.style.top = (viewY * scaleY) + 'px';
+            viewportEl.style.width = (viewW * scaleX) + 'px';
+            viewportEl.style.height = (viewH * scaleY) + 'px';
+        }
+
+        updateStatsBar() {
+            const pickCount = Object.keys(this.picks).length;
+            document.getElementById('picks-made').textContent = pickCount;
+            document.getElementById('points-earned').textContent = this.calculatePoints();
+
+            const champId = this.picks['R6_G01'];
+            const champTeam = champId ? this.teams[champId] : null;
+            document.getElementById('champion-pick').textContent = champTeam ? champTeam.team_name : '---';
+
+            const { upsets, chalk } = this.calculateUpsetChalk();
+            const total = upsets + chalk;
+            const upsetPct = total > 0 ? (upsets / total) * 100 : 0;
+            const chalkPct = total > 0 ? (chalk / total) * 100 : 0;
+
+            document.getElementById('upset-count').textContent = upsets;
+            document.getElementById('chalk-count').textContent = chalk;
+            document.getElementById('upset-fill').style.width = `${upsetPct / 2}%`;
+            document.getElementById('chalk-fill').style.width = `${chalkPct / 2}%`;
+
+            const uniqueness = this.calculateUniqueness();
+            document.getElementById('unique-fill').style.width = `${uniqueness}%`;
+            document.getElementById('unique-pct').textContent = `${uniqueness}%`;
+
+            const { chance, mode } = this.calculateWinChances();
+            const chanceEl = document.getElementById('win-chances');
+            chanceEl.textContent = `${chance}%`;
+            chanceEl.className = 'chances-value';
+
+            if (mode === 'theoretical') {
+                chanceEl.classList.add('theoretical');
+            } else if (chance >= 50) {
+                chanceEl.classList.add('high');
+            } else if (chance >= 20) {
+                chanceEl.classList.add('medium');
+            } else {
+                chanceEl.classList.add('low');
+            }
+        }
+
+        updateBracketNameDisplay() {
+            const nameEl = document.getElementById('bracket-name-display');
+            if (nameEl) {
+                nameEl.textContent = this.bracketName || 'Unnamed';
+            }
+        }
+
+        showDeleteButton(show) {
+            const deleteBtn = document.getElementById('footer-delete-btn');
+            if (deleteBtn) {
+                deleteBtn.style.display = show ? 'inline-flex' : 'none';
+            }
+        }
+
+        // Region Popup Methods
+        setupPopupListeners() {
+            const overlay = document.getElementById('region-popup-overlay');
+
+            // Close popup when clicking on the overlay background (not the container)
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    this.closeRegionPopup();
+                }
+            });
+
+            // Close popup with Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && overlay.classList.contains('show')) {
+                    this.closeRegionPopup();
+                }
+            });
+        }
+
+        toggleViewMode() {
+            const btn = document.getElementById('view-toggle-btn');
+            if (btn.classList.contains('active')) {
+                btn.classList.remove('active');
+                btn.textContent = '📋 Pop-up';
+                this.closeRegionPopup();
+            } else {
+                btn.classList.add('active');
+                btn.textContent = '🗺️ Canvas';
+                this.openRegionPopup(REGIONS[this.currentRegionIndex]);
+            }
+        }
+
+        openRegionPopup(regionId) {
+            const overlay = document.getElementById('region-popup-overlay');
+            const title = document.getElementById('region-popup-title');
+            const content = document.getElementById('region-popup-content');
+
+            title.textContent = regionId.toUpperCase() + ' REGION';
+            content.innerHTML = '';
+
+            // Render matchups organized by round
+            const roundsHtml = this.renderRegionPopupContent(regionId);
+            content.innerHTML = roundsHtml;
+
+            // Add pick handlers
+            content.querySelectorAll('.popup-team-row').forEach(row => {
+                if (!row.classList.contains('tbd')) {
+                    row.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const matchupId = row.dataset.matchup;
+                        const slot = row.dataset.slot;
+                        this.handlePopupPick(matchupId, slot);
+                    });
+                }
+            });
+
+            // Add region navigation
+            this.addPopupNavigation(regionId);
+
+            overlay.classList.add('show');
+            document.getElementById('viewport').classList.add('blurred');
+        }
+
+        closeRegionPopup() {
+            const overlay = document.getElementById('region-popup-overlay');
+            overlay.classList.remove('show');
+            document.getElementById('viewport').classList.remove('blurred');
+
+            const btn = document.getElementById('view-toggle-btn');
+            btn.classList.remove('active');
+            btn.textContent = '📋 Pop-up';
+        }
+
+        renderRegionPopupContent(regionId) {
+            let html = '';
+            const locked = isLocked(this.settings);
+
+            for (const roundId of REGION_ROUNDS) {
+                const matchups = this.getMatchupsForRegionRound(regionId, roundId);
+                if (matchups.length === 0) continue;
+
+                html += `<div class="popup-round">
+                    <div class="popup-round-label">${ROUND_NAMES[roundId]}</div>
+                    <div style="display:flex;flex-direction:column;gap:4px;">`;
+
+                for (const m of matchups) {
+                    const topTeamId = this.getTeamForSlot(m.matchup_id, 'top');
+                    const bottomTeamId = this.getTeamForSlot(m.matchup_id, 'bottom');
+                    const topTeam = topTeamId ? this.teams[topTeamId] : null;
+                    const bottomTeam = bottomTeamId ? this.teams[bottomTeamId] : null;
+                    const pickedId = this.picks[m.matchup_id];
+
+                    const topSeed = topTeam ? (topTeam.team_seed || topTeam.seed || m.top_seed) : m.top_seed;
+                    const bottomSeed = bottomTeam ? (bottomTeam.team_seed || bottomTeam.seed || m.bottom_seed) : m.bottom_seed;
+
+                    const topPicked = pickedId === topTeamId;
+                    const bottomPicked = pickedId === bottomTeamId;
+                    const topUpset = topPicked && this.isUpsetPick(m.matchup_id, topTeamId);
+                    const bottomUpset = bottomPicked && this.isUpsetPick(m.matchup_id, bottomTeamId);
+
+                    // Check if game is final and determine winner/loser status
+                    const isFinal = m.status === 'FINAL' && m.winner_team_id;
+                    const topIsWinner = isFinal && m.winner_team_id === topTeamId;
+                    const bottomIsWinner = isFinal && m.winner_team_id === bottomTeamId;
+                    const topIsLoser = isFinal && topTeamId && m.winner_team_id !== topTeamId;
+                    const bottomIsLoser = isFinal && bottomTeamId && m.winner_team_id !== bottomTeamId;
+
+                    // Score display
+                    const topScore = isFinal ? (m.top_team_score || '') : '';
+                    const bottomScore = isFinal ? (m.bottom_team_score || '') : '';
+
+                    html += `<div class="popup-matchup${isFinal ? ' final' : ''}">
+                        <div class="popup-team-row${topTeam ? '' : ' tbd'}${topPicked ? ' picked' : ''}${topUpset ? ' upset' : ''}${topIsWinner ? ' winner' : ''}${topIsLoser ? ' loser' : ''}${locked ? ' locked' : ''}"
+                             data-matchup="${m.matchup_id}" data-slot="top">
+                            <div class="popup-seed${topTeam ? '' : ' tbd'}">${topSeed || '?'}</div>
+                            <div class="popup-team-name">${topTeam ? topTeam.team_name : 'TBD'}</div>
+                            ${topScore ? `<span class="popup-score">${topScore}</span>` : ''}
+                            ${topIsWinner ? '<span class="winner-badge">✓ W</span>' : ''}
+                            ${topIsLoser ? '<span class="loser-badge">L</span>' : ''}
+                            ${!isFinal && topPicked ? '<span style="font-size:10px;">✓</span>' : ''}
+                            ${!isFinal && topUpset ? '<span style="font-size:10px;">🔥</span>' : ''}
+                        </div>
+                        <div class="popup-team-row${bottomTeam ? '' : ' tbd'}${bottomPicked ? ' picked' : ''}${bottomUpset ? ' upset' : ''}${bottomIsWinner ? ' winner' : ''}${bottomIsLoser ? ' loser' : ''}${locked ? ' locked' : ''}"
+                             data-matchup="${m.matchup_id}" data-slot="bottom">
+                            <div class="popup-seed${bottomTeam ? '' : ' tbd'}">${bottomSeed || '?'}</div>
+                            <div class="popup-team-name">${bottomTeam ? bottomTeam.team_name : 'TBD'}</div>
+                            ${bottomScore ? `<span class="popup-score">${bottomScore}</span>` : ''}
+                            ${bottomIsWinner ? '<span class="winner-badge">✓ W</span>' : ''}
+                            ${bottomIsLoser ? '<span class="loser-badge">L</span>' : ''}
+                            ${!isFinal && bottomPicked ? '<span style="font-size:10px;">✓</span>' : ''}
+                            ${bottomUpset ? '<span style="font-size:10px;">🔥</span>' : ''}
+                        </div>
+                    </div>`;
+                }
+
+                html += '</div></div>';
+            }
+
+            return html;
+        }
+
+        addPopupNavigation(currentRegion) {
+            const navDiv = document.getElementById('popup-nav');
+            navDiv.innerHTML = '';
+
+            const allRegions = [...REGIONS, 'final_four'];
+
+            for (const r of allRegions) {
+                const btn = document.createElement('button');
+                btn.className = 'zoom-level-btn' + (r === currentRegion ? ' active' : '');
+                btn.textContent = r === 'final_four' ? 'Final 4' : r.charAt(0).toUpperCase() + r.slice(1);
+                btn.onclick = () => {
+                    if (r === 'final_four') {
+                        this.openFinalFourPopup();
+                    } else {
+                        this.openRegionPopup(r);
+                    }
+                };
+                navDiv.appendChild(btn);
+            }
+        }
+
+        openFinalFourPopup() {
+            const overlay = document.getElementById('region-popup-overlay');
+            const title = document.getElementById('region-popup-title');
+            const content = document.getElementById('region-popup-content');
+
+            title.textContent = 'FINAL FOUR & CHAMPIONSHIP';
+            content.innerHTML = '';
+
+            // Final Four games
+            const ffGames = Object.values(this.matchups)
+                .filter(m => m.round_id === 'final_four')
+                .sort((a, b) => a.bracket_position - b.bracket_position);
+
+            const champ = this.matchups['R6_G01'];
+
+            let html = `
+                <div class="ff-bracket-layout">
+                    <div class="ff-bracket-row">
+                        <div class="ff-bracket-game">
+                            <div class="ff-game-label">South vs West</div>
+                            ${this.renderPopupMatchup(ffGames[0])}
+                        </div>
+                        <div class="ff-bracket-connector">
+                            <svg width="100" height="110" viewBox="0 0 100 110">
+                                <path d="M0,20 L40,20 L40,60 L50,60" stroke="var(--accent-green)" stroke-width="2" fill="none"/>
+                                <path d="M100,20 L60,20 L60,60 L50,60" stroke="var(--accent-green)" stroke-width="2" fill="none"/>
+                                <path d="M50,60 L50,110" stroke="var(--accent-green)" stroke-width="2" fill="none"/>
+                            </svg>
+                        </div>
+                        <div class="ff-bracket-game">
+                            <div class="ff-game-label">Midwest vs East</div>
+                            ${this.renderPopupMatchup(ffGames[1])}
+                        </div>
+                    </div>
+                    <div class="ff-bracket-champ">
+                        <div class="ff-champ-label">🏆 NATIONAL CHAMPIONSHIP 🏆</div>
+                        ${champ ? this.renderPopupMatchup(champ, true) : ''}
+                    </div>
+                </div>`;
+
+            content.innerHTML = html;
+
+            // Add pick handlers
+            content.querySelectorAll('.popup-team-row').forEach(row => {
+                if (!row.classList.contains('tbd')) {
+                    row.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const matchupId = row.dataset.matchup;
+                        const slot = row.dataset.slot;
+                        this.handlePopupPick(matchupId, slot);
+                    });
+                }
+            });
+
+            // Add region navigation
+            this.addPopupNavigation('final_four');
+
+            overlay.classList.add('show');
+            document.getElementById('viewport').classList.add('blurred');
+        }
+
+        renderPopupMatchup(m) {
+            const topTeamId = this.getTeamForSlot(m.matchup_id, 'top');
+            const bottomTeamId = this.getTeamForSlot(m.matchup_id, 'bottom');
+            const topTeam = topTeamId ? this.teams[topTeamId] : null;
+            const bottomTeam = bottomTeamId ? this.teams[bottomTeamId] : null;
+            const pickedId = this.picks[m.matchup_id];
+
+            const topSeed = topTeam ? (topTeam.team_seed || topTeam.seed) : '?';
+            const bottomSeed = bottomTeam ? (bottomTeam.team_seed || bottomTeam.seed) : '?';
+
+            const topPicked = pickedId === topTeamId;
+            const bottomPicked = pickedId === bottomTeamId;
+            const topUpset = topPicked && this.isUpsetPick(m.matchup_id, topTeamId);
+            const bottomUpset = bottomPicked && this.isUpsetPick(m.matchup_id, bottomTeamId);
+
+            // Check if game is final and determine winner/loser status
+            const isFinal = m.status === 'FINAL' && m.winner_team_id;
+            const topIsWinner = isFinal && m.winner_team_id === topTeamId;
+            const bottomIsWinner = isFinal && m.winner_team_id === bottomTeamId;
+            const topIsLoser = isFinal && topTeamId && m.winner_team_id !== topTeamId;
+            const bottomIsLoser = isFinal && bottomTeamId && m.winner_team_id !== bottomTeamId;
+
+            // Score display
+            const topScore = isFinal ? (m.top_team_score || '') : '';
+            const bottomScore = isFinal ? (m.bottom_team_score || '') : '';
+
+            const locked = isLocked(this.settings);
+
+            return `<div class="popup-matchup${isFinal ? ' final' : ''}">
+                <div class="popup-team-row${topTeam ? '' : ' tbd'}${topPicked ? ' picked' : ''}${topUpset ? ' upset' : ''}${topIsWinner ? ' winner' : ''}${topIsLoser ? ' loser' : ''}${locked ? ' locked' : ''}"
+                     data-matchup="${m.matchup_id}" data-slot="top">
+                    <div class="popup-seed${topTeam ? '' : ' tbd'}">${topSeed}</div>
+                    <div class="popup-team-name">${topTeam ? topTeam.team_name : 'TBD'}</div>
+                    ${topScore ? `<span class="popup-score">${topScore}</span>` : ''}
+                    ${topIsWinner ? '<span class="winner-badge">✓ W</span>' : ''}
+                    ${topIsLoser ? '<span class="loser-badge">L</span>' : ''}
+                    ${!isFinal && topPicked ? '<span style="font-size:12px;">✓</span>' : ''}
+                    ${!isFinal && topUpset ? '<span style="font-size:12px;">🔥</span>' : ''}
+                </div>
+                <div class="popup-team-row${bottomTeam ? '' : ' tbd'}${bottomPicked ? ' picked' : ''}${bottomUpset ? ' upset' : ''}${bottomIsWinner ? ' winner' : ''}${bottomIsLoser ? ' loser' : ''}${locked ? ' locked' : ''}"
+                     data-matchup="${m.matchup_id}" data-slot="bottom">
+                    <div class="popup-seed${bottomTeam ? '' : ' tbd'}">${bottomSeed}</div>
+                    <div class="popup-team-name">${bottomTeam ? bottomTeam.team_name : 'TBD'}</div>
+                    ${bottomScore ? `<span class="popup-score">${bottomScore}</span>` : ''}
+                    ${bottomIsWinner ? '<span class="winner-badge">✓ W</span>' : ''}
+                    ${bottomIsLoser ? '<span class="loser-badge">L</span>' : ''}
+                    ${!isFinal && bottomPicked ? '<span style="font-size:12px;">✓</span>' : ''}
+                    ${!isFinal && bottomUpset ? '<span style="font-size:12px;">🔥</span>' : ''}
+                </div>
+            </div>`;
+        }
+
+        handlePopupPick(matchupId, slot) {
+            const m = this.matchups[matchupId];
+            if (!m) return;
+
+            const teamId = this.getTeamForSlot(matchupId, slot);
+            if (!teamId) return;
+
+            if (isLocked(this.settings)) {
+                showToast('Tournament is locked! No changes allowed.', true);
+                return;
+            }
+
+            const oldPick = this.picks[matchupId];
+            if (oldPick === teamId) return;
+
+            this.picks[matchupId] = teamId;
+            this.hasUnsavedChanges = true;
+
+            // Clear downstream picks if changed
+            if (oldPick && oldPick !== teamId) {
+                this.cascadeClear(matchupId, oldPick);
+            }
+
+            // Re-render the popup
+            const currentTitle = document.getElementById('region-popup-title').textContent;
+            if (currentTitle.includes('FINAL FOUR')) {
+                this.openFinalFourPopup();
+            } else {
+                const regionId = currentTitle.replace(' REGION', '').toLowerCase();
+                this.openRegionPopup(regionId);
+            }
+
+            // Also update the canvas
+            this.refreshMatchup(matchupId);
+            if (m.next_matchup_id) {
+                this.refreshMatchup(m.next_matchup_id);
+            }
+            this.renderBracketLines();
+            this.updateStatsBar();
+            this.showSaveButton();
+        }
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+        const authEl = document.getElementById('auth-section');
+        const loginOverlay = document.getElementById('login-overlay');
+
+        if (user) {
+            // ADMIN CHECK: Only global admins can access this page
+            if (!isGlobalAdmin(user.uid)) {
+                console.error('🔐 ADMIN_ACCESS', 'Access denied for user:', user.uid);
+                authEl.innerHTML = `
+                    <span style="color: var(--accent-red);">⛔ Access Denied</span>
+                    <button onclick="auth.signOut()">Sign Out</button>`;
+                loginOverlay.innerHTML = `
+                    <div class="login-box" style="border: 2px solid var(--accent-red);">
+                        <h2 style="color: var(--accent-red);">⛔ ACCESS DENIED</h2>
+                        <p>This page is restricted to administrators only.</p>
+                        <button onclick="window.location.href='nerdmadness.html'">Return to My Brackets</button>
+                    </div>`;
+                loginOverlay.style.display = 'flex';
+                return;
+            }
+
+            // Enable admin mode
+            isAdminMode = true;
+            console.log('🔐 ADMIN_MODE', 'Admin access granted:', user.displayName || user.email);
+
+            // Get bracketId from URL if editing existing bracket
+            const urlParams = new URLSearchParams(window.location.search);
+            const bracketId = urlParams.get('bracketId');
+            console.log('🏀 ADMIN_BRACKET', 'URL bracketId:', bracketId || 'SELECT FROM LIST');
+
+            authEl.innerHTML = `
+                <span id="editing-user-label" style="color: var(--accent-gold); font-weight: 600;">🔐 ADMIN MODE</span>
+                <a href="nerdmadness-admin.html" class="list-view-btn" style="border-color: var(--accent-red); color: var(--accent-red);">
+                    <span>⬅️</span> Admin Home
+                </a>
+                <span style="color: var(--accent-green);">${user.displayName || user.email}</span>
+                <button onclick="auth.signOut()">Sign Out</button>`;
+            loginOverlay.style.display = 'none';
+            app = new BracketCanvasApp(user, bracketId);
+            await app.init();
+            await populateAdminBracketSwitcher();
+        } else {
+            authEl.innerHTML = `
+                <a href="nerdmadness-admin.html" class="list-view-btn" style="border-color: var(--accent-red); color: var(--accent-red);">
+                    <span>⬅️</span> Admin Home
+                </a>
+                <button onclick="signIn()">Sign In</button>`;
+            loginOverlay.style.display = 'flex';
+            document.getElementById('stats-bar').style.display = 'none';
+            document.getElementById('bottom-controls').style.display = 'none';
+            app = null;
+            isAdminMode = false;
+        }
+    });
+    </script>
+</body>
+</html>
