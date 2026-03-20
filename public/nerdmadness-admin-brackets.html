@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NerdMadness Admin - Bracket Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <style>
+        :root {
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-100: #f1f5f9;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-gold: #eab308;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --glass-bg: rgba(30, 41, 59, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+            color: var(--slate-100);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-links {
+            display: flex;
+            gap: 12px;
+        }
+
+        .header-link {
+            color: var(--slate-400);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+
+        .header-link:hover { color: var(--accent-blue); }
+
+        .admin-panel {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .selector-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field-group label {
+            font-size: 11px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        select, input {
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            color: var(--slate-100);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover { background: #2563eb; }
+
+        .btn-warning {
+            background: var(--accent-orange);
+            color: white;
+        }
+
+        .btn-warning:hover { background: #ea580c; }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-danger:hover { background: #dc2626; }
+
+        .btn-success {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .btn-success:hover { background: #16a34a; }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .bracket-info {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .bracket-info.visible { display: block; }
+
+        .bracket-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .meta-item {
+            text-align: center;
+        }
+
+        .meta-value {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--accent-blue);
+        }
+
+        .meta-label {
+            font-size: 11px;
+            color: var(--slate-400);
+            text-transform: uppercase;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .editor-container {
+            display: none;
+        }
+
+        .editor-container.visible { display: block; }
+
+        .region-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .region-tab {
+            padding: 10px 20px;
+            background: var(--slate-700);
+            border: 1px solid var(--slate-600);
+            color: var(--slate-300);
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .region-tab:hover { border-color: var(--accent-blue); }
+
+        .region-tab.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .region-panel {
+            display: none;
+        }
+
+        .region-panel.active { display: block; }
+
+        .round-section {
+            margin-bottom: 24px;
+        }
+
+        .round-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .matchups-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 12px;
+        }
+
+        .matchup-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .matchup-card.has-winner {
+            border-color: var(--accent-green);
+        }
+
+        .matchup-card.impossible {
+            border-color: var(--accent-red);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .matchup-header {
+            font-size: 10px;
+            color: var(--slate-500);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .matchup-status {
+            font-weight: 700;
+        }
+
+        .matchup-status.final { color: var(--accent-green); }
+        .matchup-status.pending { color: var(--slate-400); }
+
+        .team-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--slate-700);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .team-option:hover {
+            border-color: var(--slate-500);
+        }
+
+        .team-option.selected {
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.15);
+        }
+
+        .team-option.correct {
+            border-color: var(--accent-green);
+            background: rgba(34, 197, 94, 0.15);
+        }
+
+        .team-option.wrong {
+            border-color: var(--accent-red);
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        .team-option.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .team-seed {
+            font-size: 12px;
+            color: var(--slate-400);
+            min-width: 24px;
+        }
+
+        .team-name {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .team-points {
+            font-size: 12px;
+            color: var(--accent-gold);
+        }
+
+        .warning-badge {
+            display: inline-block;
+            background: var(--accent-red);
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        .save-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--slate-800);
+            border-top: 1px solid var(--glass-border);
+            padding: 16px 24px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .save-bar.visible { display: flex; }
+
+        .save-bar-info {
+            font-size: 14px;
+            color: var(--slate-300);
+        }
+
+        .save-bar-info strong {
+            color: var(--accent-gold);
+        }
+
+        .validation-warnings {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--accent-red);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .validation-warnings.visible { display: block; }
+
+        .validation-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-red);
+            margin-bottom: 8px;
+        }
+
+        .validation-list {
+            list-style: none;
+            font-size: 13px;
+            color: var(--slate-300);
+        }
+
+        .validation-list li {
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .validation-list li::before {
+            content: '⚠️';
+            position: absolute;
+            left: 0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--slate-400);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            right: 24px;
+            background: var(--accent-green);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 200;
+        }
+
+        .toast.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.error {
+            background: var(--accent-red);
+        }
+
+        @media (max-width: 768px) {
+            .selector-row { flex-direction: column; }
+            select, input { width: 100%; }
+            .matchups-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 Admin Bracket Editor</h1>
+        <div class="header-links">
+            <a href="nerdmadness-admin.html" class="header-link">← Admin Home</a>
+            <a href="nerdmadness.html" class="header-link">Main App</a>
+        </div>
+    </div>
+
+    <div class="admin-panel">
+        <div class="panel-title">Select Bracket</div>
+        <div class="selector-row">
+            <div class="field-group">
+                <label>User</label>
+                <select id="user-select">
+                    <option value="">-- Select User --</option>
+                </select>
+            </div>
+            <div class="field-group">
+                <label>Bracket</label>
+                <select id="bracket-select" disabled>
+                    <option value="">-- Select Bracket --</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="load-btn" disabled>Load Bracket</button>
+        </div>
+
+        <div class="bracket-info" id="bracket-info">
+            <div class="bracket-meta">
+                <div class="meta-item">
+                    <div class="meta-value" id="meta-name">-</div>
+                    <div class="meta-label">Bracket Name</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-value" id="meta-picks">0</div>
+                    <div class="meta-label">Total Picks</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-value" id="meta-score">0</div>
+                    <div class="meta-label">Current Score</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-value" id="meta-warnings">0</div>
+                    <div class="meta-label">Warnings</div>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="edit-btn">✏️ Edit Picks</button>
+                <button class="btn btn-warning" id="reset-btn">🔄 Reset All Picks</button>
+                <button class="btn btn-danger" id="delete-btn">🗑️ Delete Bracket</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="editor-container" id="editor-container">
+        <div class="validation-warnings" id="validation-warnings">
+            <div class="validation-title">⚠️ Impossible Picks Detected</div>
+            <ul class="validation-list" id="validation-list"></ul>
+        </div>
+
+        <div class="region-tabs" id="region-tabs">
+            <button class="region-tab active" data-region="east">East</button>
+            <button class="region-tab" data-region="west">West</button>
+            <button class="region-tab" data-region="south">South</button>
+            <button class="region-tab" data-region="midwest">Midwest</button>
+            <button class="region-tab" data-region="final_four">Final Four</button>
+        </div>
+
+        <div id="region-panels"></div>
+    </div>
+
+    <div class="save-bar" id="save-bar">
+        <div class="save-bar-info">
+            <strong id="changes-count">0</strong> unsaved changes
+        </div>
+        <div>
+            <button class="btn btn-secondary" id="cancel-btn" style="background: var(--slate-600); margin-right: 12px;">Cancel</button>
+            <button class="btn btn-success" id="save-btn">💾 Save Changes</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const firebaseConfig = window.getFirebaseConfig();
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+        const ROUND_MULTIPLIERS = {
+            'round_of_64': 1,
+            'round_of_32': 2,
+            'sweet_16': 4,
+            'elite_8': 8,
+            'final_four': 16,
+            'championship': 32
+        };
+
+        const ROUND_DISPLAY = {
+            'round_of_64': 'Round of 64',
+            'round_of_32': 'Round of 32',
+            'sweet_16': 'Sweet 16',
+            'elite_8': 'Elite 8',
+            'final_four': 'Final Four',
+            'championship': 'Championship'
+        };
+
+        let users = {};
+        let brackets = [];
+        let teams = {};
+        let matchups = {};
+        let currentBracket = null;
+        let originalPicks = {};
+        let editedPicks = {};
+        let hasChanges = false;
+
+        async function init() {
+            await Promise.all([
+                loadUsers(),
+                loadTeamsAndMatchups()
+            ]);
+
+            setupEventListeners();
+        }
+
+        async function loadUsers() {
+            const usersSnap = await db.collection('artifacts/nerdfootball/public/data/nerdfootball_users').get();
+            const select = document.getElementById('user-select');
+
+            usersSnap.forEach(doc => {
+                const data = doc.data();
+                users[doc.id] = data;
+                const option = document.createElement('option');
+                option.value = doc.id;
+                option.textContent = data.displayName || data.email || doc.id;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadTeamsAndMatchups() {
+            const [teamsSnap, matchupsSnap] = await Promise.all([
+                db.collection(`${BASE}/teams`).get(),
+                db.collection(`${BASE}/matchups`).get()
+            ]);
+
+            teamsSnap.forEach(doc => { teams[doc.id] = doc.data(); });
+            matchupsSnap.forEach(doc => { matchups[doc.id] = doc.data(); });
+
+            console.log('🏀 ADMIN', 'Loaded', Object.keys(teams).length, 'teams,', Object.keys(matchups).length, 'matchups');
+        }
+
+        async function loadUserBrackets(userId) {
+            const bracketSelect = document.getElementById('bracket-select');
+            bracketSelect.innerHTML = '<option value="">-- Select Bracket --</option>';
+            bracketSelect.disabled = true;
+            document.getElementById('load-btn').disabled = true;
+
+            const bracketsSnap = await db.collection(`${BASE}/brackets`)
+                .where('userId', '==', userId)
+                .get();
+
+            brackets = [];
+            bracketsSnap.forEach(doc => {
+                brackets.push({ id: doc.id, ...doc.data() });
+            });
+
+            if (brackets.length === 0) {
+                bracketSelect.innerHTML = '<option value="">No brackets found</option>';
+                return;
+            }
+
+            brackets.forEach(b => {
+                const option = document.createElement('option');
+                option.value = b.id;
+                option.textContent = b.bracketName || 'Unnamed Bracket';
+                bracketSelect.appendChild(option);
+            });
+
+            bracketSelect.disabled = false;
+        }
+
+        function setupEventListeners() {
+            document.getElementById('user-select').addEventListener('change', (e) => {
+                if (e.target.value) {
+                    loadUserBrackets(e.target.value);
+                }
+            });
+
+            document.getElementById('bracket-select').addEventListener('change', (e) => {
+                document.getElementById('load-btn').disabled = !e.target.value;
+            });
+
+            document.getElementById('load-btn').addEventListener('click', loadBracket);
+            document.getElementById('edit-btn').addEventListener('click', openEditor);
+            document.getElementById('reset-btn').addEventListener('click', resetPicks);
+            document.getElementById('delete-btn').addEventListener('click', deleteBracket);
+            document.getElementById('save-btn').addEventListener('click', saveChanges);
+            document.getElementById('cancel-btn').addEventListener('click', cancelChanges);
+
+            document.querySelectorAll('.region-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.region-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    showRegion(tab.dataset.region);
+                });
+            });
+        }
+
+        async function loadBracket() {
+            const bracketId = document.getElementById('bracket-select').value;
+            currentBracket = brackets.find(b => b.id === bracketId);
+
+            if (!currentBracket) return;
+
+            originalPicks = { ...(currentBracket.picks || {}) };
+            editedPicks = { ...originalPicks };
+
+            const pickCount = Object.keys(originalPicks).length;
+            const score = calculateScore(originalPicks);
+            const warnings = validatePicks(originalPicks);
+
+            document.getElementById('meta-name').textContent = currentBracket.bracketName || 'Unnamed';
+            document.getElementById('meta-picks').textContent = pickCount;
+            document.getElementById('meta-score').textContent = score;
+            document.getElementById('meta-warnings').textContent = warnings.length;
+            document.getElementById('meta-warnings').style.color = warnings.length > 0 ? 'var(--accent-red)' : 'var(--accent-green)';
+
+            document.getElementById('bracket-info').classList.add('visible');
+            document.getElementById('editor-container').classList.remove('visible');
+            document.getElementById('save-bar').classList.remove('visible');
+            hasChanges = false;
+        }
+
+        function calculateScore(picks) {
+            let score = 0;
+            for (const [matchupId, teamId] of Object.entries(picks)) {
+                const matchup = matchups[matchupId];
+                if (!matchup) continue;
+
+                if (matchup.status === 'FINAL' && matchup.winner_team_id === teamId) {
+                    const team = teams[teamId];
+                    const round = matchup.round_id || 'round_of_64';
+                    const multiplier = ROUND_MULTIPLIERS[round] || 1;
+                    score += (team?.seed || 1) * multiplier;
+                }
+            }
+            return score;
+        }
+
+        function validatePicks(picks) {
+            const warnings = [];
+
+            for (const [matchupId, pickedTeamId] of Object.entries(picks)) {
+                const matchup = matchups[matchupId];
+                if (!matchup) continue;
+
+                // Check if picked team is actually in this matchup
+                if (matchup.round_id === 'round_of_64') {
+                    if (pickedTeamId !== matchup.top_team_id && pickedTeamId !== matchup.bottom_team_id) {
+                        const team = teams[pickedTeamId];
+                        warnings.push(`${matchupId}: Picked ${team?.team_name || pickedTeamId} but they're not in this matchup`);
+                    }
+                } else {
+                    // For later rounds, check if team could have advanced
+                    const feeders = getFeederMatchups(matchupId);
+                    let teamCouldBeHere = false;
+
+                    for (const feederId of feeders) {
+                        const feederPick = picks[feederId];
+                        if (feederPick === pickedTeamId) {
+                            teamCouldBeHere = true;
+                            break;
+                        }
+                    }
+
+                    if (!teamCouldBeHere && feeders.length > 0) {
+                        const team = teams[pickedTeamId];
+                        warnings.push(`${matchupId}: Picked ${team?.team_name || pickedTeamId} but didn't pick them to advance from earlier round`);
+                    }
+                }
+
+                // Check if pick conflicts with actual result
+                if (matchup.status === 'FINAL' && matchup.winner_team_id && pickedTeamId !== matchup.winner_team_id) {
+                    const picked = teams[pickedTeamId];
+                    const actual = teams[matchup.winner_team_id];
+                    // This is just wrong, not impossible - don't warn
+                }
+            }
+
+            return warnings;
+        }
+
+        function getFeederMatchups(matchupId) {
+            const feeders = [];
+            for (const [id, m] of Object.entries(matchups)) {
+                if (m.next_matchup_id === matchupId) {
+                    feeders.push(id);
+                }
+            }
+            return feeders;
+        }
+
+        function openEditor() {
+            document.getElementById('editor-container').classList.add('visible');
+            renderEditor();
+            showRegion('east');
+        }
+
+        function renderEditor() {
+            const panelsContainer = document.getElementById('region-panels');
+            panelsContainer.innerHTML = '';
+
+            const regions = ['east', 'west', 'south', 'midwest', 'final_four'];
+            const rounds = ['round_of_64', 'round_of_32', 'sweet_16', 'elite_8', 'final_four', 'championship'];
+
+            for (const region of regions) {
+                const panel = document.createElement('div');
+                panel.className = 'region-panel';
+                panel.id = `panel-${region}`;
+
+                const regionMatchups = Object.entries(matchups).filter(([id, m]) => {
+                    if (region === 'final_four') {
+                        return m.round_id === 'final_four' || m.round_id === 'championship';
+                    }
+                    return m.region_id === region && m.round_id !== 'final_four' && m.round_id !== 'championship';
+                });
+
+                const byRound = {};
+                for (const [id, m] of regionMatchups) {
+                    const round = m.round_id || 'round_of_64';
+                    if (!byRound[round]) byRound[round] = [];
+                    byRound[round].push({ id, ...m });
+                }
+
+                for (const round of rounds) {
+                    if (!byRound[round]) continue;
+
+                    const section = document.createElement('div');
+                    section.className = 'round-section';
+                    section.innerHTML = `<div class="round-title">${ROUND_DISPLAY[round] || round}</div>`;
+
+                    const grid = document.createElement('div');
+                    grid.className = 'matchups-grid';
+
+                    byRound[round].sort((a, b) => a.id.localeCompare(b.id));
+
+                    for (const matchup of byRound[round]) {
+                        grid.appendChild(createMatchupCard(matchup));
+                    }
+
+                    section.appendChild(grid);
+                    panel.appendChild(section);
+                }
+
+                panelsContainer.appendChild(panel);
+            }
+
+            updateValidationWarnings();
+        }
+
+        function createMatchupCard(matchup) {
+            const card = document.createElement('div');
+            card.className = 'matchup-card';
+            card.id = `card-${matchup.id}`;
+
+            const currentPick = editedPicks[matchup.id];
+            const isFinal = matchup.status === 'FINAL';
+
+            if (isFinal) card.classList.add('has-winner');
+
+            // Get teams that could be in this matchup
+            let team1, team2;
+
+            if (matchup.round_id === 'round_of_64') {
+                team1 = { id: matchup.top_team_id, ...teams[matchup.top_team_id], slot: 'top' };
+                team2 = { id: matchup.bottom_team_id, ...teams[matchup.bottom_team_id], slot: 'bottom' };
+            } else {
+                // For later rounds, get the feeder picks
+                const feeders = getFeederMatchups(matchup.id);
+                const feederPicks = feeders.map(f => editedPicks[f]).filter(Boolean);
+
+                team1 = feederPicks[0] ? { id: feederPicks[0], ...teams[feederPicks[0]], slot: 'top' } : null;
+                team2 = feederPicks[1] ? { id: feederPicks[1], ...teams[feederPicks[1]], slot: 'bottom' } : null;
+            }
+
+            const multiplier = ROUND_MULTIPLIERS[matchup.round_id] || 1;
+
+            card.innerHTML = `
+                <div class="matchup-header">
+                    <span>${matchup.id}</span>
+                    <span class="matchup-status ${isFinal ? 'final' : 'pending'}">${isFinal ? 'FINAL' : 'Pending'}</span>
+                </div>
+                ${team1 ? createTeamOption(team1, matchup, currentPick, isFinal, multiplier) : '<div class="team-option disabled">TBD</div>'}
+                ${team2 ? createTeamOption(team2, matchup, currentPick, isFinal, multiplier) : '<div class="team-option disabled">TBD</div>'}
+            `;
+
+            return card;
+        }
+
+        function createTeamOption(team, matchup, currentPick, isFinal, multiplier) {
+            const isSelected = currentPick === team.id;
+            const isCorrect = isFinal && matchup.winner_team_id === team.id && isSelected;
+            const isWrong = isFinal && matchup.winner_team_id !== team.id && isSelected;
+
+            let classes = 'team-option';
+            if (isSelected) classes += ' selected';
+            if (isCorrect) classes += ' correct';
+            if (isWrong) classes += ' wrong';
+
+            const points = (team.seed || 1) * multiplier;
+
+            return `
+                <div class="${classes}" data-matchup="${matchup.id}" data-team="${team.id}" onclick="selectTeam('${matchup.id}', '${team.id}')">
+                    <span class="team-seed">#${team.seed || '?'}</span>
+                    <span class="team-name">${team.team_name || 'Unknown'}</span>
+                    <span class="team-points">${points} pts</span>
+                </div>
+            `;
+        }
+
+        function selectTeam(matchupId, teamId) {
+            const oldPick = editedPicks[matchupId];
+            editedPicks[matchupId] = teamId;
+
+            // If pick changed, cascade to later rounds
+            if (oldPick !== teamId) {
+                cascadePicks(matchupId, oldPick, teamId);
+            }
+
+            hasChanges = JSON.stringify(editedPicks) !== JSON.stringify(originalPicks);
+            updateUI();
+        }
+
+        function cascadePicks(matchupId, oldTeamId, newTeamId) {
+            // Find matchups that depend on this one
+            const matchup = matchups[matchupId];
+            if (!matchup || !matchup.next_matchup_id) return;
+
+            const nextMatchupId = matchup.next_matchup_id;
+            const nextPick = editedPicks[nextMatchupId];
+
+            // If we had picked the old team to advance further, clear that pick
+            if (nextPick === oldTeamId) {
+                delete editedPicks[nextMatchupId];
+                cascadePicks(nextMatchupId, oldTeamId, null);
+            }
+        }
+
+        function updateUI() {
+            // Update save bar
+            const changesCount = Object.keys(editedPicks).filter(k =>
+                editedPicks[k] !== originalPicks[k]
+            ).length + Object.keys(originalPicks).filter(k =>
+                !editedPicks[k] && originalPicks[k]
+            ).length;
+
+            document.getElementById('changes-count').textContent = changesCount;
+            document.getElementById('save-bar').classList.toggle('visible', hasChanges);
+
+            // Re-render affected cards
+            renderEditor();
+            showRegion(document.querySelector('.region-tab.active')?.dataset.region || 'east');
+        }
+
+        function updateValidationWarnings() {
+            const warnings = validatePicks(editedPicks);
+            const container = document.getElementById('validation-warnings');
+            const list = document.getElementById('validation-list');
+
+            if (warnings.length > 0) {
+                container.classList.add('visible');
+                list.innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
+            } else {
+                container.classList.remove('visible');
+            }
+        }
+
+        function showRegion(region) {
+            document.querySelectorAll('.region-panel').forEach(p => p.classList.remove('active'));
+            const panel = document.getElementById(`panel-${region}`);
+            if (panel) panel.classList.add('active');
+        }
+
+        async function resetPicks() {
+            if (!confirm('Reset all picks for this bracket? This will clear all 63 picks but keep the bracket name and settings.')) {
+                return;
+            }
+
+            try {
+                await db.doc(`${BASE}/brackets/${currentBracket.id}`).update({
+                    picks: {},
+                    isComplete: false,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showToast('✅ Picks reset successfully');
+                currentBracket.picks = {};
+                originalPicks = {};
+                editedPicks = {};
+                loadBracket();
+            } catch (e) {
+                console.error('Reset error:', e);
+                showToast('❌ Failed to reset picks', true);
+            }
+        }
+
+        async function deleteBracket() {
+            if (!confirm(`Delete bracket "${currentBracket.bracketName}"? This cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                await db.doc(`${BASE}/brackets/${currentBracket.id}`).delete();
+                showToast('✅ Bracket deleted');
+                document.getElementById('bracket-info').classList.remove('visible');
+                document.getElementById('editor-container').classList.remove('visible');
+                loadUserBrackets(document.getElementById('user-select').value);
+            } catch (e) {
+                console.error('Delete error:', e);
+                showToast('❌ Failed to delete bracket', true);
+            }
+        }
+
+        async function saveChanges() {
+            try {
+                const pickCount = Object.keys(editedPicks).length;
+                const isComplete = pickCount >= 63;
+
+                await db.doc(`${BASE}/brackets/${currentBracket.id}`).update({
+                    picks: editedPicks,
+                    isComplete: isComplete,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showToast(`✅ Saved ${pickCount} picks`);
+                originalPicks = { ...editedPicks };
+                hasChanges = false;
+                document.getElementById('save-bar').classList.remove('visible');
+                loadBracket();
+            } catch (e) {
+                console.error('Save error:', e);
+                showToast('❌ Failed to save changes', true);
+            }
+        }
+
+        function cancelChanges() {
+            editedPicks = { ...originalPicks };
+            hasChanges = false;
+            updateUI();
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast visible' + (isError ? ' error' : '');
+            setTimeout(() => toast.classList.remove('visible'), 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
