@@ -94,7 +94,7 @@ function buildTeamNameMap(teams) {
     const map = {};
 
     // Teams with name conflicts - need full name matching, not first-word
-    const conflictingFirstWords = new Set(['miami', 'michigan', 'north', 'saint', 'texas']);
+    const conflictingFirstWords = new Set(['miami', 'michigan', 'north', 'saint', 'texas', 'california']);
 
     for (const [teamId, team] of Object.entries(teams)) {
         const name = team.team_name || '';
@@ -121,8 +121,11 @@ function buildTeamNameMap(teams) {
             'uconn': 'connecticut',
             'uconn huskies': 'connecticut',
             'connecticut huskies': 'connecticut',
-            'miami fl': 'miami',
-            'miami hurricanes': 'miami',
+            'miami fl': 'miami fl',
+            'miami hurricanes': 'miami fl',
+            'california baptist': 'cal baptist',
+            'california baptist lancers': 'cal baptist',
+            'cal baptist lancers': 'cal baptist',
             'st johns': 'st johns',
             'saint johns': 'st johns',
             'vcu': 'virginia commonwealth',

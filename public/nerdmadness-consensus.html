@@ -39,50 +39,70 @@
             padding: 80px 20px 40px 20px;
         }
 
-        .header {
+        .navbar {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
-            padding: 14px 24px;
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+            padding: 0 20px;
+        }
+        .navbar-inner {
+            max-width: 1200px;
+            margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--glass-border);
-            z-index: 100;
+            height: 60px;
         }
-
-        .header-brand {
+        .navbar-brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            text-decoration: none;
         }
-
-        .header-logo {
-            height: 32px;
-            width: auto;
-        }
-
-        .header-title {
+        .navbar-logo { height: 32px; width: auto; }
+        .navbar-title {
             font-size: 16px;
             color: var(--slate-100);
             letter-spacing: 2px;
             font-weight: 800;
             text-transform: uppercase;
         }
-
-        .header-title span { color: var(--accent-gold); }
-
-        .header-link {
-            font-size: 12px;
-            color: var(--slate-400);
-            text-decoration: none;
-            transition: color 0.2s;
+        .navbar-title span { color: var(--accent-gold); }
+        .navbar-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-
-        .header-link:hover {
-            color: var(--accent-blue);
+        .nav-link {
+            color: var(--slate-300);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 8px 14px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .nav-link:hover {
+            background: var(--slate-700);
+            color: var(--slate-100);
+        }
+        .nav-link.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+        .nav-link-icon { font-size: 14px; }
+        @media (max-width: 768px) {
+            .navbar-links { gap: 4px; }
+            .nav-link { padding: 8px 10px; font-size: 12px; }
+            .nav-link-text { display: none; }
+            .nav-link-icon { font-size: 16px; }
         }
 
         .container {
@@ -444,13 +464,36 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-brand">
-            <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdMadness" class="header-logo">
-            <span class="header-title"><span>NERD</span>MADNESS</span>
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <a href="nerdmadness.html" class="navbar-brand">
+                <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdMadness" class="navbar-logo">
+                <span class="navbar-title"><span>NERD</span>MADNESS</span>
+            </a>
+            <div class="navbar-links">
+                <a href="nerdmadness.html" class="nav-link">
+                    <span class="nav-link-icon">🏠</span>
+                    <span class="nav-link-text">Home</span>
+                </a>
+                <a href="nerdmadness-consensus.html" class="nav-link active">
+                    <span class="nav-link-icon">📊</span>
+                    <span class="nav-link-text">Consensus</span>
+                </a>
+                <a href="nerdmadness-upset-tracker.html" class="nav-link">
+                    <span class="nav-link-icon">🔥</span>
+                    <span class="nav-link-text">Upsets</span>
+                </a>
+                <a href="nerdmadness-leaderboard.html" class="nav-link">
+                    <span class="nav-link-icon">🏆</span>
+                    <span class="nav-link-text">Leaderboard</span>
+                </a>
+                <a href="nerdmadness-head-to-head.html" class="nav-link">
+                    <span class="nav-link-icon">⚔️</span>
+                    <span class="nav-link-text">H2H</span>
+                </a>
+            </div>
         </div>
-        <a href="nerdmadness.html" class="header-link">← Back to Brackets</a>
-    </div>
+    </nav>
 
     <div class="container">
         <div class="page-title">
@@ -503,6 +546,54 @@
             return MATCHUP_ID_TO_ROUND[prefix] || 'round_of_64';
         }
 
+        // Feeder mapping: which games feed into which
+        function getFeederMatchups(matchupId) {
+            const prefix = matchupId.substring(0, 2);
+            const gameNum = parseInt(matchupId.split('_G')[1]);
+
+            if (prefix === 'R1') return null;
+
+            const prevRound = {
+                'R2': 'R1', 'R3': 'R2', 'R4': 'R3', 'R5': 'R4', 'R6': 'R5'
+            }[prefix];
+
+            if (!prevRound) return null;
+
+            const topFeederNum = (gameNum * 2) - 1;
+            const bottomFeederNum = gameNum * 2;
+
+            return {
+                top: `${prevRound}_G${String(topFeederNum).padStart(2, '0')}`,
+                bottom: `${prevRound}_G${String(bottomFeederNum).padStart(2, '0')}`
+            };
+        }
+
+        // Get the two teams playing in a matchup based on bracket picks
+        function getMatchupTeams(matchupId, picks, matchups, teams) {
+            const matchup = matchups[matchupId];
+            if (!matchup) return { topTeam: null, bottomTeam: null };
+
+            // Round of 64 has teams directly
+            if (matchup.top_team_id && matchup.bottom_team_id) {
+                return {
+                    topTeam: teams[matchup.top_team_id],
+                    bottomTeam: teams[matchup.bottom_team_id]
+                };
+            }
+
+            // Later rounds: derive from picks in feeder matchups
+            const feeders = getFeederMatchups(matchupId);
+            if (!feeders) return { topTeam: null, bottomTeam: null };
+
+            const topTeamId = picks[feeders.top];
+            const bottomTeamId = picks[feeders.bottom];
+
+            return {
+                topTeam: topTeamId ? teams[topTeamId] : null,
+                bottomTeam: bottomTeamId ? teams[bottomTeamId] : null
+            };
+        }
+
         let allBrackets = [];
         let matchups = {};
         let teams = {};
@@ -518,7 +609,7 @@
             ]);
 
             matchupsSnap.forEach(doc => { matchups[doc.id] = doc.data(); });
-            teamsSnap.forEach(doc => { teams[doc.id] = doc.data(); });
+            teamsSnap.forEach(doc => { teams[doc.id] = { id: doc.id, ...doc.data() }; });
         }
 
         async function loadAllBrackets() {
@@ -578,8 +669,8 @@
                     }
                 }
 
-                const topTeam = teams[matchup.top_team_id];
-                const bottomTeam = teams[matchup.bottom_team_id];
+                // Get teams for this matchup (works for all rounds)
+                const { topTeam, bottomTeam } = getMatchupTeams(matchupId, myBracket.picks, matchups, teams);
 
                 consensusData.push({
                     matchupId,
