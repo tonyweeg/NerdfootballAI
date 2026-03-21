@@ -779,6 +779,10 @@
                     <span class="nav-link-icon">⚔️</span>
                     <span class="nav-link-text">H2H</span>
                 </a>
+                <a href="nerdmadness-heatmap.html" class="nav-link">
+                    <span class="nav-link-icon">🗺️</span>
+                    <span class="nav-link-text">Heatmap</span>
+                </a>
             </div>
         </div>
     </nav>
@@ -973,6 +977,18 @@
             return multiplier * winnerSeed;
         }
 
+        function isTeamEliminated(teamId) {
+            for (const [matchupId, matchup] of Object.entries(matchups)) {
+                if (matchup.status === 'FINAL' && matchup.winner_team_id) {
+                    if ((matchup.top_team_id === teamId || matchup.bottom_team_id === teamId) &&
+                        matchup.winner_team_id !== teamId) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         function calculateBracketScore(bracket, roundFilter = 'all') {
             let totalScore = 0;
             let correctPicks = 0;
@@ -999,7 +1015,9 @@
                         correctPicks++;
                     }
                 } else {
-                    possiblePoints += calculatePoints(pickedSeed, round);
+                    if (!isTeamEliminated(pickedTeamId)) {
+                        possiblePoints += calculatePoints(pickedSeed, round);
+                    }
                 }
             }
 
@@ -1277,7 +1295,9 @@
                     }
                 } else {
                     pendingCount++;
-                    possiblePoints += pts;
+                    if (!isTeamEliminated(pickedTeamId)) {
+                        possiblePoints += pts;
+                    }
                 }
 
                 let isUpset = false;

@@ -271,6 +271,30 @@ function processGame(game, matchups, teamNameMap, teams) {
 }
 
 /**
+ * Get feeder matchup IDs for a given matchup
+ */
+function getFeederMatchups(matchupId) {
+    const prefix = matchupId.substring(0, 2);
+    const gameNum = parseInt(matchupId.split('_G')[1]);
+
+    if (prefix === 'R1') return null; // R64 has no feeders
+
+    const prevRound = {
+        'R2': 'R1', 'R3': 'R2', 'R4': 'R3', 'R5': 'R4', 'R6': 'R5'
+    }[prefix];
+
+    if (!prevRound) return null;
+
+    const topFeederNum = (gameNum * 2) - 1;
+    const bottomFeederNum = gameNum * 2;
+
+    return {
+        top: `${prevRound}_G${String(topFeederNum).padStart(2, '0')}`,
+        bottom: `${prevRound}_G${String(bottomFeederNum).padStart(2, '0')}`
+    };
+}
+
+/**
  * Find matchup by team IDs
  */
 function findMatchup(matchups, team1Id, team2Id, teams) {
@@ -284,10 +308,36 @@ function findMatchup(matchups, team1Id, team2Id, teams) {
         }
     }
 
-    // For later rounds, we need to check if winner_team_id hasn't been set yet
-    // and the teams are feeding into this matchup
-    // This is more complex - for now, return null for non-R64 games
-    // TODO: Implement feeder matching for later rounds
+    // For later rounds, check feeder matchups to determine if these teams should play
+    const roundPrefixes = ['R2', 'R3', 'R4', 'R5', 'R6'];
+
+    for (const [matchupId, matchup] of Object.entries(matchups)) {
+        const prefix = matchupId.substring(0, 2);
+        if (!roundPrefixes.includes(prefix)) continue;
+
+        // Skip if already scored
+        if (matchup.status === 'FINAL' && matchup.winner_team_id) continue;
+
+        const feeders = getFeederMatchups(matchupId);
+        if (!feeders) continue;
+
+        const topFeeder = matchups[feeders.top];
+        const bottomFeeder = matchups[feeders.bottom];
+
+        // Both feeder games must be complete
+        if (!topFeeder || !bottomFeeder) continue;
+        if (topFeeder.status !== 'FINAL' || bottomFeeder.status !== 'FINAL') continue;
+
+        const topWinner = topFeeder.winner_team_id;
+        const bottomWinner = bottomFeeder.winner_team_id;
+
+        // Check if our teams match the feeder winners
+        if ((topWinner === team1Id && bottomWinner === team2Id) ||
+            (topWinner === team2Id && bottomWinner === team1Id)) {
+            console.log(`🏀 Matched ${matchupId} via feeders: ${feeders.top} winner vs ${feeders.bottom} winner`);
+            return { id: matchupId, data: matchup };
+        }
+    }
 
     return null;
 }
