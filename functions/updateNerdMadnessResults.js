@@ -5,26 +5,63 @@ const fetch = require('node-fetch');
 
 const db = admin.firestore();
 const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
-const ESPN_API = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?groups=100';
+const ESPN_API_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?groups=100';
+
+/**
+ * Get yesterday's date in YYYYMMDD format for ESPN API
+ */
+function getYesterdayDate() {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const year = yesterday.getFullYear();
+    const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const day = String(yesterday.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+}
 
 /**
  * Fetches NCAA Tournament results from ESPN and updates Firestore matchups
  * Scheduled to run every 15 minutes during tournament
+ * Now checks both today's games AND yesterday's games to catch any that rolled off
  */
 async function fetchAndUpdateResults() {
     console.log('🏀 NerdMadness: Fetching ESPN tournament results...');
 
     try {
-        // Fetch ESPN scoreboard
-        const response = await fetch(ESPN_API);
-        if (!response.ok) {
-            throw new Error(`ESPN API returned ${response.status}`);
+        const yesterdayDate = getYesterdayDate();
+        console.log(`🏀 Checking today's scoreboard + yesterday (${yesterdayDate})`);
+
+        // Fetch both today's and yesterday's scoreboards in parallel
+        const [todayResponse, yesterdayResponse] = await Promise.all([
+            fetch(ESPN_API_BASE),
+            fetch(`${ESPN_API_BASE}&dates=${yesterdayDate}`)
+        ]);
+
+        if (!todayResponse.ok) {
+            throw new Error(`ESPN API (today) returned ${todayResponse.status}`);
         }
 
-        const data = await response.json();
-        const events = data.events || [];
+        const todayData = await todayResponse.json();
+        const todayEvents = todayData.events || [];
 
-        console.log(`🏀 ESPN returned ${events.length} games`);
+        let yesterdayEvents = [];
+        if (yesterdayResponse.ok) {
+            const yesterdayData = await yesterdayResponse.json();
+            yesterdayEvents = yesterdayData.events || [];
+        } else {
+            console.warn(`🏀 Could not fetch yesterday's games: ${yesterdayResponse.status}`);
+        }
+
+        // Combine and deduplicate by ESPN game ID
+        const gameMap = new Map();
+        [...todayEvents, ...yesterdayEvents].forEach(event => {
+            if (!gameMap.has(event.id)) {
+                gameMap.set(event.id, event);
+            }
+        });
+
+        const events = Array.from(gameMap.values());
+        console.log(`🏀 ESPN returned ${todayEvents.length} today + ${yesterdayEvents.length} yesterday = ${events.length} unique games`);
 
         // Filter for games that are FINAL (groups=100 already filters for NCAA tournament)
         const tournamentGames = events.filter(event => {
