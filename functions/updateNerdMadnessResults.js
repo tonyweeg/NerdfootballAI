@@ -51,8 +51,14 @@ async function fetchAndUpdateResults() {
         const matchups = {};
         matchupsSnap.forEach(doc => { matchups[doc.id] = doc.data(); });
 
+        console.log(`🏀 Loaded ${Object.keys(teams).length} teams, ${Object.keys(matchups).length} matchups`);
+
         // Build team name lookup (ESPN name -> our team ID)
         const teamNameMap = buildTeamNameMap(teams);
+
+        // Log some sample team mappings for debugging
+        const sampleTeams = Object.entries(teams).slice(0, 5);
+        console.log('🏀 Sample teams:', sampleTeams.map(([id, t]) => `${id}=${t.team_name}`).join(', '));
 
         const updates = [];
         const batch = db.batch();
@@ -224,6 +230,8 @@ function processGame(game, matchups, teamNameMap, teams) {
     // Find our team IDs
     const team1Id = findTeamId(team1Name, teamNameMap, teams);
     const team2Id = findTeamId(team2Name, teamNameMap, teams);
+
+    console.log(`🏀 Team lookup: "${team1Name}" -> ${team1Id || 'NOT FOUND'}, "${team2Name}" -> ${team2Id || 'NOT FOUND'}`);
 
     if (!team1Id || !team2Id) {
         console.warn(`🏀 Could not map teams: ${team1Name} vs ${team2Name}`);
