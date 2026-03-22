@@ -104,6 +104,55 @@
             .nav-link-icon { font-size: 16px; }
         }
 
+        /* Auth-gated content - hidden by default */
+        .auth-required {
+            display: none !important;
+        }
+        body.logged-in .auth-required {
+            display: flex !important;
+        }
+        body.logged-in .page-content.auth-required {
+            display: block !important;
+        }
+
+        .login-prompt {
+            text-align: center;
+            padding: 60px 20px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .login-prompt h2 {
+            font-size: 24px;
+            margin-bottom: 16px;
+            color: var(--slate-100);
+        }
+        .login-prompt p {
+            color: var(--slate-400);
+            margin-bottom: 24px;
+        }
+        .sign-in-btn {
+            background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+            color: white;
+            border: none;
+            padding: 14px 36px;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+        .sign-in-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(59, 130, 246, 0.5);
+        }
+        body.logged-in .login-prompt {
+            display: none;
+        }
+
         .page-title {
             text-align: center;
             margin-bottom: 20px;
@@ -480,23 +529,23 @@
                     <span class="nav-link-icon">🏠</span>
                     <span class="nav-link-text">Home</span>
                 </a>
-                <a href="nerdmadness-consensus.html" class="nav-link">
+                <a href="nerdmadness-consensus.html" class="nav-link auth-required">
                     <span class="nav-link-icon">📊</span>
                     <span class="nav-link-text">Consensus</span>
                 </a>
-                <a href="nerdmadness-upset-tracker.html" class="nav-link">
+                <a href="nerdmadness-upset-tracker.html" class="nav-link auth-required">
                     <span class="nav-link-icon">🔥</span>
                     <span class="nav-link-text">Upsets</span>
                 </a>
-                <a href="nerdmadness-leaderboard.html" class="nav-link">
+                <a href="nerdmadness-leaderboard.html" class="nav-link auth-required">
                     <span class="nav-link-icon">🏆</span>
                     <span class="nav-link-text">Leaderboard</span>
                 </a>
-                <a href="nerdmadness-head-to-head.html" class="nav-link">
+                <a href="nerdmadness-head-to-head.html" class="nav-link auth-required">
                     <span class="nav-link-icon">⚔️</span>
                     <span class="nav-link-text">H2H</span>
                 </a>
-                <a href="nerdmadness-heatmap.html" class="nav-link active">
+                <a href="nerdmadness-heatmap.html" class="nav-link active auth-required">
                     <span class="nav-link-icon">🗺️</span>
                     <span class="nav-link-text">Heatmap</span>
                 </a>
@@ -504,6 +553,13 @@
         </div>
     </nav>
 
+    <div class="login-prompt" id="login-prompt">
+        <h2>🔒 Sign In Required</h2>
+        <p>Please sign in to view the bracket heatmap.</p>
+        <button class="sign-in-btn" onclick="signIn()">Sign In with Google</button>
+    </div>
+
+    <div class="page-content auth-required" id="page-content">
     <div class="page-title">
         <h1>🗺️ Bracket Heatmap</h1>
         <p>All picks at a glance • Scroll right to see all 63 games</p>
@@ -530,6 +586,7 @@
     <div id="content-area">
         <div class="loading">Loading bracket data...</div>
     </div>
+    </div>
 
     <script>
         const firebaseConfig = window.getFirebaseConfig();
@@ -538,6 +595,11 @@
         const db = firebase.firestore();
 
         const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+        function signIn() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider);
+        }
 
         const ROUNDS = [
             { id: 'round_of_64', name: 'R64', prefix: 'R1', games: 32, multiplier: 1 },
@@ -795,30 +857,29 @@
         }
 
         async function init() {
-            try {
-                // Wait for auth state
-                await new Promise((resolve) => {
-                    const unsubscribe = auth.onAuthStateChanged((user) => {
-                        unsubscribe();
-                        if (user) {
-                            currentUserId = user.uid;
-                            console.log('🗺️ HEATMAP', 'User logged in:', currentUserId);
-                        }
-                        resolve();
-                    });
-                    setTimeout(() => { unsubscribe(); resolve(); }, 3000);
-                });
+            // Wait for auth state
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    document.body.classList.add('logged-in');
+                    currentUserId = user.uid;
+                    console.log('🗺️ HEATMAP', 'User logged in:', currentUserId);
 
-                await loadData();
-                renderHeatmap();
-            } catch (e) {
-                console.error('🗺️ HEATMAP', 'Error:', e);
-                document.getElementById('content-area').innerHTML = `
-                    <div class="loading">
-                        <p>Error loading data. Please try again.</p>
-                    </div>
-                `;
-            }
+                    try {
+                        await loadData();
+                        renderHeatmap();
+                    } catch (e) {
+                        console.error('🗺️ HEATMAP', 'Error:', e);
+                        document.getElementById('content-area').innerHTML = `
+                            <div class="loading">
+                                <p>Error loading data. Please try again.</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    document.body.classList.remove('logged-in');
+                    console.log('🗺️ HEATMAP', 'User not logged in');
+                }
+            });
         }
 
         init();

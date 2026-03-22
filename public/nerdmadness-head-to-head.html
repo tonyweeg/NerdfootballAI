@@ -106,6 +106,25 @@
             .nav-link-icon { font-size: 16px; }
         }
 
+        /* Auth-gated content */
+        .auth-required { display: none !important; }
+        body.logged-in .auth-required { display: flex !important; }
+        body.logged-in .page-content.auth-required { display: block !important; }
+
+        .login-prompt { text-align: center; padding: 60px 20px; max-width: 400px; margin: 0 auto; }
+        .login-prompt h2 { font-size: 24px; margin-bottom: 16px; color: var(--slate-100); }
+        .login-prompt p { color: var(--slate-400); margin-bottom: 24px; }
+        .sign-in-btn {
+            background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+            color: white; border: none; padding: 14px 36px;
+            font-family: inherit; font-size: 15px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px; cursor: pointer;
+            border-radius: 50px; transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+        .sign-in-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 30px rgba(59, 130, 246, 0.5); }
+        body.logged-in .login-prompt { display: none; }
+
         .container { max-width: 1000px; margin: 0 auto; }
 
         .page-title { text-align: center; margin-bottom: 24px; }
@@ -505,23 +524,23 @@
                     <span class="nav-link-icon">🏠</span>
                     <span class="nav-link-text">Home</span>
                 </a>
-                <a href="nerdmadness-consensus.html" class="nav-link">
+                <a href="nerdmadness-consensus.html" class="nav-link auth-required">
                     <span class="nav-link-icon">📊</span>
                     <span class="nav-link-text">Consensus</span>
                 </a>
-                <a href="nerdmadness-upset-tracker.html" class="nav-link">
+                <a href="nerdmadness-upset-tracker.html" class="nav-link auth-required">
                     <span class="nav-link-icon">🔥</span>
                     <span class="nav-link-text">Upsets</span>
                 </a>
-                <a href="nerdmadness-leaderboard.html" class="nav-link">
+                <a href="nerdmadness-leaderboard.html" class="nav-link auth-required">
                     <span class="nav-link-icon">🏆</span>
                     <span class="nav-link-text">Leaderboard</span>
                 </a>
-                <a href="nerdmadness-head-to-head.html" class="nav-link active">
+                <a href="nerdmadness-head-to-head.html" class="nav-link active auth-required">
                     <span class="nav-link-icon">⚔️</span>
                     <span class="nav-link-text">H2H</span>
                 </a>
-                <a href="nerdmadness-heatmap.html" class="nav-link">
+                <a href="nerdmadness-heatmap.html" class="nav-link auth-required">
                     <span class="nav-link-icon">🗺️</span>
                     <span class="nav-link-text">Heatmap</span>
                 </a>
@@ -529,7 +548,13 @@
         </div>
     </nav>
 
-    <div class="container">
+    <div class="login-prompt" id="login-prompt">
+        <h2>🔒 Sign In Required</h2>
+        <p>Please sign in to compare brackets.</p>
+        <button class="sign-in-btn" onclick="signIn()">Sign In with Google</button>
+    </div>
+
+    <div class="container page-content auth-required" id="page-content">
         <div class="page-title">
             <h1>⚔️ Head to Head</h1>
             <p>Compare brackets • Can you still win?</p>
@@ -547,6 +572,21 @@
         const db = firebase.firestore();
 
         const BASE = 'artifacts/nerdbasketball/pools/nerdmadness_2026';
+
+        function signIn() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider);
+        }
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.body.classList.add('logged-in');
+                console.log('⚔️ H2H', 'User logged in');
+            } else {
+                document.body.classList.remove('logged-in');
+                console.log('⚔️ H2H', 'User not logged in');
+            }
+        });
 
         const ROUND_MULTIPLIERS = {
             'round_of_64': 1,
