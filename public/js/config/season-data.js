@@ -13,6 +13,8 @@ const SEASON_DATA = {
     espnScheduleUrlTemplate: 'https://www.espn.com/nfl/schedule/_/week/{WEEK}/year/{YEAR}/seasontype/2'
 };
 
+Object.freeze(SEASON_DATA);
+
 if (typeof window !== 'undefined') {
     window.SEASON_DATA = SEASON_DATA;
 }
