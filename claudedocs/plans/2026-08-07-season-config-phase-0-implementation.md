@@ -270,8 +270,9 @@ describe('formatters and ESPN urls', () => {
 
 - [ ] **Step 2: Run it to verify it fails for the right reason**
 
-Run: `npx jest --roots '<rootDir>/tests' tests/season-config-parity.test.js 2>&1 | tail -5`
+Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js 2>&1 | tail -5`
 Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
+(The `--` separator is required: Jest's `--roots` is an array flag that otherwise swallows the file path as a second root.)
 
 - [ ] **Step 3: Create `public/js/config/season-config.js`**
 
@@ -396,7 +397,7 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
 
 - [ ] **Step 4: Run the parity tests to verify they pass**
 
-Run: `npx jest --roots '<rootDir>/tests' tests/season-config-parity.test.js 2>&1 | tail -5`
+Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js 2>&1 | tail -5`
 Expected: PASS — `Tests: 15 passed, 15 total`
 
 - [ ] **Step 5: Commit**
@@ -495,7 +496,7 @@ describe('wrapper drift guard (browser vs functions)', () => {
 
 - [ ] **Step 2: Run it to verify it fails for the right reason**
 
-Run: `npx jest --roots '<rootDir>/tests' tests/season-config-drift.test.js 2>&1 | tail -5`
+Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-drift.test.js 2>&1 | tail -5`
 Expected: FAIL — `Cannot find module '../functions/seasonConfig.js'`
 
 - [ ] **Step 3: Create `functions/seasonConfig.js`**
@@ -606,7 +607,7 @@ module.exports = { SEASON_CONFIG };
 
 - [ ] **Step 4: Run the full new suite to verify everything passes**
 
-Run: `npx jest --roots '<rootDir>/tests' tests/season-config-parity.test.js tests/season-config-drift.test.js 2>&1 | tail -5`
+Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js 2>&1 | tail -5`
 Expected: PASS — `Tests: 19 passed, 19 total` (15 parity + 4 drift)
 
 - [ ] **Step 5: Commit**
@@ -702,7 +703,7 @@ Run: `git status --short`
 Expected: clean tree (everything committed). No `firebase deploy` in this phase — the new files ship with the Phase 1 deploy after human sign-off.
 
 **Phase 0 exit checklist:**
-- [ ] `npx jest --roots '<rootDir>/tests' tests/season-config-parity.test.js tests/season-config-drift.test.js` → 19 passed
+- [ ] `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js` → 19 passed
 - [ ] Baseline unit tests unchanged
 - [ ] Guard script runs, exits 1, lists ~100-140 files (the Phase 1-5 worklist), excludes config files
 - [ ] Four commits on `claude/2026-season-config-plan-509f05`, tree clean
