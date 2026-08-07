@@ -12,6 +12,8 @@
 
 **Branch:** All work on `claude/2026-season-config-plan-509f05` (this worktree). Run every command from the worktree root. Do not touch `main`. Do not deploy anything in Phase 0.
 
+**Known repo condition (discovered during Task 1, 2026-08-07):** `auraglow/package.json` is truncated mid-file (unterminated string in devDependencies), which crashes any unscoped Jest run during project scanning. All Jest commands in this plan are therefore scoped with `--roots '<rootDir>/tests'`. The Task 1 baseline of root-level unit tests could not run — recorded as pre-existing breakage; Task 5 compares against that recorded state. Fixing auraglow is out of Phase 0 scope (flagged as a separate task).
+
 ---
 
 ## Design note: why the wrappers are plain scripts, not ES modules
@@ -266,7 +268,7 @@ describe('formatters and ESPN urls', () => {
 
 - [ ] **Step 2: Run it to verify it fails for the right reason**
 
-Run: `npx jest tests/season-config-parity.test.js 2>&1 | tail -5`
+Run: `npx jest --roots '<rootDir>/tests' tests/season-config-parity.test.js 2>&1 | tail -5`
 Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
 
 - [ ] **Step 3: Create `public/js/config/season-config.js`**
@@ -392,7 +394,7 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
 
 - [ ] **Step 4: Run the parity tests to verify they pass**
 
-Run: `npx jest tests/season-config-parity.test.js 2>&1 | tail -5`
+Run: `npx jest --roots '<rootDir>/tests' tests/season-config-parity.test.js 2>&1 | tail -5`
 Expected: PASS — `Tests: 15 passed, 15 total`
 
 - [ ] **Step 5: Commit**
@@ -491,7 +493,7 @@ describe('wrapper drift guard (browser vs functions)', () => {
 
 - [ ] **Step 2: Run it to verify it fails for the right reason**
 
-Run: `npx jest tests/season-config-drift.test.js 2>&1 | tail -5`
+Run: `npx jest --roots '<rootDir>/tests' tests/season-config-drift.test.js 2>&1 | tail -5`
 Expected: FAIL — `Cannot find module '../functions/seasonConfig.js'`
 
 - [ ] **Step 3: Create `functions/seasonConfig.js`**
@@ -602,7 +604,7 @@ module.exports = { SEASON_CONFIG };
 
 - [ ] **Step 4: Run the full new suite to verify everything passes**
 
-Run: `npx jest tests/season-config-parity.test.js tests/season-config-drift.test.js 2>&1 | tail -5`
+Run: `npx jest --roots '<rootDir>/tests' tests/season-config-parity.test.js tests/season-config-drift.test.js 2>&1 | tail -5`
 Expected: PASS — `Tests: 19 passed, 19 total` (15 parity + 4 drift)
 
 - [ ] **Step 5: Commit**
@@ -682,10 +684,10 @@ git commit -m "Phase 0: Season hardcode guard script (migration progress meter)"
 
 **Files:** none created — verification only.
 
-- [ ] **Step 1: Confirm the baseline unit tests are unchanged from Task 1 Step 1**
+- [ ] **Step 1: Confirm the pre-existing Jest condition is unchanged from Task 1 Step 1**
 
 Run: `npx jest pool-members-unit app-structure-simple 2>&1 | tail -5`
-Expected: identical pass/fail results to the Task 1 baseline (Phase 0 adds files; it must not change any existing behavior).
+Expected: the same pre-existing failure recorded at the Task 1 baseline (unscoped Jest crashes on the truncated `auraglow/package.json` before running any tests). Phase 0 must not change this in either direction; Phase 0's own suites are verified via the scoped command in the exit checklist.
 
 - [ ] **Step 2: Confirm the config caching requirement is already met (no firebase.json edit)**
 
@@ -698,7 +700,7 @@ Run: `git status --short`
 Expected: clean tree (everything committed). No `firebase deploy` in this phase — the new files ship with the Phase 1 deploy after human sign-off.
 
 **Phase 0 exit checklist:**
-- [ ] `npx jest tests/season-config-parity.test.js tests/season-config-drift.test.js` → 19 passed
+- [ ] `npx jest --roots '<rootDir>/tests' tests/season-config-parity.test.js tests/season-config-drift.test.js` → 19 passed
 - [ ] Baseline unit tests unchanged
 - [ ] Guard script runs, exits 1, lists ~100-140 files (the Phase 1-5 worklist), excludes config files
 - [ ] Four commits on `claude/2026-season-config-plan-509f05`, tree clean
