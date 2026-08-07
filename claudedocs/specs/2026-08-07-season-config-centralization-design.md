@@ -212,7 +212,7 @@ if (typeof window !== 'undefined') {
 }
 
 // functions/seasonConfig.js (CommonJS)
-const SEASON_DATA = require('./season-data.json');
+const SEASON_DATA = Object.freeze(require('./season-data.json'));
 module.exports = { SEASON_CONFIG: { ...SEASON_DATA, paths, utils, format } };
 ```
 
@@ -248,6 +248,7 @@ assert kickoffDateTime is within 24h of weekAnchor
 assert span(weekAnchor → seasonEndDate) is 17-19 weeks
 assert every week has 13-16 games; total games === 272
 assert every game timestamp parses and falls within its week's date range
+assert poolId === `nerduniverse-${year}` and weekAnchor starts with `${year}-` (lockstep guard vs partial regeneration)
 ```
 
 Any assert failure: exit non-zero, write nothing.

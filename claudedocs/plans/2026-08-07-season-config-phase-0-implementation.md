@@ -91,6 +91,8 @@ const SEASON_DATA = {
     espnScheduleUrlTemplate: 'https://www.espn.com/nfl/schedule/_/week/{WEEK}/year/{YEAR}/seasontype/2'
 };
 
+Object.freeze(SEASON_DATA);
+
 if (typeof window !== 'undefined') {
     window.SEASON_DATA = SEASON_DATA;
 }
@@ -508,7 +510,7 @@ Identical builder bodies to the browser wrapper — only the data load and expor
 // together (tests/season-config-drift.test.js enforces lockstep).
 'use strict';
 
-const SEASON_DATA = require('./season-data.json');
+const SEASON_DATA = Object.freeze(require('./season-data.json'));
 
 // 2025 and earlier live in the legacy year-less tree; 2026+ lives under the pool doc (spec D1/D5).
 const LEGACY_FINAL_YEAR = 2025;
