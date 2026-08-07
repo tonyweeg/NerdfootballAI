@@ -279,11 +279,7 @@ Runs in the pre-deploy checklist (and CI when available). Success criterion 2 is
 
 ## Config Caching (SAFE-WEEKLIES lesson)
 
-A stale cached `season-config.js` after the annual flip = users on last year's season. Add to `firebase.json` hosting headers:
-
-```json
-{ "source": "/js/config/**", "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }] }
-```
+A stale cached `season-config.js` after the annual flip = users on last year's season. **Verified 2026-08-07: already satisfied** — `firebase.json` serves every hosted file (`source: "**"`) with `Cache-Control: no-cache, no-store, must-revalidate`. No change needed; Phase 0 verifies the header is still present rather than editing anything. If per-path caching is ever introduced, `/js/config/**` must keep a no-cache policy.
 
 ## getCurrentWeek Kill-List
 
