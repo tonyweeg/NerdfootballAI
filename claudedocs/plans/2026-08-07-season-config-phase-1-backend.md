@@ -140,6 +140,13 @@ Add one inline comment above `scoringWeek` in both wrappers (its shape intention
 
 **Excluded from Batch A (Batch C judgment):** `pickAnalytics.js:16,420-421` (legacy-pool detection semantics — see C3).
 
+**Carry-in from Batch 0 review (fold into commit A1):** append two probes to the drift error-parity `probes` array (closes MUT-6b/6c sub-branch gap):
+
+```javascript
+            ['reserved userId dot', (c) => c.paths.picks(1, '.')],
+            ['reserved userId underscores', (c) => c.paths.picks(1, '__proto__')]
+```
+
 - [ ] Split into two commits (≤11 files each) for reviewable diffs. Per commit: `node --check` each file, suite 29/29, guard count recorded.
 - Commit msgs: `Phase 1: Pool-ID migration batch A1 — <files>` / `…A2 — <files>`
 
