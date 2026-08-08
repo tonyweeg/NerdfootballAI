@@ -402,14 +402,9 @@ async function processCompletedGamesForSurvivor(gameUpdates, weekNumber) {
  * Helper function to get current NFL week
  */
 function getCurrentNflWeek() {
-    // NFL 2025 season starts September 4, 2025
-    const seasonStart = new Date('2025-09-04T00:00:00Z');
-    const now = new Date();
-    const diffTime = now.getTime() - seasonStart.getTime();
-    const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
-
-    // Clamp to valid range (1-18)
-    return Math.max(1, Math.min(18, diffWeeks));
+    // Adopts canonical (Batch C / C7): fixes a boundary-millisecond off-by-one
+    // that the previous Math.ceil formula had at each weekly boundary instant.
+    return SEASON_CONFIG.utils.getCurrentWeek();
 }
 
 // Export functions for integration

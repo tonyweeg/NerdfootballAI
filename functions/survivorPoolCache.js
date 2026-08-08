@@ -504,6 +504,7 @@ function getCurrentWeekNumber() {
     const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
 
     // NFL 2025 Season Week Calendar
+    // TODO(Phase 3): derive table from config; verify boundary semantics first
     const NFL_2025_WEEKS = {
         1: { start: '2025-09-04' }, 2: { start: '2025-09-08' }, 3: { start: '2025-09-15' },
         4: { start: '2025-09-22' }, 5: { start: '2025-09-29' }, 6: { start: '2025-10-06' },
@@ -526,5 +527,5 @@ function getCurrentWeekNumber() {
     }
 
     // Fallback - if we're before week 1, return 1; if after week 18, return 18
-    return todayStr < '2025-09-04' ? 1 : 18;
+    return todayStr < SEASON_CONFIG.weekAnchor ? 1 : 18;
 }// Force deployment Sun Sep 28 20:09:50 EDT 2025

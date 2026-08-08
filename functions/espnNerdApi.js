@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 class EspnNerdApi {
     constructor() {
@@ -82,11 +83,12 @@ class EspnNerdApi {
     // Get current NFL week
     getCurrentWeek() {
         const now = new Date();
-        const seasonStart = new Date('2025-09-04'); // 2025 NFL Season starts Sept 4
+        // playoff clamp intentional — see spec kill-list
+        const seasonStart = new Date(SEASON_CONFIG.weekAnchor);
         const weekMs = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
-        
+
         if (now < seasonStart) return 1;
-        
+
         const weeksDiff = Math.floor((now - seasonStart) / weekMs) + 1;
         return Math.min(Math.max(weeksDiff, 1), 22); // Clamp between 1 and 22 (includes playoffs)
     }
@@ -335,7 +337,7 @@ class EspnNerdApi {
 
     // Get date range for a specific NFL week
     getWeekDates(week) {
-        const seasonStart = new Date('2025-09-04'); // First Thursday of 2025 season
+        const seasonStart = new Date(SEASON_CONFIG.weekAnchor); // First Thursday of 2025 season
         const weekOffset = (week - 1) * 7;
         const weekStart = new Date(seasonStart.getTime() + (weekOffset * 24 * 60 * 60 * 1000));
         

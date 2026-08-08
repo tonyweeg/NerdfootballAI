@@ -364,6 +364,7 @@ async function analyzeGameStates(bibleData) {
 /**
  * NFL 2025 Season Week Calendar (Bible-based)
  */
+// TODO(Phase 3): derive table from config; verify boundary semantics first
 const NFL_2025_WEEKS = {
     1: { start: '2025-09-04', games: '2025-09-04' },
     2: { start: '2025-09-08', games: '2025-09-11' },
@@ -408,7 +409,7 @@ function getCurrentWeekNumber() {
     }
 
     // Fallback - if we're before week 1, return 1; if after week 18, return 18
-    const fallbackWeek = todayStr < '2025-09-04' ? 1 : 18;
+    const fallbackWeek = todayStr < SEASON_CONFIG.weekAnchor ? 1 : 18;
     console.log(`📅 Fallback NFL Week: ${fallbackWeek}`);
     return fallbackWeek;
 }
