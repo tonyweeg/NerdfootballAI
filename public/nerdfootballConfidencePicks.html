@@ -491,11 +491,7 @@
 
         // Get current NFL week (Week 1 started Sept 4, 2025)
         function getCurrentWeek() {
-            const week1Start = new Date('2025-09-04');
-            const today = new Date();
-            const diffTime = today - week1Start;
-            const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
-            return Math.max(1, Math.min(18, diffWeeks));
+            return window.SEASON_CONFIG.utils.getCurrentWeek();
         }
 
         // Authentication
@@ -519,7 +515,7 @@
 
         async function checkPoolMembership() {
             try {
-                const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const membersPath = window.SEASON_CONFIG.paths.poolMembers();
                 const membersSnap = await getDoc(doc(db, membersPath));
 
                 if (membersSnap.exists()) {
@@ -606,7 +602,7 @@
 
         async function loadWeekBible() {
             try {
-                const response = await fetch(`/game-data/nfl_2025_week_${currentWeek}.json?v=${Date.now()}`);
+                const response = await fetch(`/game-data/${window.SEASON_CONFIG.format.scheduleFilename(currentWeek)}?v=${Date.now()}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 weekBible = await response.json();
                 logger.confidence(`✅ Loaded Week ${currentWeek} bible`);
