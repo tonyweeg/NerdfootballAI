@@ -1003,7 +1003,7 @@ Expected: clean tree (everything committed). No `firebase deploy` in this phase 
 **Phase 0 exit checklist (recorded 2026-08-07):**
 - [x] `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js` → **29 passed, 29 total** (1.7s)
 - [x] Pre-existing Jest condition unchanged — unscoped run still crashes on `auraglow/package.json`, identical to Task 1 baseline
-- [x] Guard script (executed directly, from worktree root and from `/tmp`) exits 1 with the migration worklist, config files excluded. Initial run listed 212 files; the whole-implementation review found 109 of those are `public/backups/**` snapshot copies — final guard adds `--exclude-dir=backups`, live worklist ≈103 (exact count recorded on the final guard run)
+- [x] Guard script (executed directly, from worktree root and from `/tmp`) exits 1 with the migration worklist, config files excluded. Initial run listed 212 files; the whole-implementation review found 109 of those are `public/backups/**` snapshot copies — final guard adds `--exclude-dir=backups`. **Recorded live worklist: 103 files (2026-08-07, commit 53aa819)**
 - [x] All commits on `claude/2026-season-config-plan-509f05`, tree clean
 - [x] No production deploy occurred
 
