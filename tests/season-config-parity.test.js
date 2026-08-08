@@ -83,17 +83,84 @@ describe('2025 path snapshots (must equal current production strings)', () => {
 
 describe('2026+ pool-scoped tree (spec D1/D5)', () => {
     test('season data moves under the pool document', () => {
-        expect(CFG.paths.picks(1, 'u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/data/nerdfootball_picks/1/submissions/u1');
-        expect(CFG.paths.picksWeek(1, 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/data/nerdfootball_picks/1/submissions');
-        expect(CFG.paths.results(1, 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/data/nerdfootball_results/1');
-        expect(CFG.paths.games(1, 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/data/nerdfootball_games/1');
-        expect(CFG.paths.survivorPicks('u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/data/nerdSurvivor_picks/u1');
-        expect(CFG.paths.survivorStatus(2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/data/nerdSurvivor_status/status');
+        expect(CFG.paths.picks(1, 'u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/nerdfootball_picks/1/submissions/u1');
+        expect(CFG.paths.picksWeek(1, 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/nerdfootball_picks/1/submissions');
+        expect(CFG.paths.results(1, 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/nerdfootball_results/1');
+        expect(CFG.paths.games(1, 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/nerdfootball_games/1');
+        expect(CFG.paths.survivorPicks('u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/nerdSurvivor_picks/u1');
+        expect(CFG.paths.survivorStatus(2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/nerdSurvivor_status/status');
     });
 
     test('explicit prior-year access still resolves the legacy tree', () => {
         expect(CFG.paths.picks(1, 'u1', 2025)).toBe('artifacts/nerdfootball/public/data/nerdfootball_picks/1/submissions/u1');
         expect(CFG.paths.poolMembers(2025)).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+    });
+});
+
+describe('path segment parity (permanent guard, flip-drill defect #2)', () => {
+    // Firestore document paths must have an EVEN number of '/'-separated segments
+    // (collection/doc/collection/doc/...); a COLLECTION reference is ODD. The flip
+    // drill found dataRoot() inserting an unpaired '/data' segment into the 2026+
+    // pool-scoped tree, silently flipping every doc builder in that tree (picks,
+    // picksWeek, results, games, survivorPicks, survivorStatus) to the wrong parity
+    // — invisible to string-equality tests, only surfaced by a real Firestore client
+    // rejecting the malformed path. This test iterates every builder in `paths` (not
+    // a hand-picked subset) for both a legacy year (2025) and a pool-scoped year
+    // (2026) and asserts the correct parity, so this defect class fails fast here
+    // instead of needing a full flip drill to surface again.
+    test('every path builder yields the correct segment parity for years 2025 and 2026', () => {
+        // Only picksWeek is an intentional COLLECTION reference (all user submissions
+        // for a week) — every other builder in `paths` names a specific document.
+        const COLLECTION_BUILDERS = new Set(['picksWeek']);
+        const week = 1;
+        const uid = 'seg-test-uid';
+
+        // Explicit per-builder arg lists — arity and argument order vary by builder,
+        // so this is not a blind spread of [week, uid, year] across all of them.
+        const argsFor = {
+            poolRoot: (year) => [year],
+            poolMembers: (year) => [year],
+            poolMembersOf: (year) => [`nerduniverse-${year}`],
+            aiCache: (year) => [year],
+            gridCache: (year) => [week, year],
+            scoringUser: (year) => [uid, year],
+            confidenceUser: (year) => [week, uid, year],
+            survivorUser: (year) => [week, uid, year],
+            scoresUser: (year) => [week, uid, year],
+            weeklyRollupUser: (year) => [week, uid, year],
+            survivorEliminations: (year) => [uid, year],
+            survivorWeek: (year) => [week, year],
+            scoringWeek: (year) => [week, year],
+            survivorDisplayCache: (year) => [year],
+            picks: (year) => [week, uid, year],
+            picksWeek: (year) => [week, year],
+            results: (year) => [week, year],
+            games: (year) => [week, year],
+            survivorPicks: (year) => [uid, year],
+            survivorStatus: (year) => [year],
+            espnCache: () => []
+        };
+
+        const builderNames = Object.keys(CFG.paths);
+        // A builder added to `paths` without a matching entry here must fail loudly,
+        // not silently skip coverage.
+        expect(builderNames.filter((name) => !(name in argsFor))).toEqual([]);
+
+        let checked = 0;
+        for (const year of [2025, 2026]) {
+            for (const name of builderNames) {
+                const value = CFG.paths[name](...argsFor[name](year));
+                const segments = value.split('/').length;
+                const expectedParity = COLLECTION_BUILDERS.has(name) ? 1 : 0;
+                expect({ name, year, value, segmentParity: segments % 2 })
+                    .toEqual({ name, year, value, segmentParity: expectedParity });
+                checked++;
+            }
+        }
+        // Pins coverage width: 21 builders * 2 years. If a builder is silently
+        // dropped from `paths` or from argsFor, this count moves and the test fails
+        // rather than quietly checking less than it claims to.
+        expect(checked).toBe(builderNames.length * 2);
     });
 });
 

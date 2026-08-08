@@ -86,7 +86,7 @@ describe('wrapper drift guard (browser vs functions)', () => {
         const a = buildBrowser(FIXTURE);
         const b = buildNode(FIXTURE);
         expect(a.paths.picks(3, 'u', 2031)).toBe(b.paths.picks(3, 'u', 2031));
-        expect(a.paths.picks(3, 'u', 2031)).toBe('artifacts/nerdfootball/pools/nerduniverse-2031/data/nerdfootball_picks/3/submissions/u');
+        expect(a.paths.picks(3, 'u', 2031)).toBe('artifacts/nerdfootball/pools/nerduniverse-2031/nerdfootball_picks/3/submissions/u');
         expect(a.utils.getEspnScheduleUrl(7)).toBe(b.utils.getEspnScheduleUrl(7));
         expect(a.format.scheduleFilename(2)).toBe(b.format.scheduleFilename(2));
     });

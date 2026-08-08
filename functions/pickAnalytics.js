@@ -466,7 +466,7 @@ exports.onLegacyPicksUpdate = functions.firestore.onDocumentWritten('artifacts/n
 // onLegacyPicksUpdate's wiring exactly — only the path, export name, and poolId
 // source (the trigger's own {poolId} param, not a hardcoded year) differ.
 exports.onPoolPicksUpdate = functions.firestore.onDocumentWritten(
-    'artifacts/nerdfootball/pools/{poolId}/data/nerdfootball_picks/{week}/submissions/{userId}',
+    'artifacts/nerdfootball/pools/{poolId}/nerdfootball_picks/{week}/submissions/{userId}',
     async (event) => {
         const { poolId, week, userId } = event.params;
 

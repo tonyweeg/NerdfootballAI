@@ -74,7 +74,7 @@
         };
         const dataRoot = (year) => {
             const y = resolveYear(year);
-            return y <= LEGACY_FINAL_YEAR ? LEGACY_DATA_ROOT : `${paths.poolRoot(y)}/data`;
+            return y <= LEGACY_FINAL_YEAR ? LEGACY_DATA_ROOT : paths.poolRoot(y);
         };
 
         const paths = {
