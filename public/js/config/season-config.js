@@ -41,7 +41,8 @@
             return y;
         };
         const reqUserId = (userId) => {
-            if (typeof userId !== 'string' || userId === '' || userId.includes('/')) {
+            if (typeof userId !== 'string' || userId === '' || userId.includes('/') ||
+                userId === '.' || userId === '..' || /^__.*__$/.test(userId)) {
                 throw new Error(`SEASON_CONFIG: invalid userId: ${userId}`);
             }
             return userId;
@@ -86,10 +87,9 @@
                 `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${reqUserId(userId)}`,
             survivorEliminations: (userId, year) =>
                 `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/eliminations/${reqUserId(userId)}`,
-            seasonRollupUser: (userId, year) =>
-                `${paths.poolRoot(year)}/rollups/season/${resolveYear(year)}/users/${reqUserId(userId)}`,
             survivorWeek: (week, year) =>
                 `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}`,
+            // Shape mirrors espnScoreMonitor.js:242 exactly — no year segment, no weeks/ separator.
             scoringWeek: (week, year) =>
                 `${paths.poolRoot(year)}/scoring/week${reqWeek(week)}`,
             survivorDisplayCache: (year) =>

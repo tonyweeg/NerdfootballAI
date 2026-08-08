@@ -25,7 +25,6 @@ describe('wrapper drift guard (browser vs functions)', () => {
             expect(nodeConfig.paths.survivorPicks(uid, year)).toBe(browserConfig.paths.survivorPicks(uid, year));
             expect(nodeConfig.paths.survivorStatus(year)).toBe(browserConfig.paths.survivorStatus(year));
             expect(nodeConfig.paths.survivorEliminations(uid, year)).toBe(browserConfig.paths.survivorEliminations(uid, year));
-            expect(nodeConfig.paths.seasonRollupUser(uid, year)).toBe(browserConfig.paths.seasonRollupUser(uid, year));
             expect(nodeConfig.paths.survivorDisplayCache(year)).toBe(browserConfig.paths.survivorDisplayCache(year));
             for (const week of weeks) {
                 expect(nodeConfig.paths.gridCache(week, year)).toBe(browserConfig.paths.gridCache(week, year));
@@ -119,7 +118,14 @@ describe('wrapper drift guard (browser vs functions)', () => {
             ['date string', (c) => c.utils.getCurrentWeek('2025-10-01')],
             ['date NaN', (c) => c.utils.getCurrentWeek(new Date('nonsense'))],
             ['epoch accepted', (c) => c.utils.getCurrentWeek(new Date('2025-11-20T17:00:00Z').getTime())],
-            ['schedule filename week 0', (c) => c.format.scheduleFilename(0)]
+            ['schedule filename week 0', (c) => c.format.scheduleFilename(0)],
+            ['survivorWeek week 0', (c) => c.paths.survivorWeek(0)],
+            ['scoringWeek week 0', (c) => c.paths.scoringWeek(0)],
+            ['survivorEliminations null userId', (c) => c.paths.survivorEliminations(null)],
+            ['survivorDisplayCache year 0', (c) => c.paths.survivorDisplayCache(0)],
+            ['slash userId', (c) => c.paths.picks(1, 'a/b')],
+            ['numeric userId', (c) => c.paths.scoringUser(12345)],
+            ['reserved userId', (c) => c.paths.picks(1, '..')]
         ];
         for (const [label, probe] of probes) {
             const a = outcome(() => probe(browserConfig));

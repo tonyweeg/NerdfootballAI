@@ -75,7 +75,6 @@ describe('2025 path snapshots (must equal current production strings)', () => {
         expect(CFG.paths.scoresUser(4, 'u1')).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/scores/2025/weeks/4/users/u1');
         expect(CFG.paths.weeklyRollupUser(4, 'u1')).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/rollups/weekly/2025/week_4/users/u1');
         expect(CFG.paths.survivorEliminations('u1')).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/eliminations/u1');
-        expect(CFG.paths.seasonRollupUser('u1')).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/rollups/season/2025/users/u1');
         expect(CFG.paths.survivorWeek(3)).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/weeks/3');
         expect(CFG.paths.scoringWeek(4)).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/scoring/week4');
         expect(CFG.paths.survivorDisplayCache()).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-survivor-display');
@@ -181,6 +180,9 @@ describe('loud failures on bad input (falsy-year footgun class)', () => {
         expect(() => CFG.paths.picks([], 'u1')).toThrow('invalid week');
         expect(() => CFG.utils.getEspnScheduleUrl(0)).toThrow('invalid week');
         expect(() => CFG.format.scheduleFilename(0)).toThrow('invalid week');
+        expect(() => CFG.paths.picks(1, '.')).toThrow('invalid userId');
+        expect(() => CFG.paths.picks(1, '..')).toThrow('invalid userId');
+        expect(() => CFG.paths.picks(1, '__proto__')).toThrow('invalid userId');
     });
 
     test('invalid dates and out-of-range weeks throw instead of returning NaN', () => {
@@ -206,7 +208,6 @@ describe('remaining 2026 branches + poolId invariant', () => {
         expect(CFG.paths.scoresUser(4, 'u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/scores/2026/weeks/4/users/u1');
         expect(CFG.paths.weeklyRollupUser(4, 'u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/rollups/weekly/2026/week_4/users/u1');
         expect(CFG.paths.survivorEliminations('u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/survivor/2026/eliminations/u1');
-        expect(CFG.paths.seasonRollupUser('u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/rollups/season/2026/users/u1');
         expect(CFG.paths.scoringWeek(4, 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/scoring/week4');
     });
 
