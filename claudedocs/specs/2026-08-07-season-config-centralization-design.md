@@ -164,9 +164,11 @@ utils: {
         return new Date() >= weekStart;
     },
 
+    // Derived from weekAnchor (not kickoffDateTime) so it can never disagree with
+    // getCurrentWeek/hasWeekStarted on opening day; kickoffDateTime is display-only.
     isSeasonActive: () => {
         const now = new Date();
-        return now >= new Date(SEASON_DATA.kickoffDateTime)
+        return now >= new Date(SEASON_DATA.weekAnchor)
             && now <= new Date(SEASON_DATA.seasonEndDate);
     },
 
@@ -200,21 +202,20 @@ format: {
 
 ## Export Pattern
 
-Same dual pattern as `firebase-config.js`:
+Both wrappers are plain dual-environment scripts (no ESM syntax — see the Phase 0 plan's design note: compat `<script>` pages, Node 20 CJS in `functions/`, transform-free Jest). Each exposes the same pure factory plus a singleton:
 
 ```javascript
-// public/js/config/season-config.js (ESM)
-import { SEASON_DATA } from './season-data.js';
-export const SEASON_CONFIG = { ...SEASON_DATA, paths, utils, format };
-if (typeof window !== 'undefined') {
-    window.SEASON_CONFIG = SEASON_CONFIG;
-    window.getSeasonConfig = () => SEASON_CONFIG;
-}
+// public/js/config/season-config.js (plain script, IIFE):
+//   window.SEASON_CONFIG, window.getSeasonConfig(), window.buildSeasonConfig(data)
+//   module.exports = { SEASON_CONFIG, buildSeasonConfig } when require()d (Jest)
 
-// functions/seasonConfig.js (CommonJS)
+// functions/seasonConfig.js (CommonJS):
 const SEASON_DATA = Object.freeze(require('./season-data.json'));
-module.exports = { SEASON_CONFIG: { ...SEASON_DATA, paths, utils, format } };
+const SEASON_CONFIG = buildSeasonConfig(SEASON_DATA);
+module.exports = { SEASON_CONFIG, buildSeasonConfig };
 ```
+
+`buildSeasonConfig(data)` exists so tests pin behavior to a frozen 2025 fixture — the annual data flip cannot rewrite the parity suite. Builders validate input loudly: malformed or falsy `year` values throw rather than silently defaulting (a missed year must never route to the previous season's data tree), and missing `week`/`userId` throw rather than minting `undefined` document paths.
 
 **Load-order rule for compat pages:** `season-config.js` must load before any script that uses it. Specifically, `public/js/utils/firebase-cache.js:260` registers caches at module top-level — that registration becomes **lazy** (first-use) so it cannot throw when script order varies.
 
@@ -285,6 +286,8 @@ A stale cached `season-config.js` after the annual flip = users on last year's s
 ## getCurrentWeek Kill-List
 
 All of these currently define their own week calculation and must be migrated to the config util, then have their local implementation **deleted** (frontend: `weekManager.js`, `core-bundle.js`, `survivor-bundle.js`, `features-bundle.js`, `espnCacheManager.js`, `liveGameRefresh.js`, `realtimeManager.js`, `espnScoreSync.js`, `espnNerdApi.js`, `survivorAutoElimination.js`, plus HTML-inline copies in `NerdSurvivorPicks.html`, `NerdSurvivorAdmin.html`, `tricked-out-ricky.html`, `espnDiagnostic.html`, `espn-monitor-test.html`; backend: `espnNerdApi.js`, `espnScoreMonitor.js`, `bulletproofWeeklyScoring.js`, `weeklyScoring.js`). Partial migration means different pages disagree about the current week — the phase is only done when the local copy is gone.
+
+**Divergent-formula warning (Task 2 review, 2026-08-07):** not all legacy implementations share the canonical semantic. Verified divergences: `core-bundle.js` anchors on **2025-09-05** (one day late); `functions/espnNerdApi.js` clamps to **1-22** (playoff weeks); `poolParticipationManager.js` uses `Math.abs`/`Math.ceil` (counts pre-season dates forward). The config util is canonical for the 18-week pool season (D3). **Blind swaps of divergent sites are forbidden** — each requires a per-site decision during migration: adopt the canonical semantic (usually a deliberate bug fix), or keep a local formula where the divergence is intentional (e.g., espnNerdApi playoff-week detection).
 
 ## Migration Strategy
 
