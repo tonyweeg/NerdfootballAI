@@ -8,7 +8,15 @@
     'use strict';
 
     if (typeof window !== 'undefined' && window.SEASON_CONFIG) {
-        return; // idempotent under duplicate <script> includes
+        // Idempotent under duplicate <script> includes — but still re-export for
+        // CJS consumers whose module registry was reset (jsdom + jest.resetModules).
+        if (typeof module !== 'undefined' && module.exports) {
+            module.exports = {
+                SEASON_CONFIG: window.SEASON_CONFIG,
+                buildSeasonConfig: window.buildSeasonConfig
+            };
+        }
+        return;
     }
 
     // Pure factory: tests pin behavior through this with a fixed fixture so the
@@ -37,11 +45,19 @@
             return value;
         };
         const timeOf = (now) => {
-            const t = now instanceof Date ? now.getTime() : NaN;
+            const t = now instanceof Date ? now.getTime()
+                : (typeof now === 'number' ? now : NaN);
             if (!Number.isFinite(t)) {
                 throw new Error(`SEASON_CONFIG: invalid date: ${now}`);
             }
             return t;
+        };
+        const reqWeek = (week) => {
+            const w = Number(week);
+            if (!Number.isInteger(w) || w < 1 || w > SEASON_DATA.totalWeeks) {
+                throw new Error(`SEASON_CONFIG: invalid week: ${week}`);
+            }
+            return w;
         };
         const dataRoot = (year) => {
             const y = resolveYear(year);
@@ -54,27 +70,27 @@
             poolMembers: (year) => `${paths.poolRoot(year)}/metadata/members`,
             aiCache: (year) => `${paths.poolRoot(year)}/cache/latest-ai-intel-sheet`,
             gridCache: (week, year) =>
-                `${paths.poolRoot(year)}/cache/grid-week-${req(week, 'week')}`,
+                `${paths.poolRoot(year)}/cache/grid-week-${reqWeek(week)}`,
             scoringUser: (userId, year) =>
                 `${paths.poolRoot(year)}/scoring-users/${req(userId, 'userId')}`,
 
             confidenceUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
             survivorUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
             scoresUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
             weeklyRollupUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${req(week, 'week')}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${req(userId, 'userId')}`,
 
             picks: (week, userId, year) =>
-                `${dataRoot(year)}/nerdfootball_picks/${req(week, 'week')}/submissions/${req(userId, 'userId')}`,
+                `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${req(userId, 'userId')}`,
             picksWeek: (week, year) =>
-                `${dataRoot(year)}/nerdfootball_picks/${req(week, 'week')}/submissions`,
+                `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions`,
             results: (week, year) =>
-                `${dataRoot(year)}/nerdfootball_results/${req(week, 'week')}`,
+                `${dataRoot(year)}/nerdfootball_results/${reqWeek(week)}`,
             games: (week, year) =>
-                `${dataRoot(year)}/nerdfootball_games/${req(week, 'week')}`,
+                `${dataRoot(year)}/nerdfootball_games/${reqWeek(week)}`,
             survivorPicks: (userId, year) =>
                 `${dataRoot(year)}/nerdSurvivor_picks/${req(userId, 'userId')}`,
             survivorStatus: (year) =>
@@ -96,10 +112,7 @@
             // Week-window check (window opens at the weekly anchor boundary, not the
             // first kickoff) — NOT a substitute for per-game kickoff gating.
             hasWeekStarted: (week, now = new Date()) => {
-                const w = Number(week);
-                if (!Number.isInteger(w) || w < 1 || w > SEASON_DATA.totalWeeks) {
-                    throw new Error(`SEASON_CONFIG: invalid week: ${week}`);
-                }
+                const w = reqWeek(week);
                 const anchor = new Date(SEASON_DATA.weekAnchor).getTime();
                 return timeOf(now) >= anchor + (w - 1) * 7 * DAY_MS;
             },
@@ -112,7 +125,7 @@
             },
             getEspnScheduleUrl: (week) =>
                 SEASON_DATA.espnScheduleUrlTemplate
-                    .replace(/\{WEEK\}/g, req(week, 'week'))
+                    .replace(/\{WEEK\}/g, reqWeek(week))
                     .replace(/\{YEAR\}/g, SEASON_DATA.year),
             getAllEspnScheduleUrls: () =>
                 Array.from({ length: SEASON_DATA.totalWeeks }, (_, i) => utils.getEspnScheduleUrl(i + 1))
@@ -125,7 +138,7 @@
             poolDisplay: () => SEASON_DATA.poolDisplayName,
             scheduleFilename: (week = null, year) => {
                 const y = resolveYear(year);
-                return week === null ? `nfl_${y}_schedule_raw.json` : `nfl_${y}_week_${week}.json`;
+                return week === null ? `nfl_${y}_schedule_raw.json` : `nfl_${y}_week_${reqWeek(week)}.json`;
             }
         };
 

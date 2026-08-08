@@ -105,6 +105,7 @@ describe('utils boundary semantics', () => {
     test('week flips at midnight UTC on the Thursday date (Wed 8:00 PM ET)', () => {
         expect(CFG.utils.getCurrentWeek(new Date('2025-09-10T23:59:00Z'))).toBe(1);
         expect(CFG.utils.getCurrentWeek(new Date('2025-09-11T00:01:00Z'))).toBe(2);
+        expect(CFG.utils.getCurrentWeek(new Date('2025-09-11T00:01:00Z').getTime())).toBe(2);
     });
 
     test('hasWeekStarted', () => {
@@ -163,11 +164,16 @@ describe('loud failures on bad input (falsy-year footgun class)', () => {
         }
     });
 
-    test('missing week/userId throw instead of minting undefined paths', () => {
-        expect(() => CFG.paths.picks(undefined, 'u1')).toThrow('missing required week');
+    test('missing or out-of-range week/userId throw instead of minting garbage paths', () => {
+        expect(() => CFG.paths.picks(undefined, 'u1')).toThrow('invalid week');
         expect(() => CFG.paths.picks(1, undefined)).toThrow('missing required userId');
-        expect(() => CFG.paths.gridCache()).toThrow('missing required week');
+        expect(() => CFG.paths.gridCache()).toThrow('invalid week');
         expect(() => CFG.paths.scoringUser(null)).toThrow('missing required userId');
+        expect(() => CFG.paths.picks(0, 'u1')).toThrow('invalid week');
+        expect(() => CFG.paths.picks(99, 'u1')).toThrow('invalid week');
+        expect(() => CFG.paths.picks([], 'u1')).toThrow('invalid week');
+        expect(() => CFG.utils.getEspnScheduleUrl(0)).toThrow('invalid week');
+        expect(() => CFG.format.scheduleFilename(0)).toThrow('invalid week');
     });
 
     test('invalid dates and out-of-range weeks throw instead of returning NaN', () => {
@@ -177,8 +183,9 @@ describe('loud failures on bad input (falsy-year footgun class)', () => {
         expect(() => CFG.utils.hasWeekStarted(99)).toThrow('invalid week');
     });
 
-    test('string years from URL params are accepted when valid integers', () => {
+    test('string years and weeks from URL params are accepted when valid integers', () => {
         expect(CFG.paths.poolRoot('2026')).toBe('artifacts/nerdfootball/pools/nerduniverse-2026');
+        expect(CFG.paths.gridCache('6')).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-6');
     });
 });
 
