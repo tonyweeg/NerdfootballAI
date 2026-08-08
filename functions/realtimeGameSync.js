@@ -7,6 +7,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -253,7 +254,7 @@ exports.syncLeaderboard = functions.https.onRequest(async (req, res) => {
         
         try {
             const week = req.query.week ? parseInt(req.query.week) : null;
-            const poolId = req.query.poolId || 'nerduniverse-2025';
+            const poolId = req.query.poolId || SEASON_CONFIG.poolId;
             
             const result = await syncLeaderboardToRTDB(week, poolId);
             
@@ -271,7 +272,7 @@ exports.syncLeaderboard = functions.https.onRequest(async (req, res) => {
 /**
  * Real-time leaderboard sync function (internal)
  */
-async function syncLeaderboardToRTDB(weekNumber = null, poolId = 'nerduniverse-2025') {
+async function syncLeaderboardToRTDB(weekNumber = null, poolId = SEASON_CONFIG.poolId) {
     console.log(`📊 Syncing leaderboard to RTDB for ${weekNumber ? `week ${weekNumber}` : 'season'}`);
     
     try {
@@ -324,7 +325,7 @@ async function syncLeaderboardToRTDB(weekNumber = null, poolId = 'nerduniverse-2
 /**
  * Calculate leaderboard from Firestore data
  */
-async function calculateLeaderboardFromFirestore(weekNumber = null, poolId = 'nerduniverse-2025') {
+async function calculateLeaderboardFromFirestore(weekNumber = null, poolId = SEASON_CONFIG.poolId) {
     try {
         // Get pool members
         const poolMembersRef = db.doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);

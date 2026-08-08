@@ -4,6 +4,7 @@
 const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 initializeApp();
 const db = getFirestore();
@@ -83,7 +84,7 @@ async function invalidateRelevantCaches(gameId, gameData) {
 
         // SUPER-SURVIVOR: Also clear the HTML display cache when games finish
         try {
-            const superSurvivorCachePath = 'artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-survivor-display';
+            const superSurvivorCachePath = SEASON_CONFIG.paths.survivorDisplayCache();
             await db.doc(superSurvivorCachePath).delete();
             console.log(`🔥 SUPER-SURVIVOR: Cleared HTML cache for game ${gameId} completion`);
         } catch (error) {
@@ -100,7 +101,7 @@ async function invalidateRelevantCaches(gameId, gameData) {
 async function warmCachesForActivePools() {
     try {
         // Get active pools (could be configurable)
-        const activePools = ['nerduniverse-2025']; // Add more pools as needed
+        const activePools = [SEASON_CONFIG.poolId]; // Add more pools as needed
         const currentWeek = getCurrentNFLWeek();
         
         for (const poolId of activePools) {
@@ -256,7 +257,7 @@ exports.refreshSurvivorCache = onRequest({
     timeoutSeconds: 120
 }, async (req, res) => {
     try {
-        const poolId = req.query.poolId || 'nerduniverse-2025';
+        const poolId = req.query.poolId || SEASON_CONFIG.poolId;
         const week = parseInt(req.query.week) || getCurrentNFLWeek();
         const force = req.query.force === 'true';
         

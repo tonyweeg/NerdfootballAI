@@ -7,6 +7,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 // Set global options for v2 functions
 setGlobalOptions({ region: 'us-central1' });
@@ -607,7 +608,7 @@ exports.deepStar6User = onCall(async (request) => {
     }
 
     const db = admin.firestore();
-    const POOL_ID = 'nerduniverse-2025';
+    const POOL_ID = SEASON_CONFIG.poolId;
     let deletionCount = 0;
 
     try {
@@ -741,7 +742,7 @@ exports.getAuthUsersNotInPool = onCall(async (request) => {
     }
 
     try {
-        const poolId = request.data.poolId || 'nerduniverse-2025';
+        const poolId = request.data.poolId || SEASON_CONFIG.poolId;
 
         // Get all pool members
         const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
@@ -822,7 +823,7 @@ exports.getPoolMembersEmails = functions.https.onCall(async (data, context) => {
 
     try {
         const actualData = data.data || data;
-        const { poolId = 'nerduniverse-2025' } = actualData;
+        const { poolId = SEASON_CONFIG.poolId } = actualData;
 
         const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
         const poolMembersSnap = await poolMembersRef.get();
@@ -895,7 +896,7 @@ exports.sendPoolEmail = functions.https.onCall(async (data, context) => {
             subject,
             body,
             recipients = 'all',
-            poolId = 'nerduniverse-2025',
+            poolId = SEASON_CONFIG.poolId,
             specificUserIds = []
         } = actualData;
 
@@ -1065,7 +1066,7 @@ const { processSurvivorUpdatesForCompletedGames } = require('./survivorAutoUpdat
 exports.processSurvivorUpdatesForCompletedGames = processSurvivorUpdatesForCompletedGames;
 
 // DYNAMIC SURVIVOR CALCULATION LOGIC - Works for all weeks
-async function calculateSurvivorEliminationsCore(poolId = 'nerduniverse-2025', isScheduled = false) {
+async function calculateSurvivorEliminationsCore(poolId = SEASON_CONFIG.poolId, isScheduled = false) {
     console.log('🏈 Starting survivor elimination calculation...');
     console.log(`📅 Pool: ${poolId}, Scheduled: ${isScheduled}`);
 
@@ -1267,7 +1268,7 @@ exports.calculateSurvivorEliminations = functions.https.onCall(async (data, cont
             throw new functions.https.HttpsError('permission-denied', 'Admin access required');
         }
 
-        const poolId = data.poolId || 'nerduniverse-2025';
+        const poolId = data.poolId || SEASON_CONFIG.poolId;
         return await calculateSurvivorEliminationsCore(poolId, false);
 
     } catch (error) {
@@ -1284,7 +1285,7 @@ exports.scheduledSurvivorCalculation = onSchedule('0 0 * * 2', async (event) => 
     try {
         console.log('🕛 SCHEDULED: Tuesday midnight survivor calculation starting...');
 
-        const poolId = 'nerduniverse-2025';
+        const poolId = SEASON_CONFIG.poolId;
         const result = await calculateSurvivorEliminationsCore(poolId, true);
 
         console.log('✅ SCHEDULED: Survivor calculation completed successfully');

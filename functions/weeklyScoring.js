@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 /**
  * Process weekly scoring for completed games
@@ -161,7 +162,7 @@ async function getCompletedGamesForWeek(weekNumber) {
  */
 async function getPoolMembers() {
     try {
-        const membersRef = admin.firestore().doc('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+        const membersRef = admin.firestore().doc(SEASON_CONFIG.paths.poolMembers());
         const membersSnap = await membersRef.get();
 
         if (membersSnap.exists()) {
@@ -278,7 +279,7 @@ async function calculateUserWeeklyScore(userId, weekNumber, userPicks, completed
  */
 async function saveUserWeeklyScore(userId, weekNumber, scoreResult) {
     try {
-        const scorePath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+        const scorePath = SEASON_CONFIG.paths.scoringUser(userId);
         const scoreRef = admin.firestore().doc(scorePath);
 
         // Prepare the weekly data

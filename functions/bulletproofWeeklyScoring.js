@@ -1,5 +1,6 @@
 const { onCall } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 /**
  * BULLETPROOF WEEKLY SCORING - Works for ALL weeks
@@ -18,7 +19,7 @@ exports.processWeeklyScoring = onCall(
             console.log(`📊 Processing Week ${weekNumber}...`);
 
             // Get pool members
-            const poolMembersRef = admin.firestore().doc('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+            const poolMembersRef = admin.firestore().doc(SEASON_CONFIG.paths.poolMembers());
             const poolMembersSnap = await poolMembersRef.get();
 
             if (!poolMembersSnap.exists) {
@@ -139,7 +140,7 @@ async function processUserScore(userId, weekNumber, bible) {
     const accuracy = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100 * 100) / 100 : 0;
 
     // Save to scoring document
-    const scoringRef = admin.firestore().doc(`artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`);
+    const scoringRef = admin.firestore().doc(SEASON_CONFIG.paths.scoringUser(userId));
 
     const weeklyData = {
         totalPoints,

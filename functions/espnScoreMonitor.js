@@ -2,6 +2,7 @@ const functions = require('firebase-functions');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const axios = require('axios');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 // Initialize Firebase Admin if not already done
 if (!admin.apps.length) {
@@ -239,7 +240,7 @@ async function triggerUserScoring(week) {
         // This is a placeholder - adapt to your existing scoring system
 
         // Example: Update user scores based on completed games
-        const scoringRef = db.doc(`artifacts/nerdfootball/pools/nerduniverse-2025/scoring/week${week}`);
+        const scoringRef = db.doc(SEASON_CONFIG.paths.scoringWeek(week));
 
         await scoringRef.set({
             lastUpdated: new Date().toISOString(),

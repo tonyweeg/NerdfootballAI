@@ -6,6 +6,7 @@
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -22,7 +23,7 @@ const db = admin.apps.length > 0 ? admin.app().firestore() : admin.firestore();
 async function processSurvivorUpdatesForCompletedGames(completedGames, weekNumber) {
     console.log(`🎯 Processing survivor updates for ${completedGames.length} completed games in Week ${weekNumber}`);
 
-    const poolId = 'nerduniverse-2025';
+    const poolId = SEASON_CONFIG.poolId;
     const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
     const results = {
         gamesProcessed: 0,
@@ -132,7 +133,7 @@ async function findUsersWithPicksForGame(memberUserIds, game, weekNumber) {
             }
 
             // Method 2: Check unified survivor documents (if available)
-            const unifiedPath = `artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/weeks/${weekNumber}`;
+            const unifiedPath = SEASON_CONFIG.paths.survivorWeek(weekNumber);
             const unifiedDoc = await db.doc(unifiedPath).get();
 
             if (unifiedDoc.exists) {
