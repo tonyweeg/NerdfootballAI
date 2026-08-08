@@ -1,23 +1,41 @@
 #!/usr/bin/env node
 
 /**
- * ESPN NFL Schedule Scraper
- * Fetches NFL game data from ESPN and creates immutable JSON files
- * Usage: node espn-schedule-scraper.js [week] [year]
+ * ESPN NFL Schedule Scraper (spec D4)
+ *
+ * Fetches a full 18-week NFL regular season from ESPN's JSON scoreboard API,
+ * derives season-level config (weekAnchor/kickoffDateTime/seasonEndDate) from
+ * the actual game data, validates everything (asserts A0-A10), and — only if
+ * every assert passes — writes:
+ *   - public/js/config/season-data.js
+ *   - functions/season-data.json
+ *   - public/game-data/nfl_{year}_week_{n}.json (weeks 1-18)
+ *   - public/nfl_{year}_schedule_raw.json
+ *
+ * All-or-nothing: fetches and validates ALL 18 weeks in memory first, then
+ * writes all outputs. Any failure prints the specific assert and writes
+ * nothing. There is no sample-data fallback.
+ *
+ * Usage:
+ *   node espn-schedule-scraper.js --year=2026 [--dry-run] [--week=N]
+ *
+ *   --year=YYYY   REQUIRED. Integer 2020-2100. No default — an accidental
+ *                 bare run must not scrape an unintended season.
+ *   --dry-run     Fetch + parse + validate + print the summary; write nothing.
+ *   --week=N      Fetch a single week for debugging; prints parsed games;
+ *                 never writes.
  */
+
+'use strict';
 
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const cheerio = require('cheerio');
 
-// Configuration
-const CURRENT_YEAR = 2025;
-const SEASON_TYPE = 2; // Regular season
-const GAME_DATA_DIR = './game-data';
-const BASE_GAME_ID = 100; // Game IDs start at 101 (100 + week 1)
+// ---------------------------------------------------------------------------
+// Team name mappings (carried over verbatim from the old scraper — correct)
+// ---------------------------------------------------------------------------
 
-// Team name mappings for consistency
 const TEAM_MAPPINGS = {
     'Arizona': 'Arizona Cardinals',
     'Atlanta': 'Atlanta Falcons',
@@ -53,309 +71,586 @@ const TEAM_MAPPINGS = {
     'Washington': 'Washington Commanders'
 };
 
+// ---------------------------------------------------------------------------
+// Timezone conversion (the critical correctness rule)
+// ---------------------------------------------------------------------------
+// ESPN's scoreboard `date` field is TRUE UTC. Our storage convention is
+// explicit-offset Eastern ISO. EDT = UTC-4 from the second Sunday of March
+// through the first Sunday of November; EST = UTC-5 otherwise. Boundary
+// Sundays are computed at 07:00 UTC (~2:00 AM local transition) — no NFL
+// game occurs within the ambiguous hour, so this is exact enough.
+
+/** Nth (1-based) Sunday of a given UTC month (0-indexed month). */
+function nthSundayOfMonth(year, month, n) {
+    const first = new Date(Date.UTC(year, month, 1));
+    const dow = first.getUTCDay(); // 0 = Sunday
+    const firstSunday = dow === 0 ? 1 : 8 - dow;
+    return firstSunday + (n - 1) * 7;
+}
+
+/** Returns the Eastern UTC offset in hours (-4 or -5) for a given UTC Date. */
+function easternOffsetFor(utcDate) {
+    const year = utcDate.getUTCFullYear();
+    const marchSecondSunday = nthSundayOfMonth(year, 2, 2); // March, 2nd Sunday
+    const novemberFirstSunday = nthSundayOfMonth(year, 10, 1); // November, 1st Sunday
+    const dstStart = new Date(Date.UTC(year, 2, marchSecondSunday, 7, 0, 0));
+    const dstEnd = new Date(Date.UTC(year, 10, novemberFirstSunday, 7, 0, 0));
+    return utcDate >= dstStart && utcDate < dstEnd ? -4 : -5;
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** Converts a true-UTC ISO string to explicit-offset Eastern ISO. */
+function toEasternISO(utcISO) {
+    const utcDate = new Date(utcISO);
+    if (isNaN(utcDate.getTime())) {
+        throw new Error(`toEasternISO: invalid UTC ISO string: ${utcISO}`);
+    }
+    const offsetHours = easternOffsetFor(utcDate);
+    const shifted = new Date(utcDate.getTime() + offsetHours * 60 * 60 * 1000);
+    const y = shifted.getUTCFullYear();
+    const mo = pad2(shifted.getUTCMonth() + 1);
+    const da = pad2(shifted.getUTCDate());
+    const h = pad2(shifted.getUTCHours());
+    const mi = pad2(shifted.getUTCMinutes());
+    const s = pad2(shifted.getUTCSeconds());
+    const offsetStr = offsetHours === -4 ? '-04:00' : '-05:00';
+    return `${y}-${mo}-${da}T${h}:${mi}:${s}${offsetStr}`;
+}
+
+// ---------------------------------------------------------------------------
+// ESPN fetch + parse
+// ---------------------------------------------------------------------------
+
+const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard';
+
 /**
- * Fetch ESPN schedule data for a specific week
+ * Fetches one week's scoreboard JSON from ESPN.
+ * Param contract (empirically verified 2026-08-08): `dates={year}` is the
+ * real season selector; `year={year}` is silently IGNORED by this endpoint.
+ * User-Agent (empirically verified 2026-08-08): this endpoint's edge
+ * protection returns 403 for Node's default (blank) UA and for realistic
+ * browser UA strings, but 200 for a plain curl UA — reproduced consistently
+ * across repeated trials. Not a spoof of a specific browser/version, just
+ * the one client signature this public endpoint currently accepts.
  */
-async function fetchESPNSchedule(week, year = CURRENT_YEAR) {
-    const url = `https://www.espn.com/nfl/schedule/_/week/${week}/year/${year}/seasontype/${SEASON_TYPE}`;
-
+function fetchWeekScoreboard(week, year) {
     return new Promise((resolve, reject) => {
-        console.log(`🏈 Fetching Week ${week} schedule from ESPN...`);
-
-        https.get(url, (res) => {
+        const url = `${ESPN_SCOREBOARD_URL}?week=${week}&dates=${year}&seasontype=2&limit=100`;
+        https.get(url, { headers: { 'User-Agent': 'curl/8.7.1' } }, (res) => {
+            if (res.statusCode !== 200) {
+                res.resume();
+                reject(new Error(`fetchWeekScoreboard: week ${week}: HTTP ${res.statusCode} for ${url}`));
+                return;
+            }
             let data = '';
-
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-
+            res.on('data', (chunk) => { data += chunk; });
             res.on('end', () => {
-                resolve(data);
+                try {
+                    resolve(JSON.parse(data));
+                } catch (e) {
+                    reject(new Error(`fetchWeekScoreboard: week ${week}: invalid JSON response: ${e.message}`));
+                }
             });
         }).on('error', (err) => {
-            reject(err);
+            reject(new Error(`fetchWeekScoreboard: week ${week}: request failed: ${err.message}`));
         });
     });
 }
 
 /**
- * Parse ESPN HTML and extract game data
+ * Parses one week's ESPN scoreboard JSON into { week, games: [{id,a,h,dt,stadium}] }.
+ * `requestedYear` is required so callers can enforce A0 (season.year lockstep)
+ * without re-parsing; parseScoreboard itself throws loudly on structural
+ * problems (missing events, missing competitors, unparseable dates) since
+ * there is no fallback data.
  */
-function parseESPNSchedule(html, week) {
-    const games = [];
-    console.log(`🔧 Parsing ESPN HTML for Week ${week}...`);
-
-    const $ = cheerio.load(html);
-
-    // ESPN schedule table structure
-    $('.schedule-table tr').each((index, element) => {
-        const $row = $(element);
-
-        // Skip header rows
-        if ($row.hasClass('table-header') || $row.find('th').length > 0) {
-            return;
+function parseScoreboard(json, week) {
+    if (!json || !Array.isArray(json.events)) {
+        throw new Error(`parseScoreboard: week ${week}: response has no events array`);
+    }
+    const games = json.events.map((event, index) => {
+        const competition = event.competitions && event.competitions[0];
+        if (!competition) {
+            throw new Error(`parseScoreboard: week ${week}: event ${event.id} has no competitions[0]`);
         }
-
-        const cells = $row.find('td');
-        if (cells.length < 3) return;
-
-        try {
-            // Extract team names
-            const matchup = $row.find('.game-name a').text().trim();
-            const timeCell = $row.find('.game-time').text().trim();
-            const venueCell = $row.find('.game-location').text().trim();
-
-            if (matchup && matchup.includes(' at ')) {
-                const [away, home] = matchup.split(' at ').map(t => t.trim());
-
-                // Parse time - ESPN format varies
-                let datetime = parseESPNDateTime(timeCell, week);
-
-                const game = {
-                    away: normalizeTeamName(away),
-                    home: normalizeTeamName(home),
-                    datetime: datetime,
-                    stadium: venueCell || ""
-                };
-
-                games.push(game);
-                console.log(`📅 Found game: ${game.away} @ ${game.home} - ${game.datetime}`);
-            }
-        } catch (error) {
-            console.warn(`⚠️ Could not parse row ${index}:`, error.message);
+        const competitors = competition.competitors || [];
+        const home = competitors.find((c) => c.homeAway === 'home');
+        const away = competitors.find((c) => c.homeAway === 'away');
+        if (!home || !away) {
+            throw new Error(`parseScoreboard: week ${week}: event ${event.id} missing home/away competitor`);
         }
+        const homeNameRaw = home.team && home.team.displayName;
+        const awayNameRaw = away.team && away.team.displayName;
+        if (!homeNameRaw || !awayNameRaw) {
+            throw new Error(`parseScoreboard: week ${week}: event ${event.id} missing team.displayName`);
+        }
+        if (!event.date) {
+            throw new Error(`parseScoreboard: week ${week}: event ${event.id} missing date`);
+        }
+        const homeName = TEAM_MAPPINGS[homeNameRaw] || homeNameRaw;
+        const awayName = TEAM_MAPPINGS[awayNameRaw] || awayNameRaw;
+        const stadium = (competition.venue && competition.venue.fullName) || '';
+        const dt = toEasternISO(event.date);
+        const id = week * 100 + index + 1;
+        return { id, a: awayName, h: homeName, dt, stadium };
     });
+    return { week, games };
+}
 
-    // Fallback: Try alternative selectors if primary parsing failed
-    if (games.length === 0) {
-        console.log(`🔄 Primary parsing failed, trying alternative selectors...`);
+// ---------------------------------------------------------------------------
+// Season data derivation
+// ---------------------------------------------------------------------------
 
-        // Try different selector patterns that ESPN might use
-        $('.Table__TR').each((index, element) => {
-            const $row = $(element);
+const ESPN_SCHEDULE_URL_TEMPLATE = 'https://www.espn.com/nfl/schedule/_/week/{WEEK}/year/{YEAR}/seasontype/2';
 
-            try {
-                const teamElements = $row.find('.team-name, .Table__TD a');
-                if (teamElements.length >= 2) {
-                    const away = $(teamElements[0]).text().trim();
-                    const home = $(teamElements[1]).text().trim();
-
-                    if (away && home && away !== home) {
-                        const game = {
-                            away: normalizeTeamName(away),
-                            home: normalizeTeamName(home),
-                            datetime: generateDefaultDateTime(week, games.length),
-                            stadium: ""
-                        };
-
-                        games.push(game);
-                        console.log(`📅 Alt found: ${game.away} @ ${game.home}`);
-                    }
-                }
-            } catch (error) {
-                // Continue trying other rows
-            }
-        });
+/**
+ * Derives season-level config from the full set of parsed weeks.
+ * weekAnchor = the Eastern CALENDAR DATE of the first week-1 game (never the
+ * UTC date — that is off by one for every night game, since a Thursday
+ * 8:20 PM ET kickoff is already past midnight UTC).
+ */
+function deriveSeasonData(year, allWeeksGames) {
+    const week1 = allWeeksGames.find((w) => w.week === 1);
+    if (!week1 || !week1.games || week1.games.length === 0) {
+        throw new Error('deriveSeasonData: week 1 has no games');
+    }
+    const week18 = allWeeksGames.find((w) => w.week === 18);
+    if (!week18 || !week18.games || week18.games.length === 0) {
+        throw new Error('deriveSeasonData: week 18 has no games');
     }
 
-    // If still no games, create sample data for testing
-    if (games.length === 0) {
-        console.log(`🚧 No games parsed from ESPN, creating sample data for Week ${week}...`);
-        games.push(...createSampleWeekData(week));
-    }
+    const firstGame = [...week1.games].sort((a, b) => new Date(a.dt) - new Date(b.dt))[0];
+    const kickoffDateTime = firstGame.dt;
+    const weekAnchor = kickoffDateTime.slice(0, 10); // YYYY-MM-DD (Eastern calendar date)
+
+    const lastGame = [...week18.games].sort((a, b) => new Date(b.dt) - new Date(a.dt))[0];
+    const [datePart] = lastGame.dt.split('T');
+    const [ly, lmo, lda] = datePart.split('-').map(Number);
+    const plusOneDay = new Date(Date.UTC(ly, lmo - 1, lda + 1)); // JS normalizes month/day overflow
+    const endOffset = easternOffsetFor(new Date(Date.UTC(
+        plusOneDay.getUTCFullYear(), plusOneDay.getUTCMonth(), plusOneDay.getUTCDate(), 17, 0, 0
+    ))); // ~noon Eastern on the end date, just to pick the correct DST bucket
+    const endOffsetStr = endOffset === -4 ? '-04:00' : '-05:00';
+    const seasonEndDate =
+        `${plusOneDay.getUTCFullYear()}-${pad2(plusOneDay.getUTCMonth() + 1)}-${pad2(plusOneDay.getUTCDate())}` +
+        `T23:59:59${endOffsetStr}`;
 
     return {
-        week: week,
-        games: games
+        year,
+        weekAnchor,
+        kickoffDateTime,
+        seasonEndDate,
+        totalWeeks: 18,
+        poolId: `nerduniverse-${year}`,
+        poolDisplayName: `Nerd Universe ${year}`,
+        espnScheduleUrlTemplate: ESPN_SCHEDULE_URL_TEMPLATE
     };
 }
 
-/**
- * Parse ESPN datetime format
- */
-function parseESPNDateTime(timeString, week) {
-    // ESPN uses various formats: "1:00 PM ET", "8:20 PM", "TBD", etc.
-    const currentYear = CURRENT_YEAR;
-
-    // Calculate approximate game date based on week
-    // Week 1 starts around September 5th
-    const seasonStart = new Date(currentYear, 8, 5); // September 5
-    const weekStart = new Date(seasonStart.getTime() + ((week - 1) * 7 * 24 * 60 * 60 * 1000));
-
-    if (timeString.includes('TBD') || !timeString.includes(':')) {
-        // Default to Sunday 1:00 PM for TBD games
-        const gameDate = new Date(weekStart);
-        gameDate.setDate(weekStart.getDate() + (7 - weekStart.getDay())); // Next Sunday
-        gameDate.setHours(13, 0, 0, 0); // 1:00 PM
-        return gameDate.toISOString().replace('.000Z', 'Z');
-    }
-
-    // Parse time like "1:00 PM ET" or "8:20 PM"
-    const timeMatch = timeString.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/);
-    if (timeMatch) {
-        let [, hour, minute, ampm] = timeMatch;
-        hour = parseInt(hour);
-        minute = parseInt(minute);
-
-        // Convert to 24-hour format
-        if (ampm === 'PM' && hour !== 12) hour += 12;
-        if (ampm === 'AM' && hour === 12) hour = 0;
-
-        const gameDate = new Date(weekStart);
-        gameDate.setDate(weekStart.getDate() + (7 - weekStart.getDay())); // Default to Sunday
-        gameDate.setHours(hour, minute, 0, 0);
-
-        return gameDate.toISOString().replace('.000Z', 'Z');
-    }
-
-    // Fallback
-    return generateDefaultDateTime(week, 0);
-}
+// ---------------------------------------------------------------------------
+// Validation (A0-A10)
+// ---------------------------------------------------------------------------
 
 /**
- * Generate default datetime for games when parsing fails
+ * Runs every validation assert against the fetched season. Returns
+ * { pass, results: [{id, pass, message}], warnings: [string] }.
+ * A10 unmapped-team-name is a warning, never a failure, per spec.
  */
-function generateDefaultDateTime(week, gameIndex) {
-    const currentYear = CURRENT_YEAR;
-    const seasonStart = new Date(currentYear, 8, 5); // September 5
-    const weekStart = new Date(seasonStart.getTime() + ((week - 1) * 7 * 24 * 60 * 60 * 1000));
+function validateSeason(year, allWeeksGames, seasonData, responseSeasonYears) {
+    const results = [];
+    const warnings = [];
+    const record = (id, pass, message) => results.push({ id, pass, message });
 
-    // Default to Sunday 1:00 PM + gameIndex hours
-    const gameDate = new Date(weekStart);
-    gameDate.setDate(weekStart.getDate() + (7 - weekStart.getDay())); // Next Sunday
-    gameDate.setHours(13 + Math.floor(gameIndex / 4), (gameIndex % 4) * 15, 0, 0);
-
-    return gameDate.toISOString().replace('.000Z', 'Z');
-}
-
-/**
- * Create sample data for testing when ESPN parsing fails
- */
-function createSampleWeekData(week) {
-    // This is fallback sample data
-    const sampleGames = [
-        { away: 'Kansas City Chiefs', home: 'Detroit Lions' },
-        { away: 'Green Bay Packers', home: 'Philadelphia Eagles' },
-        { away: 'Pittsburgh Steelers', home: 'Atlanta Falcons' },
-        { away: 'Arizona Cardinals', home: 'Buffalo Bills' }
-    ];
-
-    return sampleGames.map((game, index) => ({
-        away: game.away,
-        home: game.home,
-        datetime: generateDefaultDateTime(week, index),
-        stadium: ""
-    }));
-}
-
-/**
- * Create immutable JSON file for a week
- */
-function createWeekJSON(weekData, week) {
-    const filename = `nfl_2025_week_${week}.json`;
-    const filepath = path.join(GAME_DATA_DIR, filename);
-
-    // Ensure games are properly formatted
-    const formattedData = {
-        week: weekData.week,
-        games: weekData.games.map((game, index) => ({
-            id: BASE_GAME_ID + (week * 100) + index + 1,
-            a: normalizeTeamName(game.away),
-            h: normalizeTeamName(game.home),
-            dt: formatGameDateTime(game.datetime),
-            stadium: game.stadium || ""
-        }))
-    };
-
-    fs.writeFileSync(filepath, JSON.stringify(formattedData, null, 2));
-    console.log(`✅ Created ${filename} with ${formattedData.games.length} games`);
-
-    return filepath;
-}
-
-/**
- * Normalize team names using our mapping
- */
-function normalizeTeamName(teamName) {
-    return TEAM_MAPPINGS[teamName] || teamName;
-}
-
-/**
- * Format datetime to ISO 8601 format with Z suffix (ESPN Eastern time)
- */
-function formatGameDateTime(datetime) {
-    // ESPN times are in Eastern - we'll format as ISO with Z
-    // This is a simplified version - actual implementation would parse ESPN's format
-    return datetime; // Placeholder
-}
-
-/**
- * Generate all weeks for the season
- */
-async function generateAllWeeks(startWeek = 1, endWeek = 18) {
-    console.log(`🚀 Generating NFL schedule data for weeks ${startWeek}-${endWeek}...`);
-
-    // Ensure game-data directory exists
-    if (!fs.existsSync(GAME_DATA_DIR)) {
-        fs.mkdirSync(GAME_DATA_DIR, { recursive: true });
-    }
-
-    for (let week = startWeek; week <= endWeek; week++) {
-        try {
-            const html = await fetchESPNSchedule(week);
-            const weekData = parseESPNSchedule(html, week);
-            const filepath = createWeekJSON(weekData, week);
-
-            console.log(`📁 Week ${week} saved to: ${filepath}`);
-
-            // Add delay to be respectful to ESPN servers
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-        } catch (error) {
-            console.error(`❌ Error processing week ${week}:`, error.message);
-        }
-    }
-
-    console.log(`🏆 Completed generating schedule files!`);
-}
-
-/**
- * Main execution
- */
-async function main() {
-    const args = process.argv.slice(2);
-
-    if (args.length === 0) {
-        // Generate all weeks
-        await generateAllWeeks();
-    } else if (args.length === 1) {
-        // Generate specific week
-        const week = parseInt(args[0]);
-        if (week >= 1 && week <= 18) {
-            await generateAllWeeks(week, week);
+    // A0: response season.year === requested year for every fetched week
+    if (responseSeasonYears && responseSeasonYears.length > 0) {
+        const mismatches = responseSeasonYears.filter((r) => r.seasonYear !== year);
+        if (mismatches.length === 0) {
+            record('A0', true, `every fetched week's response season.year === ${year}`);
         } else {
-            console.error('❌ Week must be between 1 and 18');
-            process.exit(1);
+            for (const m of mismatches) {
+                record('A0', false, `week ${m.week}: response season.year=${m.seasonYear}, expected ${year} (dates= param not honored?)`);
+            }
         }
+    }
+
+    // A1: every week 1..18 fetched and parsed; no week empty
+    let a1 = true;
+    for (let w = 1; w <= 18; w++) {
+        const wk = allWeeksGames.find((x) => x.week === w);
+        if (!wk || !wk.games || wk.games.length === 0) {
+            a1 = false;
+            record('A1', false, `week ${w} missing or empty`);
+        }
+    }
+    if (a1) record('A1', true, 'every week 1..18 fetched and parsed; none empty');
+
+    // A2: per-week game count in 13..16; total === 272
+    let a2 = true;
+    let total = 0;
+    for (const wk of allWeeksGames) {
+        total += wk.games.length;
+        if (wk.games.length < 13 || wk.games.length > 16) {
+            a2 = false;
+            record('A2', false, `week ${wk.week} has ${wk.games.length} games (expected 13-16)`);
+        }
+    }
+    if (total !== 272) {
+        a2 = false;
+        record('A2', false, `total games ${total} !== 272`);
+    }
+    if (a2) record('A2', true, `all weeks in 13-16 games; total = ${total}`);
+
+    // A3: every game has id, both teams, valid parseable date; home != away
+    let a3 = true;
+    for (const wk of allWeeksGames) {
+        for (const g of wk.games) {
+            if (!g.id || !g.a || !g.h || !g.dt || isNaN(new Date(g.dt).getTime())) {
+                a3 = false;
+                record('A3', false, `week ${wk.week} game ${JSON.stringify(g)}: missing required field or unparseable date`);
+            } else if (g.a === g.h) {
+                a3 = false;
+                record('A3', false, `week ${wk.week} game ${g.id}: home === away (${g.h})`);
+            }
+        }
+    }
+    if (a3) record('A3', true, 'every game has id/teams/valid date; home != away');
+
+    // A4: weekAnchor falls on a Thursday (Eastern)
+    const anchorNoonUTC = new Date(`${seasonData.weekAnchor}T12:00:00Z`);
+    const dow = anchorNoonUTC.getUTCDay(); // 4 = Thursday
+    if (dow === 4) {
+        record('A4', true, `weekAnchor ${seasonData.weekAnchor} is a Thursday`);
     } else {
-        console.log('Usage: node espn-schedule-scraper.js [week]');
-        console.log('       node espn-schedule-scraper.js (generates all weeks)');
-        console.log('       node espn-schedule-scraper.js 1 (generates week 1 only)');
+        record('A4', false, `weekAnchor ${seasonData.weekAnchor} is NOT a Thursday (getUTCDay=${dow})`);
+    }
+
+    // A5: kickoffDateTime within 24h after weekAnchor 00:00 Eastern
+    const anchorOffsetMatch = seasonData.kickoffDateTime.match(/([+-]\d{2}:\d{2})$/);
+    const anchorOffset = anchorOffsetMatch ? anchorOffsetMatch[1] : '-04:00';
+    const anchorMidnightEastern = new Date(`${seasonData.weekAnchor}T00:00:00${anchorOffset}`);
+    const kickoff = new Date(seasonData.kickoffDateTime);
+    const kickoffDiffHours = (kickoff - anchorMidnightEastern) / (1000 * 60 * 60);
+    if (kickoffDiffHours >= 0 && kickoffDiffHours <= 24) {
+        record('A5', true, `kickoffDateTime is ${kickoffDiffHours.toFixed(2)}h after weekAnchor 00:00 Eastern`);
+    } else {
+        record('A5', false, `kickoffDateTime is ${kickoffDiffHours.toFixed(2)}h after weekAnchor 00:00 Eastern (expected 0-24)`);
+    }
+
+    // A6: seasonEndDate > kickoffDateTime; span(weekAnchor -> seasonEndDate) in 17..19 weeks
+    const endDate = new Date(seasonData.seasonEndDate);
+    if (endDate <= kickoff) {
+        record('A6', false, `seasonEndDate ${seasonData.seasonEndDate} is not after kickoffDateTime ${seasonData.kickoffDateTime}`);
+    } else {
+        const spanWeeks = (endDate - anchorMidnightEastern) / (1000 * 60 * 60 * 24 * 7);
+        if (spanWeeks >= 17 && spanWeeks <= 19) {
+            record('A6', true, `seasonEndDate > kickoffDateTime; span = ${spanWeeks.toFixed(2)} weeks`);
+        } else {
+            record('A6', false, `span(weekAnchor, seasonEndDate) = ${spanWeeks.toFixed(2)} weeks, not in 17..19`);
+        }
+    }
+
+    // A7: every game's date within [weekAnchor + (week-1)*7d - 2d, weekAnchor + week*7d + 2d]
+    let a7 = true;
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    for (const wk of allWeeksGames) {
+        const lower = new Date(anchorMidnightEastern.getTime() + (wk.week - 1) * 7 * DAY_MS - 2 * DAY_MS);
+        const upper = new Date(anchorMidnightEastern.getTime() + wk.week * 7 * DAY_MS + 2 * DAY_MS);
+        for (const g of wk.games) {
+            const gd = new Date(g.dt);
+            if (gd < lower || gd > upper) {
+                a7 = false;
+                record('A7', false, `week ${wk.week} game ${g.id} (${g.a} @ ${g.h}, ${g.dt}) outside expected window [${lower.toISOString()}, ${upper.toISOString()}]`);
+            }
+        }
+    }
+    if (a7) record('A7', true, 'every game within its week +-2d tolerance window');
+
+    // A8: poolId === 'nerduniverse-' + year and weekAnchor starts with '{year}-' (lockstep guard)
+    const expectedPoolId = `nerduniverse-${year}`;
+    if (seasonData.poolId === expectedPoolId && seasonData.weekAnchor.startsWith(`${year}-`)) {
+        record('A8', true, `poolId (${seasonData.poolId}) and weekAnchor (${seasonData.weekAnchor}) are in lockstep with year ${year}`);
+    } else {
+        record('A8', false, `poolId=${seasonData.poolId} (expected ${expectedPoolId}) / weekAnchor=${seasonData.weekAnchor} (expected prefix ${year}-)`);
+    }
+
+    // A9: no duplicate game ids within the season
+    const seenIds = new Set();
+    let a9 = true;
+    for (const wk of allWeeksGames) {
+        for (const g of wk.games) {
+            if (seenIds.has(g.id)) {
+                a9 = false;
+                record('A9', false, `duplicate game id ${g.id} (week ${wk.week})`);
+            }
+            seenIds.add(g.id);
+        }
+    }
+    if (a9) record('A9', true, 'no duplicate game ids');
+
+    // A10: every team name resolved through TEAM_MAPPINGS (unmapped = WARNING, not failure)
+    const mappedFullNames = new Set(Object.values(TEAM_MAPPINGS));
+    const unmapped = new Set();
+    for (const wk of allWeeksGames) {
+        for (const g of wk.games) {
+            if (!mappedFullNames.has(g.a)) unmapped.add(g.a);
+            if (!mappedFullNames.has(g.h)) unmapped.add(g.h);
+        }
+    }
+    if (unmapped.size > 0) {
+        const list = [...unmapped].sort().join(', ');
+        warnings.push(`A10: ${unmapped.size} unmapped team name(s) (pass through unchanged): ${list}`);
+        record('A10', true, `${unmapped.size} unmapped name(s) — WARNING only, not a failure: ${list}`);
+    } else {
+        record('A10', true, 'every team name resolved through TEAM_MAPPINGS');
+    }
+
+    const pass = results.every((r) => r.pass);
+    return { pass, results, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Output formatting (pure string builders, so tests can check text without
+// touching disk — writeOutputs() below is the only function that does I/O)
+// ---------------------------------------------------------------------------
+
+function formatSeasonDataJs(seasonData) {
+    return `// ⚠️ GENERATED FILE FORMAT — produced by espn-schedule-scraper.js (spec D4).
+// DATA ONLY — no logic, ever.
+// Companion: functions/season-data.json must contain identical values
+// (enforced by tests/season-config-drift.test.js).
+(function () {
+    'use strict';
+
+    const SEASON_DATA = {
+        year: ${seasonData.year},
+        weekAnchor: '${seasonData.weekAnchor}',
+        kickoffDateTime: '${seasonData.kickoffDateTime}',
+        seasonEndDate: '${seasonData.seasonEndDate}',
+        totalWeeks: ${seasonData.totalWeeks},
+        poolId: '${seasonData.poolId}',
+        poolDisplayName: '${seasonData.poolDisplayName}',
+        espnScheduleUrlTemplate: '${seasonData.espnScheduleUrlTemplate}'
+    };
+
+    Object.freeze(SEASON_DATA);
+
+    if (typeof window !== 'undefined') {
+        window.SEASON_DATA = SEASON_DATA;
+    }
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = { SEASON_DATA };
+    }
+})();
+`;
+}
+
+function formatSeasonDataJson(seasonData) {
+    // Same key order as season-data.js's object literal; 4-space indent,
+    // matching functions/season-data.json's current shape.
+    const ordered = {
+        year: seasonData.year,
+        weekAnchor: seasonData.weekAnchor,
+        kickoffDateTime: seasonData.kickoffDateTime,
+        seasonEndDate: seasonData.seasonEndDate,
+        totalWeeks: seasonData.totalWeeks,
+        poolId: seasonData.poolId,
+        poolDisplayName: seasonData.poolDisplayName,
+        espnScheduleUrlTemplate: seasonData.espnScheduleUrlTemplate
+    };
+    return JSON.stringify(ordered, null, 4) + '\n';
+}
+
+/**
+ * Per-week game-data file: an ID-keyed map (NOT {week, games:[...]}) —
+ * matches the shape actually consumed by production (verified against
+ * nerdfootballConfidencePicks.html's `weekBible = await response.json()`
+ * followed by `Object.keys(weekBible).filter(k => k !== '_metadata')`).
+ * No _metadata block: that provenance data belongs to a later
+ * results-verification pass, not the pre-season scraper (zero fallback
+ * data — we do not fabricate scores/status for unplayed games).
+ */
+function formatWeekGameData(weekObj) {
+    const obj = {};
+    for (const g of weekObj.games) {
+        obj[String(g.id)] = { a: g.a, h: g.h, dt: g.dt, stadium: g.stadium };
+    }
+    return JSON.stringify(obj, null, 2) + '\n';
+}
+
+function formatScheduleRaw(year, allWeeksGames) {
+    const payload = {
+        year,
+        generatedAt: new Date().toISOString(),
+        weeks: allWeeksGames.map((w) => ({ week: w.week, games: w.games }))
+    };
+    return JSON.stringify(payload, null, 2) + '\n';
+}
+
+function writeOutputs(year, allWeeksGames, seasonData) {
+    const seasonDataJsPath = path.join(__dirname, 'public', 'js', 'config', 'season-data.js');
+    fs.writeFileSync(seasonDataJsPath, formatSeasonDataJs(seasonData));
+    console.log(`  wrote ${seasonDataJsPath}`);
+
+    const seasonDataJsonPath = path.join(__dirname, 'functions', 'season-data.json');
+    fs.writeFileSync(seasonDataJsonPath, formatSeasonDataJson(seasonData));
+    console.log(`  wrote ${seasonDataJsonPath}`);
+
+    const gameDataDir = path.join(__dirname, 'public', 'game-data');
+    if (!fs.existsSync(gameDataDir)) {
+        fs.mkdirSync(gameDataDir, { recursive: true });
+    }
+    for (const wk of allWeeksGames) {
+        const p = path.join(gameDataDir, `nfl_${year}_week_${wk.week}.json`);
+        fs.writeFileSync(p, formatWeekGameData(wk));
+        console.log(`  wrote ${p}`);
+    }
+
+    const rawPath = path.join(__dirname, 'public', `nfl_${year}_schedule_raw.json`);
+    fs.writeFileSync(rawPath, formatScheduleRaw(year, allWeeksGames));
+    console.log(`  wrote ${rawPath}`);
+}
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
+
+function parseArgs(argv) {
+    const args = { year: null, dryRun: false, week: null };
+    for (const arg of argv) {
+        if (arg.startsWith('--year=')) {
+            args.year = parseInt(arg.slice('--year='.length), 10);
+        } else if (arg === '--dry-run') {
+            args.dryRun = true;
+        } else if (arg.startsWith('--week=')) {
+            args.week = parseInt(arg.slice('--week='.length), 10);
+        }
+    }
+    return args;
+}
+
+function printUsage() {
+    console.log('Usage: node espn-schedule-scraper.js --year=YYYY [--dry-run] [--week=N]');
+    console.log('');
+    console.log('  --year=YYYY   REQUIRED. Integer 2020-2100. No default.');
+    console.log('  --dry-run     Fetch + validate + print the summary; write nothing.');
+    console.log('  --week=N      Fetch a single week for debugging; never writes.');
+}
+
+async function main() {
+    const args = parseArgs(process.argv.slice(2));
+
+    if (!Number.isInteger(args.year) || args.year < 2020 || args.year > 2100) {
+        printUsage();
         process.exit(1);
     }
+
+    if (args.week !== null) {
+        if (!Number.isInteger(args.week) || args.week < 1 || args.week > 18) {
+            console.error(`❌ --week must be an integer 1-18 (got ${args.week})`);
+            process.exit(1);
+        }
+        console.log(`Fetching week ${args.week} of ${args.year} for debugging (no writes)...`);
+        const json = await fetchWeekScoreboard(args.week, args.year);
+        console.log(`  response season.year = ${json.season && json.season.year}`);
+        const parsed = parseScoreboard(json, args.week);
+        console.log(JSON.stringify(parsed, null, 2));
+        return;
+    }
+
+    console.log(`🏈 Scraping ${args.year} season (weeks 1-18) from ESPN (dates=${args.year})...`);
+    const allWeeksGames = [];
+    const responseSeasonYears = [];
+    for (let week = 1; week <= 18; week++) {
+        console.log(`  Fetching week ${week}...`);
+        let json;
+        try {
+            json = await fetchWeekScoreboard(week, args.year);
+        } catch (err) {
+            console.error(`❌ FAILED fetching week ${week}: ${err.message}`);
+            process.exit(1);
+        }
+        responseSeasonYears.push({ week, seasonYear: json.season && json.season.year });
+        let parsed;
+        try {
+            parsed = parseScoreboard(json, week);
+        } catch (err) {
+            console.error(`❌ FAILED parsing week ${week}: ${err.message}`);
+            process.exit(1);
+        }
+        allWeeksGames.push(parsed);
+        if (week < 18) {
+            await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 req/sec
+        }
+    }
+
+    let seasonData;
+    try {
+        seasonData = deriveSeasonData(args.year, allWeeksGames);
+    } catch (err) {
+        console.error(`❌ FAILED deriving season data: ${err.message}`);
+        process.exit(1);
+    }
+
+    const validation = validateSeason(args.year, allWeeksGames, seasonData, responseSeasonYears);
+
+    console.log('');
+    console.log('=== Validation Results ===');
+    for (const r of validation.results) {
+        console.log(`${r.pass ? '✅ PASS' : '❌ FAIL'} ${r.id}: ${r.message}`);
+    }
+    if (validation.warnings.length > 0) {
+        console.log('');
+        console.log('=== Warnings ===');
+        validation.warnings.forEach((w) => console.log(`⚠️  ${w}`));
+    }
+
+    console.log('');
+    console.log('=== Season Summary ===');
+    console.log(`  year: ${seasonData.year}`);
+    console.log(`  weekAnchor: ${seasonData.weekAnchor}`);
+    console.log(`  kickoffDateTime: ${seasonData.kickoffDateTime}`);
+    console.log(`  seasonEndDate: ${seasonData.seasonEndDate}`);
+    console.log(`  poolId: ${seasonData.poolId}`);
+    console.log(`  per-week game counts: ${allWeeksGames.map((w) => w.games.length).join(', ')}`);
+    console.log(`  total games: ${allWeeksGames.reduce((s, w) => s + w.games.length, 0)}`);
+
+    if (!validation.pass) {
+        console.error('');
+        console.error('❌ VALIDATION FAILED — writing NOTHING.');
+        process.exit(1);
+    }
+
+    if (args.dryRun) {
+        console.log('');
+        console.log('✅ DRY RUN — all validations passed. No files written.');
+        return;
+    }
+
+    console.log('');
+    console.log('✅ All validations passed. Writing outputs...');
+    writeOutputs(args.year, allWeeksGames, seasonData);
+    console.log('✅ Done.');
 }
 
-// Run if called directly
 if (require.main === module) {
-    main().catch(error => {
-        console.error('❌ Fatal error:', error);
+    main().catch((err) => {
+        console.error(`❌ Fatal error: ${err.message}`);
         process.exit(1);
     });
 }
 
 module.exports = {
-    fetchESPNSchedule,
-    parseESPNSchedule,
-    createWeekJSON,
-    generateAllWeeks
+    parseScoreboard,
+    toEasternISO,
+    easternOffsetFor,
+    deriveSeasonData,
+    validateSeason,
+    TEAM_MAPPINGS,
+    // Additive exports beyond the plan's minimum list — required by the
+    // "Format check" unit test (generated season-data.js text parses via
+    // require() and deep-equals the JSON twin). Both are pure string
+    // builders with no I/O.
+    formatSeasonDataJs,
+    formatSeasonDataJson
 };
