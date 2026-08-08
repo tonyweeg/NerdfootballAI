@@ -196,6 +196,19 @@ describe('validateSeason', () => {
         const a9 = result.results.filter((r) => r.id === 'A9');
         expect(a9.some((r) => !r.pass)).toBe(true);
     });
+
+    test('A11 violation (kickoffDateTime is legacy bare-Z, not explicit-offset) fails with A11 named', () => {
+        // Closes the silent leak path: a bare-Z kickoffDateTime reaching
+        // derivation would shift by hours with every other assert green.
+        const allWeeksGames = buildFixture();
+        const seasonData = deriveSeasonData(2026, allWeeksGames);
+        seasonData.kickoffDateTime = toLegacyBareZEastern(seasonData.kickoffDateTime); // '...Z' instead of '...-04:00'
+        const result = validateSeason(2026, allWeeksGames, seasonData);
+
+        expect(result.pass).toBe(false);
+        const a11 = result.results.find((r) => r.id === 'A11');
+        expect(a11.pass).toBe(false);
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -232,14 +245,21 @@ describe('output format (season-data.js / season-data.json parity)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// game-data `dt` convention: LEGACY bare-Z-meaning-Eastern (2026-08-08 review)
+// game-data `dt` convention: LEGACY bare-Z-meaning-Eastern (2026-08-08 review;
+// rationale corrected post-quality-review)
 // ---------------------------------------------------------------------------
 // Decisive, review-mandated correction: game-data / raw-schedule `dt` must
-// NOT be explicit-offset ISO. The live consumer public/easternTimeParser-v2.js
-// unconditionally strips 'Z' and subtracts a fixed 4 hours; feeding it
-// offset-ISO applies that correction to an already-correct value ("double
-// correction"), shifting pick-lock/game-start times 3-4h for non-Eastern
-// viewers. season-data.js's kickoffDateTime/seasonEndDate correctly KEEP
+// NOT be explicit-offset ISO. The HONEST reason (see toLegacyBareZEastern's
+// comment in espn-schedule-scraper.js for the full derivation): the live
+// consumer public/easternTimeParser-v2.js unconditionally strips 'Z' and
+// subtracts a fixed 4 hours. With bare-Z input that computation is skewed
+// EARLY by a VIEWER-TIMEZONE-DEPENDENT amount (measured: Eastern −4h,
+// Central −3h, Pacific −1h, UTC −8h, Tokyo −17h) — it is NOT "correct" for
+// anyone. Explicit-offset ISO input would give a UNIFORM −4h for every
+// viewer instead — arguably better, but different from what every 2025 user
+// actually experienced. We emit bare-Z solely because the ground rule is
+// byte-identical 2025 behavior, not because bare-Z produces correct times.
+// season-data.js's kickoffDateTime/seasonEndDate correctly KEEP
 // explicit-offset format (a different consumer path) and must stay untouched
 // by this fix — covered below.
 
@@ -292,7 +312,7 @@ describe('formatWeekGameData / formatScheduleRaw emit the legacy bare-Z dt conve
     });
 });
 
-describe('legacy dt convention vs. the live consumer public/easternTimeParser-v2.js (hasGameStarted) — 2026-08-08 review', () => {
+describe('legacy dt convention vs. the live consumer public/easternTimeParser-v2.js (hasGameStarted) — 2026-08-08 review, TZ-portable', () => {
     // Exact replication of public/easternTimeParser-v2.js's hasGameStarted
     // (verified against that file's actual source, 2026-08-08):
     //   const cleanTime = espnTimestamp.replace('Z', '');
@@ -301,29 +321,18 @@ describe('legacy dt convention vs. the live consumer public/easternTimeParser-v2
     //
     // `new Date(cleanTime)` has no offset, so per the ECMA-262 Date Time
     // String Format it is parsed in the *ambient* ("local") timezone of
-    // whoever runs it. Empirically verified while writing this test
-    // (2026-08-08): this repo's dev/CI process ambient TZ is
-    // America/New_York (no jest.config TZ override exists) — AND Jest's
-    // node test environment does NOT honor a runtime `process.env.TZ`
-    // mutation after startup (confirmed: mutating it mid-test has zero
-    // effect on Intl/Date, unlike a plain `node -e` script, presumably
-    // because V8's local-timezone cache is warmed before test code runs).
-    // So these tests rely on — and explicitly guard — the process's actual
-    // ambient default rather than trying to force a different one.
+    // whoever runs it — so hasGameStarted's skew from the true instant is
+    // VIEWER-TIMEZONE-DEPENDENT, not a fixed correction (measured: Eastern
+    // −4h, Central −3h, Pacific −1h, UTC −8h, Tokyo −17h — see CLAUDE.md
+    // "MEASURED REALITY" and toLegacyBareZEastern's comment). A test that
+    // hardcodes any ONE of those numbers only passes on a machine/CI runner
+    // in that specific timezone. Instead, this test DERIVES the expected
+    // skew from the machine's own measured ambient UTC offset at runtime —
+    // genuinely pinning the production quirk's formula/mechanism, correct
+    // on any machine (verified: Eastern dev box, and — separately, in a
+    // freshly spawned process, since V8 caches the resolved zone per
+    // process — TZ=UTC).
     const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
-
-    beforeAll(() => {
-        const ambientTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (ambientTZ !== 'America/New_York') {
-            throw new Error(
-                `This suite assumes ambient TZ America/New_York (this repo's verified ` +
-                `dev/CI default), because Jest does not honor runtime TZ mutation. ` +
-                `Actual ambient TZ is ${ambientTZ}. Run with TZ=America/New_York, or ` +
-                `update this guard and the expected values below if the environment's ` +
-                `default has genuinely changed.`
-            );
-        }
-    });
 
     function replicateHasGameStarted(espnTimestamp) {
         const cleanTime = espnTimestamp.replace('Z', '');
@@ -332,54 +341,32 @@ describe('legacy dt convention vs. the live consumer public/easternTimeParser-v2
         return { wrongTime, correctedGameTime };
     }
 
-    test('a generated September game-data dt: strip-and-parse (pre-correction) exactly recovers the true UTC kickoff instant', () => {
-        // Thu Sep 4, 2025, 8:20 PM EDT — true UTC per ESPN's JSON API.
-        const trueUtcInstant = new Date('2025-09-05T00:20:00Z');
-        const dt = toLegacyBareZEastern(toEasternISO(trueUtcInstant.toISOString()));
-        expect(dt).toBe('2025-09-04T20:20:00Z');
-
-        const { wrongTime } = replicateHasGameStarted(dt);
-
-        // Under this process's Eastern-ambient TZ (guarded above), the
-        // parser's Z-strip-and-reparse step is an identity: Eastern digits
-        // read back as Eastern local time land exactly on the true instant.
-        expect(wrongTime.getTime()).toBe(trueUtcInstant.getTime());
-    });
-
-    test('hasGameStarted\'s FULL corrected value reproduces the same documented 4h-early behavior as production (CLAUDE.md "ESPN Timezone Bug") — not a new regression', () => {
-        const trueUtcInstant = new Date('2025-09-05T00:20:00Z'); // 8:20 PM EDT, Sept 4
+    test.each([
+        ['Thu opener, 8:20 PM EDT', '2025-09-05T00:20:00Z'],
+        ['Sun early window, 1:00 PM EDT', '2025-09-07T17:00:00Z'],
+        ['Sun night, 8:20 PM EDT', '2025-09-15T00:20:00Z'],
+        ['Mon night, 8:15 PM EDT', '2025-09-16T00:15:00Z']
+    ])('%s: hasGameStarted\'s skew from the true instant matches the formula derived from this machine\'s own measured ambient offset', (_label, trueUtcISO) => {
+        const trueUtcInstant = new Date(trueUtcISO);
         const dt = toLegacyBareZEastern(toEasternISO(trueUtcInstant.toISOString()));
 
-        const { correctedGameTime } = replicateHasGameStarted(dt);
+        const { wrongTime, correctedGameTime } = replicateHasGameStarted(dt);
 
-        // hasGameStarted's fixed "-4h" on top of an already-correct value is
-        // a pre-existing, documented quirk (CLAUDE.md: "SYMPTOM: Game times
-        // show 4 hours early") that this fix deliberately preserves
-        // byte-for-byte, so 2026 behaves exactly like 2025 did — it is NOT
-        // fixed here. This is a known, CONSTANT 4-hour offset from true, not
-        // the unpredictable multi-hour drift the reverted explicit-offset
-        // convention would cause for non-Eastern viewers (next test).
-        expect(correctedGameTime.getTime()).toBe(trueUtcInstant.getTime() - FOUR_HOURS_MS);
-    });
+        // Measure — don't assume — this machine's own ambient UTC offset at
+        // this specific instant (DST-correct for whichever zone the process
+        // actually runs in), and Eastern's offset for the same instant
+        // (independently, via the scraper's own easternOffsetFor). Derive
+        // the expected skew purely from those two measured numbers: the
+        // parser's fixed "-4h" is calibrated for Eastern (4 === Eastern's
+        // own offset magnitude), so any ambient zone that differs from
+        // Eastern by D hours is off from the true instant by (4 + D) hours.
+        const ambientOffsetHours = -wrongTime.getTimezoneOffset() / 60;
+        const easternOffsetHours = easternOffsetFor(trueUtcInstant);
+        const expectedSkewHours = FOUR_HOURS_MS / (60 * 60 * 1000) + (ambientOffsetHours - easternOffsetHours);
 
-    test('the reverted explicit-offset convention: parser subtracts an EXTRA 4h from an already-correct value, because offset parsing is TZ-independent', () => {
-        // Offset-format dt (what this scraper produced before the fix) has
-        // no 'Z' at all, so `.replace('Z','')` is a no-op and `new Date()`
-        // parses the explicit offset deterministically (NOT ambient-TZ-
-        // dependent — this is standard, spec-guaranteed Date behavior,
-        // true in every environment) straight to the true instant — then
-        // the parser subtracts another 4h on top, unconditionally. That
-        // determinism is exactly why the bug this fix corrects is uniform
-        // "every non-Eastern viewer" rather than something that happens to
-        // self-correct for some viewers.
-        const trueUtcInstant = new Date('2025-09-05T00:20:00Z');
-        const brokenOffsetDt = toEasternISO(trueUtcInstant.toISOString());
-        expect(brokenOffsetDt).toBe('2025-09-04T20:20:00-04:00');
+        const actualSkewHours = (trueUtcInstant.getTime() - correctedGameTime.getTime()) / (60 * 60 * 1000);
 
-        const { wrongTime, correctedGameTime } = replicateHasGameStarted(brokenOffsetDt);
-
-        expect(wrongTime.getTime()).toBe(trueUtcInstant.getTime());
-        expect(correctedGameTime.getTime()).toBe(trueUtcInstant.getTime() - FOUR_HOURS_MS);
+        expect(actualSkewHours).toBe(expectedSkewHours);
     });
 });
 

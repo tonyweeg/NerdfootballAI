@@ -128,19 +128,29 @@ function toEasternISO(utcISO) {
  * place of the real offset (e.g. "2025-09-04T20:20:00Z" — despite the
  * trailing 'Z', this is NOT UTC).
  *
- * This convention is REQUIRED by the live consumer
- * public/easternTimeParser-v2.js: hasGameStarted() / formatGameTime() /
+ * THE HONEST RATIONALE (corrected 2026-08-08 after quality review — the
+ * earlier version of this comment had it backwards): the live consumer
+ * public/easternTimeParser-v2.js's hasGameStarted() / formatGameTime() /
  * getTimeUntilGameStart() all unconditionally `.replace('Z', '')` and then
- * subtract a fixed 4 hours to recover Eastern time. Feeding that parser
- * proper explicit-offset ISO (what this scraper produced before the
- * 2026-08-08 spec review) makes it apply its fixed correction on top of an
- * ALREADY-correct value ("double correction"), shifting every computed
- * pick-lock / game-start time by 3-4 hours for non-Eastern viewers.
+ * subtract a fixed 4 hours. Fed this bare-Z convention, that computation is
+ * NOT correct — it computes game-start EARLY by a VIEWER-TIMEZONE-DEPENDENT
+ * amount (measured): Eastern −4h, Central −3h, Pacific −1h, UTC −8h,
+ * Tokyo −17h. Feeding that same parser proper explicit-offset ISO instead
+ * would give a UNIFORM −4h early for every viewer, everywhere — arguably
+ * "better" (at least consistent), but DIFFERENT from what every 2025 user
+ * actually experienced (2025 shipped with bare-Z game-data files).
  *
- * DO NOT change this to real UTC or to explicit-offset ISO without first
- * updating every consumer of easternTimeParser-v2.js in lockstep. See
+ * We emit bare-Z here because the ground rule for this migration is
+ * byte-identical 2025 behavior, NOT because bare-Z produces correct times —
+ * it does not, for anyone. Changing this convention, or fixing the parser
+ * itself, is a deliberate owner decision outside this migration's scope.
+ *
+ * DO NOT change this to real UTC or to explicit-offset ISO without that
+ * explicit owner decision (it would silently change production behavior for
+ * every viewer, not fix a bug). See
  * claudedocs/plans/2026-08-08-season-config-scraper-rework.md ("Outputs"
- * item 3) and the 2026-08-08 spec review that mandated this correction.
+ * item 3, rationale corrected post-quality-review) and CLAUDE.md's "MEASURED
+ * REALITY" note under the ESPN Timezone Bug section.
  *
  * season-data.js's kickoffDateTime / seasonEndDate are a DIFFERENT consumer
  * path (season-config.js, not easternTimeParser-v2.js) and correctly KEEP
@@ -435,6 +445,18 @@ function validateSeason(year, allWeeksGames, seasonData, responseSeasonYears) {
         record('A10', true, `${unmapped.size} unmapped name(s) — WARNING only, not a failure: ${list}`);
     } else {
         record('A10', true, 'every team name resolved through TEAM_MAPPINGS');
+    }
+
+    // A11: kickoffDateTime must be explicit-offset ISO (season-data.js's
+    // consumer path), never the legacy bare-Z game-data convention. Closes
+    // a silent leak path: if a future change fed a bare-Z string into
+    // deriveSeasonData (e.g. game-data's legacy dt instead of the internal
+    // offset-format dt), kickoffDateTime would silently shift by hours
+    // while every other assert stayed green.
+    if (/[+-]\d{2}:\d{2}$/.test(seasonData.kickoffDateTime)) {
+        record('A11', true, `kickoffDateTime ${seasonData.kickoffDateTime} uses explicit-offset ISO`);
+    } else {
+        record('A11', false, `kickoffDateTime ${seasonData.kickoffDateTime} is NOT explicit-offset ISO (legacy bare-Z leaked into derivation?)`);
     }
 
     const pass = results.every((r) => r.pass);
