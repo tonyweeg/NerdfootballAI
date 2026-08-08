@@ -527,24 +527,11 @@ Reply to: tonyweeg@gmail.com`;
     }
 });
 
-// Import and export pick analytics functions - DIAMOND LEVEL ANALYTICS
-const {
-    onPicksUpdate,
-    onLegacyPicksUpdate,
-    onPoolPicksUpdate,
-    calculateAnalytics,
-    getAnalytics,
-    onGameResultUpdate,
-    onIndividualGameUpdate
-} = require('./pickAnalytics');
-
-exports.onPicksUpdate = onPicksUpdate;
-exports.onLegacyPicksUpdate = onLegacyPicksUpdate;
-exports.onPoolPicksUpdate = onPoolPicksUpdate;
-exports.calculateAnalytics = calculateAnalytics;
-exports.getAnalytics = getAnalytics;
-exports.onGameResultUpdate = onGameResultUpdate;
-exports.onIndividualGameUpdate = onIndividualGameUpdate;
+// pickAnalytics functions intentionally NOT exported — owner ruling 2026-08-08:
+// the season runs exactly as 2025 did, and these 7 never deployed in 2025
+// (see claudedocs/plans/2026-08-07-season-config-phase-1-backend.md, D9-D11).
+// The file itself is healthy (exports + v2 signatures fixed in D10); wiring them
+// back into this list is the single deliberate step to enable analytics.
 
 // Import and export ESPN API functions
 const {
