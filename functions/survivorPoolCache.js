@@ -497,35 +497,8 @@ async function loadNFLResultsForAllWeeks() {
 
 
 /**
- * Get current NFL week number based on date
+ * Get current NFL week number (canonical SEASON_CONFIG anchor formula)
  */
 function getCurrentWeekNumber() {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-
-    // NFL 2025 Season Week Calendar
-    // TODO(Phase 3): derive table from config; verify boundary semantics first
-    const NFL_2025_WEEKS = {
-        1: { start: '2025-09-04' }, 2: { start: '2025-09-08' }, 3: { start: '2025-09-15' },
-        4: { start: '2025-09-22' }, 5: { start: '2025-09-29' }, 6: { start: '2025-10-06' },
-        7: { start: '2025-10-13' }, 8: { start: '2025-10-20' }, 9: { start: '2025-10-27' },
-        10: { start: '2025-11-03' }, 11: { start: '2025-11-10' }, 12: { start: '2025-11-17' },
-        13: { start: '2025-11-24' }, 14: { start: '2025-12-01' }, 15: { start: '2025-12-08' },
-        16: { start: '2025-12-15' }, 17: { start: '2025-12-22' }, 18: { start: '2025-12-29' }
-    };
-
-    // Find current week based on today's date
-    for (let week = 1; week <= 18; week++) {
-        const weekData = NFL_2025_WEEKS[week];
-        const weekStart = new Date(weekData.start);
-        const nextWeek = NFL_2025_WEEKS[week + 1];
-        const weekEnd = nextWeek ? new Date(nextWeek.start) : new Date('2026-01-10');
-
-        if (today >= weekStart && today < weekEnd) {
-            return week;
-        }
-    }
-
-    // Fallback - if we're before week 1, return 1; if after week 18, return 18
-    return todayStr < SEASON_CONFIG.weekAnchor ? 1 : 18;
+    return SEASON_CONFIG.utils.getCurrentWeek();
 }// Force deployment Sun Sep 28 20:09:50 EDT 2025

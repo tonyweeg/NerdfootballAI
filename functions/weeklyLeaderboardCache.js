@@ -362,56 +362,10 @@ async function analyzeGameStates(bibleData) {
 }
 
 /**
- * NFL 2025 Season Week Calendar (Bible-based)
- */
-// TODO(Phase 3): derive table from config; verify boundary semantics first
-const NFL_2025_WEEKS = {
-    1: { start: '2025-09-04', games: '2025-09-04' },
-    2: { start: '2025-09-08', games: '2025-09-11' },
-    3: { start: '2025-09-15', games: '2025-09-21' },
-    4: { start: '2025-09-22', games: '2025-09-26' },
-    5: { start: '2025-09-29', games: '2025-10-03' },
-    6: { start: '2025-10-06', games: '2025-10-10' },
-    7: { start: '2025-10-13', games: '2025-10-17' },
-    8: { start: '2025-10-20', games: '2025-10-24' },
-    9: { start: '2025-10-27', games: '2025-10-31' },
-    10: { start: '2025-11-03', games: '2025-11-07' },
-    11: { start: '2025-11-10', games: '2025-11-14' },
-    12: { start: '2025-11-17', games: '2025-11-21' },
-    13: { start: '2025-11-24', games: '2025-11-28' },
-    14: { start: '2025-12-01', games: '2025-12-05' },
-    15: { start: '2025-12-08', games: '2025-12-12' },
-    16: { start: '2025-12-15', games: '2025-12-19' },
-    17: { start: '2025-12-22', games: '2025-12-26' },
-    18: { start: '2025-12-29', games: '2026-01-02' }
-};
-
-/**
- * Get current NFL week number based on bible data and current date
+ * Get current NFL week number (canonical SEASON_CONFIG anchor formula)
  */
 function getCurrentWeekNumber() {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-
-    // Find current week based on today's date
-    for (let week = 1; week <= 18; week++) {
-        const weekData = NFL_2025_WEEKS[week];
-        const weekStart = new Date(weekData.start);
-        const nextWeek = NFL_2025_WEEKS[week + 1];
-        const weekEnd = nextWeek ? new Date(nextWeek.start) : new Date('2026-01-10');
-
-        if (today >= weekStart && today < weekEnd) {
-            console.log(`📅 Current Date: ${today.toISOString()}`);
-            console.log(`📅 Week ${week} Range: ${weekData.start} to ${nextWeek ? nextWeek.start : '2026-01-10'}`);
-            console.log(`📅 Bible-based NFL Week: ${week}`);
-            return week;
-        }
-    }
-
-    // Fallback - if we're before week 1, return 1; if after week 18, return 18
-    const fallbackWeek = todayStr < SEASON_CONFIG.weekAnchor ? 1 : 18;
-    console.log(`📅 Fallback NFL Week: ${fallbackWeek}`);
-    return fallbackWeek;
+    return SEASON_CONFIG.utils.getCurrentWeek();
 }
 
 /**
