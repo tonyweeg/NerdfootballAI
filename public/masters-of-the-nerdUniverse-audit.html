@@ -430,6 +430,9 @@
         }
     </style>
     <script src="./js/utils/logger-compat.js"></script>
+    <script src="./js/config/season-data.js"></script>
+    <script src="./js/config/season-config.js"></script>
+    <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
     <div class="fibonacci-pattern"></div>
@@ -539,11 +542,7 @@
 
         // Helper functions for real-time season calculation (from gold standard leaderboard.html)
         function getCurrentWeekNumber() {
-            const week1Start = new Date('2025-09-04');
-            const today = new Date();
-            const diffTime = today - week1Start;
-            const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
-            return Math.max(1, Math.min(18, diffWeeks));
+            return window.SEASON_CONFIG.utils.getCurrentWeek();
         }
 
         // Week navigation functions
@@ -741,7 +740,7 @@
             try {
                 logger.auth('📊 Calculating universe stats from real-time data...');
 
-                const poolMembersRef = db.collection('artifacts').doc('nerdfootball').collection('pools').doc('nerduniverse-2025').collection('metadata').doc('members');
+                const poolMembersRef = db.collection('artifacts').doc('nerdfootball').collection('pools').doc(window.SEASON_CONFIG.poolId).collection('metadata').doc('members');
                 const poolMembersSnap = await poolMembersRef.get();
                 const poolMembers = poolMembersSnap.exists ? poolMembersSnap.data() : {};
                 const totalUsers = Object.keys(poolMembers).length;
@@ -941,7 +940,7 @@
                 // Load pool members for validation
                 let poolMembers = {};
                 try {
-                    const membersRef = db.collection('artifacts').doc('nerdfootball').collection('pools').doc('nerduniverse-2025').collection('metadata').doc('members');
+                    const membersRef = db.collection('artifacts').doc('nerdfootball').collection('pools').doc(window.SEASON_CONFIG.poolId).collection('metadata').doc('members');
                     const membersSnap = await membersRef.get();
                     if (membersSnap.exists) {
                         poolMembers = membersSnap.data();

@@ -6,6 +6,9 @@
     <title>Weekly Picks Viewer - All Users (Authenticated)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="./js/utils/suppress-tailwind-warning.js"></script>
+    <script src="./js/config/season-data.js"></script>
+    <script src="./js/config/season-config.js"></script>
+    <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body class="bg-gray-100 p-8">
     <div class="max-w-7xl mx-auto">
@@ -157,12 +160,7 @@
         }
 
         function getCurrentWeekNumber() {
-            // Week 1 started Sept 4, 2025 - calculate current week based on date
-            const week1Start = new Date('2025-09-04');
-            const today = new Date();
-            const diffTime = today - week1Start;
-            const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
-            return Math.max(1, Math.min(18, diffWeeks));
+            return window.SEASON_CONFIG.utils.getCurrentWeek();
         }
 
         async function checkUserRegistration(uid) {
@@ -301,7 +299,7 @@
                 // Load pool members for validation
                 let poolMembers = {};
                 try {
-                    const membersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                    const membersPath = window.SEASON_CONFIG.paths.poolMembers();
                     const membersSnap = await getDoc(doc(db, membersPath));
                     if (membersSnap.exists()) {
                         poolMembers = membersSnap.data();
@@ -746,7 +744,7 @@
 
             try {
                 // Step 1: Get pool members
-                const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+                const poolMembersPath = window.SEASON_CONFIG.paths.poolMembers();
                 const poolMembersSnap = await getDoc(doc(db, poolMembersPath));
                 const poolMembers = poolMembersSnap.exists() ? poolMembersSnap.data() : {};
                 const poolMemberIds = Object.keys(poolMembers);

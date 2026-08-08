@@ -385,6 +385,9 @@
         }
     </style>
     <script src="./js/utils/logger-compat.js"></script>
+    <script src="./js/config/season-data.js"></script>
+    <script src="./js/config/season-config.js"></script>
+    <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
     <div class="spiral-background"></div>
@@ -560,7 +563,7 @@
         }
 
         async function loadPoolMembers() {
-            const membersSnap = await getDoc(doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members'));
+            const membersSnap = await getDoc(doc(db, window.SEASON_CONFIG.paths.poolMembers()));
             return membersSnap.exists() ? membersSnap.data() : {};
         }
 
@@ -678,7 +681,7 @@
                     if (!poolMembers[uid]) continue; // Skip non-pool members
 
                     // Get Firestore scoring data
-                    const scoringSnap = await getDoc(doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${uid}`));
+                    const scoringSnap = await getDoc(doc(db, window.SEASON_CONFIG.paths.scoringUser(uid)));
                     if (scoringSnap.exists()) {
                         const weeklyPoints = scoringSnap.data().weeklyPoints || {};
                         const firestoreData = weeklyPoints[week.toString()] || { gamesWon: 0, totalPoints: 0 };
@@ -765,7 +768,7 @@
                     const correct = await calculateCorrectScoring(picks, bibleData, isWeekComplete);
 
                     // Get stored scoring
-                    const scoringSnap = await getDoc(doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${uid}`));
+                    const scoringSnap = await getDoc(doc(db, window.SEASON_CONFIG.paths.scoringUser(uid)));
                     let stored = { gamesWon: 0, totalPoints: 0 };
 
                     if (scoringSnap.exists()) {
@@ -1116,7 +1119,7 @@
                     const correct = await calculateCorrectScoring(picks, bibleData);
 
                     // Update scoring document
-                    const scoringRef = doc(db, `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${uid}`);
+                    const scoringRef = doc(db, window.SEASON_CONFIG.paths.scoringUser(uid));
                     const scoringSnap = await getDoc(scoringRef);
 
                     if (scoringSnap.exists()) {
