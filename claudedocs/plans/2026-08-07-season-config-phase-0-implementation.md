@@ -56,7 +56,7 @@ const { SEASON_CONFIG } = require('./seasonConfig');
 | `public/js/config/season-config.js` | Create | Browser wrapper: `buildSeasonConfig` factory + singleton with `paths`/`utils`/`format` |
 | `functions/seasonConfig.js` | Create | Node wrapper: identical factory (lockstep mirror) |
 | `tests/season-config-parity.test.js` | Create | Legacy-formula parity + path snapshots + input-guard coverage (23 tests) |
-| `tests/season-config-drift.test.js` | Create | Browser wrapper ≡ Node wrapper (5 tests) |
+| `tests/season-config-drift.test.js` | Create | Browser wrapper ≡ Node wrapper (6 tests: data, paths, full-season sweep, formatters, non-live fixture, error parity) |
 | `scripts/check-season-hardcodes.sh` | Create | Migration progress meter; Phase 5 exit gate |
 | `firebase.json` | **None** | Verified 2026-08-07: global `Cache-Control: no-cache, no-store, must-revalidate` on `source: "**"` already covers `/js/config/**` — the spec's caching requirement is already met |
 
@@ -394,6 +394,9 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
     // Pure factory: tests pin behavior through this with a fixed fixture so the
     // annual data flip cannot silently rewrite the safety net.
     function buildSeasonConfig(SEASON_DATA) {
+        if (!SEASON_DATA || typeof SEASON_DATA !== 'object') {
+            throw new Error('SEASON_CONFIG: buildSeasonConfig requires a season data object');
+        }
         // 2025 and earlier live in the legacy year-less tree; 2026+ lives under the
         // pool doc (spec D1/D5).
         const LEGACY_FINAL_YEAR = 2025;
@@ -573,6 +576,8 @@ git commit -m "Phase 0: Season config factory + input guards + fixture-driven pa
 | NEW-2: `req()` presence-only; out-of-range weeks mint garbage paths | **Fixed (round 2)** — `reqWeek` (integer 1..totalWeeks) across paths/utils/scheduleFilename |
 | NEW-3: `timeOf` rejects epoch-ms numbers (over-tightening) | **Fixed (round 2)** — accepts Date or finite epoch ms; strings still throw |
 | NEW-4: spec "zero behavior change" overclaim vs divergent-formula warning | **Fixed (round 2)** — qualified to canonical-formula sites |
+| NEW-5: drift suite mutation-tested — missed 3/5 planted bugs (sampled instants, no error-path comparison) | **Fixed (round 3)** — full-season 6h sweep over all weeks + error-parity table guarding the guards |
+| NEW-6: `buildSeasonConfig(null)` fails late with raw TypeError | **Fixed (round 3)** — loud factory guard in both wrappers |
 
 ---
 
@@ -628,19 +633,16 @@ describe('wrapper drift guard (browser vs functions)', () => {
         expect(nodeConfig.paths.espnCache()).toBe(browserConfig.paths.espnCache());
     });
 
-    test('utils identical at fixed instants', () => {
-        const instants = [
-            '2025-07-01T00:00:00Z',
-            '2025-09-10T23:59:00Z',
-            '2025-09-11T00:01:00Z',
-            '2025-11-20T17:00:00Z',
-            '2026-03-01T00:00:00Z'
-        ];
-        for (const iso of instants) {
-            const now = new Date(iso);
+    test('week math identical across a full-season 6-hour sweep', () => {
+        // Sweep, don't sample: hand-picked instants missed an off-by-one-day
+        // hasWeekStarted mutation in review; the sweep catches any boundary drift.
+        const start = new Date('2025-08-01T00:00:00Z').getTime();
+        const end = new Date('2026-02-01T00:00:00Z').getTime();
+        for (let t = start; t <= end; t += 6 * 60 * 60 * 1000) {
+            const now = new Date(t);
             expect(nodeConfig.utils.getCurrentWeek(now)).toBe(browserConfig.utils.getCurrentWeek(now));
             expect(nodeConfig.utils.isSeasonActive(now)).toBe(browserConfig.utils.isSeasonActive(now));
-            for (const w of [1, 9, 18]) {
+            for (let w = 1; w <= nodeConfig.totalWeeks; w++) {
                 expect(nodeConfig.utils.hasWeekStarted(w, now)).toBe(browserConfig.utils.hasWeekStarted(w, now));
             }
         }
@@ -677,6 +679,47 @@ describe('wrapper drift guard (browser vs functions)', () => {
         expect(a.utils.getEspnScheduleUrl(7)).toBe(b.utils.getEspnScheduleUrl(7));
         expect(a.format.scheduleFilename(2)).toBe(b.format.scheduleFilename(2));
     });
+
+    test('error behavior identical for the full bad-input table', () => {
+        // Guards the guards: a validation check removed or loosened in one wrapper
+        // must fail here, not survive as silent divergence.
+        const outcome = (fn) => {
+            try {
+                return { ok: true, value: fn() };
+            } catch (e) {
+                return { ok: false, message: e.message };
+            }
+        };
+        const probes = [
+            ['year null', (c) => c.paths.poolRoot(null)],
+            ['year 0', (c) => c.paths.poolRoot(0)],
+            ['year empty string', (c) => c.paths.poolRoot('')],
+            ['year NaN', (c) => c.paths.poolRoot(NaN)],
+            ['year 1999', (c) => c.paths.poolRoot(1999)],
+            ['year 2101', (c) => c.paths.poolRoot(2101)],
+            ['week 0', (c) => c.paths.picks(0, 'u1')],
+            ['week -3', (c) => c.paths.picks(-3, 'u1')],
+            ['week 99', (c) => c.paths.picks(99, 'u1')],
+            ['week array', (c) => c.paths.picks([], 'u1')],
+            ['week 1.5', (c) => c.paths.picks(1.5, 'u1')],
+            ['espn week 0', (c) => c.utils.getEspnScheduleUrl(0)],
+            ['missing userId', (c) => c.paths.picks(1, undefined)],
+            ['null userId', (c) => c.paths.scoringUser(null)],
+            ['date string', (c) => c.utils.getCurrentWeek('2025-10-01')],
+            ['date NaN', (c) => c.utils.getCurrentWeek(new Date('nonsense'))],
+            ['epoch accepted', (c) => c.utils.getCurrentWeek(new Date('2025-11-20T17:00:00Z').getTime())],
+            ['schedule filename week 0', (c) => c.format.scheduleFilename(0)]
+        ];
+        for (const [label, probe] of probes) {
+            const a = outcome(() => probe(browserConfig));
+            const b = outcome(() => probe(nodeConfig));
+            expect({ label, ...b }).toEqual({ label, ...a });
+        }
+        const factoryA = outcome(() => buildBrowser(null));
+        const factoryB = outcome(() => buildNode(null));
+        expect(factoryA.ok).toBe(false);
+        expect(factoryB).toEqual(factoryA);
+    });
 });
 ```
 
@@ -700,6 +743,9 @@ Identical factory body to the browser wrapper — only the data load and export 
 const SEASON_DATA = Object.freeze(require('./season-data.json'));
 
 function buildSeasonConfig(SEASON_DATA) {
+    if (!SEASON_DATA || typeof SEASON_DATA !== 'object') {
+        throw new Error('SEASON_CONFIG: buildSeasonConfig requires a season data object');
+    }
     // 2025 and earlier live in the legacy year-less tree; 2026+ lives under the
     // pool doc (spec D1/D5).
     const LEGACY_FINAL_YEAR = 2025;
@@ -836,7 +882,7 @@ module.exports = { SEASON_CONFIG, buildSeasonConfig };
 - [ ] **Step 4: Run the full new suite to verify everything passes**
 
 Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js 2>&1 | tail -5`
-Expected: PASS — `Tests: 28 passed, 28 total` (23 parity + 5 drift)
+Expected: PASS — `Tests: 29 passed, 29 total` (23 parity + 6 drift)
 
 - [ ] **Step 5: Commit**
 
@@ -931,7 +977,7 @@ Run: `git status --short`
 Expected: clean tree (everything committed). No `firebase deploy` in this phase — the new files ship with the Phase 1 deploy after human sign-off.
 
 **Phase 0 exit checklist:**
-- [ ] `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js` → 28 passed
+- [ ] `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js` → 29 passed
 - [ ] Pre-existing Jest condition unchanged
 - [ ] Guard script runs, exits 1, lists ~100-140 files (the Phase 1-5 worklist), excludes config files
 - [ ] All commits on `claude/2026-season-config-plan-509f05`, tree clean
