@@ -39,12 +39,12 @@ One machine-generated data source; two thin hand-written logic wrappers (browser
 ```
 espn-schedule-scraper.js  (reworked, --year aware)
         │  scrape + validate
-        ├──► public/js/config/season-data.js     (GENERATED — data only, ESM + window global)
+        ├──► public/js/config/season-data.js     (GENERATED — data only, plain script: window + CJS export)
         ├──► functions/season-data.json          (GENERATED — same data, for Node require())
         └──► public/game-data/nfl_{year}_week_{n}.json  (schedule files, as today)
 
-public/js/config/season-config.js   (HAND-WRITTEN — imports season-data.js; paths/utils/format)
-functions/seasonConfig.js           (HAND-WRITTEN — requires season-data.json; same API)
+public/js/config/season-config.js   (HAND-WRITTEN — buildSeasonConfig factory + frozen singleton; paths/utils/format)
+functions/seasonConfig.js           (HAND-WRITTEN — requires season-data.json; identical factory)
 tests/season-config-parity.test.js  (Jest — asserts both wrappers emit identical paths/weeks)
 ```
 
@@ -89,53 +89,21 @@ Every season-scoped builder takes an optional trailing `year` parameter (default
 - `year >= 2026` → pool-scoped tree: `artifacts/nerdfootball/pools/nerduniverse-{year}/data/…` (rules already exist at firestore.rules:119-137)
 
 ```javascript
-paths: {
-    // Pool-level
-    poolRoot:    (year = SEASON_DATA.year) => `artifacts/nerdfootball/pools/nerduniverse-${year}`,
-    poolMembers: (year = SEASON_DATA.year) => `${paths.poolRoot(year)}/metadata/members`,
-    aiCache:     (year = SEASON_DATA.year) => `${paths.poolRoot(year)}/cache/latest-ai-intel-sheet`,
-    gridCache:   (week, year = SEASON_DATA.year) => `${paths.poolRoot(year)}/cache/grid-week-${week}`,
-    scoringUser: (userId, year = SEASON_DATA.year) => `${paths.poolRoot(year)}/scoring-users/${userId}`,
-
-    // Year-segmented families inside the pool (shapes from functions/index.js:659-690)
-    confidenceUser: (week, userId, year = SEASON_DATA.year) =>
-        `${paths.poolRoot(year)}/confidence/${year}/weeks/${week}/users/${userId}`,
-    survivorUser: (week, userId, year = SEASON_DATA.year) =>
-        `${paths.poolRoot(year)}/survivor/${year}/weeks/${week}/users/${userId}`,
-    scoresUser: (week, userId, year = SEASON_DATA.year) =>
-        `${paths.poolRoot(year)}/scores/${year}/weeks/${week}/users/${userId}`,
-    weeklyRollupUser: (week, userId, year = SEASON_DATA.year) =>
-        `${paths.poolRoot(year)}/rollups/weekly/${year}/week_${week}/users/${userId}`,
-
-    // Season data families — resolution rule applies
-    picks: (week, userId, year = SEASON_DATA.year) =>
-        year <= 2025
-            ? `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions/${userId}`
-            : `${paths.poolRoot(year)}/data/nerdfootball_picks/${week}/submissions/${userId}`,
-    picksWeek: (week, year = SEASON_DATA.year) =>
-        year <= 2025
-            ? `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions`
-            : `${paths.poolRoot(year)}/data/nerdfootball_picks/${week}/submissions`,
-    results: (week, year = SEASON_DATA.year) =>
-        year <= 2025
-            ? `artifacts/nerdfootball/public/data/nerdfootball_results/${week}`
-            : `${paths.poolRoot(year)}/data/nerdfootball_results/${week}`,
-    games: (week, year = SEASON_DATA.year) =>
-        year <= 2025
-            ? `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`
-            : `${paths.poolRoot(year)}/data/nerdfootball_games/${week}`,
-    survivorPicks: (userId, year = SEASON_DATA.year) =>
-        year <= 2025
-            ? `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${userId}`
-            : `${paths.poolRoot(year)}/data/nerdSurvivor_picks/${userId}`,
-    survivorStatus: (year = SEASON_DATA.year) =>
-        year <= 2025
-            ? `artifacts/nerdfootball/public/data/nerdSurvivor_status/status`
-            : `${paths.poolRoot(year)}/data/nerdSurvivor_status/status`,
-
-    // Season-less "current" pointers (unchanged semantics)
-    espnCache: () => `cache/espn_current_data`,
-}
+// AUTHORITATIVE IMPLEMENTATION: public/js/config/season-config.js (mirrored in
+// functions/seasonConfig.js; lockstep enforced by tests/season-config-drift.test.js).
+// API summary — all `year` params optional (default: current season). Invalid input
+// throws: falsy/malformed year, week outside 1..totalWeeks, malformed userId.
+paths.poolRoot(year)                       paths.poolMembers(year)
+paths.aiCache(year)                        paths.gridCache(week, year)
+paths.scoringUser(userId, year)
+paths.confidenceUser(week, userId, year)   // …/confidence/{year}/weeks/{week}/users/{userId}
+paths.survivorUser(week, userId, year)     // …/survivor/{year}/…
+paths.scoresUser(week, userId, year)       // …/scores/{year}/…
+paths.weeklyRollupUser(week, userId, year) // …/rollups/weekly/{year}/week_{week}/…
+paths.picks(week, userId, year)            paths.picksWeek(week, year)
+paths.results(week, year)                  paths.games(week, year)
+paths.survivorPicks(userId, year)          paths.survivorStatus(year)
+paths.espnCache()                          // season-less current pointer
 ```
 
 ### Required infrastructure changes for the pool-scoped tree
@@ -143,43 +111,37 @@ paths: {
 1. **firestore.rules:** the pool-scoped tree already covers picks/results/survivorPicks/survivorStatus (lines 119-137). **Games is missing** — add a `match /artifacts/nerdfootball/pools/{poolId}/data/nerdfootball_games/{week}` block mirroring the legacy games rule body (lines 68-73).
 2. **Firestore trigger:** `functions/pickAnalytics.js:414` (`onLegacyPicksUpdate`) listens on the legacy picks path. Add a sibling trigger on `artifacts/nerdfootball/pools/{poolId}/data/nerdfootball_picks/{week}/submissions/{userId}`. The existing trigger's name confirms the legacy tree was always intended to be superseded.
 
+### Phase 1 backend path inventory addendum (whole-implementation review, 2026-08-07)
+
+Beyond the four `index.js:659-690` families that have builders, six more year-carrying shapes exist in `functions/` and need per-family dispositions during Phase 1. New builders are additive — the frozen wrapper contract is unaffected, and `paths.poolRoot(year)` is the generic escape hatch:
+
+| Shape | Site | Disposition |
+|---|---|---|
+| `pools/{poolId}/survivor/{year}/eliminations/{userId}` | index.js:690 | Add builder |
+| `pools/{poolId}/rollups/season/{year}/users/{userId}` | index.js:684 | Add builder |
+| `users/{userId}/picks/{year}/weeks/week-{n}/picks` | realtimeGameSync.js:387 | Per-site decision |
+| `ml_learning/{year}/algorithm_evolution` | mlPredictionManager.js:380 | Per-site decision |
+| `pools/nerduniverse-{year}/scoring/week{n}` | espnScoreMonitor.js:242 | Add builder or `poolRoot()` |
+| `pools/nerduniverse-{year}/cache/latest-survivor-display` | survivorCacheUpdater.js:86 | Add builder or `poolRoot()` |
+
+These bare `{year}` path segments are **invisible to the guard's date/pool patterns** — which is why the bare-year sweep is a Phase 1 gate, not Phase 5 (see Hardcode Enforcement Guard).
+
 ## Utility Functions
 
 ```javascript
-utils: {
-    // Formula note: ceil((d+1)/7) ≡ floor(d/7)+1 for integer d ≥ 0 — identical to the
-    // legacy formula in weekManager.js:49. Anchor is date-only (D3), so boundaries
-    // flip at midnight UTC on the Thursday date = Wednesday 8:00 PM ET, same as today.
-    getCurrentWeek: () => {
-        const now = new Date();
-        const anchor = new Date(SEASON_DATA.weekAnchor);
-        if (now < anchor) return 1;
-        const diffDays = Math.floor((now - anchor) / 86400000);
-        return Math.min(SEASON_DATA.totalWeeks, Math.max(1, Math.floor(diffDays / 7) + 1));
-    },
-
-    hasWeekStarted: (week) => {
-        const anchor = new Date(SEASON_DATA.weekAnchor);
-        const weekStart = new Date(anchor.getTime() + (week - 1) * 7 * 86400000);
-        return new Date() >= weekStart;
-    },
-
-    // Derived from weekAnchor (not kickoffDateTime) so it can never disagree with
-    // getCurrentWeek/hasWeekStarted on opening day; kickoffDateTime is display-only.
-    isSeasonActive: () => {
-        const now = new Date();
-        return now >= new Date(SEASON_DATA.weekAnchor)
-            && now <= new Date(SEASON_DATA.seasonEndDate);
-    },
-
-    getEspnScheduleUrl: (week) =>
-        SEASON_DATA.espnScheduleUrlTemplate
-            .replace('{WEEK}', week)
-            .replace('{YEAR}', SEASON_DATA.year),
-
-    getAllEspnScheduleUrls: () =>
-        Array.from({ length: SEASON_DATA.totalWeeks }, (_, i) => utils.getEspnScheduleUrl(i + 1)),
-}
+// AUTHORITATIVE IMPLEMENTATION: the wrappers' utils + buildSeasonConfig(data) factory.
+// Semantics:
+//   getCurrentWeek(now?)  — date-only anchor; flips midnight UTC on the Thursday date
+//                           (Wed 8:00 PM ET), identical to legacy weekManager.js:47-49;
+//                           clamps 1..totalWeeks; accepts Date or epoch ms; else throws.
+//   hasWeekStarted(week, now?) — window opens at the weekly anchor boundary, NOT the
+//                           first kickoff; never a substitute for per-game gating;
+//                           week validated 1..totalWeeks.
+//   isSeasonActive(now?)  — weekAnchor..seasonEndDate; cannot disagree with the week
+//                           utils on opening day (kickoffDateTime is display-only data).
+//   getEspnScheduleUrl(week) / getAllEspnScheduleUrls() — global-regex substitution.
+//   buildSeasonConfig(data) — pure factory; tests pin a frozen 2025 fixture so the
+//                           annual data flip cannot rewrite the parity suite.
 ```
 
 Boundary semantics, stated explicitly so nobody re-derives them:
@@ -195,8 +157,8 @@ format: {
     seasonLabel: () => `${SEASON_DATA.year} NFL Season`,
     weekLabel:   (week = null) => `Week ${week ?? utils.getCurrentWeek()}, ${SEASON_DATA.year}`,
     poolDisplay: () => SEASON_DATA.poolDisplayName,
-    scheduleFilename: (week = null, year = SEASON_DATA.year) =>
-        week === null ? `nfl_${year}_schedule_raw.json` : `nfl_${year}_week_${week}.json`,
+    scheduleFilename: (week = null, year) =>   // year resolved via resolveYear; week validated when given
+        week === null ? `nfl_${y}_schedule_raw.json` : `nfl_${y}_week_${reqWeek(week)}.json`,
 }
 ```
 
@@ -265,23 +227,22 @@ firebase deploy --only hosting,functions
 "Zero hardcoded season values" must be permanent, not a one-time cleanup. Add `scripts/check-season-hardcodes.sh`:
 
 ```bash
-#!/bin/bash
-# Fails if season hardcodes exist outside the generated/config files and archives.
-PATTERN="nerduniverse-20[0-9][0-9]|20[0-9][0-9]-09-0[0-9]"
-EXCLUDE=(--glob '!**/season-data.*' --glob '!**/season-config.js' --glob '!**/seasonConfig.js'
-         --glob '!backups/**' --glob '!archive/**' --glob '!**/game-data/**' --glob '!node_modules/**')
-MATCHES=$(rg -l "$PATTERN" public functions "${EXCLUDE[@]}")
-if [ -n "$MATCHES" ]; then
-    echo "❌ Season hardcodes found:"; echo "$MATCHES"; exit 1
-fi
-echo "✅ No season hardcodes outside config."
+# AUTHORITATIVE IMPLEMENTATION: scripts/check-season-hardcodes.sh — portable grep
+# (BSD/GNU). NOT rg: on this machine rg exists only as a Claude-shell function, and an
+# rg-based version silently false-passed (exit 0) when executed directly from a normal
+# terminal. The shipped script cd's to its repo root, excludes node_modules / game-data /
+# archive / backups and the config/generated files, exits 2 loudly on tool failure,
+# 1 with the migration worklist, 0 when clean.
+# Live worklist baseline 2026-08-07: ~103 files (earlier 211/212 counts were ~2x
+# inflated by the committed public/backups/** snapshot).
 ```
 
 Runs in the pre-deploy checklist (and CI when available). Success criterion 2 is defined as "this script passes."
 
 **Phase 5 gate hardening (required before the guard becomes a blocking exit gate — from Phase 0 review, 2026-08-07):**
 1. Positive-control canary: assert the pattern still matches a known-containing excluded file (`public/js/config/season-data.js`) — guards against the silent-✅-when-nothing-ran failure class (missing tool, empty tree, broken regex).
-2. Widen the date pattern from `-09-0[0-9]` (Sept 1-9 only) to `-09-[0-3][0-9]`, and add a bare-year literal sweep — as a progress meter the narrow pattern is fine, but as an exit gate it would pass a file whose last hardcode is `2025-09-15` or `year: 2025`.
+2. Widen the date pattern from `-09-0[0-9]` (Sept 1-9 only) to `-09-[0-3][0-9]` — as a progress meter the narrow pattern is fine, but as an exit gate it would pass a file whose last hardcode is `2025-09-15`.
+3. **Bare-year literal sweep — pulled forward to a Phase 1 gate** (not Phase 5): the six families in the Phase 1 inventory addendum carry year segments like `survivor/2025/…` that no current pattern detects; after Phase 1 swaps pool IDs for config, those would read as "clean" while still hardcoded.
 
 ## Config Caching (SAFE-WEEKLIES lesson)
 
@@ -298,7 +259,7 @@ All of these currently define their own week calculation and must be migrated to
 All phases run with **2025 values first** (year: 2025, weekAnchor: '2025-09-04', poolId: 'nerduniverse-2025') so every migrated file produces byte-identical paths, and identical week numbers for sites on the canonical week formula (divergent sites follow the kill-list per-site rules) — provable by the parity tests. The 2026 flip happens once, at the end, via the scraper.
 
 - **Phase 0 — Foundation.** Build `season-data.*` (2025 values), both wrappers, parity tests, hardcode guard script, firebase.json header. Commit gate: parity tests green.
-- **Phase 1 — Backend.** Migrate the 17 pool-ID function files + the 6 start-date functions + `index.js` year-segment paths to `seasonConfig.js`. Add the pool-scoped picks trigger and the games rules block (dormant until 2026 data exists). Commit gate: functions deploy to emulator, existing function tests pass.
+- **Phase 1 — Backend.** Migrate the 17 pool-ID function files + the 6 start-date functions + `index.js` year-segment paths to `seasonConfig.js`, working the inventory addendum's six extra families per their dispositions. Add the pool-scoped picks trigger and the games rules block (dormant until 2026 data exists). Commit gates: functions deploy to emulator, existing function tests pass, and a bare-year literal sweep over `functions/` comes back clean.
 - **Phase 2 — Core user-facing pages (5).** `nerd-universe.html`, `nerdfootballConfidencePicks.html`, `NerdSurvivorPicks.html`, `nerdfootballTheGrid.html`, `leaderboard.html`. Per-page gate: loads clean, console clean, data renders, KILLER BEES intact.
 - **Phase 3 — Shared bundles.** `core/survivor/features/confidence` bundles + `weekManager.js`; delete duplicate `getCurrentWeek` implementations per the kill-list.
 - **Phase 4 — Admin tools** (~15 files), same per-page gate.

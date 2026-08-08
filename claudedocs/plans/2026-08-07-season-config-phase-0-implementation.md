@@ -149,7 +149,7 @@ git commit -m "Phase 0: Season data files (2025 values, generated format)"
 - Test: `tests/season-config-parity.test.js`
 - Create: `public/js/config/season-config.js`
 
-- [ ] **Step 1: Create/replace `tests/season-config-parity.test.js` with EXACTLY this content**
+- [x] **Step 1: Create/replace `tests/season-config-parity.test.js` with EXACTLY this content**
 
 ```javascript
 const { SEASON_CONFIG, buildSeasonConfig } = require('../public/js/config/season-config.js');
@@ -320,9 +320,11 @@ describe('loud failures on bad input (falsy-year footgun class)', () => {
 
     test('missing or out-of-range week/userId throw instead of minting garbage paths', () => {
         expect(() => CFG.paths.picks(undefined, 'u1')).toThrow('invalid week');
-        expect(() => CFG.paths.picks(1, undefined)).toThrow('missing required userId');
+        expect(() => CFG.paths.picks(1, undefined)).toThrow('invalid userId');
         expect(() => CFG.paths.gridCache()).toThrow('invalid week');
-        expect(() => CFG.paths.scoringUser(null)).toThrow('missing required userId');
+        expect(() => CFG.paths.scoringUser(null)).toThrow('invalid userId');
+        expect(() => CFG.paths.picks(1, {})).toThrow('invalid userId');
+        expect(() => CFG.paths.picks(1, 'a/b')).toThrow('invalid userId');
         expect(() => CFG.paths.picks(0, 'u1')).toThrow('invalid week');
         expect(() => CFG.paths.picks(99, 'u1')).toThrow('invalid week');
         expect(() => CFG.paths.picks([], 'u1')).toThrow('invalid week');
@@ -361,13 +363,13 @@ describe('remaining 2026 branches + poolId invariant', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails for the right reason** *(first execution only — on the revision round the module already exists, so run Step 4 directly)*
+- [x] **Step 2: Run it to verify it fails for the right reason** *(first execution only — on the revision round the module already exists, so run Step 4 directly)*
 
 Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js 2>&1 | tail -5`
 Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
 (The `--` separator is required: Jest's `--roots` is an array flag that otherwise swallows the file path as a second root.)
 
-- [ ] **Step 3: Create/replace `public/js/config/season-config.js` with EXACTLY this content**
+- [x] **Step 3: Create/replace `public/js/config/season-config.js` with EXACTLY this content**
 
 ```javascript
 // Season configuration — single source of truth for season paths, week math, and labels.
@@ -412,12 +414,11 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
             }
             return y;
         };
-        const req = (value, name) => {
-            if (value === undefined || value === null || value === '' ||
-                (typeof value === 'number' && !Number.isFinite(value))) {
-                throw new Error(`SEASON_CONFIG: missing required ${name}`);
+        const reqUserId = (userId) => {
+            if (typeof userId !== 'string' || userId === '' || userId.includes('/')) {
+                throw new Error(`SEASON_CONFIG: invalid userId: ${userId}`);
             }
-            return value;
+            return userId;
         };
         const timeOf = (now) => {
             const t = now instanceof Date ? now.getTime()
@@ -447,19 +448,19 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
             gridCache: (week, year) =>
                 `${paths.poolRoot(year)}/cache/grid-week-${reqWeek(week)}`,
             scoringUser: (userId, year) =>
-                `${paths.poolRoot(year)}/scoring-users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/scoring-users/${reqUserId(userId)}`,
 
             confidenceUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
             survivorUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
             scoresUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
             weeklyRollupUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${reqUserId(userId)}`,
 
             picks: (week, userId, year) =>
-                `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${req(userId, 'userId')}`,
+                `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${reqUserId(userId)}`,
             picksWeek: (week, year) =>
                 `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions`,
             results: (week, year) =>
@@ -467,7 +468,7 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
             games: (week, year) =>
                 `${dataRoot(year)}/nerdfootball_games/${reqWeek(week)}`,
             survivorPicks: (userId, year) =>
-                `${dataRoot(year)}/nerdSurvivor_picks/${req(userId, 'userId')}`,
+                `${dataRoot(year)}/nerdSurvivor_picks/${reqUserId(userId)}`,
             survivorStatus: (year) =>
                 `${dataRoot(year)}/nerdSurvivor_status/status`,
 
@@ -545,12 +546,12 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
 })();
 ```
 
-- [ ] **Step 4: Run the parity tests to verify they pass**
+- [x] **Step 4: Run the parity tests to verify they pass**
 
 Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js 2>&1 | tail -5`
 Expected: PASS — `Tests: 23 passed, 23 total`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/season-config-parity.test.js public/js/config/season-config.js public/js/config/season-data.js
@@ -586,11 +587,13 @@ git commit -m "Phase 0: Season config factory + input guards + fixture-driven pa
 
 ### Task 3: Functions wrapper via drift test (TDD)
 
+> **EXECUTED 2026-08-07** (commit `af7612e`; drift suite hardened round 3 as `5e34f8b` — mutation kill rate 6/6). Blocks below are current authoritative content.
+
 **Files:**
 - Test: `tests/season-config-drift.test.js`
 - Create: `functions/seasonConfig.js`
 
-- [ ] **Step 1: Write the failing drift test**
+- [x] **Step 1: Write the failing drift test**
 
 Create `tests/season-config-drift.test.js`:
 
@@ -726,12 +729,12 @@ describe('wrapper drift guard (browser vs functions)', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails for the right reason**
+- [x] **Step 2: Run it to verify it fails for the right reason**
 
 Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-drift.test.js 2>&1 | tail -5`
 Expected: FAIL — `Cannot find module '../functions/seasonConfig.js'`
 
-- [ ] **Step 3: Create `functions/seasonConfig.js`**
+- [x] **Step 3: Create `functions/seasonConfig.js`**
 
 Identical factory body to the browser wrapper — only the data load and export differ:
 
@@ -764,12 +767,11 @@ function buildSeasonConfig(SEASON_DATA) {
         }
         return y;
     };
-    const req = (value, name) => {
-        if (value === undefined || value === null || value === '' ||
-            (typeof value === 'number' && !Number.isFinite(value))) {
-            throw new Error(`SEASON_CONFIG: missing required ${name}`);
+    const reqUserId = (userId) => {
+        if (typeof userId !== 'string' || userId === '' || userId.includes('/')) {
+            throw new Error(`SEASON_CONFIG: invalid userId: ${userId}`);
         }
-        return value;
+        return userId;
     };
     const timeOf = (now) => {
         const t = now instanceof Date ? now.getTime()
@@ -799,19 +801,19 @@ function buildSeasonConfig(SEASON_DATA) {
         gridCache: (week, year) =>
             `${paths.poolRoot(year)}/cache/grid-week-${reqWeek(week)}`,
         scoringUser: (userId, year) =>
-            `${paths.poolRoot(year)}/scoring-users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/scoring-users/${reqUserId(userId)}`,
 
         confidenceUser: (week, userId, year) =>
-            `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
         survivorUser: (week, userId, year) =>
-            `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
         scoresUser: (week, userId, year) =>
-            `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
         weeklyRollupUser: (week, userId, year) =>
-            `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${reqUserId(userId)}`,
 
         picks: (week, userId, year) =>
-            `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${req(userId, 'userId')}`,
+            `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${reqUserId(userId)}`,
         picksWeek: (week, year) =>
             `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions`,
         results: (week, year) =>
@@ -819,7 +821,7 @@ function buildSeasonConfig(SEASON_DATA) {
         games: (week, year) =>
             `${dataRoot(year)}/nerdfootball_games/${reqWeek(week)}`,
         survivorPicks: (userId, year) =>
-            `${dataRoot(year)}/nerdSurvivor_picks/${req(userId, 'userId')}`,
+            `${dataRoot(year)}/nerdSurvivor_picks/${reqUserId(userId)}`,
         survivorStatus: (year) =>
             `${dataRoot(year)}/nerdSurvivor_status/status`,
 
@@ -882,12 +884,12 @@ const SEASON_CONFIG = buildSeasonConfig(SEASON_DATA);
 module.exports = { SEASON_CONFIG, buildSeasonConfig };
 ```
 
-- [ ] **Step 4: Run the full new suite to verify everything passes**
+- [x] **Step 4: Run the full new suite to verify everything passes**
 
 Run: `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js 2>&1 | tail -5`
 Expected: PASS — `Tests: 29 passed, 29 total` (23 parity + 6 drift)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/season-config-drift.test.js functions/seasonConfig.js
@@ -898,10 +900,12 @@ git commit -m "Phase 0: Functions season config wrapper + drift guard tests"
 
 ### Task 4: Hardcode guard script
 
+> **EXECUTED 2026-08-07** (commits `354619e` rg version → `7114b58` portable grep → final round adds `--exclude-dir=backups` after the whole-implementation review found 109/212 listed files were a committed backup snapshot; live worklist ≈103). Block below is current authoritative content.
+
 **Files:**
 - Create: `scripts/check-season-hardcodes.sh`
 
-- [ ] **Step 1: Create `scripts/check-season-hardcodes.sh`**
+- [x] **Step 1: Create `scripts/check-season-hardcodes.sh`**
 
 ```bash
 #!/bin/bash
@@ -925,6 +929,7 @@ RAW=$(grep -rEl --binary-files=without-match "$PATTERN" public functions \
     --exclude-dir=node_modules \
     --exclude-dir=game-data \
     --exclude-dir=archive \
+    --exclude-dir=backups \
     --exclude='season-data.js' \
     --exclude='season-data.json' \
     --exclude='season-config.js' \
@@ -948,24 +953,24 @@ fi
 echo "✅ No season hardcodes outside config."
 ```
 
-- [ ] **Step 2: Make it executable**
+- [x] **Step 2: Make it executable**
 
 Run: `chmod +x scripts/check-season-hardcodes.sh`
 
-- [ ] **Step 3: Verify it detects today's hardcodes (correct current behavior = failure)**
+- [x] **Step 3: Verify it detects today's hardcodes (correct current behavior = failure)**
 
 Run (works in bash and zsh):
 ```bash
 OUT=$(./scripts/check-season-hardcodes.sh); CODE=$?; echo "$OUT" | head -3; echo "exit=$CODE"
 ```
-Expected: `❌ Season hardcodes remain in N files:` where N is in the low-to-mid 200s (rg-sourced baseline 2026-08-07: 211; pure grep also sees gitignored files so may run slightly higher), followed by file paths, and `exit=1`. This must hold when the script is executed directly as its own subprocess — not sourced.
+Expected: `❌ Season hardcodes remain in N files:` where N ≈ 103 (2026-08-07 live baseline after excluding the `public/backups/**` snapshot; earlier 211/212 counts were ~2x inflated by 109 backup copies), followed by file paths, and `exit=1`. This must hold when the script is executed directly as its own subprocess — not sourced.
 
-- [ ] **Step 4: Verify the config files themselves are excluded**
+- [x] **Step 4: Verify the config files themselves are excluded**
 
 Run: `./scripts/check-season-hardcodes.sh | rg 'season-data|season-config|seasonConfig'; echo "excluded-check exit=$? (1 means correctly excluded)"`
 Expected: no file lines printed; `excluded-check exit=1 (1 means correctly excluded)`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/check-season-hardcodes.sh
@@ -976,29 +981,31 @@ git commit -m "Phase 0: Season hardcode guard script (migration progress meter)"
 
 ### Task 5: Regression + Phase 0 exit checklist
 
+> **EXECUTED 2026-08-07** by the controller. Results recorded in the exit checklist below.
+
 **Files:** none created — verification only.
 
-- [ ] **Step 1: Confirm the pre-existing Jest condition is unchanged from Task 1 Step 1**
+- [x] **Step 1: Confirm the pre-existing Jest condition is unchanged from Task 1 Step 1**
 
 Run: `npx jest pool-members-unit app-structure-simple 2>&1 | tail -5`
 Expected: the same pre-existing failure recorded at the Task 1 baseline (unscoped Jest crashes on the truncated `auraglow/package.json` before running any tests). Phase 0 must not change this in either direction; Phase 0's own suites are verified via the scoped command in the exit checklist.
 
-- [ ] **Step 2: Confirm the config caching requirement is already met (no firebase.json edit)**
+- [x] **Step 2: Confirm the config caching requirement is already met (no firebase.json edit)**
 
 Run: `grep -n 'no-cache, no-store, must-revalidate' firebase.json`
 Expected: one line hit inside the hosting `headers` block for `source: "**"` — the global hosting header already prevents stale `season-config.js` after the annual flip. Do not edit firebase.json. (Earlier revisions used `rg -A2` from the `source` line, which never reaches the header — it sits below the long CSP value.)
 
-- [ ] **Step 3: Confirm nothing deploys from Phase 0**
+- [x] **Step 3: Confirm nothing deploys from Phase 0**
 
 Run: `git status --short`
 Expected: clean tree (everything committed). No `firebase deploy` in this phase — the new files ship with the Phase 1 deploy after human sign-off.
 
-**Phase 0 exit checklist:**
-- [ ] `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js` → 29 passed
-- [ ] Pre-existing Jest condition unchanged
-- [ ] Guard script (executed directly, not sourced) exits 1 and lists the migration worklist (2026-08-07 baseline: 211 files via rg; grep count recorded at Task 4), excluding config files
-- [ ] All commits on `claude/2026-season-config-plan-509f05`, tree clean
-- [ ] No production deploy occurred
+**Phase 0 exit checklist (recorded 2026-08-07):**
+- [x] `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js` → **29 passed, 29 total** (1.7s)
+- [x] Pre-existing Jest condition unchanged — unscoped run still crashes on `auraglow/package.json`, identical to Task 1 baseline
+- [x] Guard script (executed directly, from worktree root and from `/tmp`) exits 1 with the migration worklist, config files excluded. Initial run listed 212 files; the whole-implementation review found 109 of those are `public/backups/**` snapshot copies — final guard adds `--exclude-dir=backups`, live worklist ≈103 (exact count recorded on the final guard run)
+- [x] All commits on `claude/2026-season-config-plan-509f05`, tree clean
+- [x] No production deploy occurred
 
 ---
 
