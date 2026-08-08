@@ -40,6 +40,8 @@ Pages NOT at the standard pattern (compat-SDK or mixed pages in P2-C) still take
 
 Per-page gate (each page, after edit): page loads via local static serve, browser console clean, `window.SEASON_CONFIG.poolId === 'nerduniverse-2025'` in console, page renders its data. Commit per page or per two pages.
 
+**P2-A execution record (2026-08-08):** landed as `ec81c59` + `67f9f3e` + a round-2 fix commit. Corrections from review: (1) FOUR pages call the config (confidence, leaderboard, survivor via poolMembers, Grid via scheduleFilename) — only the hub is tag-only; (2) **schedule-directory decision:** the public-ROOT `nfl_YYYY_week_N.json` copies are a hand-maintained legacy duplicate the scraper does not write — `/game-data/` is the canonical tree; the Grid's fetch moves there (diff-gated against the 2025 root copies first). The 8 other root-tree consumers are all dead-register files — no live impact; the flip runbook does NOT need to populate root copies. (3) All four calling pages carry a config-failure banner — inert normally, surfaces the migration-introduced outage mode instead of plausible-looking empty states.
+
 ## P2-B: Live divergences — explicit dispositions
 
 | # | Site | Facts (inventory-verified) | Disposition |
