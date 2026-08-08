@@ -164,9 +164,5 @@ async function processUserScore(userId, weekNumber, bible) {
  * Get current NFL week number
  */
 function getCurrentWeek() {
-    const today = new Date();
-    const seasonStart = new Date('2025-09-04'); // Week 1 starts Sept 4, 2025
-    const daysSinceStart = Math.floor((today - seasonStart) / (1000 * 60 * 60 * 24));
-    const weeksSinceStart = Math.floor(daysSinceStart / 7);
-    return Math.max(1, Math.min(18, weeksSinceStart + 1));
+    return SEASON_CONFIG.utils.getCurrentWeek();
 }

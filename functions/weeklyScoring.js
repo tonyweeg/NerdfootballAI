@@ -119,11 +119,7 @@ exports.processWeeklyScoring = functions.https.onCall(async (data, context) => {
  * Get current NFL week based on season start
  */
 function getCurrentWeek() {
-    const seasonStart = new Date('2025-09-04');
-    const now = new Date();
-    const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
-    const weeksSinceStart = Math.floor(daysSinceStart / 7);
-    return Math.max(1, Math.min(18, weeksSinceStart + 1));
+    return SEASON_CONFIG.utils.getCurrentWeek();
 }
 
 /**

@@ -28,11 +28,7 @@ const ESPN_API_BASE = 'https://site.api.espn.com/apis/site/v2/sports/football/nf
  * Get current NFL week number
  */
 function getCurrentWeek() {
-    const seasonStart = new Date('2025-09-04'); // Week 1 starts Sept 4, 2025
-    const now = new Date();
-    const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
-    const weeksSinceStart = Math.floor(daysSinceStart / 7);
-    return Math.max(1, Math.min(18, weeksSinceStart + 1));
+    return SEASON_CONFIG.utils.getCurrentWeek();
 }
 
 /**

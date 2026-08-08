@@ -240,13 +240,7 @@ async function computeAndCacheSurvivorResults(poolId, week) {
 
 // Simple NFL week calculation
 function getCurrentNFLWeek() {
-    // Week 1 starts September 4, 2025 (simplified calculation)
-    const week1Start = new Date('2025-09-04');
-    const now = new Date();
-    const diffInMs = now.getTime() - week1Start.getTime();
-    const diffInWeeks = Math.floor(diffInMs / (7 * 24 * 60 * 60 * 1000));
-    
-    return Math.max(1, Math.min(18, diffInWeeks + 1));
+    return SEASON_CONFIG.utils.getCurrentWeek();
 }
 
 // Manual cache refresh trigger (can be called via HTTP)
