@@ -26,8 +26,6 @@ New builders (add after `weeklyRollupUser` in BOTH wrappers, identical bodies):
 ```javascript
         survivorEliminations: (userId, year) =>
             `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/eliminations/${reqUserId(userId)}`,
-        seasonRollupUser: (userId, year) =>
-            `${paths.poolRoot(year)}/rollups/season/${resolveYear(year)}/users/${reqUserId(userId)}`,
         survivorWeek: (week, year) =>
             `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}`,
         scoringWeek: (week, year) =>
@@ -44,7 +42,6 @@ In `tests/season-config-parity.test.js`, append to the `'year-segmented pool fam
 
 ```javascript
         expect(CFG.paths.survivorEliminations('u1')).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/eliminations/u1');
-        expect(CFG.paths.seasonRollupUser('u1')).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/rollups/season/2025/users/u1');
         expect(CFG.paths.survivorWeek(3)).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/survivor/2025/weeks/3');
         expect(CFG.paths.scoringWeek(4)).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/scoring/week4');
         expect(CFG.paths.survivorDisplayCache()).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-survivor-display');
@@ -54,7 +51,6 @@ Append to the `'cache/scoring/segmented families under a 2026 pool'` test:
 
 ```javascript
         expect(CFG.paths.survivorEliminations('u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/survivor/2026/eliminations/u1');
-        expect(CFG.paths.seasonRollupUser('u1', 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/rollups/season/2026/users/u1');
         expect(CFG.paths.scoringWeek(4, 2026)).toBe('artifacts/nerdfootball/pools/nerduniverse-2026/scoring/week4');
 ```
 
@@ -62,7 +58,6 @@ In `tests/season-config-drift.test.js`, inside the `'every path builder identica
 
 ```javascript
             expect(nodeConfig.paths.survivorEliminations(uid, year)).toBe(browserConfig.paths.survivorEliminations(uid, year));
-            expect(nodeConfig.paths.seasonRollupUser(uid, year)).toBe(browserConfig.paths.seasonRollupUser(uid, year));
             expect(nodeConfig.paths.survivorDisplayCache(year)).toBe(browserConfig.paths.survivorDisplayCache(year));
 ```
 
@@ -73,7 +68,57 @@ and inside the week loop:
                 expect(nodeConfig.paths.scoringWeek(week, year)).toBe(browserConfig.paths.scoringWeek(week, year));
 ```
 
-- [ ] Apply all four file changes; run suite → 29/29; commit `Phase 1: Five additive path builders (survivor/rollup/scoring families)`.
+- [x] Apply all four file changes; run suite → 29/29; commit `Phase 1: Five additive path builders (survivor/rollup/scoring families)`. *(Executed as `afae3e5` with five builders; revision below removes one.)*
+
+### Batch 0 revision (quality review, 2026-08-07)
+
+Findings: (1) `seasonRollupUser` emitted a **9-segment (odd) Firestore doc path** — structurally invalid for `db.doc()`, and demonstrably why its production source (`index.js:683-684`, comment "skip if bad path") is dead code. Removed; resolving the dead code is Batch C4. (2) All five new builders + `reqUserId`'s slash branch dodged the drift error-parity table (5/5 guard mutations survived). (3) `reqUserId` accepted Firestore-reserved ids (`.`, `..`, `__x__`).
+
+Revision content — apply to both wrappers and both test files:
+
+`reqUserId` hardened (both wrappers, at each file's indent):
+
+```javascript
+        const reqUserId = (userId) => {
+            if (typeof userId !== 'string' || userId === '' || userId.includes('/') ||
+                userId === '.' || userId === '..' || /^__.*__$/.test(userId)) {
+                throw new Error(`SEASON_CONFIG: invalid userId: ${userId}`);
+            }
+            return userId;
+        };
+```
+
+Remove `seasonRollupUser` from both wrappers and its three test assertions (locations per the pre-revision lists above).
+
+Parity test — append inside `'missing or out-of-range week/userId throw instead of minting garbage paths'`:
+
+```javascript
+        expect(() => CFG.paths.picks(1, '.')).toThrow('invalid userId');
+        expect(() => CFG.paths.picks(1, '..')).toThrow('invalid userId');
+        expect(() => CFG.paths.picks(1, '__proto__')).toThrow('invalid userId');
+```
+
+*(Note: `/^__.*__$/` catches `__proto__` since it both starts and ends with double underscores.)*
+
+Drift test — append to the `probes` array inside `'error behavior identical for the full bad-input table'`:
+
+```javascript
+            ['survivorWeek week 0', (c) => c.paths.survivorWeek(0)],
+            ['scoringWeek week 0', (c) => c.paths.scoringWeek(0)],
+            ['survivorEliminations null userId', (c) => c.paths.survivorEliminations(null)],
+            ['survivorDisplayCache year 0', (c) => c.paths.survivorDisplayCache(0)],
+            ['slash userId', (c) => c.paths.picks(1, 'a/b')],
+            ['numeric userId', (c) => c.paths.scoringUser(12345)],
+            ['reserved userId', (c) => c.paths.picks(1, '..')]
+```
+
+Add one inline comment above `scoringWeek` in both wrappers (its shape intentionally has no year segment and no `weeks/` separator — mirrors espnScoreMonitor.js:242; do not "normalize"):
+
+```javascript
+        // Shape mirrors espnScoreMonitor.js:242 exactly — no year segment, no weeks/ separator.
+```
+
+- [ ] Revision applied; suite 29/29; commit `Phase 1: Batch 0 revision — drop invalid seasonRollupUser, guard-drift the new builders`.
 
 ---
 
@@ -122,6 +167,7 @@ Candidate sites (each has a local `seasonStart` + formula):
 | C1 | `espnNerdApi.js:85` (getCurrentWeek, clamp 1-22) and `:338` | Playoff-week detection is intentional divergence | Keep local formula; replace only the anchor literal: `new Date(SEASON_CONFIG.weekAnchor)`. Add comment: `// playoff clamp intentional — see spec kill-list` |
 | C2 | `survivorPoolCache.js:507-528` and `weeklyLeaderboardCache.js:367-410` (hand week→date tables + `< '2025-09-04'` fallbacks) | Tables encode their own week-boundary semantics; replacing with anchor math changes boundaries | Phase 1: replace ONLY the `'2025-09-04'` fallback-comparison literals with `SEASON_CONFIG.weekAnchor`; leave the tables intact and add `// TODO(Phase 3): derive table from config; verify boundary semantics first`. Tables get resolved with the frontend bundles phase where the same pattern recurs |
 | C3 | `pickAnalytics.js:16,421` (`poolId === 'nerduniverse-2025'` legacy detection) | The check means "is this a 2025-era legacy pool", which stays true forever — `SEASON_CONFIG.poolId` would silently break it in 2026 | Rewrite as year-parse: `const y = parseInt(String(poolId).split('-').pop(), 10); const isLegacyPool = Number.isInteger(y) && y <= 2025;` (plus the `nerdfootball-2025` alias check). Line 421's `const poolId = 'nerduniverse-2025'` in the legacy handler stays semantically 2025 → use `` `nerduniverse-${y}` `` derived from parsed year or keep via the same isLegacy path — subagent proposes, reviewer verifies |
+| C4 | `index.js:682-686` — dead season-rollup writer (comment: "skip if bad path") | The path `rollups/season/{year}/users/{uid}` has 9 segments (odd) — structurally invalid for `db.doc()`; that's why it was disabled. A season-rollup builder was removed from Batch 0 for the same reason | **Owner decision required:** delete the dead block outright, or define the correct season-rollup document shape (needs one more document level, like weekly's `week_{n}`) and add a builder then. Default action if no preference: delete the dead code |
 
 - [ ] One commit per decision cluster; suite green; guard count recorded.
 

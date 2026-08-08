@@ -118,7 +118,7 @@ Beyond the four `index.js:659-690` families that have builders, six more year-ca
 | Shape | Site | Disposition |
 |---|---|---|
 | `pools/{poolId}/survivor/{year}/eliminations/{userId}` | index.js:690 | Add builder |
-| `pools/{poolId}/rollups/season/{year}/users/{userId}` | index.js:684 | Add builder |
+| `pools/{poolId}/rollups/season/{year}/users/{userId}` | index.js:684 | **Dead code** — 9-segment (odd) doc path, invalid for `db.doc()`; the source comment "skip if bad path" marks it disabled. Phase 1 Batch C4: delete or redesign with owner |
 | `users/{userId}/picks/{year}/weeks/week-{n}/picks` | realtimeGameSync.js:387 | Per-site decision |
 | `ml_learning/{year}/algorithm_evolution` | mlPredictionManager.js:380 | Per-site decision |
 | `pools/nerduniverse-{year}/scoring/week{n}` | espnScoreMonitor.js:242 | Add builder or `poolRoot()` |
