@@ -36,7 +36,7 @@ function getCurrentWeek() {
  */
 async function fetchESPNScoreboard(week, year = SEASON_CONFIG.year) {
     try {
-        const url = `${ESPN_API_BASE}?week=${week}&year=${year}&seasontype=2`;
+        const url = `${ESPN_API_BASE}?week=${week}&dates=${year}&seasontype=2`;
         console.log(`🏈 Fetching ESPN data: ${url}`);
 
         const response = await axios.get(url, {
