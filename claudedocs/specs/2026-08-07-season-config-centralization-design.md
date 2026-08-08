@@ -16,7 +16,7 @@ Embedded recommendations requiring sign-off with this revision:
 
 | # | Recommendation | Rationale |
 |---|----------------|-----------|
-| D3 | Week boundaries anchor to a **date-only** value (`weekAnchor: '2026-09-10'`), preserving the exact legacy flip time (Wednesday 8:00 PM ET) | Zero behavior change during migration; legacy code (`weekManager.js:47` et al.) uses `new Date('2025-09-04')` = midnight UTC |
+| D3 | Week boundaries anchor to a **date-only** value (`weekAnchor: '2026-09-09'`, a Wednesday — see boundary notes below), preserving the exact legacy flip mechanism (midnight UTC on the anchor date) | Zero behavior change during migration; legacy code (`weekManager.js:47` et al.) uses `new Date('2025-09-04')` = midnight UTC |
 | D4 | Rework scraper to use ESPN's JSON API instead of HTML scraping; remove silent sample-data fallback | Current scraper fabricates datetimes and writes fake sample games on parse failure (see Scraper section) |
 | D5 | 2026+ season data lives under the pool document (`pools/nerduniverse-{year}/data/…`) | Implements D1 using the pool-scoped tree **already defined in firestore.rules:119-137**; poolId carries the year, so segmentation is free |
 
@@ -57,14 +57,20 @@ Why two wrappers instead of one shared module: `public/` is ESM/compat-script, `
 const SEASON_DATA = {
     year: 2026,
 
-    // Week-boundary anchor: DATE-ONLY, the Thursday of Week 1.
-    // new Date('2026-09-10') === midnight UTC === Wed 8:00 PM ET.
-    // This preserves the legacy flip time exactly (see D3).
-    weekAnchor: '2026-09-10',
+    // Week-boundary anchor: DATE-ONLY, the Eastern calendar date of Week 1's
+    // earliest game. 2026 opens WEDNESDAY Sept 9 — the Rams@49ers Melbourne,
+    // Australia game bumped the marquee opener off its usual Thursday slot.
+    // Confirmed real 2026 scheduling (Phase 6 flip drill, 2026-08-08), not a
+    // placeholder guess and not a bug.
+    // new Date('2026-09-09') === midnight UTC === Tue 8:00 PM ET.
+    // The flip MECHANISM (midnight UTC on the anchor date) preserves the
+    // legacy behavior exactly (see D3) — only the mapped weekday differs,
+    // because the real opener isn't a Thursday this year.
+    weekAnchor: '2026-09-09',
 
     // Real timestamps carry an EXPLICIT UTC offset — never a bare 'Z'.
     // ESPN's 'Z' means Eastern (documented EST-as-Zulu bug); scraper converts at scrape time.
-    kickoffDateTime: '2026-09-10T20:20:00-04:00',   // first game of season
+    kickoffDateTime: '2026-09-09T20:20:00-04:00',   // first game of season
     seasonEndDate: '2027-01-11T23:59:59-05:00',     // after Week 18's last game (JANUARY 2027)
 
     totalWeeks: 18,
@@ -76,7 +82,7 @@ const SEASON_DATA = {
 ```
 
 Notes:
-- The values above are **expected** placeholders (kickoff = Thursday after Labor Day). The scraper overwrites them with real extracted values and validates them (see Scraper Validation).
+- The values above are the actual 2026 season values, confirmed against live ESPN data (Phase 6 flip drill, 2026-08-08) — not a guessed placeholder. Historically the opener fell on the Thursday after Labor Day, but that must never be hardcoded as an assumption: 2026 opens **Wednesday** Sept 9 instead (see above). The scraper always derives the real date from ESPN's live data and validates it (see Scraper Validation); it never assumes a particular weekday.
 - v1 of this spec had `seasonEndDate: '2026-01-03'` — before the start date, which made `isSeasonActive()` permanently false. The 2026 season ends in January **2027**. The validation asserts below exist to make this class of error impossible.
 - `poolName`/`poolId` duplication from v1 is removed; `poolDisplayName` is an actual display string.
 
@@ -131,8 +137,10 @@ These bare `{year}` path segments are **invisible to the guard's date/pool patte
 ```javascript
 // AUTHORITATIVE IMPLEMENTATION: the wrappers' utils + buildSeasonConfig(data) factory.
 // Semantics:
-//   getCurrentWeek(now?)  — date-only anchor; flips midnight UTC on the Thursday date
-//                           (Wed 8:00 PM ET), identical to legacy weekManager.js:47-49;
+//   getCurrentWeek(now?)  — date-only anchor; flips midnight UTC on the anchor's
+//                           date (8:00 PM ET the day before — Wed->Thu historically,
+//                           Tue->Wed for 2026's Wednesday opener; see boundary notes);
+//                           mechanism identical to legacy weekManager.js:47-49;
 //                           clamps 1..totalWeeks; accepts Date or epoch ms; else throws.
 //   hasWeekStarted(week, now?) — window opens at the weekly anchor boundary, NOT the
 //                           first kickoff; never a substitute for per-game gating;
@@ -145,7 +153,8 @@ These bare `{year}` path segments are **invisible to the guard's date/pool patte
 ```
 
 Boundary semantics, stated explicitly so nobody re-derives them:
-- **Weeks flip Wednesday 8:00 PM ET** (midnight UTC on the Thursday date). Identical to current production behavior.
+- **Weeks flip at midnight UTC on the anchor's date** — 8:00 PM ET the day before. For the 2025 season (Thursday-anchored) that lands on Wednesday 8:00 PM ET, identical to current production behavior. **2026 anchors on a Wednesday** (the real Sept 9 opener — see Core Data Structure), so the 2026 boundary is **Tuesday 8:00 PM ET going into Wednesday**, self-consistently derived from the exact same midnight-UTC-on-anchor-date mechanism — not a new rule, just a different weekday because the real opener isn't a Thursday this year.
+- **2026 grace-window consequence (accepted, recorded for the owner):** `weekly-leaderboard.html`'s `gamesStartFor(week)` — the threshold that holds last week's complete leaderboard until this week's games actually start — is built from a uniform `weekAnchor + (week-1)*7d` model keyed to Week 1's actual kickoff wall-clock time. Because 2026's Week 1 truly kicks off Wednesday while weeks 2-18 revert to the usual Thursday, that uniform model fires the grace threshold exactly 24 hours before the real Thursday kickoff for weeks 2-18 (verified by direct computation) — the grace window shrinks by about a day for those weeks, so the leaderboard can show a still-empty current week up to a day before games actually start. The invariant that matters (the threshold always fires strictly after the week's canonical boundary, never before) still holds — this is a narrower grace period, not a broken one. Whether a per-week-aware model is worth building instead is an owner call, not made here.
 - `hasWeekStarted` is a coarse week-level check. It is **not** a substitute for per-game kickoff gating (The Grid's pick-reveal security stays per-game).
 - Before the season: `getCurrentWeek()` returns 1. After Week 18: returns 18.
 
@@ -206,7 +215,7 @@ Rework:
 
 ```
 assert seasonEndDate > kickoffDateTime
-assert weekAnchor falls on a Thursday (America/New_York)
+assert weekAnchor equals the Eastern date of the earliest week-1 game (internal consistency — NOT a Thursday-only assumption; 2026 opens Wednesday, see Core Data Structure); a non-Thursday opener prints informationally and WARNS, never fails
 assert kickoffDateTime is within 24h of weekAnchor
 assert span(weekAnchor → seasonEndDate) is 17-19 weeks
 assert every week has 13-16 games; total games === 272

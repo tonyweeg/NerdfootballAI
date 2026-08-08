@@ -163,15 +163,39 @@ describe('validateSeason', () => {
         expect(a2.some((r) => !r.pass)).toBe(true);
     });
 
-    test('A4 violation (weekAnchor not a Thursday) fails with A4 named', () => {
+    test('A4 violation (weekAnchor mismatches the date derived from raw week-1 data) fails with A4 named', () => {
+        // A4 is now an internal-consistency check, not a day-of-week assumption:
+        // it independently re-derives the expected anchor from allWeeksGames and
+        // compares against seasonData.weekAnchor. Mutating weekAnchor away from
+        // what the raw fixture actually implies (2026-09-10) must fail — the
+        // mutated value happening to also not be a Thursday is incidental, not
+        // what triggers the failure (see the next test for that distinction).
         const allWeeksGames = buildFixture();
         const seasonData = deriveSeasonData(2026, allWeeksGames);
-        seasonData.weekAnchor = '2026-09-09'; // a Wednesday
+        expect(seasonData.weekAnchor).toBe('2026-09-10'); // sanity: the raw-data-true anchor
+        seasonData.weekAnchor = '2026-09-09'; // no longer matches the raw data
         const result = validateSeason(2026, allWeeksGames, seasonData);
 
         expect(result.pass).toBe(false);
         const a4 = result.results.find((r) => r.id === 'A4');
         expect(a4.pass).toBe(false);
+    });
+
+    test('A4 passes a genuine non-Thursday opener when weekAnchor matches the derived date; warns instead of failing (2026 Wednesday-opener regression guard)', () => {
+        // Real 2026 case: the season opens Wednesday Sept 9 (an international
+        // game in Melbourne bumped the marquee game off Thursday) — a genuine
+        // schedule fact (flip-drill defect #1), not a data bug. A4 must not
+        // fail a self-consistent non-Thursday anchor; it should only warn.
+        const allWeeksGames = buildFixture({ week1FirstGameUtcISO: '2026-09-10T00:20:00Z' });
+        const seasonData = deriveSeasonData(2026, allWeeksGames);
+        expect(seasonData.weekAnchor).toBe('2026-09-09'); // sanity: really Wednesday-anchored
+
+        const result = validateSeason(2026, allWeeksGames, seasonData);
+
+        const a4 = result.results.find((r) => r.id === 'A4');
+        expect(a4.pass).toBe(true);
+        expect(result.warnings.some((w) => w.startsWith('A4:'))).toBe(true);
+        expect(result.pass).toBe(true);
     });
 
     test('A6 violation (seasonEndDate not after kickoff) fails with A6 named', () => {

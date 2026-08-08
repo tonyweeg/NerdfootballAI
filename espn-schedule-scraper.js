@@ -358,13 +358,29 @@ function validateSeason(year, allWeeksGames, seasonData, responseSeasonYears) {
     }
     if (a3) record('A3', true, 'every game has id/teams/valid date; home != away');
 
-    // A4: weekAnchor falls on a Thursday (Eastern)
+    // A4: weekAnchor equals the Eastern calendar date of the earliest week-1
+    // game — an internal consistency check (did deriveSeasonData compute
+    // weekAnchor correctly from the same game list this validator sees?),
+    // independently re-derived from raw data rather than trusting seasonData
+    // blindly. This does NOT assume the opener falls on a Thursday: the real
+    // 2026 season opens Wednesday 9/9 (the Rams@49ers Melbourne game bumped
+    // the marquee game off Thursday) — a genuine schedule fact, not a bug
+    // (flip-drill defect #1). The weekday is printed informationally below,
+    // and a non-Thursday opener is a WARNING, never a failure.
+    const week1Games = (allWeeksGames.find((w) => w.week === 1) || {}).games || [];
+    const earliestWeek1Game = [...week1Games].sort((a, b) => new Date(a.dt) - new Date(b.dt))[0];
+    const expectedAnchor = earliestWeek1Game ? earliestWeek1Game.dt.slice(0, 10) : null;
+    const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const anchorNoonUTC = new Date(`${seasonData.weekAnchor}T12:00:00Z`);
     const dow = anchorNoonUTC.getUTCDay(); // 4 = Thursday
-    if (dow === 4) {
-        record('A4', true, `weekAnchor ${seasonData.weekAnchor} is a Thursday`);
+    console.log(`   weekAnchor ${seasonData.weekAnchor} falls on a ${DOW_NAMES[dow]} (Eastern)`);
+    if (seasonData.weekAnchor === expectedAnchor) {
+        record('A4', true, `weekAnchor ${seasonData.weekAnchor} matches the Eastern date of the earliest week-1 game`);
     } else {
-        record('A4', false, `weekAnchor ${seasonData.weekAnchor} is NOT a Thursday (getUTCDay=${dow})`);
+        record('A4', false, `weekAnchor ${seasonData.weekAnchor} does NOT match the Eastern date of the earliest week-1 game (expected ${expectedAnchor})`);
+    }
+    if (dow !== 4) {
+        warnings.push(`A4: weekAnchor ${seasonData.weekAnchor} is a ${DOW_NAMES[dow]}, not the usual Thursday opener — verify this is intentional real-world scheduling (e.g. an international game bumping the opener), not a data bug`);
     }
 
     // A5: kickoffDateTime within 24h after weekAnchor 00:00 Eastern
