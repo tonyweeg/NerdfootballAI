@@ -232,6 +232,15 @@ echo "✅ No bare year literals in functions/."
 ```
 Expect it to FAIL initially (that's the meter); Phase 1 exit wants the count driven to the C2-documented survivors only (tables), each carrying a TODO comment — record the final accepted list here.
 
+**Batch D carry-ins (from the Batch C quality review, 2026-08-08):**
+- D4: `pickAnalytics.js` year-parse gains a lower bound — `parsedYear >= 2020 && parsedYear <= 2025` (currently `pool-99` would classify LEGACY; mirror `resolveYear`'s bounding).
+- D5: `reqPoolId` aligns with `reqUserId` — also reject `.`, `..`, `/^__.*__$/` (both wrappers) + one drift probe `['reserved poolId', (c) => c.paths.poolMembersOf('..')]`.
+- D6: `espnNerdApi.js:~340` stale comment `// First Thursday of 2025 season` → season-agnostic wording.
+- D7: report-only — list `pickAnalytics.getPoolMembersPath` callers and confirm none can pass an unguarded invalid poolId (it now throws instead of returning garbage).
+- D3 expected survivors (accepted, recorded): `mlPredictionManager.js:62,434` (bare year literals pending the ml_learning per-site inventory item) and the two C2 table files (quoted 2025 date strings, Phase 3 TODO). Any OTHER file the widened gate flags = report.
+
+**C2 carry-forward (elevated visibility):** the 2025 week-date tables in `survivorPoolCache.js`/`weeklyLeaderboardCache.js` pin `getCurrentWeekNumber()` at 18 for the entire 2026 season if Phase 3 slips — blast radius: weekly-leaderboard cache TTLs treat the real current week as "past" (24h-stale live leaderboards, a SAFE-WEEKLIES regression) and survivor summaries display week 18 all season. No crashes, no wrong-tree I/O. **Phase 3 must land the table derivation before kickoff.**
+
 - [ ] Commit: `Phase 1: Pool picks trigger + pool games rule + bare-year gate`
 
 ---
