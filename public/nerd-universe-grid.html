@@ -624,6 +624,9 @@
         }
     </style>
     <script src="./js/utils/logger-compat.js"></script>
+    <script src="./js/config/season-data.js"></script>
+    <script src="./js/config/season-config.js"></script>
+    <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 
 <body class="min-h-screen">
@@ -884,7 +887,7 @@
 
             try {
                 // Delete the cache for current week
-                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cachePath = window.SEASON_CONFIG.paths.gridCache(currentWeek);
                 logger.grid('🗑️ FORCE_REFRESH: Deleting cache at', cachePath);
                 await deleteDoc(doc(db, cachePath));
                 logger.grid('✅ FORCE_REFRESH: Cache deleted');
@@ -949,11 +952,7 @@
 
         // Get current NFL week number
         function getCurrentWeekNumber() {
-            const now = new Date();
-            const seasonStart = new Date('2025-09-04T00:00:00Z');
-            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
-            const weeksSinceStart = Math.floor(daysSinceStart / 7);
-            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+            return window.SEASON_CONFIG.utils.getCurrentWeek();
         }
 
         // Wait for Firebase Auth
@@ -975,8 +974,7 @@
         // Load pool members
         async function loadPoolMembers() {
             try {
-                const poolId = 'nerduniverse-2025';
-                const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+                const poolMembersPath = window.SEASON_CONFIG.paths.poolMembers();
 
                 const membersDoc = await getDoc(doc(db, poolMembersPath));
 
@@ -1080,7 +1078,7 @@
         // 🔥 FIREBASE CACHE SYSTEM - STRAIGHT CACHE GRIDDY
         async function loadFirebaseCachedGrid() {
             try {
-                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cachePath = window.SEASON_CONFIG.paths.gridCache(currentWeek);
 
                 const cacheDoc = await getDoc(doc(db, cachePath));
 
@@ -1120,7 +1118,7 @@
 
         async function saveFirebaseCachedGrid() {
             try {
-                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cachePath = window.SEASON_CONFIG.paths.gridCache(currentWeek);
                 logger.grid('💾 GRID_CACHE: Saving grid data to Firebase cache');
 
                 const cacheData = {
@@ -2212,7 +2210,7 @@
         // 🔥 CACHE MANAGEMENT FUNCTIONS - STRAIGHT CACHE GRIDDY
         window.showCacheStatus = async function() {
             try {
-                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cachePath = window.SEASON_CONFIG.paths.gridCache(currentWeek);
                 const cacheDoc = await getDoc(doc(db, cachePath));
 
                 if (!cacheDoc.exists()) {
@@ -2245,7 +2243,7 @@ ${cacheAge > 15 * 60 * 1000 ? '⚠️ Cache expired (>15min) - will regenerate o
 
         window.clearGridCache = async function() {
             try {
-                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cachePath = window.SEASON_CONFIG.paths.gridCache(currentWeek);
                 await deleteDoc(doc(db, cachePath));
 
                 logger.grid('🗑️ GRID_CACHE: Cache cleared for week', currentWeek);

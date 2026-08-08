@@ -465,6 +465,9 @@
             color: #c0c0d0 !important;
         }
     </style>
+    <script src="./js/config/season-data.js"></script>
+    <script src="./js/config/season-config.js"></script>
+    <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
     <!-- Animated Starfield Background -->
@@ -657,11 +660,7 @@
 
         // Get current NFL week based on date
         function getCurrentWeek() {
-            const now = new Date();
-            const seasonStart = new Date('2025-09-04'); // Week 1 starts Sept 4, 2025
-            const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24));
-            const weeksSinceStart = Math.floor(daysSinceStart / 7);
-            return Math.max(1, Math.min(18, weeksSinceStart + 1));
+            return window.SEASON_CONFIG.utils.getCurrentWeek();
         }
 
         // Tufte-inspired Color Palette
@@ -1966,7 +1965,7 @@
 
             try {
                 // Check cache first (6 segments = valid Firestore path)
-                const cacheDoc = await db.doc(`artifacts/nerdfootball/pools/nerduniverse-2025/cache/tricked-out-ricky-week-${currentWeek}`).get();
+                const cacheDoc = await db.doc(`${window.SEASON_CONFIG.paths.poolRoot()}/cache/tricked-out-ricky-week-${currentWeek}`).get();
 
                 let analyticsData;
                 if (cacheDoc.exists) {
@@ -1989,7 +1988,7 @@
 
         async function generateAnalytics() {
             console.log(`🔥 TRICKED OUT RICKY: Fetching analytics for WEEK ${currentWeek}`);
-            console.log(`📍 Date check: ${new Date().toISOString()} | Season start: 2025-09-04`);
+            console.log(`📍 Date check: ${new Date().toISOString()} | Season start: ${window.SEASON_CONFIG.weekAnchor}`);
 
             // Fetch Week Bible (game results)
             const bibleDoc = await db.doc(`artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`).get();
@@ -2004,7 +2003,7 @@
             const picksSnapshot = await db.collection(picksPath).get();
 
             // Fetch pool members
-            const membersDoc = await db.doc('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members').get();
+            const membersDoc = await db.doc(window.SEASON_CONFIG.paths.poolMembers()).get();
             const members = membersDoc.data() || {};
 
             const games = Object.keys(bible).filter(k => k !== '_metadata');
