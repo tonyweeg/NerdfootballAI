@@ -118,6 +118,38 @@ function toEasternISO(utcISO) {
     return `${y}-${mo}-${da}T${h}:${mi}:${s}${offsetStr}`;
 }
 
+/**
+ * ⚠️⚠️⚠️  LEGACY CONVENTION — REQUIRED. DO NOT "FIX" THIS.  ⚠️⚠️⚠️
+ * ---------------------------------------------------------------------------
+ * Converts an explicit-offset Eastern ISO string (as produced by toEasternISO
+ * above, e.g. "2025-09-04T20:20:00-04:00") into the LEGACY bare-Z-meaning-
+ * Eastern format used ONLY by game-data / raw-schedule JSON outputs: the
+ * IDENTICAL Eastern wall-clock digits, but with a literal 'Z' suffix in
+ * place of the real offset (e.g. "2025-09-04T20:20:00Z" — despite the
+ * trailing 'Z', this is NOT UTC).
+ *
+ * This convention is REQUIRED by the live consumer
+ * public/easternTimeParser-v2.js: hasGameStarted() / formatGameTime() /
+ * getTimeUntilGameStart() all unconditionally `.replace('Z', '')` and then
+ * subtract a fixed 4 hours to recover Eastern time. Feeding that parser
+ * proper explicit-offset ISO (what this scraper produced before the
+ * 2026-08-08 spec review) makes it apply its fixed correction on top of an
+ * ALREADY-correct value ("double correction"), shifting every computed
+ * pick-lock / game-start time by 3-4 hours for non-Eastern viewers.
+ *
+ * DO NOT change this to real UTC or to explicit-offset ISO without first
+ * updating every consumer of easternTimeParser-v2.js in lockstep. See
+ * claudedocs/plans/2026-08-08-season-config-scraper-rework.md ("Outputs"
+ * item 3) and the 2026-08-08 spec review that mandated this correction.
+ *
+ * season-data.js's kickoffDateTime / seasonEndDate are a DIFFERENT consumer
+ * path (season-config.js, not easternTimeParser-v2.js) and correctly KEEP
+ * explicit-offset ISO — never apply this function to those.
+ */
+function toLegacyBareZEastern(easternOffsetISO) {
+    return easternOffsetISO.replace(/[+-]\d{2}:\d{2}$/, 'Z');
+}
+
 // ---------------------------------------------------------------------------
 // ESPN fetch + parse
 // ---------------------------------------------------------------------------
@@ -469,20 +501,32 @@ function formatSeasonDataJson(seasonData) {
  * No _metadata block: that provenance data belongs to a later
  * results-verification pass, not the pre-season scraper (zero fallback
  * data — we do not fabricate scores/status for unplayed games).
+ *
+ * `dt` uses the LEGACY bare-Z-meaning-Eastern convention (toLegacyBareZEastern
+ * above), NOT explicit-offset ISO — see that function's comment block for
+ * why. Decisive, review-mandated correction, 2026-08-08.
  */
 function formatWeekGameData(weekObj) {
     const obj = {};
     for (const g of weekObj.games) {
-        obj[String(g.id)] = { a: g.a, h: g.h, dt: g.dt, stadium: g.stadium };
+        obj[String(g.id)] = { a: g.a, h: g.h, dt: toLegacyBareZEastern(g.dt), stadium: g.stadium };
     }
     return JSON.stringify(obj, null, 2) + '\n';
 }
 
+/**
+ * Per-game `dt` uses the LEGACY bare-Z-meaning-Eastern convention here too
+ * (toLegacyBareZEastern) — same reasoning as formatWeekGameData above; this
+ * file feeds the same production consumers.
+ */
 function formatScheduleRaw(year, allWeeksGames) {
     const payload = {
         year,
         generatedAt: new Date().toISOString(),
-        weeks: allWeeksGames.map((w) => ({ week: w.week, games: w.games }))
+        weeks: allWeeksGames.map((w) => ({
+            week: w.week,
+            games: w.games.map((g) => ({ id: g.id, a: g.a, h: g.h, dt: toLegacyBareZEastern(g.dt), stadium: g.stadium }))
+        }))
     };
     return JSON.stringify(payload, null, 2) + '\n';
 }
@@ -622,6 +666,30 @@ async function main() {
     }
 
     if (args.dryRun) {
+        const week1 = allWeeksGames.find((w) => w.week === 1);
+        const sampleGame = week1 && week1.games && week1.games[0];
+        if (sampleGame) {
+            console.log('');
+            console.log('=== Sample game-data dt (legacy bare-Z Eastern convention, as written to game-data files) ===');
+            console.log(`  week 1 game ${sampleGame.id} (${sampleGame.a} @ ${sampleGame.h}):`);
+            console.log(`    internal / season-data path (explicit-offset): ${sampleGame.dt}`);
+            console.log(`    game-data file output (legacy bare-Z):         ${toLegacyBareZEastern(sampleGame.dt)}`);
+        }
+
+        console.log('');
+        console.log('=== seasonEndDate parity: derived vs live functions/season-data.json ===');
+        try {
+            const liveSeasonDataPath = path.join(__dirname, 'functions', 'season-data.json');
+            const liveSeasonData = JSON.parse(fs.readFileSync(liveSeasonDataPath, 'utf8'));
+            const liveSeasonEndDate = liveSeasonData.seasonEndDate;
+            const deltaDays = (new Date(seasonData.seasonEndDate).getTime() - new Date(liveSeasonEndDate).getTime()) / (1000 * 60 * 60 * 24);
+            console.log(`  derived: ${seasonData.seasonEndDate}`);
+            console.log(`  live:    ${liveSeasonEndDate}  (functions/season-data.json)`);
+            console.log(`  delta:   ${deltaDays.toFixed(2)} day(s) (derived - live) — MAY differ from live; informational only, not a failure`);
+        } catch (err) {
+            console.log(`  could not read live functions/season-data.json for comparison: ${err.message}`);
+        }
+
         console.log('');
         console.log('✅ DRY RUN — all validations passed. No files written.');
         return;
@@ -652,5 +720,10 @@ module.exports = {
     // require() and deep-equals the JSON twin). Both are pure string
     // builders with no I/O.
     formatSeasonDataJs,
-    formatSeasonDataJson
+    formatSeasonDataJson,
+    // Additive exports for the game-data dt legacy-convention fix
+    // (2026-08-08 review) — pure functions, no I/O.
+    toLegacyBareZEastern,
+    formatWeekGameData,
+    formatScheduleRaw
 };
