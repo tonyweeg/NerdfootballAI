@@ -35,8 +35,10 @@ function buildSeasonConfig(SEASON_DATA) {
     };
     // Dynamic-pool builder guard (C5): validates a caller-supplied poolId (e.g. from
     // req.query/data.poolId) rather than assuming the current SEASON_CONFIG.poolId.
+    // Aligned with reqUserId's reserved-id checks (D5).
     const reqPoolId = (poolId) => {
-        if (typeof poolId !== 'string' || poolId === '' || poolId.includes('/')) {
+        if (typeof poolId !== 'string' || poolId === '' || poolId.includes('/') ||
+            poolId === '.' || poolId === '..' || /^__.*__$/.test(poolId)) {
             throw new Error(`SEASON_CONFIG: invalid poolId: ${poolId}`);
         }
         return poolId;

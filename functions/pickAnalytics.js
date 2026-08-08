@@ -21,9 +21,11 @@ class PickAnalyticsEngine {
         // alias parses the same way, since it also ends in -2025, but is also checked
         // explicitly so this stays correct-by-construction rather than by coincidence
         // if the alias is ever renamed to something that doesn't end in a bare year).
+        // Lower-bounded at 2020 (mirrors resolveYear's bounding, D4) so a non-year
+        // trailing segment like 'pool-99' doesn't get misclassified as legacy.
         const parsedYear = parseInt(String(poolId).split('-').pop(), 10);
         const isLegacyPool = poolId === 'nerdfootball-2025' ||
-            (Number.isInteger(parsedYear) && parsedYear <= 2025);
+            (Number.isInteger(parsedYear) && parsedYear >= 2020 && parsedYear <= 2025);
         if (isLegacyPool) {
             return `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions/${userId}`;
         }

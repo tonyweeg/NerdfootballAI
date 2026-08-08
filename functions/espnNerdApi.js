@@ -329,7 +329,7 @@ class EspnNerdApi {
 
     // Get date range for a specific NFL week
     getWeekDates(week) {
-        const seasonStart = new Date(SEASON_CONFIG.weekAnchor); // First Thursday of 2025 season
+        const seasonStart = new Date(SEASON_CONFIG.weekAnchor); // First Thursday of the season
         const weekOffset = (week - 1) * 7;
         const weekStart = new Date(seasonStart.getTime() + (weekOffset * 24 * 60 * 60 * 1000));
         

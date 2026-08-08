@@ -129,7 +129,8 @@ describe('wrapper drift guard (browser vs functions)', () => {
             ['reserved userId', (c) => c.paths.picks(1, '..')],
             ['reserved userId dot', (c) => c.paths.picks(1, '.')],
             ['reserved userId underscores', (c) => c.paths.picks(1, '__proto__')],
-            ['invalid poolId', (c) => c.paths.poolMembersOf('a/b')]
+            ['invalid poolId', (c) => c.paths.poolMembersOf('a/b')],
+            ['reserved poolId', (c) => c.paths.poolMembersOf('..')]
         ];
         for (const [label, probe] of probes) {
             const a = outcome(() => probe(browserConfig));
