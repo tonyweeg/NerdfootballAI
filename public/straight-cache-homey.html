@@ -258,6 +258,9 @@
         }
     </style>
     <script src="./js/utils/logger-compat.js"></script>
+    <script src="./js/config/season-data.js"></script>
+    <script src="./js/config/season-config.js"></script>
+    <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
     <div class="star-field"></div>
@@ -296,7 +299,7 @@
                     </div>
                     <div class="mb-4">
                         <p class="text-sm text-gray-400">Cache Path</p>
-                        <p class="text-xs text-purple-300 break-all">artifacts/nerdfootball/pools/nerduniverse-2025/cache/latest-ai-intel-sheet</p>
+                        <p class="text-xs text-purple-300 break-all" id="aiCachePathDisplay"></p>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
@@ -444,7 +447,7 @@
                     </div>
                     <div class="mb-4">
                         <p class="text-sm text-gray-400">Cache Path</p>
-                        <p class="text-xs text-purple-300 break-all">artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-*</p>
+                        <p class="text-xs text-purple-300 break-all" id="gridCachePathDisplay"></p>
                     </div>
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
@@ -506,6 +509,9 @@
         window.getDoc = getDoc;
         window.deleteDoc = deleteDoc;
 
+        document.getElementById('aiCachePathDisplay').textContent = window.SEASON_CONFIG.paths.aiCache();
+        document.getElementById('gridCachePathDisplay').textContent = `${window.SEASON_CONFIG.paths.poolRoot()}/cache/grid-week-*`;
+
         let currentUser = null;
 
         onAuthStateChanged(auth, async (user) => {
@@ -561,7 +567,7 @@
 
         async function loadAICache() {
             try {
-                const cacheRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/cache', 'latest-ai-intel-sheet');
+                const cacheRef = doc(db, window.SEASON_CONFIG.paths.aiCache());
                 const cacheSnap = await getDoc(cacheRef);
 
                 if (cacheSnap.exists()) {
@@ -680,7 +686,7 @@
                 const currentWeek = getCurrentNFLWeek();
                 document.getElementById('gridWeek').textContent = currentWeek;
 
-                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cachePath = window.SEASON_CONFIG.paths.gridCache(currentWeek);
                 const cacheRef = doc(db, cachePath);
                 const cacheSnap = await getDoc(cacheRef);
 
@@ -743,11 +749,7 @@
         }
 
         function getCurrentNFLWeek() {
-            const seasonStart = new Date('2025-09-04');
-            const now = new Date();
-            const diff = now - seasonStart;
-            const week = Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1;
-            return Math.max(1, Math.min(18, week));
+            return window.SEASON_CONFIG.utils.getCurrentWeek();
         }
 
         window.refreshAICache = async () => {
@@ -854,7 +856,7 @@
                 let cacheRef;
                 switch(cacheType) {
                     case 'ai':
-                        cacheRef = doc(db, 'artifacts/nerdfootball/pools/nerduniverse-2025/cache', 'latest-ai-intel-sheet');
+                        cacheRef = doc(db, window.SEASON_CONFIG.paths.aiCache());
                         break;
                     case 'espn':
                         cacheRef = doc(db, 'cache', 'espn_current_data');
@@ -888,7 +890,7 @@
             logTest(`🗑️ GRID_CACHE_DELETE: Deleting grid cache for week ${currentWeek}...`);
 
             try {
-                const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${currentWeek}`;
+                const cachePath = window.SEASON_CONFIG.paths.gridCache(currentWeek);
                 await deleteDoc(doc(db, cachePath));
                 logTest(`✅ GRID_CACHE_DELETE: Week ${currentWeek} cache deleted successfully`);
                 await loadGridCache();
@@ -907,7 +909,7 @@
             try {
                 const deletePromises = [];
                 for (let week = 1; week <= 18; week++) {
-                    const cachePath = `artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-${week}`;
+                    const cachePath = window.SEASON_CONFIG.paths.gridCache(week);
                     deletePromises.push(deleteDoc(doc(db, cachePath)).catch(() => null));
                 }
                 await Promise.all(deletePromises);

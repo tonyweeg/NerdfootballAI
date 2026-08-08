@@ -137,6 +137,9 @@
         }
     </style>
     <script src="./js/utils/logger-compat.js"></script>
+    <script src="./js/config/season-data.js"></script>
+    <script src="./js/config/season-config.js"></script>
+    <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
     <div class="wu-tang-header">
@@ -385,7 +388,7 @@
                     logToConsole('ADMIN ACCESS REQUIRED', 'error');
                     return;
                 }
-                const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${currentUser.uid}`;
+                const scoringPath = window.SEASON_CONFIG.paths.scoringUser(currentUser.uid);
                 const scoringDoc = await firebase.firestore().doc(scoringPath).get();
 
                 if (!scoringDoc.exists) {
@@ -521,7 +524,7 @@
 
                 // Get all users
                 const usersSnapshot = await firebase.firestore()
-                    .collection('artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users')
+                    .collection(`${window.SEASON_CONFIG.paths.poolRoot()}/scoring-users`)
                     .get();
 
                 const userIds = [];
@@ -553,7 +556,7 @@
 
         async function recalculateUserWeek(userId, weekNumber) {
             // Mock implementation - in real version would calculate based on picks vs results
-            const scoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`;
+            const scoringPath = window.SEASON_CONFIG.paths.scoringUser(userId);
             const scoringDoc = await firebase.firestore().doc(scoringPath).get();
 
             let scoringData = {};
@@ -627,7 +630,7 @@
                 await autoLogin();
 
                 const usersSnapshot = await firebase.firestore()
-                    .collection('artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users')
+                    .collection(`${window.SEASON_CONFIG.paths.poolRoot()}/scoring-users`)
                     .get();
 
                 let cleanedCount = 0;
@@ -650,7 +653,7 @@
                         cleanedData.gameDetailsRemoved = true;
                         cleanedData.cleanupTimestamp = new Date().toISOString();
 
-                        await firebase.firestore().doc(`artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userDoc.id}`).set(cleanedData);
+                        await firebase.firestore().doc(window.SEASON_CONFIG.paths.scoringUser(userDoc.id)).set(cleanedData);
                         cleanedCount++;
                     }
                 }
