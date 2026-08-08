@@ -23,7 +23,11 @@ node espn-schedule-scraper.js --year=2026 [--dry-run] [--week=N]
 
 ## Data source
 
-`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week={W}&year={Y}&seasontype=2&limit=100`
+`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?week={W}&dates={Y}&seasontype=2&limit=100`
+
+**Param contract (empirically verified 2026-08-08):** `dates={Y}` is the season selector; `year={Y}` is silently IGNORED by this endpoint (returns the current season regardless — verified: `year=2025` returned season.year 2026, `dates=2025` returned true 2025 data with first game `2025-09-05T00:20Z` = Thu Sep 4 8:20 PM EDT, matching the live config exactly). The scraper must additionally assert the response's `season.year === requested year` (new assert A0) so a future API change fails loudly instead of silently serving the wrong season.
+
+**Companion fix (C9, same discovery):** `functions/updateLiveScores.js` and `functions/espnScoreMonitor.js` pass `year=${SEASON_CONFIG.year}` — a no-op; they get the API's default (current) season and only ever worked by coincidence. Change both to `dates=${SEASON_CONFIG.year}` so the config genuinely pins the season. Also inspect `functions/espnNerdApi.js`'s `year: SEASON_CONFIG.year` usage (~:423) — trace how it reaches a URL and apply the same correction if it feeds this endpoint. `realtimeGameSync.js` already uses `dates=` correctly.
 
 Per event: `id`, `date` (ISO UTC — this endpoint returns true UTC with `Z`), `competitions[0].competitors` (two entries with `homeAway` = 'home'/'away', `team.displayName`), `competitions[0].venue.fullName` (may be absent → empty string). Team names normalized through the existing TEAM_MAPPINGS table (carry it over from the old scraper verbatim — it is correct) applied to `team.displayName`; unmapped names pass through unchanged BUT count toward a validation warning list printed in the summary.
 
