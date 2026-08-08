@@ -259,6 +259,7 @@ describe('utils boundary semantics', () => {
     test('week flips at midnight UTC on the Thursday date (Wed 8:00 PM ET)', () => {
         expect(CFG.utils.getCurrentWeek(new Date('2025-09-10T23:59:00Z'))).toBe(1);
         expect(CFG.utils.getCurrentWeek(new Date('2025-09-11T00:01:00Z'))).toBe(2);
+        expect(CFG.utils.getCurrentWeek(new Date('2025-09-11T00:01:00Z').getTime())).toBe(2);
     });
 
     test('hasWeekStarted', () => {
@@ -317,11 +318,16 @@ describe('loud failures on bad input (falsy-year footgun class)', () => {
         }
     });
 
-    test('missing week/userId throw instead of minting undefined paths', () => {
-        expect(() => CFG.paths.picks(undefined, 'u1')).toThrow('missing required week');
+    test('missing or out-of-range week/userId throw instead of minting garbage paths', () => {
+        expect(() => CFG.paths.picks(undefined, 'u1')).toThrow('invalid week');
         expect(() => CFG.paths.picks(1, undefined)).toThrow('missing required userId');
-        expect(() => CFG.paths.gridCache()).toThrow('missing required week');
+        expect(() => CFG.paths.gridCache()).toThrow('invalid week');
         expect(() => CFG.paths.scoringUser(null)).toThrow('missing required userId');
+        expect(() => CFG.paths.picks(0, 'u1')).toThrow('invalid week');
+        expect(() => CFG.paths.picks(99, 'u1')).toThrow('invalid week');
+        expect(() => CFG.paths.picks([], 'u1')).toThrow('invalid week');
+        expect(() => CFG.utils.getEspnScheduleUrl(0)).toThrow('invalid week');
+        expect(() => CFG.format.scheduleFilename(0)).toThrow('invalid week');
     });
 
     test('invalid dates and out-of-range weeks throw instead of returning NaN', () => {
@@ -331,8 +337,9 @@ describe('loud failures on bad input (falsy-year footgun class)', () => {
         expect(() => CFG.utils.hasWeekStarted(99)).toThrow('invalid week');
     });
 
-    test('string years from URL params are accepted when valid integers', () => {
+    test('string years and weeks from URL params are accepted when valid integers', () => {
         expect(CFG.paths.poolRoot('2026')).toBe('artifacts/nerdfootball/pools/nerduniverse-2026');
+        expect(CFG.paths.gridCache('6')).toBe('artifacts/nerdfootball/pools/nerduniverse-2025/cache/grid-week-6');
     });
 });
 
@@ -373,7 +380,15 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
     'use strict';
 
     if (typeof window !== 'undefined' && window.SEASON_CONFIG) {
-        return; // idempotent under duplicate <script> includes
+        // Idempotent under duplicate <script> includes — but still re-export for
+        // CJS consumers whose module registry was reset (jsdom + jest.resetModules).
+        if (typeof module !== 'undefined' && module.exports) {
+            module.exports = {
+                SEASON_CONFIG: window.SEASON_CONFIG,
+                buildSeasonConfig: window.buildSeasonConfig
+            };
+        }
+        return;
     }
 
     // Pure factory: tests pin behavior through this with a fixed fixture so the
@@ -402,11 +417,19 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
             return value;
         };
         const timeOf = (now) => {
-            const t = now instanceof Date ? now.getTime() : NaN;
+            const t = now instanceof Date ? now.getTime()
+                : (typeof now === 'number' ? now : NaN);
             if (!Number.isFinite(t)) {
                 throw new Error(`SEASON_CONFIG: invalid date: ${now}`);
             }
             return t;
+        };
+        const reqWeek = (week) => {
+            const w = Number(week);
+            if (!Number.isInteger(w) || w < 1 || w > SEASON_DATA.totalWeeks) {
+                throw new Error(`SEASON_CONFIG: invalid week: ${week}`);
+            }
+            return w;
         };
         const dataRoot = (year) => {
             const y = resolveYear(year);
@@ -419,27 +442,27 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
             poolMembers: (year) => `${paths.poolRoot(year)}/metadata/members`,
             aiCache: (year) => `${paths.poolRoot(year)}/cache/latest-ai-intel-sheet`,
             gridCache: (week, year) =>
-                `${paths.poolRoot(year)}/cache/grid-week-${req(week, 'week')}`,
+                `${paths.poolRoot(year)}/cache/grid-week-${reqWeek(week)}`,
             scoringUser: (userId, year) =>
                 `${paths.poolRoot(year)}/scoring-users/${req(userId, 'userId')}`,
 
             confidenceUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
             survivorUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
             scoresUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
             weeklyRollupUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${req(week, 'week')}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${req(userId, 'userId')}`,
 
             picks: (week, userId, year) =>
-                `${dataRoot(year)}/nerdfootball_picks/${req(week, 'week')}/submissions/${req(userId, 'userId')}`,
+                `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${req(userId, 'userId')}`,
             picksWeek: (week, year) =>
-                `${dataRoot(year)}/nerdfootball_picks/${req(week, 'week')}/submissions`,
+                `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions`,
             results: (week, year) =>
-                `${dataRoot(year)}/nerdfootball_results/${req(week, 'week')}`,
+                `${dataRoot(year)}/nerdfootball_results/${reqWeek(week)}`,
             games: (week, year) =>
-                `${dataRoot(year)}/nerdfootball_games/${req(week, 'week')}`,
+                `${dataRoot(year)}/nerdfootball_games/${reqWeek(week)}`,
             survivorPicks: (userId, year) =>
                 `${dataRoot(year)}/nerdSurvivor_picks/${req(userId, 'userId')}`,
             survivorStatus: (year) =>
@@ -461,10 +484,7 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
             // Week-window check (window opens at the weekly anchor boundary, not the
             // first kickoff) — NOT a substitute for per-game kickoff gating.
             hasWeekStarted: (week, now = new Date()) => {
-                const w = Number(week);
-                if (!Number.isInteger(w) || w < 1 || w > SEASON_DATA.totalWeeks) {
-                    throw new Error(`SEASON_CONFIG: invalid week: ${week}`);
-                }
+                const w = reqWeek(week);
                 const anchor = new Date(SEASON_DATA.weekAnchor).getTime();
                 return timeOf(now) >= anchor + (w - 1) * 7 * DAY_MS;
             },
@@ -477,7 +497,7 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
             },
             getEspnScheduleUrl: (week) =>
                 SEASON_DATA.espnScheduleUrlTemplate
-                    .replace(/\{WEEK\}/g, req(week, 'week'))
+                    .replace(/\{WEEK\}/g, reqWeek(week))
                     .replace(/\{YEAR\}/g, SEASON_DATA.year),
             getAllEspnScheduleUrls: () =>
                 Array.from({ length: SEASON_DATA.totalWeeks }, (_, i) => utils.getEspnScheduleUrl(i + 1))
@@ -490,7 +510,7 @@ Expected: FAIL — `Cannot find module '../public/js/config/season-config.js'`
             poolDisplay: () => SEASON_DATA.poolDisplayName,
             scheduleFilename: (week = null, year) => {
                 const y = resolveYear(year);
-                return week === null ? `nfl_${y}_schedule_raw.json` : `nfl_${y}_week_${week}.json`;
+                return week === null ? `nfl_${y}_schedule_raw.json` : `nfl_${y}_week_${reqWeek(week)}.json`;
             }
         };
 
@@ -549,6 +569,10 @@ git commit -m "Phase 0: Season config factory + input guards + fixture-driven pa
 | No default `npm test` invocation (auraglow) | **Deferred** — rides on the separate auraglow-fix task; scoped command is the Phase 0 gate |
 | Shallow freeze; double-load; `.replace` first-only; six repeated ternaries | **Fixed** — frozen sub-objects, idempotence guard + data-file IIFE, `/g` regex, `dataRoot` helper |
 | Redundant year segment in 2026 `confidence/{year}` paths | **Intentional** — mirrors existing index.js:659-690 shapes (spec) |
+| NEW-1: idempotence guard skips `module.exports` under jsdom + `jest.resetModules` | **Fixed (round 2)** — guard re-exports from window before returning |
+| NEW-2: `req()` presence-only; out-of-range weeks mint garbage paths | **Fixed (round 2)** — `reqWeek` (integer 1..totalWeeks) across paths/utils/scheduleFilename |
+| NEW-3: `timeOf` rejects epoch-ms numbers (over-tightening) | **Fixed (round 2)** — accepts Date or finite epoch ms; strings still throw |
+| NEW-4: spec "zero behavior change" overclaim vs divergent-formula warning | **Fixed (round 2)** — qualified to canonical-formula sites |
 
 ---
 
@@ -699,11 +723,19 @@ function buildSeasonConfig(SEASON_DATA) {
         return value;
     };
     const timeOf = (now) => {
-        const t = now instanceof Date ? now.getTime() : NaN;
+        const t = now instanceof Date ? now.getTime()
+            : (typeof now === 'number' ? now : NaN);
         if (!Number.isFinite(t)) {
             throw new Error(`SEASON_CONFIG: invalid date: ${now}`);
         }
         return t;
+    };
+    const reqWeek = (week) => {
+        const w = Number(week);
+        if (!Number.isInteger(w) || w < 1 || w > SEASON_DATA.totalWeeks) {
+            throw new Error(`SEASON_CONFIG: invalid week: ${week}`);
+        }
+        return w;
     };
     const dataRoot = (year) => {
         const y = resolveYear(year);
@@ -716,27 +748,27 @@ function buildSeasonConfig(SEASON_DATA) {
         poolMembers: (year) => `${paths.poolRoot(year)}/metadata/members`,
         aiCache: (year) => `${paths.poolRoot(year)}/cache/latest-ai-intel-sheet`,
         gridCache: (week, year) =>
-            `${paths.poolRoot(year)}/cache/grid-week-${req(week, 'week')}`,
+            `${paths.poolRoot(year)}/cache/grid-week-${reqWeek(week)}`,
         scoringUser: (userId, year) =>
             `${paths.poolRoot(year)}/scoring-users/${req(userId, 'userId')}`,
 
         confidenceUser: (week, userId, year) =>
-            `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
         survivorUser: (week, userId, year) =>
-            `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
         scoresUser: (week, userId, year) =>
-            `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${req(week, 'week')}/users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
         weeklyRollupUser: (week, userId, year) =>
-            `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${req(week, 'week')}/users/${req(userId, 'userId')}`,
+            `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${req(userId, 'userId')}`,
 
         picks: (week, userId, year) =>
-            `${dataRoot(year)}/nerdfootball_picks/${req(week, 'week')}/submissions/${req(userId, 'userId')}`,
+            `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${req(userId, 'userId')}`,
         picksWeek: (week, year) =>
-            `${dataRoot(year)}/nerdfootball_picks/${req(week, 'week')}/submissions`,
+            `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions`,
         results: (week, year) =>
-            `${dataRoot(year)}/nerdfootball_results/${req(week, 'week')}`,
+            `${dataRoot(year)}/nerdfootball_results/${reqWeek(week)}`,
         games: (week, year) =>
-            `${dataRoot(year)}/nerdfootball_games/${req(week, 'week')}`,
+            `${dataRoot(year)}/nerdfootball_games/${reqWeek(week)}`,
         survivorPicks: (userId, year) =>
             `${dataRoot(year)}/nerdSurvivor_picks/${req(userId, 'userId')}`,
         survivorStatus: (year) =>
@@ -758,10 +790,7 @@ function buildSeasonConfig(SEASON_DATA) {
         // Week-window check (window opens at the weekly anchor boundary, not the
         // first kickoff) — NOT a substitute for per-game kickoff gating.
         hasWeekStarted: (week, now = new Date()) => {
-            const w = Number(week);
-            if (!Number.isInteger(w) || w < 1 || w > SEASON_DATA.totalWeeks) {
-                throw new Error(`SEASON_CONFIG: invalid week: ${week}`);
-            }
+            const w = reqWeek(week);
             const anchor = new Date(SEASON_DATA.weekAnchor).getTime();
             return timeOf(now) >= anchor + (w - 1) * 7 * DAY_MS;
         },
@@ -774,7 +803,7 @@ function buildSeasonConfig(SEASON_DATA) {
         },
         getEspnScheduleUrl: (week) =>
             SEASON_DATA.espnScheduleUrlTemplate
-                .replace(/\{WEEK\}/g, req(week, 'week'))
+                .replace(/\{WEEK\}/g, reqWeek(week))
                 .replace(/\{YEAR\}/g, SEASON_DATA.year),
         getAllEspnScheduleUrls: () =>
             Array.from({ length: SEASON_DATA.totalWeeks }, (_, i) => utils.getEspnScheduleUrl(i + 1))
@@ -787,7 +816,7 @@ function buildSeasonConfig(SEASON_DATA) {
         poolDisplay: () => SEASON_DATA.poolDisplayName,
         scheduleFilename: (week = null, year) => {
             const y = resolveYear(year);
-            return week === null ? `nfl_${y}_schedule_raw.json` : `nfl_${y}_week_${week}.json`;
+            return week === null ? `nfl_${y}_schedule_raw.json` : `nfl_${y}_week_${reqWeek(week)}.json`;
         }
     };
 

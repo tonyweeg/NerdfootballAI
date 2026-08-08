@@ -291,7 +291,7 @@ All of these currently define their own week calculation and must be migrated to
 
 ## Migration Strategy
 
-All phases run with **2025 values first** (year: 2025, weekAnchor: '2025-09-04', poolId: 'nerduniverse-2025') so every migrated file produces byte-identical paths and identical week numbers — zero behavior change, provable by the parity tests. The 2026 flip happens once, at the end, via the scraper.
+All phases run with **2025 values first** (year: 2025, weekAnchor: '2025-09-04', poolId: 'nerduniverse-2025') so every migrated file produces byte-identical paths, and identical week numbers for sites on the canonical week formula (divergent sites follow the kill-list per-site rules) — provable by the parity tests. The 2026 flip happens once, at the end, via the scraper.
 
 - **Phase 0 — Foundation.** Build `season-data.*` (2025 values), both wrappers, parity tests, hardcode guard script, firebase.json header. Commit gate: parity tests green.
 - **Phase 1 — Backend.** Migrate the 17 pool-ID function files + the 6 start-date functions + `index.js` year-segment paths to `seasonConfig.js`. Add the pool-scoped picks trigger and the games rules block (dormant until 2026 data exists). Commit gate: functions deploy to emulator, existing function tests pass.
