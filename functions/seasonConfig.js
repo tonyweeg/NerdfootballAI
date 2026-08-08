@@ -8,6 +8,9 @@
 const SEASON_DATA = Object.freeze(require('./season-data.json'));
 
 function buildSeasonConfig(SEASON_DATA) {
+    if (!SEASON_DATA || typeof SEASON_DATA !== 'object') {
+        throw new Error('SEASON_CONFIG: buildSeasonConfig requires a season data object');
+    }
     // 2025 and earlier live in the legacy year-less tree; 2026+ lives under the
     // pool doc (spec D1/D5).
     const LEGACY_FINAL_YEAR = 2025;

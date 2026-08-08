@@ -39,19 +39,16 @@ describe('wrapper drift guard (browser vs functions)', () => {
         expect(nodeConfig.paths.espnCache()).toBe(browserConfig.paths.espnCache());
     });
 
-    test('utils identical at fixed instants', () => {
-        const instants = [
-            '2025-07-01T00:00:00Z',
-            '2025-09-10T23:59:00Z',
-            '2025-09-11T00:01:00Z',
-            '2025-11-20T17:00:00Z',
-            '2026-03-01T00:00:00Z'
-        ];
-        for (const iso of instants) {
-            const now = new Date(iso);
+    test('week math identical across a full-season 6-hour sweep', () => {
+        // Sweep, don't sample: hand-picked instants missed an off-by-one-day
+        // hasWeekStarted mutation in review; the sweep catches any boundary drift.
+        const start = new Date('2025-08-01T00:00:00Z').getTime();
+        const end = new Date('2026-02-01T00:00:00Z').getTime();
+        for (let t = start; t <= end; t += 6 * 60 * 60 * 1000) {
+            const now = new Date(t);
             expect(nodeConfig.utils.getCurrentWeek(now)).toBe(browserConfig.utils.getCurrentWeek(now));
             expect(nodeConfig.utils.isSeasonActive(now)).toBe(browserConfig.utils.isSeasonActive(now));
-            for (const w of [1, 9, 18]) {
+            for (let w = 1; w <= nodeConfig.totalWeeks; w++) {
                 expect(nodeConfig.utils.hasWeekStarted(w, now)).toBe(browserConfig.utils.hasWeekStarted(w, now));
             }
         }
@@ -87,5 +84,46 @@ describe('wrapper drift guard (browser vs functions)', () => {
         expect(a.paths.picks(3, 'u', 2031)).toBe('artifacts/nerdfootball/pools/nerduniverse-2031/data/nerdfootball_picks/3/submissions/u');
         expect(a.utils.getEspnScheduleUrl(7)).toBe(b.utils.getEspnScheduleUrl(7));
         expect(a.format.scheduleFilename(2)).toBe(b.format.scheduleFilename(2));
+    });
+
+    test('error behavior identical for the full bad-input table', () => {
+        // Guards the guards: a validation check removed or loosened in one wrapper
+        // must fail here, not survive as silent divergence.
+        const outcome = (fn) => {
+            try {
+                return { ok: true, value: fn() };
+            } catch (e) {
+                return { ok: false, message: e.message };
+            }
+        };
+        const probes = [
+            ['year null', (c) => c.paths.poolRoot(null)],
+            ['year 0', (c) => c.paths.poolRoot(0)],
+            ['year empty string', (c) => c.paths.poolRoot('')],
+            ['year NaN', (c) => c.paths.poolRoot(NaN)],
+            ['year 1999', (c) => c.paths.poolRoot(1999)],
+            ['year 2101', (c) => c.paths.poolRoot(2101)],
+            ['week 0', (c) => c.paths.picks(0, 'u1')],
+            ['week -3', (c) => c.paths.picks(-3, 'u1')],
+            ['week 99', (c) => c.paths.picks(99, 'u1')],
+            ['week array', (c) => c.paths.picks([], 'u1')],
+            ['week 1.5', (c) => c.paths.picks(1.5, 'u1')],
+            ['espn week 0', (c) => c.utils.getEspnScheduleUrl(0)],
+            ['missing userId', (c) => c.paths.picks(1, undefined)],
+            ['null userId', (c) => c.paths.scoringUser(null)],
+            ['date string', (c) => c.utils.getCurrentWeek('2025-10-01')],
+            ['date NaN', (c) => c.utils.getCurrentWeek(new Date('nonsense'))],
+            ['epoch accepted', (c) => c.utils.getCurrentWeek(new Date('2025-11-20T17:00:00Z').getTime())],
+            ['schedule filename week 0', (c) => c.format.scheduleFilename(0)]
+        ];
+        for (const [label, probe] of probes) {
+            const a = outcome(() => probe(browserConfig));
+            const b = outcome(() => probe(nodeConfig));
+            expect({ label, ...b }).toEqual({ label, ...a });
+        }
+        const factoryA = outcome(() => buildBrowser(null));
+        const factoryB = outcome(() => buildNode(null));
+        expect(factoryA.ok).toBe(false);
+        expect(factoryB).toEqual(factoryA);
     });
 });
