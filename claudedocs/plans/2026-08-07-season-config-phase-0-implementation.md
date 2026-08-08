@@ -578,7 +578,9 @@ git commit -m "Phase 0: Season config factory + input guards + fixture-driven pa
 | NEW-4: spec "zero behavior change" overclaim vs divergent-formula warning | **Fixed (round 2)** — qualified to canonical-formula sites |
 | NEW-5: drift suite mutation-tested — missed 3/5 planted bugs (sampled instants, no error-path comparison) | **Fixed (round 3)** — full-season 6h sweep over all weeks + error-parity table guarding the guards |
 | NEW-6: `buildSeasonConfig(null)` fails late with raw TypeError | **Fixed (round 3)** — loud factory guard in both wrappers |
-| NEW-7: `rg` is a Claude-shell-only function, not an installed binary — rg-based guard script silently reported false ✅ when executed directly | **Fixed (round 4)** — guard rewritten in portable grep with loud exit-2 on tool failure; worklist baseline corrected to 211 files |
+| NEW-7: `rg` is a Claude-shell-only function, not an installed binary — rg-based guard script silently reported false ✅ when executed directly | **Fixed (round 4)** — guard rewritten in portable grep with loud exit-2 on tool failure; worklist baseline corrected to 211 files (grep sees 212) |
+| NEW-8: guard false-passes on an empty scan tree (dirs exist but nothing scanned) | **Deferred to Phase 5 gate hardening** — add a positive-control canary (season-data.js must match the pattern) before the gate goes live; recorded in spec |
+| NEW-9: guard date pattern covers only Sept 1-9; misses `2025-09-15`, bare `year: 2025` literals | **Deferred to Phase 5 gate hardening** — widen to `-09-[0-3][0-9]` + bare-year sweep before the gate goes live; harmless as a progress meter |
 
 ---
 

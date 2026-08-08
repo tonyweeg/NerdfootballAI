@@ -279,6 +279,10 @@ echo "✅ No season hardcodes outside config."
 
 Runs in the pre-deploy checklist (and CI when available). Success criterion 2 is defined as "this script passes."
 
+**Phase 5 gate hardening (required before the guard becomes a blocking exit gate — from Phase 0 review, 2026-08-07):**
+1. Positive-control canary: assert the pattern still matches a known-containing excluded file (`public/js/config/season-data.js`) — guards against the silent-✅-when-nothing-ran failure class (missing tool, empty tree, broken regex).
+2. Widen the date pattern from `-09-0[0-9]` (Sept 1-9 only) to `-09-[0-3][0-9]`, and add a bare-year literal sweep — as a progress meter the narrow pattern is fine, but as an exit gate it would pass a file whose last hardcode is `2025-09-15` or `year: 2025`.
+
 ## Config Caching (SAFE-WEEKLIES lesson)
 
 A stale cached `season-config.js` after the annual flip = users on last year's season. **Verified 2026-08-07: already satisfied** — `firebase.json` serves every hosted file (`source: "**"`) with `Cache-Control: no-cache, no-store, must-revalidate`. No change needed; Phase 0 verifies the header is still present rather than editing anything. If per-path caching is ever introduced, `/js/config/**` must keep a no-cache policy.
