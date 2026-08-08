@@ -531,6 +531,7 @@ Reply to: tonyweeg@gmail.com`;
 const {
     onPicksUpdate,
     onLegacyPicksUpdate,
+    onPoolPicksUpdate,
     calculateAnalytics,
     getAnalytics,
     onGameResultUpdate,
@@ -539,6 +540,7 @@ const {
 
 exports.onPicksUpdate = onPicksUpdate;
 exports.onLegacyPicksUpdate = onLegacyPicksUpdate;
+exports.onPoolPicksUpdate = onPoolPicksUpdate;
 exports.calculateAnalytics = calculateAnalytics;
 exports.getAnalytics = getAnalytics;
 exports.onGameResultUpdate = onGameResultUpdate;
