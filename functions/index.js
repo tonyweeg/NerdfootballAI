@@ -650,7 +650,7 @@ exports.deepStar6User = onCall(async (request) => {
         // STEP 2: Delete all user data (18 weeks) - individually with error handling
         let deletionCount = 0;
 
-        for (let week = 1; week <= 18; week++) {
+        for (let week = 1; week <= SEASON_CONFIG.totalWeeks; week++) {
             try {
                 // Confidence picks - path 1
                 await db.doc(`artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions/${userId}`).delete();

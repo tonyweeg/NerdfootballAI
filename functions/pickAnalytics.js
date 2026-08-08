@@ -482,13 +482,13 @@ exports.onPoolPicksUpdate = functions.firestore.onDocumentWritten(
 );
 
 // HTTP function to manually trigger analytics calculation
-exports.calculateAnalytics = functions.https.onCall(async (data, context) => {
+exports.calculateAnalytics = functions.https.onCall(async (request) => {
     // Check authentication
-    if (!context.auth) {
-        throw new functions.https.functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    if (!request.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
-    
-    const { poolId, week, force = false } = data;
+
+    const { poolId, week, force = false } = request.data;
     
     if (!poolId || !week) {
         throw new functions.https.HttpsError('invalid-argument', 'poolId and week are required');
@@ -532,13 +532,13 @@ exports.calculateAnalytics = functions.https.onCall(async (data, context) => {
 });
 
 // HTTP function to get analytics data
-exports.getAnalytics = functions.https.onCall(async (data, context) => {
+exports.getAnalytics = functions.https.onCall(async (request) => {
     // Check authentication
-    if (!context.auth) {
+    if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
-    
-    const { poolId, week } = data;
+
+    const { poolId, week } = request.data;
     
     if (!poolId || !week) {
         throw new functions.https.HttpsError('invalid-argument', 'poolId and week are required');
@@ -650,4 +650,4 @@ exports.onIndividualGameUpdate = functions.firestore.onDocumentWritten('artifact
 });
 
 // Export the analytics engine for use in other functions
-module.exports = { PickAnalyticsEngine };
+exports.PickAnalyticsEngine = PickAnalyticsEngine;
