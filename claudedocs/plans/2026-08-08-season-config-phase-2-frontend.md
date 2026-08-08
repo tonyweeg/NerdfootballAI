@@ -54,6 +54,8 @@ Per-page gate (each page, after edit): page loads via local static serve, browse
 
 Each B-item is its own commit with before/after behavior stated in the message.
 
+**P2-B execution record (2026-08-08):** landed as `d9b2344`/`5e44c6b`/`3390edc`/`96567bc`/`c412b24` + grace fix `151ac09`. Review outcomes: (1) B4's first cut silently collapsed weekly-leaderboard's grace period (previous complete week shown until games start) — restored with a config-derived `gamesStartFor(week)` threshold, exactness-verified against the true first-kickoff instant. Honest numbers: grace WINDOW is 438h/season vs the old table's 1656h (canonical weeks flip much closer to kickoff), but the DISPLAYED week differs from old behavior in only 2.7% of season hours — the old table's early Monday boundary and its long grace largely cancelled. (2) DST drift found: constant-delta gamesStartFor fires 1h early for weeks 9-18 (EST) — fixed in the P2-C round with per-date Eastern offset. (3) Structural record, third confirmed instance: ZERO automated coverage exists for frontend page logic (a grace-collapse mutation passes 54/54) — every Phase 2 frontend behavior is protected by the review pair + owner regression only; a frontend harness is a recorded future line item.
+
 ## P2-C: Live secondary + admin pages — mechanical sweep (~17 files)
 
 Same patterns as P2-A (tag injection + builder/delegate swaps; conforming formulas verified per-site before swap, kill-list rule applies). From inventory §1C/§1D:
