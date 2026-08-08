@@ -40,12 +40,11 @@
             }
             return y;
         };
-        const req = (value, name) => {
-            if (value === undefined || value === null || value === '' ||
-                (typeof value === 'number' && !Number.isFinite(value))) {
-                throw new Error(`SEASON_CONFIG: missing required ${name}`);
+        const reqUserId = (userId) => {
+            if (typeof userId !== 'string' || userId === '' || userId.includes('/')) {
+                throw new Error(`SEASON_CONFIG: invalid userId: ${userId}`);
             }
-            return value;
+            return userId;
         };
         const timeOf = (now) => {
             const t = now instanceof Date ? now.getTime()
@@ -75,19 +74,19 @@
             gridCache: (week, year) =>
                 `${paths.poolRoot(year)}/cache/grid-week-${reqWeek(week)}`,
             scoringUser: (userId, year) =>
-                `${paths.poolRoot(year)}/scoring-users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/scoring-users/${reqUserId(userId)}`,
 
             confidenceUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/confidence/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
             survivorUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
             scoresUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
             weeklyRollupUser: (week, userId, year) =>
-                `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${req(userId, 'userId')}`,
+                `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${reqUserId(userId)}`,
 
             picks: (week, userId, year) =>
-                `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${req(userId, 'userId')}`,
+                `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${reqUserId(userId)}`,
             picksWeek: (week, year) =>
                 `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions`,
             results: (week, year) =>
@@ -95,7 +94,7 @@
             games: (week, year) =>
                 `${dataRoot(year)}/nerdfootball_games/${reqWeek(week)}`,
             survivorPicks: (userId, year) =>
-                `${dataRoot(year)}/nerdSurvivor_picks/${req(userId, 'userId')}`,
+                `${dataRoot(year)}/nerdSurvivor_picks/${reqUserId(userId)}`,
             survivorStatus: (year) =>
                 `${dataRoot(year)}/nerdSurvivor_status/status`,
 

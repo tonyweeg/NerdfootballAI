@@ -19,6 +19,7 @@ RAW=$(grep -rEl --binary-files=without-match "$PATTERN" public functions \
     --exclude-dir=node_modules \
     --exclude-dir=game-data \
     --exclude-dir=archive \
+    --exclude-dir=backups \
     --exclude='season-data.js' \
     --exclude='season-data.json' \
     --exclude='season-config.js' \

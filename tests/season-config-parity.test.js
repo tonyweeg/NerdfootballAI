@@ -166,9 +166,11 @@ describe('loud failures on bad input (falsy-year footgun class)', () => {
 
     test('missing or out-of-range week/userId throw instead of minting garbage paths', () => {
         expect(() => CFG.paths.picks(undefined, 'u1')).toThrow('invalid week');
-        expect(() => CFG.paths.picks(1, undefined)).toThrow('missing required userId');
+        expect(() => CFG.paths.picks(1, undefined)).toThrow('invalid userId');
         expect(() => CFG.paths.gridCache()).toThrow('invalid week');
-        expect(() => CFG.paths.scoringUser(null)).toThrow('missing required userId');
+        expect(() => CFG.paths.scoringUser(null)).toThrow('invalid userId');
+        expect(() => CFG.paths.picks(1, {})).toThrow('invalid userId');
+        expect(() => CFG.paths.picks(1, 'a/b')).toThrow('invalid userId');
         expect(() => CFG.paths.picks(0, 'u1')).toThrow('invalid week');
         expect(() => CFG.paths.picks(99, 'u1')).toThrow('invalid week');
         expect(() => CFG.paths.picks([], 'u1')).toThrow('invalid week');
