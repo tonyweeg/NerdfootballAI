@@ -24,6 +24,9 @@ describe('wrapper drift guard (browser vs functions)', () => {
             expect(nodeConfig.paths.scoringUser(uid, year)).toBe(browserConfig.paths.scoringUser(uid, year));
             expect(nodeConfig.paths.survivorPicks(uid, year)).toBe(browserConfig.paths.survivorPicks(uid, year));
             expect(nodeConfig.paths.survivorStatus(year)).toBe(browserConfig.paths.survivorStatus(year));
+            expect(nodeConfig.paths.survivorEliminations(uid, year)).toBe(browserConfig.paths.survivorEliminations(uid, year));
+            expect(nodeConfig.paths.seasonRollupUser(uid, year)).toBe(browserConfig.paths.seasonRollupUser(uid, year));
+            expect(nodeConfig.paths.survivorDisplayCache(year)).toBe(browserConfig.paths.survivorDisplayCache(year));
             for (const week of weeks) {
                 expect(nodeConfig.paths.gridCache(week, year)).toBe(browserConfig.paths.gridCache(week, year));
                 expect(nodeConfig.paths.picks(week, uid, year)).toBe(browserConfig.paths.picks(week, uid, year));
@@ -34,6 +37,8 @@ describe('wrapper drift guard (browser vs functions)', () => {
                 expect(nodeConfig.paths.survivorUser(week, uid, year)).toBe(browserConfig.paths.survivorUser(week, uid, year));
                 expect(nodeConfig.paths.scoresUser(week, uid, year)).toBe(browserConfig.paths.scoresUser(week, uid, year));
                 expect(nodeConfig.paths.weeklyRollupUser(week, uid, year)).toBe(browserConfig.paths.weeklyRollupUser(week, uid, year));
+                expect(nodeConfig.paths.survivorWeek(week, year)).toBe(browserConfig.paths.survivorWeek(week, year));
+                expect(nodeConfig.paths.scoringWeek(week, year)).toBe(browserConfig.paths.scoringWeek(week, year));
             }
         }
         expect(nodeConfig.paths.espnCache()).toBe(browserConfig.paths.espnCache());

@@ -84,6 +84,16 @@
                 `${paths.poolRoot(year)}/scores/${resolveYear(year)}/weeks/${reqWeek(week)}/users/${reqUserId(userId)}`,
             weeklyRollupUser: (week, userId, year) =>
                 `${paths.poolRoot(year)}/rollups/weekly/${resolveYear(year)}/week_${reqWeek(week)}/users/${reqUserId(userId)}`,
+            survivorEliminations: (userId, year) =>
+                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/eliminations/${reqUserId(userId)}`,
+            seasonRollupUser: (userId, year) =>
+                `${paths.poolRoot(year)}/rollups/season/${resolveYear(year)}/users/${reqUserId(userId)}`,
+            survivorWeek: (week, year) =>
+                `${paths.poolRoot(year)}/survivor/${resolveYear(year)}/weeks/${reqWeek(week)}`,
+            scoringWeek: (week, year) =>
+                `${paths.poolRoot(year)}/scoring/week${reqWeek(week)}`,
+            survivorDisplayCache: (year) =>
+                `${paths.poolRoot(year)}/cache/latest-survivor-display`,
 
             picks: (week, userId, year) =>
                 `${dataRoot(year)}/nerdfootball_picks/${reqWeek(week)}/submissions/${reqUserId(userId)}`,
