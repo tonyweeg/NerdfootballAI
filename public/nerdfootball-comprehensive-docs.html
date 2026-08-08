@@ -931,32 +931,20 @@ const SURVIVOR_PICKS_PATH = `artifacts/nerdfootball/public/data/nerdSurvivor_pic
 
             <div class="workflow-step">
                 <h4>📅 Dynamic Week Detection</h4>
-                <p>Synchronized NFL_2025_WEEKS calendar across all systems ensures automatic week transitions</p>
+                <p><code>window.SEASON_CONFIG</code> (browser) and <code>functions/seasonConfig.js</code> (Cloud Functions) are the single source of truth for the current NFL week — every live page and function calls the same formula instead of maintaining its own calendar table.</p>
                 <div class="code-block">
-                    <pre><code class="language-javascript">// NFL_2025_WEEKS - Synchronized Everywhere
-const NFL_2025_WEEKS = {
-    1: { start: '2025-09-04', end: '2025-09-10' },
-    2: { start: '2025-09-11', end: '2025-09-17' },
-    // ... through week 18
-    18: { start: '2026-01-01', end: '2026-01-07' }
-};
-
-function getCurrentWeekNumber() {
-    const now = new Date();
-    for (const [week, dates] of Object.entries(NFL_2025_WEEKS)) {
-        const start = new Date(dates.start);
-        const end = new Date(dates.end);
-        if (now >= start && now <= end) {
-            return parseInt(week);
-        }
-    }
-    return 1; // Default to week 1
+                    <pre><code class="language-javascript">// SEASON_CONFIG.utils.getCurrentWeek() - canonical formula
+// (public/js/config/season-config.js, mirrored in functions/seasonConfig.js;
+// tests/season-config-drift.test.js keeps the two in lockstep)
+function getCurrentWeek(now = new Date()) {
+    const anchor = new Date(SEASON_DATA.weekAnchor).getTime(); // from season-data.js
+    if (now.getTime() < anchor) return 1;
+    const diffDays = Math.floor((now.getTime() - anchor) / 86400000);
+    return Math.min(SEASON_DATA.totalWeeks, Math.max(1, Math.floor(diffDays / 7) + 1));
 }
 
-// Used identically in:
-// - functions/weeklyLeaderboardCache.js
-// - functions/survivorPoolCache.js
-// - All frontend pages</code></pre>
+// Weeks flip every 7 days from the season anchor (midnight UTC Thursday =
+// Wed 8:00 PM ET), clamped to 1..totalWeeks. No per-page calendar tables.</code></pre>
                 </div>
             </div>
 
@@ -1040,8 +1028,8 @@ function hasGameStarted(game) {
                 <p>All systems verified to work dynamically week-to-week with:</p>
                 <ul style="list-style: none; padding-left: 20px;">
                     <li>✅ Identical Firestore data paths</li>
-                    <li>✅ Synchronized NFL_2025_WEEKS calendar</li>
-                    <li>✅ Consistent getCurrentWeekNumber() implementation</li>
+                    <li>✅ Single SEASON_CONFIG source for the current week (no per-page calendar tables)</li>
+                    <li>✅ Consistent getCurrentWeek() via SEASON_CONFIG.utils, called from every live surface</li>
                     <li>✅ Case-insensitive game status detection</li>
                     <li>✅ Automatic week transitions</li>
                     <li>✅ Zero manual intervention required</li>
