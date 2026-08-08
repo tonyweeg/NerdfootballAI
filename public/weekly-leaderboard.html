@@ -13,13 +13,25 @@
             return window.SEASON_CONFIG.utils.getCurrentWeek();
         };
 
+        // Each week's games start at the season's kickoff wall-clock time (e.g. 8:20 PM ET
+        // Thursday), which is a DISTINCT, LATER instant than the week's canonical boundary
+        // (midnight UTC Thursday) used by getCurrentNFLWeek(). Computed as an offset-delta
+        // from the anchor, not via setUTCHours: kickoffDateTime's evening ET time crosses
+        // into the next UTC calendar day, so copying just hours/minutes would land 24h early.
+        window.gamesStartFor = function(week) {
+            const anchorMidnightInstant = new Date(window.SEASON_CONFIG.weekAnchor).getTime();
+            const kickInstant = new Date(window.SEASON_CONFIG.kickoffDateTime).getTime();
+            const delta = kickInstant - anchorMidnightInstant;
+            return new Date(anchorMidnightInstant + (week - 1) * 7 * 86400000 + delta);
+        };
+
         // Get the most recent week with actual game data for leaderboard display
         window.getMostRecentWeekWithData = function() {
             const currentWeek = window.getCurrentNFLWeek();
             const today = new Date();
 
-            // Check if current week's games have started (canonical weekAnchor + (w-1)*7d)
-            const gamesDate = new Date(new Date(window.SEASON_CONFIG.weekAnchor).getTime() + (currentWeek - 1) * 7 * 86400000);
+            // Check if current week's games have started
+            const gamesDate = window.gamesStartFor(currentWeek);
             if (today >= gamesDate) {
                 return currentWeek;
             }
@@ -1754,7 +1766,7 @@
         // Show Wu-Tang styled message for weeks that haven't started
         function showNoDataMessage(weekNumber, data) {
             const previousWeek = weekNumber - 1;
-            const gameDate = new Date(new Date(window.SEASON_CONFIG.weekAnchor).getTime() + (weekNumber - 1) * 7 * 86400000);
+            const gameDate = window.gamesStartFor(weekNumber);
             const gameDateTime = new Date(gameDate).toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
