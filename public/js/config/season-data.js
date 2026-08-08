@@ -1,18 +1,18 @@
-// ⚠️ GENERATED FILE FORMAT — espn-schedule-scraper.js will emit this file (spec D4).
-// Hand-authored for Phase 0 with 2025 season values. DATA ONLY — no logic, ever.
+// ⚠️ GENERATED FILE FORMAT — produced by espn-schedule-scraper.js (spec D4).
+// DATA ONLY — no logic, ever.
 // Companion: functions/season-data.json must contain identical values
 // (enforced by tests/season-config-drift.test.js).
 (function () {
     'use strict';
 
     const SEASON_DATA = {
-        year: 2025,
-        weekAnchor: '2025-09-04',
-        kickoffDateTime: '2025-09-04T20:20:00-04:00',
-        seasonEndDate: '2026-01-07T23:59:59-05:00',
+        year: 2026,
+        weekAnchor: '2026-09-09',
+        kickoffDateTime: '2026-09-09T20:20:00-04:00',
+        seasonEndDate: '2027-01-11T23:59:59-05:00',
         totalWeeks: 18,
-        poolId: 'nerduniverse-2025',
-        poolDisplayName: 'Nerd Universe 2025',
+        poolId: 'nerduniverse-2026',
+        poolDisplayName: 'Nerd Universe 2026',
         espnScheduleUrlTemplate: 'https://www.espn.com/nfl/schedule/_/week/{WEEK}/year/{YEAR}/seasontype/2'
     };
 
