@@ -5,6 +5,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const nodemailer = require('nodemailer');
 const cors = require('cors')({ origin: true });
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 let transporter = null;
 
@@ -48,7 +49,7 @@ const MAX_SUBMISSIONS_PER_WINDOW = 5;
 const GLOBAL_ADMIN_EMAILS = ['tonyweeg@gmail.com'];
 
 // Get pool admin emails for dynamic routing
-async function getPoolAdminEmails(userId, poolId = 'nerduniverse-2025') {
+async function getPoolAdminEmails(userId, poolId = SEASON_CONFIG.poolId) {
     try {
         const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
         const poolMembersSnap = await poolMembersRef.get();
@@ -86,7 +87,7 @@ async function getPoolAdminEmails(userId, poolId = 'nerduniverse-2025') {
 // Get user's primary pool
 async function getUserPool(userId) {
     try {
-        if (!userId) return 'nerduniverse-2025'; // Default pool for anonymous users
+        if (!userId) return SEASON_CONFIG.poolId; // Default pool for anonymous users
 
         // Try to get user's pool memberships
         const userPoolsRef = admin.firestore().doc(`userPools/${userId}`);
@@ -103,21 +104,21 @@ async function getUserPool(userId) {
         }
 
         // Fallback: Check if user is in the default pool
-        const defaultPoolRef = admin.firestore().doc(`artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members`);
+        const defaultPoolRef = admin.firestore().doc(SEASON_CONFIG.paths.poolMembers());
         const defaultPoolSnap = await defaultPoolRef.get();
 
         if (defaultPoolSnap.exists) {
             const poolMembers = defaultPoolSnap.data();
             if (poolMembers[userId]) {
-                return 'nerduniverse-2025';
+                return SEASON_CONFIG.poolId;
             }
         }
 
-        return 'nerduniverse-2025'; // Default fallback
+        return SEASON_CONFIG.poolId; // Default fallback
 
     } catch (error) {
         console.error('Error getting user pool:', error);
-        return 'nerduniverse-2025';
+        return SEASON_CONFIG.poolId;
     }
 }
 

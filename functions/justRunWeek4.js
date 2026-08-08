@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 /**
  * Just run the existing scoring system for Week 4
@@ -13,7 +14,7 @@ exports.processWeeklyScoring = functions.https.onCall(async (data, context) => {
         const weekNumber = 4;
 
         // Get pool members (same way as existing system)
-        const poolMembersRef = admin.firestore().doc('artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members');
+        const poolMembersRef = admin.firestore().doc(SEASON_CONFIG.paths.poolMembers());
         const poolMembersSnap = await poolMembersRef.get();
         const poolMembers = Object.values(poolMembersSnap.data()).filter(member => member && member.uid && member.uid !== 'undefined');
 
@@ -107,7 +108,7 @@ async function processUserScore(userId, weekNumber) {
     const accuracy = totalPicks > 0 ? Math.round((correctPicks / totalPicks) * 100 * 100) / 100 : 0;
 
     // Step 4: Save to scoring document (EXACT same format as existing weeks)
-    const scoringRef = admin.firestore().doc(`artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${userId}`);
+    const scoringRef = admin.firestore().doc(SEASON_CONFIG.paths.scoringUser(userId));
 
     const weeklyData = {
         totalPoints: totalPoints,

@@ -4,6 +4,7 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 // Initialize Firebase Admin
 if (!initializeApp.apps || initializeApp.apps.length === 0) {
@@ -144,7 +145,7 @@ async function generateSeasonLeaderboardData() {
     console.log('📊 Starting season leaderboard data generation...');
 
     // Get pool members
-    const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+    const poolMembersPath = SEASON_CONFIG.paths.poolMembers();
     const membersDoc = await db.doc(poolMembersPath).get();
 
     if (!membersDoc.exists) {
@@ -191,7 +192,7 @@ async function generateSeasonLeaderboardData() {
 
             // FIXED: Read directly from corrected scoring documents instead of outdated weekly cache
             try {
-                const userScoringPath = `artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${memberId}`;
+                const userScoringPath = SEASON_CONFIG.paths.scoringUser(memberId);
                 const userScoringSnap = await db.doc(userScoringPath).get();
 
                 if (userScoringSnap.exists) {

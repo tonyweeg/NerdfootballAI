@@ -1,6 +1,7 @@
 // 🔍 Check if specific users have picks data
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 exports.checkUserPicks = onRequest(async (req, res) => {
     console.log('🔍 CHECKING USER PICKS DATA...');
@@ -19,7 +20,7 @@ exports.checkUserPicks = onRequest(async (req, res) => {
         'RThxWwOKm8fm52CHU5VUWIdMa7q2': 'Rey Gomez'
     };
     
-    const poolId = 'nerduniverse-2025';
+    const poolId = SEASON_CONFIG.poolId;
     const picksResults = {};
     
     try {

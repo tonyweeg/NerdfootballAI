@@ -125,7 +125,9 @@ describe('wrapper drift guard (browser vs functions)', () => {
             ['survivorDisplayCache year 0', (c) => c.paths.survivorDisplayCache(0)],
             ['slash userId', (c) => c.paths.picks(1, 'a/b')],
             ['numeric userId', (c) => c.paths.scoringUser(12345)],
-            ['reserved userId', (c) => c.paths.picks(1, '..')]
+            ['reserved userId', (c) => c.paths.picks(1, '..')],
+            ['reserved userId dot', (c) => c.paths.picks(1, '.')],
+            ['reserved userId underscores', (c) => c.paths.picks(1, '__proto__')]
         ];
         for (const [label, probe] of probes) {
             const a = outcome(() => probe(browserConfig));

@@ -1,12 +1,13 @@
 // 💎 CRITICAL FIX: Firebase Function to add missing users to pool
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 exports.addMissingUsersToPool = onRequest(async (req, res) => {
     console.log('🔥 CRITICAL: Adding missing users to pool members...');
     
     const db = admin.firestore();
-    const poolId = 'nerduniverse-2025';
+    const poolId = SEASON_CONFIG.poolId;
     const usersPath = 'artifacts/nerdfootball/public/data/nerdfootball_users';
     const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
     

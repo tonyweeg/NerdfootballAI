@@ -4,6 +4,7 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 // NFL Team Helmet URLs
 function getHelmetUrl(teamName) {
@@ -68,7 +69,7 @@ exports.getSurvivorPoolData = onRequest(
     async (req, res) => {
         console.log('🏈 Survivor Pool Data Request Started');
         const startTime = Date.now();
-        const poolId = req.query.poolId || 'nerduniverse-2025';
+        const poolId = req.query.poolId || SEASON_CONFIG.poolId;
 
         try {
             // Check if we have recent cached data

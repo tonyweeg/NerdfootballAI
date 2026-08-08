@@ -4,6 +4,7 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 // Initialize Firebase Admin
 if (!initializeApp.apps || initializeApp.apps.length === 0) {
@@ -145,7 +146,7 @@ async function generateLeaderboardData() {
     console.log('📊 Starting leaderboard data generation...');
 
     // Get pool members
-    const poolMembersPath = 'artifacts/nerdfootball/pools/nerduniverse-2025/metadata/members';
+    const poolMembersPath = SEASON_CONFIG.paths.poolMembers();
     const membersDoc = await db.doc(poolMembersPath).get();
 
     if (!membersDoc.exists) {

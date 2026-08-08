@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 /**
  * SIMPLE Weekly Scoring - No fancy error handling, just works
@@ -90,7 +91,7 @@ exports.processWeeklyScoring = functions.https.onCall(async (data, context) => {
 
         // STEP 4: Save to scoring document
         console.log('Step 4: Saving score...');
-        const scoringRef = admin.firestore().doc(`artifacts/nerdfootball/pools/nerduniverse-2025/scoring-users/${tonyUID}`);
+        const scoringRef = admin.firestore().doc(SEASON_CONFIG.paths.scoringUser(tonyUID));
 
         const weeklyData = {
             totalPoints: totalPoints,
