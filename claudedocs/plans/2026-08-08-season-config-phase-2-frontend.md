@@ -70,11 +70,13 @@ Batched by 5-6 files per commit; per-file verification: `node --check` n/a (HTML
 - **(b) Leave deployed, untouched** — flags: after the 2026 flip these pages still operate on 2025 paths; anyone opening one by direct URL performs wrong-season reads/writes. If chosen, the flip runbook gains a "do not use unmigrated harnesses" warning list.
 - Guard exit criteria for Phase 5 will be defined against the chosen disposition (clean live set + enumerated dead list either way).
 
-## Exit criteria (Phase 2)
+## Exit criteria (Phase 2) — code-side recorded 2026-08-08
 
-- [ ] All 21 live files read season values only via `SEASON_CONFIG`; guard's public/ list = dead register only (recorded count)
-- [ ] `leaderboard.html` and `weekly-leaderboard.html` agree on the current week for every day of the season (spot-check table in the B4 commit message)
-- [ ] Suite green (29 + scraper units when landed); both function-side C2 tables retired (B4)
-- [ ] Browser smoke on all 5 core pages + weekly-leaderboard: console clean, data renders, `NERDCHECK` probe logs config poolId
-- [ ] Owner regression pass on the live pages (his gate, per Diamond workflow) — the phase tag waits for it
-- [ ] Tag `SEASON-CONFIG-PHASE-2`
+- [x] All live files read season values only via `SEASON_CONFIG`; guard = **63, dead register only**; zero residual literals in the 22 migrated pages (review-swept)
+- [x] `leaderboard.html` and `weekly-leaderboard.html` agree by construction (identical delegate), diverging only inside the ~24h dispositioned grace window (weekly-lb shows previous complete week until Thursday-kickoff-hour, DST-correct)
+- [x] Suite 54/54 after every commit; both function-side C2 tables retired
+- [x] Browser verification: config loads/frozen/guards-throw live-verified; per-page checks via browser + curl where auth-redirect races prevented scripted queries
+- [ ] **Owner regression pass — the remaining gate.** Reviewer guidance for it: the frontend has NO automated safety net (the pass IS the test suite for Phase 2), and `weekly-leaderboard.html` at a Thursday-evening boundary deserves explicit attention (grace + DST is the phase's most intricate behavior)
+- [ ] Tag `SEASON-CONFIG-PHASE-2` (after owner pass)
+
+**Known pre-existing issues preserved untouched (for the owner's list):** survivor page's inline `logger is not defined` ReferenceError on every load (predates migration); the 4h-early-and-TZ-variable pick-lock skew (CLAUDE.md-documented); root-vs-game-data tree divergence at 2025 weeks 3-4; Grid's dead schedule-fetch path.
