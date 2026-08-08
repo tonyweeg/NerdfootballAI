@@ -15,14 +15,32 @@
 
         // Each week's games start at the season's kickoff wall-clock time (e.g. 8:20 PM ET
         // Thursday), which is a DISTINCT, LATER instant than the week's canonical boundary
-        // (midnight UTC Thursday) used by getCurrentNFLWeek(). Computed as an offset-delta
-        // from the anchor, not via setUTCHours: kickoffDateTime's evening ET time crosses
-        // into the next UTC calendar day, so copying just hours/minutes would land 24h early.
+        // (midnight UTC Thursday) used by getCurrentNFLWeek(). Built from that week's own
+        // Eastern UTC offset (EDT/EST), not a constant delta: a fixed delta captured from
+        // week 1 (EDT, -04:00) fires 1h early from the November DST rollback onward, when
+        // Eastern is -05:00 but the constant delta still assumes -04:00.
+        function nthSundayOfMonth(year, month /* 0-indexed */, n) {
+            const first = new Date(Date.UTC(year, month, 1));
+            const firstSunday = 1 + ((7 - first.getUTCDay()) % 7);
+            return new Date(Date.UTC(year, month, firstSunday + (n - 1) * 7));
+        }
+        function isEasternDST(dateUTC) {
+            // US rule since 2007: DST runs from the 2nd Sunday in March to the 1st Sunday
+            // in November. Date-level comparison is exact for our purposes — weeks always
+            // land on Thursdays, never on the Sunday transition day itself.
+            const year = dateUTC.getUTCFullYear();
+            const dstStart = nthSundayOfMonth(year, 2, 2);
+            const dstEnd = nthSundayOfMonth(year, 10, 1);
+            return dateUTC >= dstStart && dateUTC < dstEnd;
+        }
         window.gamesStartFor = function(week) {
-            const anchorMidnightInstant = new Date(window.SEASON_CONFIG.weekAnchor).getTime();
-            const kickInstant = new Date(window.SEASON_CONFIG.kickoffDateTime).getTime();
-            const delta = kickInstant - anchorMidnightInstant;
-            return new Date(anchorMidnightInstant + (week - 1) * 7 * 86400000 + delta);
+            const anchor = new Date(window.SEASON_CONFIG.weekAnchor);
+            const thursday = new Date(anchor.getTime() + (week - 1) * 7 * 86400000);
+            const kick = window.SEASON_CONFIG.kickoffDateTime.match(/T(\d{2}):(\d{2})/);
+            const offset = isEasternDST(thursday) ? '-04:00' : '-05:00';
+            const pad = (n) => String(n).padStart(2, '0');
+            const iso = `${thursday.getUTCFullYear()}-${pad(thursday.getUTCMonth() + 1)}-${pad(thursday.getUTCDate())}T${kick[1]}:${kick[2]}:00${offset}`;
+            return new Date(iso);
         };
 
         // Get the most recent week with actual game data for leaderboard display
