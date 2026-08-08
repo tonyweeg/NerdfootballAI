@@ -562,6 +562,8 @@ gameTime = new Date(Date.UTC(year, month, day, hours + offsetHours, minutes, sec
 
 **DST RULES**: March 9 - November 2 (EDT), November 3 - March 8 (EST)
 
+**⚠️ MEASURED REALITY (2026-08-08 audit):** the `easternTimeParser-v2.js` "fix" (strip Z, subtract fixed 4h) does NOT recover true game times — with the bare-Z game-data files it computes game-start EARLY by a viewer-timezone-dependent amount: Eastern −4h, Central −3h, Mountain −2h, Pacific −1h, UTC −8h, London −9h, Tokyo −17h. Everything gated by `hasGameStarted()` (pick locking, game-time display) fires early by those amounts, and did so for the entire 2025 season. Preserved deliberately for 2026 (ground rule: identical behavior); fixing the parser + dt convention together is a deliberate future project, not a drive-by.
+
 ## 🧰 CENTRALIZED UTILITY MODULES
 **Location**: `/public/js/utils/`
 **Purpose**: DRY principle implementation - single source of truth for common patterns
