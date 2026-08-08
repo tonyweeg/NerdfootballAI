@@ -18,7 +18,7 @@ Embedded recommendations requiring sign-off with this revision:
 |---|----------------|-----------|
 | D3 | Week boundaries anchor to a **date-only** value (`weekAnchor: '2026-09-09'`, a Wednesday — see boundary notes below), preserving the exact legacy flip mechanism (midnight UTC on the anchor date) | Zero behavior change during migration; legacy code (`weekManager.js:47` et al.) uses `new Date('2025-09-04')` = midnight UTC |
 | D4 | Rework scraper to use ESPN's JSON API instead of HTML scraping; remove silent sample-data fallback | Current scraper fabricates datetimes and writes fake sample games on parse failure (see Scraper section) |
-| D5 | 2026+ season data lives under the pool document (`pools/nerduniverse-{year}/data/…`) | Implements D1 using the pool-scoped tree **already defined in firestore.rules:119-137**; poolId carries the year, so segmentation is free |
+| D5 | 2026+ season data lives under the pool document (`pools/nerduniverse-{year}/nerdfootball_picks/…` etc. — **corrected 2026-08-08**) | Implements D1: poolId carries the year, so segmentation is free. **Historical correction:** the original justification cited pool-scoped rules "already defined" at firestore.rules:119-137 — the flip drill proved those legacy blocks were structurally unmatchable (9-segment doc paths) and had never worked; they were a pre-existing mistake, not a design precedent. The shipped tree drops the extra `/data` hop for even segment counts, the rules were rewritten to match, and a permanent segment-parity unit test guards the class |
 
 ## Problem Statement (verified counts, 2026-08-07)
 
@@ -90,9 +90,9 @@ Notes:
 
 Every season-scoped builder takes an optional trailing `year` parameter (default: current season) so history/audit pages can read prior seasons without hardcoding.
 
-**Resolution rule (implements D1/D5):**
+**Resolution rule (implements D1/D5, corrected post-flip-drill 2026-08-08):**
 - `year <= 2025` → legacy year-less tree: `artifacts/nerdfootball/public/data/…` (2025 data stays put)
-- `year >= 2026` → pool-scoped tree: `artifacts/nerdfootball/pools/nerduniverse-{year}/data/…` (rules already exist at firestore.rules:119-137)
+- `year >= 2026` → pool-scoped tree: `artifacts/nerdfootball/pools/nerduniverse-{year}/nerdfootball_picks/…` (and results/games/nerdSurvivor_picks/nerdSurvivor_status directly under the pool doc — NO `/data` hop; even segment counts, drill-verified against a real Firestore client; rules rewritten to match)
 
 ```javascript
 // AUTHORITATIVE IMPLEMENTATION: public/js/config/season-config.js (mirrored in
