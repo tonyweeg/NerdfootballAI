@@ -398,6 +398,24 @@ class PickAnalyticsEngine {
     }
 }
 
+// Shared core (D1): computes weekly analytics for a pool/week and writes it to the
+// analytics path. `label` preserves each trigger's own log/message wording. Both
+// onLegacyPicksUpdate and onPoolPicksUpdate delegate here rather than duplicating
+// this logic — getAllPicksForWeek/getPicksPath/getPoolMembersPath are already
+// poolId-shape-agnostic (route legacy vs. pool-scoped internally), so this is safe
+// to reuse unmodified for both the legacy tree and the new pool-scoped tree.
+async function updatePoolWeeklyAnalytics(poolId, week, label = 'Analytics') {
+    const analytics = new PickAnalyticsEngine();
+    const weeklyAnalytics = await analytics.calculateWeeklyAnalytics(poolId, week);
+
+    const analyticsPath = analytics.getAnalyticsPath(poolId, week);
+    await analytics.db.doc(analyticsPath).set(weeklyAnalytics, { merge: true });
+
+    console.log(`${label} updated for pool ${poolId}, week ${week}`);
+
+    return { success: true, message: `${label} updated successfully` };
+}
+
 // Firestore trigger to update analytics when picks change
 exports.onPicksUpdate = functions.firestore.onDocumentWritten('artifacts/nerdfootball/pools/{poolId}/weeks/{week}/picks/{userId}', async (event) => {
     const { poolId, week, userId } = event.params;
@@ -424,31 +442,42 @@ exports.onPicksUpdate = functions.firestore.onDocumentWritten('artifacts/nerdfoo
 // Legacy picks path trigger for backward compatibility
 exports.onLegacyPicksUpdate = functions.firestore.onDocumentWritten('artifacts/nerdfootball/public/data/nerdfootball_picks/{week}/submissions/{userId}', async (event) => {
     const { week, userId } = event.params;
-    
+
     try {
         console.log(`Legacy pick change detected for week ${week}, user ${userId}`);
-        
+
         // This trigger only ever fires for the legacy (pre-2026) picks tree, so its
         // pool is permanently the 2025 pool — NOT SEASON_CONFIG.poolId, which tracks
         // the current season and will point at next year's pool once the season flips.
         const LEGACY_POOL_YEAR = 2025;
         const poolId = `nerduniverse-${LEGACY_POOL_YEAR}`;
-        
-        const analytics = new PickAnalyticsEngine();
-        const weeklyAnalytics = await analytics.calculateWeeklyAnalytics(poolId, week);
-        
-        // Store analytics in new path structure
-        const analyticsPath = analytics.getAnalyticsPath(poolId, week);
-        await analytics.db.doc(analyticsPath).set(weeklyAnalytics, { merge: true });
-        
-        console.log(`Legacy analytics updated for pool ${poolId}, week ${week}`);
-        
-        return { success: true, message: 'Legacy analytics updated successfully' };
+
+        return await updatePoolWeeklyAnalytics(poolId, week, 'Legacy analytics');
     } catch (error) {
         console.error('Error updating legacy analytics:', error);
         return { success: false, error: error.message };
     }
 });
+
+// Pool-scoped picks path trigger (D1, spec D1/D5): the 2026+ tree lives under the
+// pool document (SEASON_CONFIG.paths.picks() for year > 2025). Mirrors
+// onLegacyPicksUpdate's wiring exactly — only the path, export name, and poolId
+// source (the trigger's own {poolId} param, not a hardcoded year) differ.
+exports.onPoolPicksUpdate = functions.firestore.onDocumentWritten(
+    'artifacts/nerdfootball/pools/{poolId}/data/nerdfootball_picks/{week}/submissions/{userId}',
+    async (event) => {
+        const { poolId, week, userId } = event.params;
+
+        try {
+            console.log(`Pool pick change detected for pool ${poolId}, week ${week}, user ${userId}`);
+
+            return await updatePoolWeeklyAnalytics(poolId, week, 'Pool analytics');
+        } catch (error) {
+            console.error('Error updating pool analytics:', error);
+            return { success: false, error: error.message };
+        }
+    }
+);
 
 // HTTP function to manually trigger analytics calculation
 exports.calculateAnalytics = functions.https.onCall(async (data, context) => {
