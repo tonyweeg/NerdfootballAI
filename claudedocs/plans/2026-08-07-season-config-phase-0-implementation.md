@@ -578,6 +578,7 @@ git commit -m "Phase 0: Season config factory + input guards + fixture-driven pa
 | NEW-4: spec "zero behavior change" overclaim vs divergent-formula warning | **Fixed (round 2)** — qualified to canonical-formula sites |
 | NEW-5: drift suite mutation-tested — missed 3/5 planted bugs (sampled instants, no error-path comparison) | **Fixed (round 3)** — full-season 6h sweep over all weeks + error-parity table guarding the guards |
 | NEW-6: `buildSeasonConfig(null)` fails late with raw TypeError | **Fixed (round 3)** — loud factory guard in both wrappers |
+| NEW-7: `rg` is a Claude-shell-only function, not an installed binary — rg-based guard script silently reported false ✅ when executed directly | **Fixed (round 4)** — guard rewritten in portable grep with loud exit-2 on tool failure; worklist baseline corrected to 211 files |
 
 ---
 
@@ -905,28 +906,42 @@ git commit -m "Phase 0: Functions season config wrapper + drift guard tests"
 # Season hardcode guard — fails when season literals exist outside config/generated/archived files.
 # Spec: claudedocs/specs/2026-08-07-season-config-centralization-design.md (v2), success criterion 2.
 #
+# Pure grep (BSD/GNU portable) — rg is NOT a standalone binary on this machine (it
+# exists only as a Claude Code shell function), and this gate must tell the truth
+# from any terminal or CI. Tool failures exit 2 loudly instead of a false ✅.
+#
 # Phases 0-4: EXPECTED TO FAIL — the file list is the migration progress meter.
 # Phase 5 exit gate: this script passes, then it joins the pre-deploy checklist.
-PATTERN='nerduniverse-20[0-9][0-9]|20[0-9][0-9]-09-0[0-9]'
-MATCHES=$(rg -l -e "$PATTERN" public functions \
-  --glob '!**/node_modules/**' \
-  --glob '!**/season-data.js' \
-  --glob '!**/season-data.json' \
-  --glob '!**/season-config.js' \
-  --glob '!**/seasonConfig.js' \
-  --glob '!**/game-data/**' \
-  --glob '!**/nfl_*_week_*.json' \
-  --glob '!**/nfl_*_schedule_raw.json' \
-  --glob '!**/nfl_*_week_*_corrected.json' \
-  --glob '!**/archive/**' \
-  --glob '!**/*BACKUP*' \
-  2>/dev/null | sort)
+cd "$(dirname "$0")/.." || exit 2
+if [ ! -d public ] || [ ! -d functions ]; then
+    echo "❌ guard: public/ and functions/ not found — wrong directory?" >&2
+    exit 2
+fi
 
+PATTERN='nerduniverse-20[0-9][0-9]|20[0-9][0-9]-09-0[0-9]'
+RAW=$(grep -rEl --binary-files=without-match "$PATTERN" public functions \
+    --exclude-dir=node_modules \
+    --exclude-dir=game-data \
+    --exclude-dir=archive \
+    --exclude='season-data.js' \
+    --exclude='season-data.json' \
+    --exclude='season-config.js' \
+    --exclude='seasonConfig.js' \
+    --exclude='nfl_*_week_*.json' \
+    --exclude='nfl_*_schedule_raw.json' \
+    --exclude='*BACKUP*')
+STATUS=$?
+if [ "$STATUS" -gt 1 ]; then
+    echo "❌ guard: grep failed (status ${STATUS})" >&2
+    exit 2
+fi
+
+MATCHES=$(printf '%s\n' "$RAW" | sed '/^$/d' | sort)
 if [ -n "$MATCHES" ]; then
-  COUNT=$(echo "$MATCHES" | wc -l | tr -d ' ')
-  echo "❌ Season hardcodes remain in ${COUNT} files:"
-  echo "$MATCHES"
-  exit 1
+    COUNT=$(printf '%s\n' "$MATCHES" | wc -l | tr -d ' ')
+    echo "❌ Season hardcodes remain in ${COUNT} files:"
+    echo "$MATCHES"
+    exit 1
 fi
 echo "✅ No season hardcodes outside config."
 ```
@@ -941,7 +956,7 @@ Run (works in bash and zsh):
 ```bash
 OUT=$(./scripts/check-season-hardcodes.sh); CODE=$?; echo "$OUT" | head -3; echo "exit=$CODE"
 ```
-Expected: `❌ Season hardcodes remain in N files:` where N is roughly 100-140, followed by file paths, and `exit=1`
+Expected: `❌ Season hardcodes remain in N files:` where N is in the low-to-mid 200s (rg-sourced baseline 2026-08-07: 211; pure grep also sees gitignored files so may run slightly higher), followed by file paths, and `exit=1`. This must hold when the script is executed directly as its own subprocess — not sourced.
 
 - [ ] **Step 4: Verify the config files themselves are excluded**
 
@@ -979,7 +994,7 @@ Expected: clean tree (everything committed). No `firebase deploy` in this phase 
 **Phase 0 exit checklist:**
 - [ ] `npx jest --roots '<rootDir>/tests' -- tests/season-config-parity.test.js tests/season-config-drift.test.js` → 29 passed
 - [ ] Pre-existing Jest condition unchanged
-- [ ] Guard script runs, exits 1, lists ~100-140 files (the Phase 1-5 worklist), excludes config files
+- [ ] Guard script (executed directly, not sourced) exits 1 and lists the migration worklist (2026-08-07 baseline: 211 files via rg; grep count recorded at Task 4), excluding config files
 - [ ] All commits on `claude/2026-season-config-plan-509f05`, tree clean
 - [ ] No production deploy occurred
 
