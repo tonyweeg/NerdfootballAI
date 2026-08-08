@@ -34,7 +34,7 @@ function getCurrentWeek() {
 /**
  * Fetch ESPN scoreboard data for specific week
  */
-async function fetchESPNScoreboard(week, year = 2025) {
+async function fetchESPNScoreboard(week, year = SEASON_CONFIG.year) {
     try {
         const url = `${ESPN_API_BASE}?week=${week}&year=${year}&seasontype=2`;
         console.log(`🏈 Fetching ESPN data: ${url}`);

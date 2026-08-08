@@ -422,7 +422,7 @@ class EspnNerdApi {
     async fetchSeasonSchedule() {
         try {
             const schedule = {
-                year: 2025,
+                year: SEASON_CONFIG.year,
                 weeks: [],
                 lastUpdated: new Date().toISOString()
             };

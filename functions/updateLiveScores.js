@@ -17,7 +17,7 @@ exports.updateLiveScores = functions.https.onCall(async (data, context) => {
         console.log(`Updating Week ${currentWeek} scores`);
 
         // Fetch ESPN data
-        const url = `${ESPN_API_BASE}?week=${currentWeek}&year=2025&seasontype=2`;
+        const url = `${ESPN_API_BASE}?week=${currentWeek}&year=${SEASON_CONFIG.year}&seasontype=2`;
         const response = await axios.get(url, { timeout: 10000 });
         const espnData = response.data;
 

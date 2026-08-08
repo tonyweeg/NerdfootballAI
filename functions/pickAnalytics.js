@@ -12,8 +12,18 @@ class PickAnalyticsEngine {
 
     // Core utility functions
     getPicksPath(poolId, week, userId) {
-        // Maintain backward compatibility for legacy pools
-        if (poolId === 'nerdfootball-2025' || poolId === 'nerduniverse-2025') {
+        // Maintain backward compatibility for legacy pools.
+        // "Legacy" means "2025-era or earlier", which stays true forever — this is
+        // NOT the same question as "is this the current season's pool", so it is
+        // intentionally NOT keyed off SEASON_CONFIG.poolId (which changes yearly).
+        // Year-parse covers any nerduniverse-<year> id <= 2025 (the nerdfootball-2025
+        // alias parses the same way, since it also ends in -2025, but is also checked
+        // explicitly so this stays correct-by-construction rather than by coincidence
+        // if the alias is ever renamed to something that doesn't end in a bare year).
+        const parsedYear = parseInt(String(poolId).split('-').pop(), 10);
+        const isLegacyPool = poolId === 'nerdfootball-2025' ||
+            (Number.isInteger(parsedYear) && parsedYear <= 2025);
+        if (isLegacyPool) {
             return `artifacts/nerdfootball/public/data/nerdfootball_picks/${week}/submissions/${userId}`;
         }
         return `artifacts/nerdfootball/pools/${poolId}/weeks/${week}/picks/${userId}`;
@@ -417,8 +427,11 @@ exports.onLegacyPicksUpdate = functions.firestore.onDocumentWritten('artifacts/n
     try {
         console.log(`Legacy pick change detected for week ${week}, user ${userId}`);
         
-        // Determine pool ID for legacy data (default to nerduniverse-2025)
-        const poolId = 'nerduniverse-2025';
+        // This trigger only ever fires for the legacy (pre-2026) picks tree, so its
+        // pool is permanently the 2025 pool — NOT SEASON_CONFIG.poolId, which tracks
+        // the current season and will point at next year's pool once the season flips.
+        const LEGACY_POOL_YEAR = 2025;
+        const poolId = `nerduniverse-${LEGACY_POOL_YEAR}`;
         
         const analytics = new PickAnalyticsEngine();
         const weeklyAnalytics = await analytics.calculateWeeklyAnalytics(poolId, week);

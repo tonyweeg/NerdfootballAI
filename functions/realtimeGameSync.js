@@ -108,7 +108,7 @@ exports.syncGameScores = functions.https.onRequest(async (req, res) => {
         try {
             // Get current NFL week
             const currentWeek = getCurrentNflWeek();
-            const year = 2025;
+            const year = SEASON_CONFIG.year;
             
             // Fetch game scores from ESPN API
             const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${year}&seasontype=2&week=${currentWeek}`;
