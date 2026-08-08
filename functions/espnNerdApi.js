@@ -82,15 +82,7 @@ class EspnNerdApi {
 
     // Get current NFL week
     getCurrentWeek() {
-        const now = new Date();
-        // playoff clamp intentional — see spec kill-list
-        const seasonStart = new Date(SEASON_CONFIG.weekAnchor);
-        const weekMs = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
-
-        if (now < seasonStart) return 1;
-
-        const weeksDiff = Math.floor((now - seasonStart) / weekMs) + 1;
-        return Math.min(Math.max(weeksDiff, 1), 22); // Clamp between 1 and 22 (includes playoffs)
+        return SEASON_CONFIG.utils.getCurrentWeek();
     }
 
     // Normalize ESPN team name to NerdFootball format
