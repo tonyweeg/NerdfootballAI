@@ -985,8 +985,8 @@ Expected: the same pre-existing failure recorded at the Task 1 baseline (unscope
 
 - [ ] **Step 2: Confirm the config caching requirement is already met (no firebase.json edit)**
 
-Run: `rg -A2 '"source": "\*\*"' firebase.json | rg 'no-store'`
-Expected: one line containing `no-cache, no-store, must-revalidate` — the global hosting header already prevents stale `season-config.js` after the annual flip. Do not edit firebase.json.
+Run: `grep -n 'no-cache, no-store, must-revalidate' firebase.json`
+Expected: one line hit inside the hosting `headers` block for `source: "**"` — the global hosting header already prevents stale `season-config.js` after the annual flip. Do not edit firebase.json. (Earlier revisions used `rg -A2` from the `source` line, which never reaches the header — it sits below the long CSP value.)
 
 - [ ] **Step 3: Confirm nothing deploys from Phase 0**
 
