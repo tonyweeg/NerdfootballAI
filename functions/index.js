@@ -659,38 +659,40 @@ exports.deepStar6User = onCall(async (request) => {
 
             try {
                 // Confidence picks - path 2
-                await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/confidence/2025/weeks/${week}/users/${userId}`).delete();
+                await db.doc(SEASON_CONFIG.paths.confidenceUser(week, userId)).delete();
                 deletionCount++;
             } catch (e) { /* ignore missing docs */ }
 
             try {
                 // Survivor picks - path 2
-                await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/survivor/2025/weeks/${week}/users/${userId}`).delete();
+                await db.doc(SEASON_CONFIG.paths.survivorUser(week, userId)).delete();
                 deletionCount++;
             } catch (e) { /* ignore missing docs */ }
 
             try {
                 // Scoring data
-                await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/scores/2025/weeks/${week}/users/${userId}`).delete();
+                await db.doc(SEASON_CONFIG.paths.scoresUser(week, userId)).delete();
                 deletionCount++;
             } catch (e) { /* ignore missing docs */ }
 
             try {
                 // Weekly rollups
-                await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/rollups/weekly/2025/week_${week}/users/${userId}`).delete();
+                await db.doc(SEASON_CONFIG.paths.weeklyRollupUser(week, userId)).delete();
                 deletionCount++;
             } catch (e) { /* ignore missing docs */ }
         }
 
         try {
-            // Season rollup - skip if bad path
-            // await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/rollups/season/2025/users/${userId}`).delete();
+            // Season rollup (year segment) - skip if bad path: this shape is a
+            // 9-segment path, invalid for db.doc() (C4, owner decision pending
+            // on delete-vs-fix; see spec kill-list)
+            // await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/rollups/season/<year>/users/${userId}`).delete();
             // deletionCount++;
         } catch (e) { /* ignore */ }
 
         try {
             // Eliminations
-            await db.doc(`artifacts/nerdfootball/pools/${POOL_ID}/survivor/2025/eliminations/${userId}`).delete();
+            await db.doc(SEASON_CONFIG.paths.survivorEliminations(userId)).delete();
             deletionCount++;
         } catch (e) { /* ignore missing docs */ }
 
