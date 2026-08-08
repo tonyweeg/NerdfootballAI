@@ -216,10 +216,20 @@ assert poolId === `nerduniverse-${year}` and weekAnchor starts with `${year}-` (
 
 Any assert failure: exit non-zero, write nothing.
 
-**Annual workflow:**
+**Annual flip runbook (code + data — the config cannot invent pool documents):**
 ```bash
+# 1. Generate the new season's config + schedule files (validated, loud on failure)
 node espn-schedule-scraper.js --year=2026
+
+# 2. Provision the season pool DATA (operational step, not code):
+#    - create artifacts/nerdfootball/pools/nerduniverse-2026/metadata/members
+#      (copy the prior season's membership or enroll via the existing admin tools)
+#    - load the 2026 game data into pools/nerduniverse-2026/data/nerdfootball_games/{week}
+
+# 3. Ship both surfaces
 firebase deploy --only hosting,functions
+
+# 4. Verify: getCurrentWeek() = 1 pre-season; pages read the 2026 pool; suites + guard green
 ```
 
 ## Hardcode Enforcement Guard
@@ -264,7 +274,7 @@ All phases run with **2025 values first** (year: 2025, weekAnchor: '2025-09-04',
 - **Phase 3 — Shared bundles.** `core/survivor/features/confidence` bundles + `weekManager.js`; delete duplicate `getCurrentWeek` implementations per the kill-list.
 - **Phase 4 — Admin tools** (~15 files), same per-page gate.
 - **Phase 5 — Harness audit.** Inventory the remaining ~75 HTML files: **archive dead debug harnesses and backups** (move to `archive/`, excluded from the guard) rather than migrating them; migrate only the live ones.
-- **Phase 6 — Flip drill.** On a branch against the emulator: run the reworked scraper with `--year=2026`, deploy locally, verify pages load, paths resolve to `pools/nerduniverse-2026/data/…`, rules permit reads/writes, `getCurrentWeek` returns 1 pre-season. This proves success criterion 3 before September.
+- **Phase 6 — Flip drill.** On a branch against the emulator: run the reworked scraper with `--year=2026`, **provision a test 2026 pool (members doc + week 1 games) exactly as the runbook prescribes**, deploy locally, verify pages load, picks write to `pools/nerduniverse-2026/data/…`, rules permit reads/writes, `getCurrentWeek` returns 1 pre-season, and a test pick round-trips end to end. This rehearses the entire runbook — not just the code — before September.
 
 Priority note: Phases 0-3 must land before 2026 kickoff (~Sept 10). Phases 4-5 can trail.
 
@@ -279,7 +289,7 @@ Priority note: Phases 0-3 must land before 2026 kickoff (~Sept 10). Phases 4-5 c
 
 1. One generated data source (`season-data.*`) consumed by both hosting and functions
 2. `scripts/check-season-hardcodes.sh` passes (zero hardcodes outside config/generated/archived files)
-3. Annual transition = `node espn-schedule-scraper.js --year=YYYY` + `firebase deploy --only hosting,functions` — nothing else
+3. Annual transition = scraper + pool-data provisioning (members doc + game data) + one deploy — per the flip runbook; no code edits
 4. Parity tests prove 2025-value config reproduces current production paths and week numbers exactly
 5. Flip drill (Phase 6) passes on the emulator before kickoff
 6. All existing functionality preserved; ghost user still blocked; sub-500ms cache targets still met
