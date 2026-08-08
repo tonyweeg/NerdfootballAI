@@ -12,7 +12,7 @@
 
 **Branch:** All work on `claude/2026-season-config-plan-509f05` (this worktree). Run every command from the worktree root. Do not touch `main`. Do not deploy anything in Phase 0.
 
-**Known repo condition (discovered during Task 1, 2026-08-07):** `auraglow/package.json` is truncated mid-file (unterminated string in devDependencies), which crashes any unscoped Jest run during project scanning. All Jest commands in this plan are therefore scoped with `--roots '<rootDir>/tests'` plus a `--` separator before file paths. The Task 1 baseline of root-level unit tests could not run — recorded as pre-existing breakage; Task 5 compares against that recorded state. Fixing auraglow (which also restores plain `npm test`) is out of Phase 0 scope — flagged as a separate task.
+**Known repo condition (discovered during Task 1, 2026-08-07):** `auraglow/package.json` is truncated mid-file (unterminated string in devDependencies), which crashes any unscoped Jest run during project scanning. All Jest commands in this plan are therefore scoped with `--roots '<rootDir>/tests'` plus a `--` separator before file paths. The Task 1 baseline of root-level unit tests could not run — recorded as pre-existing breakage; Task 5 compares against that recorded state. Per owner direction (2026-08-07): auraglow is a separate project and is not to be touched from nerdfootball work — the scoped `--roots` invocation is the permanent convention here.
 
 ---
 
@@ -914,5 +914,5 @@ Expected: clean tree (everything committed). No `firebase deploy` in this phase 
 
 - No HTML page, bundle, or function is modified — `firebase-cache.js` lazy registration, the pool-scoped picks trigger, and the games rules block all land in Phase 1+
 - No scraper changes (spec D4 is its own workstream)
-- No `npm test` restoration — that rides on the separate auraglow-fix task
+- No `npm test` restoration and no changes under `auraglow/` — separate project, per owner direction; season-config suites run via the scoped command
 - No deploy, no push to main — human review gates per the Diamond workflow
