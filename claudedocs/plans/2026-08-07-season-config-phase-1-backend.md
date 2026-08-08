@@ -249,12 +249,13 @@ Expect it to FAIL initially (that's the meter); Phase 1 exit wants the count dri
 
 ---
 
-## Phase 1 exit checklist
+## Phase 1 exit checklist (recorded 2026-08-08)
 
-- [ ] Suite 29/29 (scoped command)
-- [ ] `node --check` clean on every modified functions file
-- [ ] Hardcode guard: functions/ files remaining = only C2 survivors with TODO comments (record exact list + count)
-- [ ] Bare-year gate: same recorded survivor list only
-- [ ] `firebase emulators:start --only functions` boots without error (if emulator unavailable locally, record why and substitute `node --check` + a require-smoke of seasonConfig)
-- [ ] Guard total count recorded (started 103; functions portion should be near zero)
-- [ ] Tag `SEASON-CONFIG-PHASE-1` (annotated), tree clean, nothing pushed/deployed
+- [x] Suite 29/29 (scoped command)
+- [x] `node --check` clean on every modified functions file (verified per batch)
+- [x] Hardcode guard: functions/ remaining = exactly the two C2 survivors with TODOs (`survivorPoolCache.js`, `weeklyLeaderboardCache.js`)
+- [x] Bare-year gate: exactly the three recorded survivors (`mlPredictionManager.js`, `realtimeGameSync.js`, `testRTDB.js`)
+- [x] Emulator boots clean: 52 endpoints discovered (45 before D10), all pickAnalytics functions visible, `All emulators ready!`
+- [x] Guard total: **86** (started 103; the 17-file drop is entirely functions/ migration)
+- [x] Tag `SEASON-CONFIG-PHASE-1` set; 25 commits since PHASE-0; tree clean; nothing pushed or deployed
+- Carried forward: C2 tables → Phase 3 (kickoff-critical); F2 zero Cloud Functions test coverage → Phase 2+ line item; F3 rules `request.auth == null` grant → security pass; owner-pending: C4 dead rollup block, testRTDB archival, survivorCacheUpdater deletion
