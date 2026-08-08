@@ -51,7 +51,7 @@ const GLOBAL_ADMIN_EMAILS = ['tonyweeg@gmail.com'];
 // Get pool admin emails for dynamic routing
 async function getPoolAdminEmails(userId, poolId = SEASON_CONFIG.poolId) {
     try {
-        const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersRef = admin.firestore().doc(SEASON_CONFIG.paths.poolMembersOf(poolId));
         const poolMembersSnap = await poolMembersRef.get();
 
         if (!poolMembersSnap.exists) {

@@ -33,6 +33,14 @@ function buildSeasonConfig(SEASON_DATA) {
         }
         return userId;
     };
+    // Dynamic-pool builder guard (C5): validates a caller-supplied poolId (e.g. from
+    // req.query/data.poolId) rather than assuming the current SEASON_CONFIG.poolId.
+    const reqPoolId = (poolId) => {
+        if (typeof poolId !== 'string' || poolId === '' || poolId.includes('/')) {
+            throw new Error(`SEASON_CONFIG: invalid poolId: ${poolId}`);
+        }
+        return poolId;
+    };
     const timeOf = (now) => {
         const t = now instanceof Date ? now.getTime()
             : (typeof now === 'number' ? now : NaN);
@@ -57,6 +65,9 @@ function buildSeasonConfig(SEASON_DATA) {
         poolRoot: (year) =>
             `artifacts/nerdfootball/pools/nerduniverse-${resolveYear(year)}`,
         poolMembers: (year) => `${paths.poolRoot(year)}/metadata/members`,
+        // Dynamic-pool variant (C5): builds the members path for an arbitrary
+        // caller-supplied poolId, not just the current-season default.
+        poolMembersOf: (poolId) => `artifacts/nerdfootball/pools/${reqPoolId(poolId)}/metadata/members`,
         aiCache: (year) => `${paths.poolRoot(year)}/cache/latest-ai-intel-sheet`,
         gridCache: (week, year) =>
             `${paths.poolRoot(year)}/cache/grid-week-${reqWeek(week)}`,

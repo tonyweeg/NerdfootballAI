@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
+const { SEASON_CONFIG } = require('./seasonConfig');
 
 // DIAMOND-LEVEL PICK ANALYTICS SYSTEM
 // Comprehensive pick statistics and insights for NerdFootballAI
@@ -30,7 +31,7 @@ class PickAnalyticsEngine {
     }
 
     getPoolMembersPath(poolId) {
-        return `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+        return SEASON_CONFIG.paths.poolMembersOf(poolId);
     }
 
     getAnalyticsPath(poolId, week) {

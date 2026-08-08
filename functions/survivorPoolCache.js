@@ -139,7 +139,7 @@ async function generateSurvivorPoolData(poolId) {
     console.log(`🏈 Starting survivor pool data generation for ${poolId}...`);
 
     // Get pool members - CORRECT PATH FROM USER
-    const poolMembersPath = `artifacts/nerdfootball/pools/${poolId}/metadata/members`;
+    const poolMembersPath = SEASON_CONFIG.paths.poolMembersOf(poolId);
     const membersDoc = await db.doc(poolMembersPath).get();
 
     if (!membersDoc.exists) {

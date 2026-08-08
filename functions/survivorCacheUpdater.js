@@ -154,7 +154,7 @@ async function computeAndCacheSurvivorResults(poolId, week) {
         const startTime = Date.now();
         
         // 1. Get pool members
-        const membersDoc = await db.doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`).get();
+        const membersDoc = await db.doc(SEASON_CONFIG.paths.poolMembersOf(poolId)).get();
         if (!membersDoc.exists) {
             throw new Error(`Pool ${poolId} not found`);
         }

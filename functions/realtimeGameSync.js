@@ -328,7 +328,7 @@ async function syncLeaderboardToRTDB(weekNumber = null, poolId = SEASON_CONFIG.p
 async function calculateLeaderboardFromFirestore(weekNumber = null, poolId = SEASON_CONFIG.poolId) {
     try {
         // Get pool members
-        const poolMembersRef = db.doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersRef = db.doc(SEASON_CONFIG.paths.poolMembersOf(poolId));
         const poolMembersSnap = await poolMembersRef.get();
         
         if (!poolMembersSnap.exists) {

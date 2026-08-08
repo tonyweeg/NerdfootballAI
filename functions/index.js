@@ -745,7 +745,7 @@ exports.getAuthUsersNotInPool = onCall(async (request) => {
         const poolId = request.data.poolId || SEASON_CONFIG.poolId;
 
         // Get all pool members
-        const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersRef = admin.firestore().doc(SEASON_CONFIG.paths.poolMembersOf(poolId));
         const poolMembersSnap = await poolMembersRef.get();
         const poolMembers = poolMembersSnap.exists ? poolMembersSnap.data() : {};
 
@@ -825,7 +825,7 @@ exports.getPoolMembersEmails = functions.https.onCall(async (data, context) => {
         const actualData = data.data || data;
         const { poolId = SEASON_CONFIG.poolId } = actualData;
 
-        const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersRef = admin.firestore().doc(SEASON_CONFIG.paths.poolMembersOf(poolId));
         const poolMembersSnap = await poolMembersRef.get();
 
         if (!poolMembersSnap.exists) {
@@ -914,7 +914,7 @@ exports.sendPoolEmail = functions.https.onCall(async (data, context) => {
         }
 
         // Get pool members
-        const poolMembersRef = admin.firestore().doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`);
+        const poolMembersRef = admin.firestore().doc(SEASON_CONFIG.paths.poolMembersOf(poolId));
         const poolMembersSnap = await poolMembersRef.get();
 
         if (!poolMembersSnap.exists) {
@@ -1119,7 +1119,7 @@ async function calculateSurvivorEliminationsCore(poolId = SEASON_CONFIG.poolId, 
 
     // Get pool members
     const poolMembersDoc = await admin.firestore()
-        .doc(`artifacts/nerdfootball/pools/${poolId}/metadata/members`)
+        .doc(SEASON_CONFIG.paths.poolMembersOf(poolId))
             .get();
 
     if (!poolMembersDoc.exists()) {

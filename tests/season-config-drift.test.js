@@ -20,6 +20,7 @@ describe('wrapper drift guard (browser vs functions)', () => {
         for (const year of years) {
             expect(nodeConfig.paths.poolRoot(year)).toBe(browserConfig.paths.poolRoot(year));
             expect(nodeConfig.paths.poolMembers(year)).toBe(browserConfig.paths.poolMembers(year));
+            expect(nodeConfig.paths.poolMembersOf(`nerduniverse-${year}`)).toBe(browserConfig.paths.poolMembersOf(`nerduniverse-${year}`));
             expect(nodeConfig.paths.aiCache(year)).toBe(browserConfig.paths.aiCache(year));
             expect(nodeConfig.paths.scoringUser(uid, year)).toBe(browserConfig.paths.scoringUser(uid, year));
             expect(nodeConfig.paths.survivorPicks(uid, year)).toBe(browserConfig.paths.survivorPicks(uid, year));
@@ -127,7 +128,8 @@ describe('wrapper drift guard (browser vs functions)', () => {
             ['numeric userId', (c) => c.paths.scoringUser(12345)],
             ['reserved userId', (c) => c.paths.picks(1, '..')],
             ['reserved userId dot', (c) => c.paths.picks(1, '.')],
-            ['reserved userId underscores', (c) => c.paths.picks(1, '__proto__')]
+            ['reserved userId underscores', (c) => c.paths.picks(1, '__proto__')],
+            ['invalid poolId', (c) => c.paths.poolMembersOf('a/b')]
         ];
         for (const [label, probe] of probes) {
             const a = outcome(() => probe(browserConfig));
