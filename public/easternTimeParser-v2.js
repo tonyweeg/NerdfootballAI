@@ -91,12 +91,13 @@ class EasternTimeParserV2 {
      */
     hasGameStarted(espnTimestamp) {
         try {
-            // Bible data has wrong timezone - subtract 4 hours to get correct game time
+            // ESPN Z timestamps ARE Eastern time - strip Z and compare directly
             const cleanTime = espnTimestamp.replace('Z', '');
-            const wrongTime = new Date(cleanTime);
-            const correctedGameTime = new Date(wrongTime.getTime() - (4 * 60 * 60 * 1000));
+            const gameTime = new Date(cleanTime);
             const now = new Date();
-            return now >= correctedGameTime;
+            const hasStarted = now >= gameTime;
+            console.log(`⏰ hasGameStarted: ${espnTimestamp} → ${gameTime.toLocaleString()}, now: ${now.toLocaleString()}, started: ${hasStarted}`);
+            return hasStarted;
         } catch (error) {
             console.error('Error checking if game started:', error);
             return true; // Assume started to be safe
@@ -110,29 +111,25 @@ class EasternTimeParserV2 {
      */
     formatGameTime(espnTimestamp) {
         try {
-            // Bible data has wrong timezone - always subtract 4 hours to get correct Eastern Time
+            // ESPN Z timestamps ARE Eastern time - strip Z and display directly
             const cleanTime = espnTimestamp.replace('Z', '');
-            const wrongTime = new Date(cleanTime);
+            const gameTime = new Date(cleanTime);
 
-            if (isNaN(wrongTime.getTime())) {
+            if (isNaN(gameTime.getTime())) {
                 console.warn('Invalid ESPN timestamp:', espnTimestamp);
                 return espnTimestamp;
             }
 
-            // Subtract 4 hours to get correct Eastern Time
-            const correctedTime = new Date(wrongTime.getTime() - (4 * 60 * 60 * 1000));
+            console.log(`⏰ ESPN Eastern: ${espnTimestamp} → ${gameTime.toLocaleString()}`);
 
-            console.log(`⏰ BIBLE FIX: ${espnTimestamp} → corrected to ${correctedTime.toLocaleString()}`);
-
-            // Format the corrected time
-            return correctedTime.toLocaleString('en-US', {
+            // Format as Eastern time (the timestamp IS already Eastern)
+            return gameTime.toLocaleString('en-US', {
                 weekday: 'short',
                 month: 'short',
                 day: 'numeric',
                 hour: 'numeric',
-                minute: '2-digit',
-                timeZoneName: 'short'
-            });
+                minute: '2-digit'
+            }) + ' EDT';
         } catch (error) {
             console.error('Error formatting game time:', error);
             return espnTimestamp;
@@ -146,14 +143,13 @@ class EasternTimeParserV2 {
      */
     getTimeUntilGameStart(espnTimestamp) {
         try {
-            // Bible data has wrong timezone - subtract 4 hours to get correct game time
+            // ESPN Z timestamps ARE Eastern time - strip Z and compare directly
             const cleanTime = espnTimestamp.replace('Z', '');
-            const wrongTime = new Date(cleanTime);
-            const correctedGameTime = new Date(wrongTime.getTime() - (4 * 60 * 60 * 1000));
+            const gameTime = new Date(cleanTime);
             const now = new Date();
-            const timeUntil = correctedGameTime.getTime() - now.getTime();
+            const timeUntil = gameTime.getTime() - now.getTime();
 
-            console.log(`⏰ TIME_UNTIL: Game at ${correctedGameTime.toLocaleString()}, Now: ${now.toLocaleString()}, Until: ${Math.floor(timeUntil / (1000 * 60 * 60))}h ${Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60))}m`);
+            console.log(`⏰ TIME_UNTIL: Game at ${gameTime.toLocaleString()}, Now: ${now.toLocaleString()}, Until: ${Math.floor(timeUntil / (1000 * 60 * 60))}h ${Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60))}m`);
 
             return timeUntil;
         } catch (error) {
