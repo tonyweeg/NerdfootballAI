@@ -53,7 +53,8 @@ const db = getFirestore();
 
 // Cache configuration (matching ESPN cache pattern)
 const CACHE_DURATION_MS = 10 * 1000; // 10 seconds for DEBUG - will change back
-const SURVIVOR_CACHE_PATH = 'cache/survivor_pool_2025';
+// Use SEASON_CONFIG for dynamic cache path
+const SURVIVOR_CACHE_PATH = SEASON_CONFIG.paths.survivorDisplayCache();
 
 /**
  * Get survivor pool data with blazing fast caching
@@ -208,8 +209,9 @@ async function generateSurvivorPoolData(poolId) {
 
             console.log(`👤 Checking survivor picks for: ${memberName} (${memberId})`);
 
-            // Get survivor picks for this member - CORRECT PATH FROM USER
-            const survivorPicksPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${memberId}`;
+            // Get survivor picks for this member - USE SEASON_CONFIG FOR CORRECT YEAR PATH
+            const survivorPicksPath = SEASON_CONFIG.paths.survivorPicks(memberId);
+            console.log(`📍 Survivor picks path for ${memberName}: ${survivorPicksPath}`);
             const picksDoc = await db.doc(survivorPicksPath).get();
 
             // Check current participation status
@@ -228,7 +230,26 @@ async function generateSurvivorPoolData(poolId) {
                 eliminatedBy: 'N/A'
             };
 
+            // Get all available weeks from NFL results and sort them
+            const completedWeeks = Object.keys(nflResults).map(w => parseInt(w)).sort((a, b) => a - b);
+            console.log(`🗓️ Available weeks with NFL results: ${completedWeeks.join(', ')}`);
+
+            // Check if ANY games have actually finished (FINAL status)
+            const anyFinalGames = completedWeeks.some(w => nflResults[w] && nflResults[w].finalGamesCount > 0);
+            console.log(`🎯 Any final games played: ${anyFinalGames}`);
+
+            // PRE-SEASON LOGIC: If no games have actually finished yet, everyone is ALIVE
+            if (!anyFinalGames) {
+                console.log(`🆕 PRE-SEASON: No final games yet - ${memberName} is ALIVE by default`);
+                survivorRecord.status = 'ALIVE';
+                survivorRecord.week1Pick = 'PENDING';
+                alive.push(survivorRecord);
+                survivorData.summary.alive++;
+                continue;
+            }
+
             if (!picksDoc.exists) {
+                // Only mark as not participating if games have been played
                 console.log(`❌ NO PICKS DOCUMENT found for ${memberName} at: ${survivorPicksPath}`);
                 survivorRecord.status = 'NO_PICKS_FOUND';
                 nonParticipating.push(survivorRecord);
@@ -243,11 +264,7 @@ async function generateSurvivorPoolData(poolId) {
             const picks = picksData.picks || picksData;
             console.log(`📋 Raw picks data structure for ${memberName}:`, JSON.stringify(picks, null, 2));
 
-            // Get all available weeks from NFL results and sort them
-            const completedWeeks = Object.keys(nflResults).map(w => parseInt(w)).sort((a, b) => a - b);
-            console.log(`🗓️ Available weeks with NFL results: ${completedWeeks.join(', ')}`);
-
-            // Check if user has week 1 pick (required to participate)
+            // Check if user has week 1 pick (required to participate once games have started)
             const week1Pick = picks['1'];
             if (!week1Pick || !week1Pick.team) {
                 console.log(`⚠️ ${memberName} has NO Week 1 pick`);
@@ -399,7 +416,8 @@ async function loadNFLResultsForAllWeeks() {
     // Check weeks 1-18 for available NFL results
     for (let week = 1; week <= 18; week++) {
         try {
-            const weekPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`;
+            // Use SEASON_CONFIG for correct year-based path
+            const weekPath = SEASON_CONFIG.paths.games(week);
             console.log(`🔍 Checking NFL results for Week ${week} at path: ${weekPath}`);
             const weekDoc = await db.doc(weekPath).get();
 
