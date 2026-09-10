@@ -1,0 +1,65 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Job id "test" is the required status check configured in NERD-6. Renaming it
+  # silently disables branch protection, so don't.
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      # Unit tests only: the smoke suite needs a running site and is handled below.
+      - run: npm run test:unit
+
+  preview:
+    name: Preview channel
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+
+      # Secrets cannot be referenced in a job-level `if`, so gate the steps instead.
+      # Until FIREBASE_SERVICE_ACCOUNT exists this job passes with a notice rather
+      # than painting every PR red.
+      - name: Check for deploy credentials
+        id: creds
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -n "$SA" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT is not set — skipping preview deploy. See NERD-5."
+          fi
+
+      - name: Deploy preview channel
+        id: deploy
+        if: steps.creds.outputs.present == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: nerdfootball
+          channelId: pr-${{ github.event.pull_request.number }}
+          expires: 7d
+
+      - name: Smoke the preview
+        if: steps.creds.outputs.present == 'true'
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.details_url }}
+        run: npm run test:smoke
