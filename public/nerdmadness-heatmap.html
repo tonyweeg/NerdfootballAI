@@ -685,9 +685,27 @@
         function isTeamEliminated(teamId) {
             for (const [matchupId, matchup] of Object.entries(matchups)) {
                 if (matchup.status === 'FINAL' && matchup.winner_team_id) {
+                    // Check if team was in this matchup directly (R64)
                     if ((matchup.top_team_id === teamId || matchup.bottom_team_id === teamId) &&
                         matchup.winner_team_id !== teamId) {
                         return true;
+                    }
+
+                    // Check if team was in this matchup via feeder winners (R32+)
+                    const feeders = getFeederMatchups(matchupId);
+                    if (feeders) {
+                        const topFeeder = matchups[feeders.top];
+                        const bottomFeeder = matchups[feeders.bottom];
+
+                        // Get actual participants from feeder winners
+                        const topParticipant = topFeeder?.winner_team_id;
+                        const bottomParticipant = bottomFeeder?.winner_team_id;
+
+                        // If team was a participant (won their feeder) but lost this matchup
+                        if ((topParticipant === teamId || bottomParticipant === teamId) &&
+                            matchup.winner_team_id !== teamId) {
+                            return true;
+                        }
                     }
                 }
             }

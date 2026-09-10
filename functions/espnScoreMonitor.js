@@ -151,8 +151,8 @@ async function updateGameInFirestore(week, gameId, updates) {
     try {
         console.log(`🔄 Updating Game ${gameId} with:`, updates);
 
-        // Use the EXACT same approach as the working force update
-        const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${week}`;
+        // Use SEASON_CONFIG for correct year-based path
+        const gamesPath = SEASON_CONFIG.paths.games(week);
         const gamesRef = db.doc(gamesPath);
 
         // Build update data with dot notation (same as force update)
@@ -301,9 +301,9 @@ async function monitorESPNScores() {
     console.log(`🏈 ESPN Score Monitor - Week ${currentWeek} - ${new Date().toISOString()}`);
 
     try {
-        // STEP 1: Load existing games from Firestore first (backwards compatibility)
+        // STEP 1: Load existing games from Firestore first (uses SEASON_CONFIG path)
         console.log(`📥 Loading existing Week ${currentWeek} games from Firestore...`);
-        const gamesPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+        const gamesPath = SEASON_CONFIG.paths.games(currentWeek);
         const gamesRef = db.doc(gamesPath);
         const gamesSnap = await gamesRef.get();
 

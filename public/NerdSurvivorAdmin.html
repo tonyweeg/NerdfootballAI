@@ -18,7 +18,12 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="max-w-7xl mx-auto p-4">
-        <h1 class="text-3xl font-bold mb-6">🏈 Survivor Pool Admin CRUD</h1>
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold">🏈 Survivor Pool Admin CRUD</h1>
+            <a href="./nerd-universe.html" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                ← Back to Universe
+            </a>
+        </div>
 
         <!-- Auth Status -->
         <div id="authStatus" class="mb-6 p-4 bg-yellow-100 border border-yellow-300 rounded">
@@ -150,6 +155,45 @@
         let selectedUserId = null;
         let selectedWeek = null;
 
+        // URL state management - keeps user/week selection across refresh
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const week = params.get('week') ? parseInt(params.get('week'), 10) : null;
+            return {
+                week: (week && week >= 1 && week <= 18) ? week : null,
+                user: params.get('user')
+            };
+        }
+
+        function updateUrlParams() {
+            const params = new URLSearchParams();
+            if (selectedUserId) params.set('user', selectedUserId);
+            if (selectedWeek) params.set('week', selectedWeek);
+            const query = params.toString();
+            const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+            window.history.replaceState({}, '', newUrl);
+        }
+
+        async function restoreStateFromUrl() {
+            const urlParams = getUrlParams();
+            if (!urlParams.user && !urlParams.week) return;
+
+            if (urlParams.week) {
+                document.getElementById('weekSelect').value = urlParams.week.toString();
+            }
+
+            if (urlParams.user && poolMembers[urlParams.user]) {
+                document.getElementById('userSelect').value = urlParams.user;
+                await handleUserChange();
+            } else if (urlParams.user) {
+                addStatusMessage(`\u26a0\ufe0f User ${urlParams.user.substring(0, 8)}... from URL is not a pool member`, 'info');
+            }
+
+            if (urlParams.week) {
+                await handleWeekChange();
+            }
+        }
+
         // Authentication
         onAuthStateChanged(auth, async (user) => {
             const authStatus = document.getElementById('authStatus');
@@ -171,6 +215,7 @@
                 populateWeekSelect();
                 populateTeamSelect();
                 setupEventListeners();
+                await restoreStateFromUrl();
                 addStatusMessage('🎯 Admin interface ready', 'success');
             } catch (error) {
                 logger.error('SURVIVOR', 'Error initializing admin interface:', error);
@@ -201,7 +246,14 @@
             const userSelect = document.getElementById('userSelect');
             userSelect.innerHTML = '<option value="">Select a user...</option>';
 
-            Object.entries(poolMembers).forEach(([uid, memberInfo]) => {
+            // Sort members alphabetically by name
+            const sortedMembers = Object.entries(poolMembers).sort((a, b) => {
+                const nameA = (a[1].name || a[1].email || 'Unknown').toLowerCase();
+                const nameB = (b[1].name || b[1].email || 'Unknown').toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+
+            sortedMembers.forEach(([uid, memberInfo]) => {
                 const option = document.createElement('option');
                 option.value = uid;
                 option.textContent = `${memberInfo.name || memberInfo.email || 'Unknown'} (${uid.substring(0, 8)}...)`;
@@ -265,6 +317,7 @@
             } else {
                 hidePickSections();
             }
+            updateUrlParams();
         }
 
         async function handleWeekChange() {
@@ -273,11 +326,12 @@
                 displayCurrentPick();
                 showPickEditor();
             }
+            updateUrlParams();
         }
 
         async function loadUserSurvivorData() {
             try {
-                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${selectedUserId}`;
+                const survivorPath = window.SEASON_CONFIG.paths.survivorPicks(selectedUserId);
                 const survivorDoc = doc(db, survivorPath);
                 const survivorSnap = await getDoc(survivorDoc);
 
@@ -415,7 +469,7 @@
                 };
 
                 // Save to Firebase
-                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${selectedUserId}`;
+                const survivorPath = window.SEASON_CONFIG.paths.survivorPicks(selectedUserId);
                 const survivorDoc = doc(db, survivorPath);
                 await setDoc(survivorDoc, currentUserData);
 
@@ -448,7 +502,7 @@
                 }
 
                 // Save to Firebase
-                const survivorPath = `artifacts/nerdfootball/public/data/nerdSurvivor_picks/${selectedUserId}`;
+                const survivorPath = window.SEASON_CONFIG.paths.survivorPicks(selectedUserId);
                 const survivorDoc = doc(db, survivorPath);
                 await setDoc(survivorDoc, currentUserData);
 

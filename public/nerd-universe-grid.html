@@ -202,6 +202,31 @@
             transform: translateX(2px);
         }
 
+        .user-name.no-picks {
+            font-weight: 400 !important;
+            color: #888888 !important;
+            opacity: 0.7;
+        }
+
+        .user-name.has-picks {
+            font-weight: 700 !important;
+            color: #ffffff !important;
+        }
+
+        .no-picks-pill {
+            display: inline-block;
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: #ffffff;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            vertical-align: middle;
+        }
+
         .pick-cell {
             min-width: 45px;
             max-width: 45px;
@@ -770,7 +795,7 @@
                 updateStats();
                 startCountdownTimer();
 
-                document.getElementById('week-display').textContent = `WEEK ${currentWeek} • 2025`;
+                document.getElementById('week-display').textContent = window.SEASON_CONFIG.format.weekDisplay(currentWeek);
                 setupWeekNavigation();
                 hideLoading();
             } catch (error) {
@@ -923,7 +948,7 @@
             if (newWeek < 1 || newWeek > maxWeek) return;
 
             currentWeek = newWeek;
-            document.getElementById('week-display').textContent = `WEEK ${currentWeek} • 2025`;
+            document.getElementById('week-display').textContent = window.SEASON_CONFIG.format.weekDisplay(currentWeek);
 
             document.getElementById('table-body').innerHTML = '<tr><td colspan="100%" class="text-center p-4 text-nerd-grey">LOADING WEEK ' + currentWeek + '...</td></tr>';
 
@@ -1337,12 +1362,23 @@
 
             let rowsHTML = '';
 
+            // Helper to check if user has picks
+            const hasUserPicks = (userPicks) => {
+                if (!userPicks) return false;
+                const pickKeys = Object.keys(userPicks).filter(k => k.match(/^\d+$/));
+                return pickKeys.length > 0;
+            };
+
             // Render current user first if exists
             if (currentUserRow) {
+                const hasPicks = hasUserPicks(currentUserRow.userPicks);
+                const pickClass = hasPicks ? 'has-picks' : 'no-picks';
+                const pickPill = hasPicks ? '' : '<span class="no-picks-pill">No Picks</span>';
+
                 rowsHTML += `<tr class="current-user-row">`;
                 rowsHTML += `<td class="place-column">${currentUserRow.place}</td>`;
-                rowsHTML += `<td class="user-name" onclick="showUserDetails('${currentUserRow.memberId}')">
-                    👤 ${currentUserRow.member.name || currentUserRow.member.email || 'Unknown'}
+                rowsHTML += `<td class="user-name ${pickClass}" onclick="showUserDetails('${currentUserRow.memberId}')">
+                    👤 ${currentUserRow.member.name || currentUserRow.member.email || 'Unknown'}${pickPill}
                 </td>`;
 
                 gameIds.forEach(gameId => {
@@ -1355,10 +1391,14 @@
 
             // Render remaining players
             playerRankings.forEach(player => {
+                const hasPicks = hasUserPicks(player.userPicks);
+                const pickClass = hasPicks ? 'has-picks' : 'no-picks';
+                const pickPill = hasPicks ? '' : '<span class="no-picks-pill">No Picks</span>';
+
                 rowsHTML += `<tr>`;
                 rowsHTML += `<td class="place-column">${player.place}</td>`;
-                rowsHTML += `<td class="user-name" onclick="showUserDetails('${player.memberId}')">
-                    ${player.member.name || player.member.email || 'Unknown'}
+                rowsHTML += `<td class="user-name ${pickClass}" onclick="showUserDetails('${player.memberId}')">
+                    ${player.member.name || player.member.email || 'Unknown'}${pickPill}
                 </td>`;
 
                 gameIds.forEach(gameId => {

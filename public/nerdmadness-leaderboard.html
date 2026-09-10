@@ -1017,12 +1017,49 @@
             return multiplier * winnerSeed;
         }
 
+        function getFeederMatchups(matchupId) {
+            const prefix = matchupId.substring(0, 2);
+            const gameNum = parseInt(matchupId.split('_G')[1]);
+
+            if (prefix === 'R1') return null;
+
+            const prevRound = {
+                'R2': 'R1', 'R3': 'R2', 'R4': 'R3', 'R5': 'R4', 'R6': 'R5'
+            }[prefix];
+
+            if (!prevRound) return null;
+
+            const topFeederNum = (gameNum * 2) - 1;
+            const bottomFeederNum = gameNum * 2;
+
+            return {
+                top: `${prevRound}_G${String(topFeederNum).padStart(2, '0')}`,
+                bottom: `${prevRound}_G${String(bottomFeederNum).padStart(2, '0')}`
+            };
+        }
+
         function isTeamEliminated(teamId) {
             for (const [matchupId, matchup] of Object.entries(matchups)) {
                 if (matchup.status === 'FINAL' && matchup.winner_team_id) {
+                    // Check if team was in this matchup directly (R64)
                     if ((matchup.top_team_id === teamId || matchup.bottom_team_id === teamId) &&
                         matchup.winner_team_id !== teamId) {
                         return true;
+                    }
+
+                    // Check if team was in this matchup via feeder winners (R32+)
+                    const feeders = getFeederMatchups(matchupId);
+                    if (feeders) {
+                        const topFeeder = matchups[feeders.top];
+                        const bottomFeeder = matchups[feeders.bottom];
+
+                        const topParticipant = topFeeder?.winner_team_id;
+                        const bottomParticipant = bottomFeeder?.winner_team_id;
+
+                        if ((topParticipant === teamId || bottomParticipant === teamId) &&
+                            matchup.winner_team_id !== teamId) {
+                            return true;
+                        }
                     }
                 }
             }

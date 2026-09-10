@@ -574,6 +574,18 @@
                 if (gameSnap.exists()) {
                     gameData[currentWeek] = gameSnap.data();
                 }
+
+                // Also load next week's game data (for when current week completes)
+                const nextWeek = currentWeek + 1;
+                if (nextWeek <= window.SEASON_CONFIG.totalWeeks) {
+                    const nextWeekPath = window.SEASON_CONFIG.paths.games(nextWeek);
+                    const nextWeekDoc = doc(db, nextWeekPath);
+                    const nextWeekSnap = await getDoc(nextWeekDoc);
+                    if (nextWeekSnap.exists()) {
+                        gameData[nextWeek] = nextWeekSnap.data();
+                        logger.survivor(`📅 GAME_DATA: Loaded Week ${nextWeek} data for advance picking`);
+                    }
+                }
             } catch (error) {
                 logger.error('SURVIVOR', 'Error loading game data:', error);
                 gameData[currentWeek] = {};
@@ -618,11 +630,52 @@
             return window.SEASON_CONFIG.utils.getCurrentWeek();
         }
 
+        function getActivePickWeek() {
+            // Determine which week the user should be picking for:
+            // - If current week games haven't all finished → current week
+            // - If current week ALL FINAL and user alive → next week
+            const allCurrentComplete = areAllGamesComplete(currentWeek);
+            const userAlive = userSurvivorStatus && userSurvivorStatus.isAlive;
+
+            if (allCurrentComplete && userAlive && currentWeek < window.SEASON_CONFIG.totalWeeks) {
+                logger.survivor(`📅 ACTIVE_WEEK: Current week ${currentWeek} complete, user alive → active week is ${currentWeek + 1}`);
+                return currentWeek + 1;
+            }
+            logger.survivor(`📅 ACTIVE_WEEK: Active week is ${currentWeek}`);
+            return currentWeek;
+        }
+
+        function areAllGamesComplete(week) {
+            // Check if ALL games in a week have FINAL status
+            const weekGames = gameData[week];
+            if (!weekGames) return false;
+
+            let gameCount = 0;
+            let finalCount = 0;
+
+            for (const gameId in weekGames) {
+                if (gameId.startsWith('_')) continue; // Skip metadata
+                const game = weekGames[gameId];
+                if (!game) continue;
+
+                gameCount++;
+                // Check for FINAL status (handles "FINAL", "F", "FINAL/OT", etc.)
+                const status = (game.s || game.status || '').toUpperCase();
+                if (status.includes('FINAL') || status === 'F') {
+                    finalCount++;
+                }
+            }
+
+            const allComplete = gameCount > 0 && gameCount === finalCount;
+            logger.survivor(`🔒 ALL_GAMES_CHECK: Week ${week} - ${finalCount}/${gameCount} games FINAL, allComplete: ${allComplete}`);
+            return allComplete;
+        }
+
         function isWeekLocked(week) {
-            // SURVIVOR RULE: Picks allowed from Tuesday forward until first game starts
-            // Week is UNLOCKED if:
-            // 1. It's the current week AND today is Tuesday or later
-            // 2. No game has started yet
+            // SURVIVOR RULE:
+            // 1. Picks allowed until first game of the week starts
+            // 2. Next week unlocks when ALL current week games are FINAL
+            // NO day-of-week restriction - only game status matters
 
             logger.survivor(`🔒 LOCK_CHECK: Week ${week}, currentWeek: ${currentWeek}`);
 
@@ -632,28 +685,29 @@
                 return true;
             }
 
-            // Future weeks are always locked
-            if (week > currentWeek) {
-                logger.survivor(`🔒 LOCK_CHECK: Week ${week} is FUTURE - LOCKED`);
+            // Next week (currentWeek + 1): Unlock if all current week games are FINAL
+            if (week === currentWeek + 1) {
+                const currentWeekComplete = areAllGamesComplete(currentWeek);
+                if (currentWeekComplete && userSurvivorStatus && userSurvivorStatus.isAlive) {
+                    logger.survivor(`🔒 LOCK_CHECK: Week ${week} is NEXT WEEK - current week complete & user alive - UNLOCKED`);
+                    return false; // UNLOCKED - can pick for next week
+                }
+                logger.survivor(`🔒 LOCK_CHECK: Week ${week} is NEXT WEEK - waiting for current week to complete - LOCKED`);
                 return true;
             }
 
-            // Current week: Check if it's Tuesday or later
-            const now = new Date();
-            const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, 2=Tuesday, etc.
-
-            // If it's before Tuesday (Sunday=0, Monday=1), week is locked
-            if (dayOfWeek < 2) {
-                logger.survivor(`🔒 LOCK_CHECK: Before Tuesday (day ${dayOfWeek}) - LOCKED`);
+            // Future weeks beyond next week are always locked
+            if (week > currentWeek + 1) {
+                logger.survivor(`🔒 LOCK_CHECK: Week ${week} is FAR FUTURE - LOCKED`);
                 return true;
             }
 
-            // Tuesday or later - check if games have started
+            // Current week: Check if any game has started
             const weekGames = gameData[week];
 
             if (!weekGames || !window.easternTimeParser) {
-                // No game data yet - allow picks from Tuesday onward
-                logger.survivor(`🔒 LOCK_CHECK: Tuesday+ without game data - UNLOCKED for picks`);
+                // No game data yet - allow picks (no games to check)
+                logger.survivor(`🔒 LOCK_CHECK: No game data available - UNLOCKED for picks`);
                 return false;
             }
 
@@ -671,7 +725,7 @@
                 }
             }
 
-            logger.survivor(`🔒 LOCK_CHECK: Week ${week} is UNLOCKED - Tuesday+ and no games started`);
+            logger.survivor(`🔒 LOCK_CHECK: Week ${week} is UNLOCKED - no games have started`);
             return false;
         }
 
@@ -768,12 +822,16 @@
         }
 
         function displayCurrentWeekCard() {
-            logger.survivor(`🎯 DISPLAY_CARD: Checking lock for currentWeek: ${currentWeek}`);
-            const weekLocked = isWeekLocked(currentWeek);
+            // Use active pick week (shifts to next week when current week completes)
+            const activeWeek = getActivePickWeek();
+            logger.survivor(`🎯 DISPLAY_CARD: Checking lock for activeWeek: ${activeWeek} (currentWeek: ${currentWeek})`);
+            const weekLocked = isWeekLocked(activeWeek);
             const picks = userSurvivorData.picks || {};
-            const currentPick = picks[currentWeek.toString()];
+            const activePick = picks[activeWeek.toString()];
 
-            document.getElementById('currentWeekTitle').textContent = `Week ${currentWeek} - Current Pick`;
+            // Show which week user is picking for
+            const weekLabel = activeWeek > currentWeek ? `Week ${activeWeek} - Advance Pick` : `Week ${activeWeek} - Current Pick`;
+            document.getElementById('currentWeekTitle').textContent = weekLabel;
 
             const lockStatus = document.getElementById('lockStatus');
             if (weekLocked) {
@@ -784,15 +842,15 @@
 
             const currentWeekContent = document.getElementById('currentWeekContent');
 
-            if (currentPick) {
-                const alive = currentPick.alive !== false;
+            if (activePick) {
+                const alive = activePick.alive !== false;
                 currentWeekContent.innerHTML = `
                     <div class="current-pick p-6 rounded-lg">
                         <div class="flex items-center justify-between mb-4">
                             <div>
-                                <h3 class="text-lg font-bold">${currentPick.team}</h3>
-                                <p class="text-sm text-gray-600">Game ID: ${currentPick.gameId || 'Not set'}</p>
-                                <p class="text-sm text-gray-600">Status: ${currentPick.result || 'Pending'}</p>
+                                <h3 class="text-lg font-bold">${activePick.team}</h3>
+                                <p class="text-sm text-gray-600">Game ID: ${activePick.gameId || 'Not set'}</p>
+                                <p class="text-sm text-gray-600">Status: ${activePick.result || 'Pending'}</p>
                             </div>
                             <div class="text-right">
                                 <div class="text-2xl mb-1">${alive ? '✅' : '💀'}</div>
@@ -802,7 +860,7 @@
                             </div>
                         </div>
                         ${!weekLocked ? `
-                            <button onclick="startEditing(${currentWeek})" class="w-full blood-button py-2 px-4 rounded-lg transition-colors">
+                            <button onclick="startEditing(${activeWeek})" class="w-full blood-button py-2 px-4 rounded-lg transition-colors">
                                 ✏️ Change Pick
                             </button>
                         ` : `
@@ -818,8 +876,8 @@
                         <div class="available-pick p-6 rounded-lg text-center">
                             <div class="text-4xl mb-4">🎯</div>
                             <h3 class="text-lg font-bold mb-2">No Pick Yet</h3>
-                            <p class="text-gray-600 mb-4">Select your team for Week ${currentWeek}</p>
-                            <button onclick="startEditing(${currentWeek})" class="bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors pulse-animation">
+                            <p class="text-gray-600 mb-4">Select your team for Week ${activeWeek}</p>
+                            <button onclick="startEditing(${activeWeek})" class="bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors pulse-animation">
                                 🏈 Make Your Pick
                             </button>
                         </div>
@@ -829,7 +887,7 @@
                         <div class="locked-pick p-6 rounded-lg text-center">
                             <div class="text-4xl mb-4">🔒</div>
                             <h3 class="text-lg font-bold mb-2">No Pick Made</h3>
-                            <p class="text-gray-600">Week ${currentWeek} is locked - games have started</p>
+                            <p class="text-gray-600">Week ${activeWeek} is locked - games have started</p>
                         </div>
                     `;
                 }
@@ -949,7 +1007,8 @@
 
         function displayGameInfo() {
             const gameInfoContent = document.getElementById('gameInfoContent');
-            const weekGames = gameData[currentWeek];
+            const activeWeek = getActivePickWeek();
+            const weekGames = gameData[activeWeek];
 
             if (!weekGames || !window.easternTimeParser) {
                 gameInfoContent.innerHTML = `

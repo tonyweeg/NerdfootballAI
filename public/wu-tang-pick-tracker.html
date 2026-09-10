@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚔️ 36 Chambers Pick Tracker - Wu-Tang Admin</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-auth-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #000000 0%, #1a1a00 50%, #000000 100%);
+            color: #ffd700;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .wu-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .wu-header {
+            text-align: center;
+            padding: 30px 20px;
+            background: linear-gradient(45deg, #000000, #1a1a00, #333300);
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.4), inset 0 0 50px rgba(0, 0, 0, 0.5);
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .wu-header::before {
+            content: "W";
+            position: absolute;
+            font-size: 200px;
+            font-weight: 900;
+            color: rgba(255, 215, 0, 0.05);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .wu-logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 48px;
+            font-weight: 900;
+            color: #ffd700;
+            text-shadow: 3px 3px 0 #000, 0 0 20px #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .wu-subtitle {
+            font-size: 24px;
+            color: #ff6600;
+            text-shadow: 2px 2px 0 #000;
+            margin-bottom: 5px;
+        }
+
+        .wu-tagline {
+            font-size: 14px;
+            color: #888;
+            letter-spacing: 3px;
+        }
+
+        .admin-gate {
+            background: linear-gradient(45deg, #330000, #000000);
+            border: 2px solid #ff0000;
+            padding: 40px;
+            text-align: center;
+            margin: 50px auto;
+            max-width: 500px;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.3);
+        }
+
+        .admin-gate h2 {
+            color: #ff0000;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .admin-gate p {
+            color: #ff6666;
+            margin-bottom: 20px;
+        }
+
+        .wu-btn {
+            background: linear-gradient(45deg, #ffd700, #cc9900);
+            border: 2px solid #ffd700;
+            color: #000;
+            padding: 12px 24px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+
+        .wu-btn:hover {
+            background: linear-gradient(45deg, #ffea00, #ffd700);
+            box-shadow: 0 0 20px #ffd700;
+            transform: scale(1.05);
+        }
+
+        .wu-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #333;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .control-group select {
+            background: #1a1a1a;
+            color: #ffd700;
+            border: 1px solid #ffd700;
+            padding: 8px 15px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #444;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .stat-card.survivor {
+            border-color: #ff6600;
+            box-shadow: 0 0 15px rgba(255, 102, 0, 0.3);
+        }
+
+        .stat-card.confidence {
+            border-color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+
+        .stat-number {
+            font-size: 48px;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .stat-card.survivor .stat-number { color: #ff6600; }
+        .stat-card.confidence .stat-number { color: #00ff00; }
+
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 10px;
+        }
+
+        .tracker-section {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #ffd700;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: linear-gradient(45deg, #1a1a00, #333300);
+            padding: 15px 20px;
+            border-bottom: 2px solid #ffd700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        .section-badge {
+            background: #ffd700;
+            color: #000;
+            padding: 5px 15px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .tracker-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .tracker-table th {
+            background: #1a1a1a;
+            color: #ffd700;
+            padding: 12px 8px;
+            text-align: center;
+            border: 1px solid #333;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .tracker-table th.user-col {
+            text-align: left;
+            min-width: 150px;
+        }
+
+        .tracker-table td {
+            padding: 10px 8px;
+            text-align: center;
+            border: 1px solid #333;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .tracker-table td.user-cell {
+            text-align: left;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .tracker-table tr:nth-child(even) td {
+            background: rgba(26, 26, 0, 0.3);
+        }
+
+        .tracker-table tr:hover td {
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .pick-status {
+            font-size: 18px;
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            border-radius: 4px;
+        }
+
+        .pick-status.has-pick {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+        }
+
+        .pick-status.no-pick {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff0000;
+        }
+
+        .pick-status.future {
+            background: rgba(100, 100, 100, 0.2);
+            color: #666;
+        }
+
+        .pick-details {
+            font-size: 10px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .loading-chamber {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .loading-chamber .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #333;
+            border-top-color: #ffd700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .wu-console {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 11px;
+            margin-top: 20px;
+        }
+
+        .wu-console .log-entry {
+            margin: 3px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .wu-console .log-info { color: #ffd700; }
+        .wu-console .log-success { color: #00ff00; }
+        .wu-console .log-error { color: #ff0000; }
+
+        .summary-row {
+            background: linear-gradient(45deg, #1a1a00, #000) !important;
+            font-weight: bold;
+        }
+
+        .summary-row td {
+            color: #ffd700 !important;
+            border-top: 2px solid #ffd700;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: #ffd700;
+            text-decoration: none;
+            padding: 10px 20px;
+            border: 1px solid #ffd700;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 215, 0, 0.1);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .wu-logo { font-size: 32px; }
+            .wu-subtitle { font-size: 18px; }
+            .tracker-table { font-size: 11px; }
+            .pick-status { width: 24px; height: 24px; line-height: 24px; font-size: 14px; }
+        }
+    </style>
+    <script src="./js/utils/logger-compat.js"></script>
+    <script src="./js/config/season-data.js"></script>
+    <script src="./js/config/season-config.js"></script>
+</head>
+<body>
+    <div class="wu-container">
+        <a href="./nerd-universe.html" class="back-link">← Back to Nerd Universe</a>
+
+        <div class="wu-header">
+            <div class="wu-logo">⚔️ 36 CHAMBERS ⚔️</div>
+            <div class="wu-subtitle">PICK TRACKER - WHO'S IN, WHO'S OUT</div>
+            <div class="wu-tagline">PROTECT YA NECK • ADMIN SURVEILLANCE SYSTEM</div>
+        </div>
+
+        <!-- Admin Gate (shown when not authenticated) -->
+        <div id="admin-gate" class="admin-gate">
+            <h2>🔒 ADMIN ACCESS REQUIRED</h2>
+            <p>Only Wu-Tang Clan members may enter the 36 Chambers</p>
+            <button class="wu-btn" onclick="signIn()">🐝 ENTER THE WU</button>
+        </div>
+
+        <!-- Main Content (shown when authenticated as admin) -->
+        <div id="main-content" style="display: none;">
+            <!-- Controls -->
+            <div class="controls">
+                <div class="control-group">
+                    <label>POOL:</label>
+                    <select id="pool-selector">
+                        <option value="both">Both Pools</option>
+                        <option value="survivor">Survivor Only</option>
+                        <option value="confidence">Confidence Only</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>WEEK RANGE:</label>
+                    <select id="week-start">
+                        <option value="1">Week 1</option>
+                    </select>
+                    <span style="color: #ffd700;">to</span>
+                    <select id="week-end">
+                        <option value="3">Week 3</option>
+                    </select>
+                </div>
+                <button class="wu-btn" onclick="loadPickData()">🔍 SCAN CHAMBERS</button>
+                <button class="wu-btn" onclick="exportData()">📊 EXPORT</button>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="stats-grid">
+                <div class="stat-card survivor">
+                    <div class="stat-number" id="survivor-picked">-</div>
+                    <div class="stat-label">Survivor Picks This Week</div>
+                </div>
+                <div class="stat-card survivor">
+                    <div class="stat-number" id="survivor-missing">-</div>
+                    <div class="stat-label">Survivor Missing</div>
+                </div>
+                <div class="stat-card confidence">
+                    <div class="stat-number" id="confidence-picked">-</div>
+                    <div class="stat-label">Confidence Picks This Week</div>
+                </div>
+                <div class="stat-card confidence">
+                    <div class="stat-number" id="confidence-missing">-</div>
+                    <div class="stat-label">Confidence Missing</div>
+                </div>
+            </div>
+
+            <!-- Survivor Pool Tracker -->
+            <div id="survivor-section" class="tracker-section">
+                <div class="section-header">
+                    <span class="section-title">🗡️ SURVIVOR POOL - Death Before Dishonor</span>
+                    <span class="section-badge" id="survivor-badge">LOADING...</span>
+                </div>
+                <div id="survivor-table-container">
+                    <div class="loading-chamber">
+                        <div class="spinner"></div>
+                        <div style="color: #ffd700;">Entering the chamber...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confidence Pool Tracker -->
+            <div id="confidence-section" class="tracker-section">
+                <div class="section-header">
+                    <span class="section-title">🐝 CONFIDENCE POOL - Killer Bees on a Swarm</span>
+                    <span class="section-badge" id="confidence-badge">LOADING...</span>
+                </div>
+                <div id="confidence-table-container">
+                    <div class="loading-chamber">
+                        <div class="spinner"></div>
+                        <div style="color: #ffd700;">Summoning the swarm...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Console Output -->
+            <div class="wu-console" id="console-output">
+                <div class="log-entry log-info">[SYSTEM] Wu-Tang Pick Tracker initialized...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/config/firebase-config-compat.js"></script>
+    <script>
+        firebase.initializeApp(window.getFirebaseConfig());
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+
+        const ADMIN_UIDS = [
+            'WxSPmEildJdqs6T5hIpBUZrscwt2',
+            'BPQvRhpVl1ZzsBXaS7C2iFe2Xpc2',
+            'bEVzcZtSExT8cIjamWnGbWZ3J5s1'
+        ];
+
+        let poolMembers = [];
+        let survivorData = {};
+        let confidenceData = {};
+        let currentWeek = 1;
+
+        function log(message, type = 'info') {
+            const console_output = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            console_output.innerHTML += `<div class="log-entry log-${type}">[${timestamp}] ${message}</div>`;
+            console_output.scrollTop = console_output.scrollHeight;
+        }
+
+        async function signIn() {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await window.auth.signInWithPopup(provider);
+            } catch (error) {
+                log(`Sign in failed: ${error.message}`, 'error');
+            }
+        }
+
+        function initWeekSelectors() {
+            const totalWeeks = window.SEASON_CONFIG.totalWeeks;
+            currentWeek = window.SEASON_CONFIG.utils.getCurrentWeek();
+
+            const startSelect = document.getElementById('week-start');
+            const endSelect = document.getElementById('week-end');
+
+            startSelect.innerHTML = '';
+            endSelect.innerHTML = '';
+
+            for (let w = 1; w <= totalWeeks; w++) {
+                startSelect.innerHTML += `<option value="${w}" ${w === 1 ? 'selected' : ''}>Week ${w}</option>`;
+                endSelect.innerHTML += `<option value="${w}" ${w === currentWeek ? 'selected' : ''}>Week ${w}</option>`;
+            }
+        }
+
+        async function loadPoolMembers() {
+            log('Loading pool members...', 'info');
+            try {
+                const membersPath = window.SEASON_CONFIG.paths.poolMembers();
+                const membersDoc = await window.db.doc(membersPath).get();
+
+                if (!membersDoc.exists) {
+                    log('No pool members document found', 'error');
+                    return [];
+                }
+
+                const data = membersDoc.data();
+                const members = [];
+
+                for (const [key, value] of Object.entries(data)) {
+                    if (key !== 'lastUpdated' && key !== 'count') {
+                        members.push({
+                            odayId: key,
+                            name: value.displayName || value.name || value.email || key.slice(-6),
+                            email: value.email || ''
+                        });
+                    }
+                }
+
+                members.sort((a, b) => a.name.localeCompare(b.name));
+                log(`Loaded ${members.length} pool members`, 'success');
+                return members;
+            } catch (error) {
+                log(`Error loading members: ${error.message}`, 'error');
+                return [];
+            }
+        }
+
+        async function loadSurvivorPicks(members, startWeek, endWeek) {
+            log(`Loading survivor picks for weeks ${startWeek}-${endWeek}...`, 'info');
+            const data = {};
+
+            const promises = members.map(async (member) => {
+                const survivorPath = window.SEASON_CONFIG.paths.survivorPicks(member.odayId);
+                try {
+                    const doc = await window.db.doc(survivorPath).get();
+                    if (doc.exists) {
+                        const picks = doc.data().picks || {};
+                        data[member.odayId] = picks;
+                    } else {
+                        data[member.odayId] = {};
+                    }
+                } catch (e) {
+                    data[member.odayId] = {};
+                }
+            });
+
+            await Promise.all(promises);
+            log(`Survivor data loaded for ${Object.keys(data).length} users`, 'success');
+            return data;
+        }
+
+        async function loadConfidencePicks(members, startWeek, endWeek) {
+            log(`Loading confidence picks for weeks ${startWeek}-${endWeek}...`, 'info');
+            const data = {};
+
+            for (let week = startWeek; week <= endWeek; week++) {
+                data[week] = {};
+
+                const picksPath = `${window.SEASON_CONFIG.paths.poolRoot()}/nerdfootball_picks/${week}/submissions`;
+
+                try {
+                    const snapshot = await window.db.collection(picksPath).get();
+                    snapshot.forEach(doc => {
+                        const docData = doc.data();
+                        const pickCount = Object.keys(docData).filter(k =>
+                            !['userName', 'userId', 'mnfTotalPoints', 'weekNumber', 'submittedAt', 'timestamp'].includes(k)
+                        ).length;
+
+                        data[week][doc.id] = {
+                            pickCount: pickCount,
+                            submittedAt: docData.submittedAt || docData.timestamp
+                        };
+                    });
+                } catch (e) {
+                    log(`Week ${week} confidence: ${e.message}`, 'error');
+                }
+            }
+
+            log(`Confidence data loaded`, 'success');
+            return data;
+        }
+
+        function renderSurvivorTable(members, survivorData, startWeek, endWeek) {
+            const container = document.getElementById('survivor-table-container');
+            let pickedCount = 0;
+            let missingCount = 0;
+
+            let html = '<table class="tracker-table"><thead><tr>';
+            html += '<th class="user-col">WARRIOR</th>';
+
+            for (let w = startWeek; w <= endWeek; w++) {
+                html += `<th>WK ${w}</th>`;
+            }
+            html += '</tr></thead><tbody>';
+
+            const weekTotals = {};
+            for (let w = startWeek; w <= endWeek; w++) {
+                weekTotals[w] = { picked: 0, total: 0 };
+            }
+
+            members.forEach(member => {
+                const picks = survivorData[member.odayId] || {};
+                html += `<tr><td class="user-cell">${member.name}</td>`;
+
+                for (let w = startWeek; w <= endWeek; w++) {
+                    const weekKey = w.toString();
+                    const hasPick = picks[weekKey] && picks[weekKey].team;
+                    const team = hasPick ? picks[weekKey].team : null;
+
+                    weekTotals[w].total++;
+
+                    if (w > currentWeek) {
+                        html += `<td><span class="pick-status future">-</span></td>`;
+                    } else if (hasPick) {
+                        weekTotals[w].picked++;
+                        if (w === currentWeek) pickedCount++;
+                        html += `<td><span class="pick-status has-pick">✓</span><div class="pick-details">${team}</div></td>`;
+                    } else {
+                        if (w === currentWeek) missingCount++;
+                        html += `<td><span class="pick-status no-pick">✗</span></td>`;
+                    }
+                }
+                html += '</tr>';
+            });
+
+            html += '<tr class="summary-row"><td class="user-cell">TOTAL PICKED</td>';
+            for (let w = startWeek; w <= endWeek; w++) {
+                html += `<td>${weekTotals[w].picked}/${weekTotals[w].total}</td>`;
+            }
+            html += '</tr>';
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            document.getElementById('survivor-picked').textContent = pickedCount;
+            document.getElementById('survivor-missing').textContent = missingCount;
+            document.getElementById('survivor-badge').textContent = `${pickedCount}/${members.length} PICKED`;
+        }
+
+        function renderConfidenceTable(members, confidenceData, startWeek, endWeek) {
+            const container = document.getElementById('confidence-table-container');
+            let pickedCount = 0;
+            let missingCount = 0;
+
+            let html = '<table class="tracker-table"><thead><tr>';
+            html += '<th class="user-col">WARRIOR</th>';
+
+            for (let w = startWeek; w <= endWeek; w++) {
+                html += `<th>WK ${w}</th>`;
+            }
+            html += '</tr></thead><tbody>';
+
+            const weekTotals = {};
+            for (let w = startWeek; w <= endWeek; w++) {
+                weekTotals[w] = { picked: 0, total: 0 };
+            }
+
+            members.forEach(member => {
+                html += `<tr><td class="user-cell">${member.name}</td>`;
+
+                for (let w = startWeek; w <= endWeek; w++) {
+                    const weekData = confidenceData[w] || {};
+                    const userPick = weekData[member.odayId];
+                    const hasPick = userPick && userPick.pickCount > 0;
+
+                    weekTotals[w].total++;
+
+                    if (w > currentWeek) {
+                        html += `<td><span class="pick-status future">-</span></td>`;
+                    } else if (hasPick) {
+                        weekTotals[w].picked++;
+                        if (w === currentWeek) pickedCount++;
+                        html += `<td><span class="pick-status has-pick">✓</span><div class="pick-details">${userPick.pickCount} picks</div></td>`;
+                    } else {
+                        if (w === currentWeek) missingCount++;
+                        html += `<td><span class="pick-status no-pick">✗</span></td>`;
+                    }
+                }
+                html += '</tr>';
+            });
+
+            html += '<tr class="summary-row"><td class="user-cell">TOTAL PICKED</td>';
+            for (let w = startWeek; w <= endWeek; w++) {
+                html += `<td>${weekTotals[w].picked}/${weekTotals[w].total}</td>`;
+            }
+            html += '</tr>';
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            document.getElementById('confidence-picked').textContent = pickedCount;
+            document.getElementById('confidence-missing').textContent = missingCount;
+            document.getElementById('confidence-badge').textContent = `${pickedCount}/${members.length} PICKED`;
+        }
+
+        async function loadPickData() {
+            const poolType = document.getElementById('pool-selector').value;
+            const startWeek = parseInt(document.getElementById('week-start').value);
+            const endWeek = parseInt(document.getElementById('week-end').value);
+
+            if (startWeek > endWeek) {
+                log('Start week must be <= end week', 'error');
+                return;
+            }
+
+            log(`Scanning chambers: ${poolType} pools, weeks ${startWeek}-${endWeek}...`, 'info');
+
+            poolMembers = await loadPoolMembers();
+
+            if (poolType === 'both' || poolType === 'survivor') {
+                document.getElementById('survivor-section').style.display = 'block';
+                survivorData = await loadSurvivorPicks(poolMembers, startWeek, endWeek);
+                renderSurvivorTable(poolMembers, survivorData, startWeek, endWeek);
+            } else {
+                document.getElementById('survivor-section').style.display = 'none';
+            }
+
+            if (poolType === 'both' || poolType === 'confidence') {
+                document.getElementById('confidence-section').style.display = 'block';
+                confidenceData = await loadConfidencePicks(poolMembers, startWeek, endWeek);
+                renderConfidenceTable(poolMembers, confidenceData, startWeek, endWeek);
+            } else {
+                document.getElementById('confidence-section').style.display = 'none';
+            }
+
+            log('Chamber scan complete!', 'success');
+        }
+
+        function exportData() {
+            const startWeek = parseInt(document.getElementById('week-start').value);
+            const endWeek = parseInt(document.getElementById('week-end').value);
+
+            let csv = 'User,';
+            for (let w = startWeek; w <= endWeek; w++) {
+                csv += `Survivor W${w},Confidence W${w},`;
+            }
+            csv += '\n';
+
+            poolMembers.forEach(member => {
+                csv += `"${member.name}",`;
+                const survivorPicks = survivorData[member.odayId] || {};
+
+                for (let w = startWeek; w <= endWeek; w++) {
+                    const survPick = survivorPicks[w.toString()]?.team || '';
+                    const confPick = confidenceData[w]?.[member.odayId]?.pickCount || 0;
+                    csv += `"${survPick}",${confPick},`;
+                }
+                csv += '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pick-tracker-weeks-${startWeek}-${endWeek}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            log('Data exported to CSV', 'success');
+        }
+
+        window.auth.onAuthStateChanged(async (user) => {
+            if (user && ADMIN_UIDS.includes(user.uid)) {
+                document.getElementById('admin-gate').style.display = 'none';
+                document.getElementById('main-content').style.display = 'block';
+                log(`Admin authenticated: ${user.email}`, 'success');
+                initWeekSelectors();
+                await loadPickData();
+            } else if (user) {
+                log(`Access denied for: ${user.email}`, 'error');
+                document.getElementById('admin-gate').querySelector('p').textContent =
+                    'Access denied. You are not a Wu-Tang Clan admin.';
+            } else {
+                document.getElementById('admin-gate').style.display = 'block';
+                document.getElementById('main-content').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

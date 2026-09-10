@@ -177,7 +177,7 @@ exports.syncGameScores = functions.https.onRequest(async (req, res) => {
             if (Object.keys(liveScores).length > 0) {
                 console.log(`📝 Updating Firestore bible data for ${Object.keys(liveScores).length} games`);
 
-                const biblePath = `artifacts/nerdfootball/public/data/nerdfootball_games/${currentWeek}`;
+                const biblePath = SEASON_CONFIG.paths.games(currentWeek);
                 const bibleRef = db.doc(biblePath);
                 const bibleSnap = await bibleRef.get();
 

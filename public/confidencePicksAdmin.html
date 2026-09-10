@@ -50,7 +50,12 @@
     <div class="max-w-7xl mx-auto p-6">
         <!-- Header -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">🛠️ Confidence Picks Admin Tool</h1>
+            <div class="flex items-center justify-between mb-2">
+                <h1 class="text-3xl font-bold text-gray-800">🛠️ Confidence Picks Admin Tool</h1>
+                <a href="./nerd-universe.html" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                    ← Back to Universe
+                </a>
+            </div>
             <p class="text-gray-600">Full CRUD management for all weeks • Auto-save on field exit • Minimal clicks</p>
 
             <!-- Auth Status -->
@@ -183,6 +188,23 @@
         let currentPicks = {};
         let autoSaveTimeout = null;
 
+        // URL state management
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                week: params.get('week') ? parseInt(params.get('week')) : null,
+                user: params.get('user')
+            };
+        }
+
+        function updateUrlParams() {
+            const params = new URLSearchParams();
+            if (currentWeek) params.set('week', currentWeek);
+            if (currentUserId) params.set('user', currentUserId);
+            const newUrl = `${window.location.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newUrl);
+        }
+
         // Authentication
         onAuthStateChanged(auth, async (user) => {
             const authStatus = document.getElementById('authStatus');
@@ -204,7 +226,9 @@
                 await loadAllUsers();
                 initializeWeekSelector();
                 setupEventListeners();
-                updateStatus('Ready for picks management', 'success');
+
+                // Auto-load week data and restore user from URL if present
+                await onWeekChange(true);
             } catch (error) {
                 logger.error('CONFIDENCE', 'Initialization failed:', error);
                 updateStatus(`Initialization failed: ${error.message}`, 'error');
@@ -237,13 +261,24 @@
 
         function initializeWeekSelector() {
             const selector = document.getElementById('weekSelector');
+            const currentNflWeek = window.SEASON_CONFIG.utils.getCurrentWeek();
+            const urlParams = getUrlParams();
+
+            // Use URL param week if valid, otherwise current NFL week
+            const initialWeek = (urlParams.week && urlParams.week >= 1 && urlParams.week <= 18)
+                ? urlParams.week
+                : currentNflWeek;
+
             for (let i = 1; i <= 18; i++) {
                 const option = document.createElement('option');
                 option.value = i;
-                option.textContent = `Week ${i}`;
-                if (i === 1) option.selected = true;
+                option.textContent = i === currentNflWeek ? `Week ${i} (Current)` : `Week ${i}`;
+                if (i === initialWeek) option.selected = true;
                 selector.appendChild(option);
             }
+
+            // Set currentWeek to match the selector
+            currentWeek = initialWeek;
         }
 
         function setupEventListeners() {
@@ -256,7 +291,7 @@
             // Auto-save listeners will be added dynamically to pick inputs
         }
 
-        async function onWeekChange() {
+        async function onWeekChange(autoLoadFromUrl = false) {
             const selectedWeek = parseInt(document.getElementById('weekSelector').value);
             currentWeek = selectedWeek;
 
@@ -265,7 +300,20 @@
             try {
                 await loadWeekBible();
                 await populateUserSelector();
-                hidePicksEditor();
+
+                // Check if we should restore user from URL
+                const urlParams = getUrlParams();
+                if (autoLoadFromUrl && urlParams.user && usersList[urlParams.user]) {
+                    // Set the user selector and load their picks
+                    document.getElementById('userSelector').value = urlParams.user;
+                    currentUserId = urlParams.user;
+                    onUserChange(); // Update user info display
+                    await loadUserPicks();
+                } else {
+                    hidePicksEditor();
+                }
+
+                updateUrlParams();
                 updateStatus(`Week ${selectedWeek} ready`, 'success');
             } catch (error) {
                 logger.error('CONFIDENCE', 'Week change failed:', error);
@@ -275,10 +323,38 @@
 
         async function loadWeekBible() {
             try {
-                const response = await fetch(`/game-data/nfl_2025_week_${currentWeek}.json?v=${Date.now()}`);
+                // Load static schedule data first
+                const scheduleFile = window.SEASON_CONFIG.format.scheduleFilename(currentWeek);
+                const response = await fetch(`/game-data/${scheduleFile}?v=${Date.now()}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 weekBible = await response.json();
-                logger.confidence(`✅ Loaded Week ${currentWeek} bible:`, Object.keys(weekBible).filter(k => k !== '_metadata').length, 'games');
+                logger.confidence(`✅ Loaded Week ${currentWeek} static schedule:`, Object.keys(weekBible).filter(k => k !== '_metadata').length, 'games');
+
+                // Now load live game data from Firestore (has status/winner)
+                try {
+                    const gamesPath = window.SEASON_CONFIG.paths.games(currentWeek);
+                    const gamesSnap = await getDoc(doc(db, gamesPath));
+                    if (gamesSnap.exists()) {
+                        const liveGames = gamesSnap.data();
+                        // Merge live data into weekBible
+                        Object.keys(liveGames).forEach(gameId => {
+                            if (gameId.startsWith('_')) return; // Skip metadata
+                            if (weekBible[gameId]) {
+                                // Merge live status/winner/scores into static schedule
+                                weekBible[gameId] = {
+                                    ...weekBible[gameId],
+                                    status: liveGames[gameId].status || weekBible[gameId].status,
+                                    winner: liveGames[gameId].winner || weekBible[gameId].winner,
+                                    awayScore: liveGames[gameId].awayScore,
+                                    homeScore: liveGames[gameId].homeScore
+                                };
+                            }
+                        });
+                        logger.confidence(`✅ Merged live game data from Firestore`);
+                    }
+                } catch (liveError) {
+                    logger.warn('CONFIDENCE', 'Could not load live game data:', liveError);
+                }
             } catch (error) {
                 logger.error('CONFIDENCE', `Failed to load Week ${currentWeek} bible:`, error);
                 weekBible = {};
@@ -290,7 +366,7 @@
             selector.innerHTML = '<option value="">Select user...</option>';
 
             // Load existing picks to see who has data
-            const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+            const picksPath = window.SEASON_CONFIG.paths.picksWeek(currentWeek);
             let existingPicks = new Set();
 
             try {
@@ -368,7 +444,7 @@
             updateStatus('Loading picks...', 'info');
 
             try {
-                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksPath = window.SEASON_CONFIG.paths.picksWeek(currentWeek);
                 const picksDoc = doc(db, picksPath, currentUserId);
                 const picksSnap = await getDoc(picksDoc);
 
@@ -383,6 +459,9 @@
                     populatePicksEditor();
                     showPicksEditor();
                 }
+
+                // Update URL to persist state
+                updateUrlParams();
             } catch (error) {
                 logger.error('CONFIDENCE', 'Failed to load picks:', error);
                 updateStatus(`Failed to load picks: ${error.message}`, 'error');
@@ -451,13 +530,39 @@
                 const game = weekBible[gameId];
                 const pick = currentPicks[gameId] || { winner: '', confidence: '' };
 
+                // Check if game is final and determine if pick was correct
+                const gameStatus = (game.status || '').toLowerCase();
+                const isGameFinal = gameStatus === 'final' || gameStatus === 'final/ot' || gameStatus === 'status_final';
+                const hasWinner = game.winner && game.winner !== 'TBD';
+                const hasPick = pick.winner && pick.winner !== '';
+
+                let resultIndicator = '';
+                let borderClass = 'border-gray-200';
+
+                if (isGameFinal && hasWinner && hasPick) {
+                    if (pick.winner === game.winner) {
+                        resultIndicator = '<span class="text-green-600 font-bold text-lg">✓</span>';
+                        borderClass = 'border-green-400 border-2';
+                    } else {
+                        resultIndicator = '<span class="text-red-600 font-bold text-lg">✗</span>';
+                        borderClass = 'border-red-400 border-2';
+                    }
+                } else if (isGameFinal && hasWinner && !hasPick) {
+                    resultIndicator = '<span class="text-orange-500 font-bold text-sm">NO PICK</span>';
+                    borderClass = 'border-orange-400 border-2';
+                }
+
                 const gameDiv = document.createElement('div');
-                gameDiv.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4';
+                gameDiv.className = `bg-gray-50 border ${borderClass} rounded-lg p-4`;
                 gameDiv.innerHTML = `
                     <div class="mb-2">
-                        <h4 class="font-semibold text-gray-800">Game ${gameId}</h4>
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-semibold text-gray-800">Game ${gameId}</h4>
+                            ${resultIndicator}
+                        </div>
                         <p class="text-xs text-gray-600">${game.a} @ ${game.h}</p>
-                        ${game.winner ? `<p class="text-xs text-green-600">Winner: ${game.winner}</p>` : ''}
+                        ${hasWinner ? `<p class="text-xs text-green-600 font-semibold">Winner: ${game.winner}</p>` :
+                          (gameStatus ? `<p class="text-xs text-blue-600">Status: ${game.status}</p>` : '')}
                     </div>
 
                     <div class="space-y-2">
@@ -545,7 +650,7 @@
                 currentPicks.weekNumber = currentWeek;
                 currentPicks.userId = currentUserId;
 
-                const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${currentWeek}/submissions`;
+                const picksPath = window.SEASON_CONFIG.paths.picksWeek(currentWeek);
                 const picksDoc = doc(db, picksPath, currentUserId);
                 await setDoc(picksDoc, currentPicks);
 
