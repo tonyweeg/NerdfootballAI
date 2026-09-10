@@ -38,17 +38,25 @@ async function apiGet(url, token) {
   return res.json();
 }
 
-async function latestVersionId(token = accessToken()) {
-  const data = await apiGet(`${API_BASE}/versions?pageSize=1`, token);
-  if (!data.versions || !data.versions.length) throw new Error('no hosting versions returned');
-  return data.versions[0].name.split('/').pop();
+/**
+ * The version currently RELEASED to the live channel.
+ *
+ * Deliberately /releases, not /versions: preview-channel deploys create versions in the
+ * same collection, and an aborted deploy leaves a CREATED version behind. Either would
+ * make /versions?pageSize=1 return something that was never served, and the check would
+ * report the whole tree as drifted. /releases is by definition what is live.
+ */
+async function liveVersionId(token = accessToken()) {
+  const data = await apiGet(`${API_BASE}/releases?pageSize=1`, token);
+  if (!data.releases || !data.releases.length) throw new Error('no hosting releases returned');
+  return data.releases[0].version.name.split('/').pop();
 }
 
 async function fetchLiveManifest(versionId, token = accessToken()) {
   const out = {};
   let pageToken = '';
   do {
-    const url = `${API_BASE}/versions/${versionId}/files?pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ''}`;
+    const url = `${API_BASE}/versions/${versionId}/files?pageSize=1000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
     const data = await apiGet(url, token);
     for (const file of data.files || []) out[file.path] = file.hash;
     pageToken = data.nextPageToken || '';
@@ -56,7 +64,14 @@ async function fetchLiveManifest(versionId, token = accessToken()) {
   return out;
 }
 
-/** Mirrors firebase.json hosting.ignore: firebase.json, dotfiles, node_modules. */
+/**
+ * Approximates firebase.json hosting.ignore: dotfiles and node_modules.
+ *
+ * KNOWN DIVERGENCE (NERD-9): this prunes whole dot-DIRECTORIES, while firebase.json's
+ * `**\/.*` matches only basenames. If a dot-directory such as public/.well-known is ever
+ * added and Firebase uploads its contents, those paths would be reported as permanent
+ * false LIVE ONLY drift. No such directory exists in public/ today, so this is latent.
+ */
 function buildLocalManifest(publicDir) {
   const out = {};
   (function walk(dir) {
@@ -100,7 +115,7 @@ module.exports = {
   hashBuffer,
   isReserved,
   accessToken,
-  latestVersionId,
+  liveVersionId,
   fetchLiveManifest,
   buildLocalManifest,
   diffManifests,

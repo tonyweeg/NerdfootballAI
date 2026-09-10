@@ -13,15 +13,19 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const {
   accessToken,
-  latestVersionId,
+  liveVersionId,
   fetchLiveManifest,
   buildLocalManifest,
   diffManifests,
 } = require('./lib/hosting-manifest');
 
+const REPO_ROOT = path.join(__dirname, '..');
+
+/** Anchored to REPO_ROOT so running this script from any cwd reports this repo's state. */
 function gitState() {
-  const dirty = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim() !== '';
-  const head = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
+  const opts = { cwd: REPO_ROOT, encoding: 'utf8' };
+  const dirty = execFileSync('git', ['status', '--porcelain'], opts).trim() !== '';
+  const head = execFileSync('git', ['rev-parse', '--short', 'HEAD'], opts).trim();
   return { dirty, head };
 }
 
@@ -31,9 +35,9 @@ function list(label, paths) {
 }
 
 (async () => {
-  const publicDir = path.join(__dirname, '..', 'public');
+  const publicDir = path.join(REPO_ROOT, 'public');
   const token = accessToken();
-  const versionId = await latestVersionId(token);
+  const versionId = await liveVersionId(token);
   const live = await fetchLiveManifest(versionId, token);
   const local = buildLocalManifest(publicDir);
   const { dirty, head } = gitState();
