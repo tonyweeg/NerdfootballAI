@@ -66,6 +66,26 @@ jobs:
           channelId: pr-${{ github.event.pull_request.number }}
           expires: 7d
 
+      # The channel URL is not serving the instant the deploy action returns; the
+      # first run smoked it too early and got 404 on every page while the same URL
+      # answered 200 a minute later. Wait for it to actually serve.
+      - name: Wait for the preview to serve
+        if: steps.creds.outputs.present == 'true'
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.details_url }}
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/nerd-universe.html")
+            if [ "$code" = "200" ]; then
+              echo "preview ready after $i attempt(s)"
+              exit 0
+            fi
+            echo "attempt $i: HTTP $code"
+            sleep 5
+          done
+          echo "::error::preview never served 200 within 150s"
+          exit 1
+
       - name: Smoke the preview
         if: steps.creds.outputs.present == 'true'
         env:
