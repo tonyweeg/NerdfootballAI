@@ -185,6 +185,8 @@
         let poolMembers = {};
         let weekBible = {};
         let usersList = {};
+        let legacyUsers = {};
+        const GHOST_USER_ID = 'okl4sw2aDhW3yKpOfOwe5lH7OQj1';
         let currentPicks = {};
         let autoSaveTimeout = null;
 
@@ -244,19 +246,58 @@
             }
         }
 
+        /**
+         * Builds the admin user list from POOL MEMBERS, which are authoritative.
+         *
+         * This previously listed the legacy nerdfootball_users collection instead, which
+         * CLAUDE.md marks "DO NOT USE". Any pool member without a legacy document was
+         * unselectable — 14 of 53 members, including every user added recently (NERD-12).
+         * The legacy collection is now consulted only to enrich display names, never to
+         * decide who exists.
+         */
         async function loadAllUsers() {
-            const usersCollection = collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users');
-            const usersSnap = await getDocs(usersCollection);
+            legacyUsers = {};
+            try {
+                const usersSnap = await getDocs(collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users'));
+                usersSnap.forEach(userDoc => { legacyUsers[userDoc.id] = userDoc.data(); });
+            } catch (error) {
+                // Display names degrade to the pool member record; membership is unaffected.
+                logger.warn('CONFIDENCE', 'Legacy user lookup failed, using pool member data only:', error);
+            }
+
             usersList = {};
-            usersSnap.forEach(userDoc => {
-                const userData = userDoc.data();
-                usersList[userDoc.id] = {
-                    name: userData.userName || userData.displayName || userData.name || 'Unknown User',
-                    email: userData.email || userData.emailAddress || 'No Email',
-                    isPoolMember: !!poolMembers[userDoc.id]
-                };
+            Object.entries(poolMembers).forEach(([uid, member]) => {
+                if (uid === GHOST_USER_ID) {
+                    logger.confidence('🚫 GHOST USER BLOCKED:', uid);
+                    return;
+                }
+                usersList[uid] = buildUserEntry(uid, member, true);
             });
-            logger.confidence(`✅ Loaded ${Object.keys(usersList).length} total users`);
+
+            logger.confidence(`✅ Loaded ${Object.keys(usersList).length} pool members (legacy docs available for ${Object.keys(legacyUsers).length})`);
+
+            // NERD12 debug marker — filter the console by "NERD12" to verify this fix.
+            console.log(`🔍 NERD12 | pool members loaded: ${Object.keys(usersList).length}`);
+            console.log('🔍 NERD12 | target user U3pmTnTEdJeLN0dk8IaeesoFt2T2:',
+                usersList['U3pmTnTEdJeLN0dk8IaeesoFt2T2'] || 'MISSING — fix did not work');
+            const unnamed = Object.entries(usersList).filter(([uid, u]) => u.name === uid);
+            console.log(`🔍 NERD12 | entries falling back to a bare uid: ${unnamed.length}`, unnamed.map(([uid]) => uid));
+        }
+
+        /**
+         * Member records are inconsistently shaped across the 53 pool members — email is
+         * on all of them, displayName on 37, name on 23 — so fall through every known
+         * source before giving up. A bare uid is a last resort, never a silent blank.
+         */
+        function buildUserEntry(uid, member, isPoolMember) {
+            const legacy = legacyUsers[uid] || {};
+            const m = member || {};
+            return {
+                name: m.displayName || m.name || legacy.userName || legacy.displayName
+                    || legacy.name || m.email || legacy.email || uid,
+                email: m.email || legacy.email || legacy.emailAddress || 'No Email',
+                isPoolMember
+            };
         }
 
         function initializeWeekSelector() {
@@ -376,6 +417,15 @@
                 logger.warn('CONFIDENCE', 'Could not load existing picks:', error);
             }
 
+            // Anyone holding a picks document for this week must remain reachable even if
+            // they are not (or no longer) a pool member, so stray docs can be found and
+            // reset from this tool. Pool membership still decides the badge.
+            existingPicks.forEach(uid => {
+                if (uid === GHOST_USER_ID || usersList[uid]) return;
+                usersList[uid] = buildUserEntry(uid, null, false);
+                logger.confidence(`📄 Non-member with picks for week ${currentWeek}: ${uid}`);
+            });
+
             // Sort users: pool members first, then by name
             const sortedUsers = Object.entries(usersList).sort((a, b) => {
                 const [idA, userA] = a;
@@ -401,6 +451,8 @@
 
                 selector.appendChild(option);
             });
+
+            console.log(`🔍 NERD12 | dropdown rendered with ${sortedUsers.length} entries for week ${currentWeek} (${existingPicks.size} have picks)`);
 
             selector.disabled = false;
             document.getElementById('loadPicks').disabled = false;
@@ -454,10 +506,11 @@
                     showPicksEditor();
                     updateStatus('Picks loaded successfully', 'success');
                 } else {
-                    updateStatus('No picks found for this user', 'warning');
-                    currentPicks = {};
-                    populatePicksEditor();
-                    showPicksEditor();
+                    // Brand-new user with no picks document. Binding the editor to {}
+                    // renders zero game rows and looks broken, so seed a full blank
+                    // sheet the admin can fill in and save (NERD-12).
+                    createBlankPicks();
+                    updateStatus(`No picks yet for ${usersList[currentUserId]?.name || currentUserId} — blank Week ${currentWeek} sheet started. Click Save to create it.`, 'warning');
                 }
 
                 // Update URL to persist state
