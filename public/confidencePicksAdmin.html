@@ -326,7 +326,7 @@
             document.getElementById('weekSelector').addEventListener('change', onWeekChange);
             document.getElementById('userSelector').addEventListener('change', onUserChange);
             document.getElementById('loadPicks').addEventListener('click', loadUserPicks);
-            document.getElementById('createBlank').addEventListener('click', createBlankPicks);
+            document.getElementById('createBlank').addEventListener('click', () => createBlankPicks({ save: true }));
             document.getElementById('deleteUser').addEventListener('click', resetUserPicks);
 
             // Auto-save listeners will be added dynamically to pick inputs
@@ -509,8 +509,7 @@
                     // Brand-new user with no picks document. Binding the editor to {}
                     // renders zero game rows and looks broken, so seed a full blank
                     // sheet the admin can fill in and save (NERD-12).
-                    createBlankPicks();
-                    updateStatus(`No picks yet for ${usersList[currentUserId]?.name || currentUserId} — blank Week ${currentWeek} sheet started. Click Save to create it.`, 'warning');
+                    await createBlankPicks({ save: true });
                 }
 
                 // Update URL to persist state
@@ -521,7 +520,17 @@
             }
         }
 
-        async function createBlankPicks() {
+        /**
+         * Builds a complete, valid pick sheet: every game of the week, confidence 1..n,
+         * and each winner defaulted to the HOME team so the sheet is immediately usable
+         * rather than a grid of empty selects (NERD-13).
+         *
+         * @param {Object}  [options]
+         * @param {boolean} [options.save=false] Persist to Firestore immediately. Used
+         *   when the document does not exist yet; resetUserPicks saves separately, so it
+         *   leaves this false to avoid writing twice.
+         */
+        async function createBlankPicks({ save = false } = {}) {
             if (!currentUserId) {
                 alert('Please select a user first');
                 return;
@@ -539,17 +548,31 @@
                 timestamp: Date.now()
             };
 
-            // Create blank picks
+            // Confidence 1..n, n = games this week. Winner defaults to the home team.
+            let missingHome = 0;
             gameIds.forEach((gameId, index) => {
+                const game = weekBible[gameId] || {};
+                if (!game.h) missingHome++;
                 currentPicks[gameId] = {
-                    winner: '',
+                    winner: game.h || '',
                     confidence: index + 1
                 };
             });
 
+            console.log(`🔍 NERD12 | blank sheet: ${gameIds.length} games, confidence 1-${gameIds.length}, home teams preselected${missingHome ? `, ${missingHome} without a home team` : ''}`);
+
             populatePicksEditor();
             showPicksEditor();
-            updateStatus('Blank picks created', 'success');
+
+            if (save) {
+                await savePicksData();
+                console.log(`🔍 NERD12 | blank sheet SAVED for ${currentUserId} week ${currentWeek}`);
+                updateStatus(`Created and saved Week ${currentWeek} picks for ${user.name} — ${gameIds.length} games, home teams preselected`, 'success');
+                await populateUserSelector();
+                document.getElementById('userSelector').value = currentUserId;
+            } else {
+                updateStatus('Blank picks created', 'success');
+            }
         }
 
         function populatePicksEditor() {
