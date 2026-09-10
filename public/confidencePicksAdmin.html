@@ -690,6 +690,52 @@
             });
         }
 
+        /** Game ids for the current week. currentPicks also holds metadata keys
+         *  (userId, userName, weekNumber, submittedAt, mnfTotalPoints, timestamp),
+         *  so never iterate currentPicks directly when looking for games. */
+        function currentGameIds() {
+            return Object.keys(weekBible).filter(k => k !== '_metadata').sort();
+        }
+
+        /**
+         * Assigns a confidence value, swapping with whichever game already holds it.
+         *
+         * Confidence must be a permutation of 1..n, n = games that week. Mirrors the
+         * behaviour of the player-facing page (nerdfootballConfidencePicks.html
+         * handleConfidenceChange): the game that held the value inherits the value the
+         * edited game just gave up, so the set stays complete and duplicate-free
+         * instead of requiring the admin to unpick and re-pick (NERD-15).
+         *
+         * @returns {string|null} the game id that was swapped, if any
+         */
+        function applyConfidenceWithSwap(gameId, newConfidence) {
+            const previous = currentPicks[gameId] ? (currentPicks[gameId].confidence ?? null) : null;
+
+            if (!currentPicks[gameId]) {
+                currentPicks[gameId] = { winner: '', confidence: null };
+            }
+
+            if (newConfidence === null) {
+                currentPicks[gameId].confidence = null;
+                return null;
+            }
+
+            const holder = currentGameIds().find(id =>
+                id !== gameId && currentPicks[id] && currentPicks[id].confidence === newConfidence);
+
+            currentPicks[gameId].confidence = newConfidence;
+
+            if (holder) {
+                // May be null when the edited game had no value yet; that leaves the
+                // other game empty rather than silently duplicating a value.
+                currentPicks[holder].confidence = previous;
+                const otherInput = document.querySelector(`[data-game-id="${holder}"][data-field="confidence"]`);
+                if (otherInput) otherInput.value = previous ?? '';
+            }
+
+            return holder;
+        }
+
         function setupPickAutoSave(input) {
             input.addEventListener('blur', async () => {
                 const gameId = input.getAttribute('data-game-id');
@@ -697,7 +743,25 @@
                 let value = input.value;
 
                 if (field === 'confidence') {
-                    value = value ? parseInt(value) : null;
+                    const total = currentGameIds().length;
+                    const parsed = value === '' ? null : parseInt(value, 10);
+
+                    if (parsed !== null && (Number.isNaN(parsed) || parsed < 1 || parsed > total)) {
+                        input.value = (currentPicks[gameId] && currentPicks[gameId].confidence) || '';
+                        updateStatus(`Confidence must be between 1 and ${total}`, 'error');
+                        return;
+                    }
+
+                    const swappedWith = applyConfidenceWithSwap(gameId, parsed);
+                    console.log(`🔍 NERD12 | confidence ${gameId} -> ${parsed}${swappedWith ? `, swapped with game ${swappedWith}` : ''}`);
+
+                    await savePicksData();
+                    validatePicks();
+
+                    if (swappedWith) {
+                        updateStatus(`Confidence ${parsed} moved to game ${gameId}; game ${swappedWith} took ${currentPicks[swappedWith].confidence ?? 'none'}`, 'success');
+                    }
+                    return;
                 }
 
                 if (!currentPicks[gameId]) {
