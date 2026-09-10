@@ -118,7 +118,12 @@ service cloud.firestore {
     // Pool-specific picks data
     match /artifacts/nerdfootball/pools/{poolId}/nerdfootball_picks/{week}/submissions/{userId} {
       allow read: if isPoolMember(poolId);
-      allow write: if isPoolMember(poolId) && request.auth.uid == userId;
+      // Members write their own picks. Global admins may write any member's picks,
+      // which is what confidencePicksAdmin.html needs to exist at all. The season
+      // migration to pool-scoped paths dropped this exception that the legacy rule
+      // above has always carried, silently breaking every admin save (NERD-14).
+      allow write: if (isPoolMember(poolId) && request.auth.uid == userId)
+                      || isGlobalAdmin();
     }
     
     // Pool-specific results
