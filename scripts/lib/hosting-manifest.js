@@ -2,20 +2,46 @@
 
 const fs = require('fs');
 const path = require('path');
-const zlib = require('zlib');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 
 const SITE = 'nerdfootball';
 const API_BASE = `https://firebasehosting.googleapis.com/v1beta1/sites/${SITE}`;
 
+const LIVE_ORIGIN = `https://${SITE}.web.app`;
+
 /**
- * Firebase Hosting content hash: sha256 of the gzip level-9 encoding.
- * Verified 2026-09-10 against release a9a8567313832060 (/NerdSurvivorAdmin.html).
- * Levels 1 and 6 do not match, nor does the gzip CLI at -9 -n. Do not change the level.
+ * Raw sha256 of the bytes. Identical on every platform and Node version.
+ *
+ * NOT Firebase's manifest hash. Firebase stores sha256(gzip level 9), which is
+ * reproducible only on a machine whose zlib matches the one that ran the deploy —
+ * node 24 (zlib 1.2.12) and node 20 disagree on the same input (NERD-11). Comparing
+ * manifest hashes across machines reports every file as drifted, so we compare the
+ * actual bytes instead.
  */
 function hashBuffer(buf) {
-  return crypto.createHash('sha256').update(zlib.gzipSync(buf, { level: 9 })).digest('hex');
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+/**
+ * Fetches every live path and hashes its raw bytes.
+ *
+ * fetch() transparently decodes Content-Encoding, so this yields the original file
+ * bytes regardless of how Firebase stored or served them.
+ */
+async function fetchLiveContentHashes(paths, { origin = LIVE_ORIGIN, concurrency = 24 } = {}) {
+  const out = {};
+  const queue = [...paths];
+  const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+    while (queue.length) {
+      const p = queue.pop();
+      const res = await fetch(`${origin}${p}`, { redirect: 'follow' });
+      if (!res.ok) throw new Error(`${res.status} fetching ${p}`);
+      out[p] = hashBuffer(Buffer.from(await res.arrayBuffer()));
+    }
+  });
+  await Promise.all(workers);
+  return out;
 }
 
 /**
@@ -114,6 +140,8 @@ function diffManifests(live, local) {
 module.exports = {
   hashBuffer,
   isReserved,
+  fetchLiveContentHashes,
+  LIVE_ORIGIN,
   accessToken,
   liveVersionId,
   fetchLiveManifest,
