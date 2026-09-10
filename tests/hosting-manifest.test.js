@@ -2,23 +2,31 @@ const fs = require('fs');
 const path = require('path');
 const { hashBuffer, diffManifests, buildLocalManifest } = require('../scripts/lib/hosting-manifest');
 
-// Firebase Hosting content hash = sha256(gzip level 9). Established empirically on
-// 2026-09-10 against release a9a8567313832060: /NerdSurvivorAdmin.html hashed to
-// 74b03104f65263ae49cfed7db94e4371143155fce4cde725c1674474bec71090, which gzip
-// levels 1 and 6 did NOT reproduce. This literal locks the algorithm in place.
+// hashBuffer is a RAW sha256, deliberately not Firebase's manifest hash.
+// Firebase stores sha256(gzip level 9), which differs by zlib version: node 24
+// (zlib 1.2.12) and node 20 produce different digests for identical bytes, so
+// comparing manifest hashes across machines reports total false drift (NERD-11).
+// This literal is therefore stable on every platform and Node version — that is
+// the property under test.
 const FIXTURE = path.join(__dirname, 'fixtures', 'hash-sample.txt');
-const FIXTURE_HASH = 'd1406b8f82375e0aa289d4d242c6c656062f911285ec298dd96262fab98913d3';
+const FIXTURE_HASH = '634d9dac701f6f129bf1babb7ef9cb12faf9b9c80f95ee98624d750e0867822f';
 
 describe('hashBuffer', () => {
-  test('reproduces the Firebase Hosting content hash for a known fixture', () => {
+  test('is a raw sha256, identical on every platform', () => {
     expect(hashBuffer(fs.readFileSync(FIXTURE))).toBe(FIXTURE_HASH);
+  });
+
+  test('matches what a plain sha256 of the same bytes produces', () => {
+    const buf = fs.readFileSync(FIXTURE);
+    const expected = require('crypto').createHash('sha256').update(buf).digest('hex');
+    expect(hashBuffer(buf)).toBe(expected);
   });
 
   test('is sensitive to content', () => {
     expect(hashBuffer(Buffer.from('a'))).not.toBe(hashBuffer(Buffer.from('b')));
   });
 
-  test('is deterministic across calls (no embedded mtime)', () => {
+  test('is deterministic across calls', () => {
     const buf = fs.readFileSync(FIXTURE);
     expect(hashBuffer(buf)).toBe(hashBuffer(buf));
   });

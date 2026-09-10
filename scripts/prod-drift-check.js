@@ -15,8 +15,10 @@ const {
   accessToken,
   liveVersionId,
   fetchLiveManifest,
+  fetchLiveContentHashes,
   buildLocalManifest,
   diffManifests,
+  isReserved,
 } = require('./lib/hosting-manifest');
 
 const REPO_ROOT = path.join(__dirname, '..');
@@ -38,12 +40,21 @@ function list(label, paths) {
   const publicDir = path.join(REPO_ROOT, 'public');
   const token = accessToken();
   const versionId = await liveVersionId(token);
-  const live = await fetchLiveManifest(versionId, token);
+  const manifest = await fetchLiveManifest(versionId, token);
+
+  // The manifest gives us the live path list. Its hashes are gzip-based and only
+  // reproducible on the machine that deployed (NERD-11), so content comparison is
+  // done by fetching the real bytes.
+  const livePaths = Object.keys(manifest).filter((p) => !isReserved(p));
+  const started = Date.now();
+  const live = await fetchLiveContentHashes(livePaths);
+  const fetchSecs = ((Date.now() - started) / 1000).toFixed(1);
   const local = buildLocalManifest(publicDir);
   const { dirty, head } = gitState();
 
   console.log(`live release : ${versionId} (${Object.keys(live).length} files)`);
   console.log(`local tree   : ${head} (${Object.keys(local).length} files)`);
+  console.log(`fetched      : ${livePaths.length} live files in ${fetchSecs}s`);
   if (dirty) {
     console.log('WARNING: working tree is dirty — comparing production against uncommitted files');
   }
