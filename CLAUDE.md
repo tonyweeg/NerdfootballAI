@@ -829,6 +829,13 @@ npx jest
 # Current suites: hosting-manifest, scraper-units, season-config-drift,
 # season-config-parity, pool-members-unit  (72 tests, ~1.6s)
 
+# Unit tests only, no network — this is what gates a merge
+npm run test:unit
+
+# Smoke tests against a running site (defaults to production)
+npm run test:smoke
+BASE_URL=https://nerdfootball--pr-12-abc.web.app npm run test:smoke
+
 # Production drift check — is live hosting content what main says it should be?
 env -u GOOGLE_APPLICATION_CREDENTIALS npm run drift:check
 ```
