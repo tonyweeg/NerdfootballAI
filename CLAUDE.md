@@ -823,15 +823,19 @@ showDebugConfig()               // Show current settings
 
 ### Testing
 ```bash
-# Puppeteer Tests
-node test-picks-summary-diamond.js
-node test-datetime-security-diamond.js
-node test-pool-members-diamond.js
+# Full suite — must be green before any merge (NERD-6 makes this a required check)
+npx jest
 
-# JEST Tests
-npx jest app-structure-simple.test.js
-npx jest pool-members-unit.test.js
+# Current suites: hosting-manifest, scraper-units, season-config-drift,
+# season-config-parity, pool-members-unit  (72 tests, ~1.6s)
+
+# Production drift check — is live hosting content what main says it should be?
+env -u GOOGLE_APPLICATION_CREDENTIALS npm run drift:check
 ```
+
+The 2025 Puppeteer suite was deleted in NERD-3: it targeted last season's app and
+required a hand-run server on localhost:8080. The 93 standalone `test-*-diamond.js`
+scripts in the repo root are not jest tests and are not run by `npx jest`.
 
 ### Build & Deploy
 ```bash
