@@ -5,6 +5,7 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 const { SEASON_CONFIG } = require('./seasonConfig');
+const Scoring = require('./confidenceScoring');
 
 // Initialize Firebase Admin
 if (!initializeApp.apps || initializeApp.apps.length === 0) {
@@ -16,7 +17,7 @@ const db = getFirestore();
 const CACHE_DURATION_CURRENT_WEEK_MS = 0; // ZERO CACHE for current week (always fresh)
 const CACHE_DURATION_PREVIOUS_WEEK_MS = 5 * 60 * 1000; // 5 minutes for previous week (MNF/SNF updates)
 const CACHE_DURATION_PAST_WEEKS_MS = 24 * 60 * 60 * 1000; // 24 hours for past weeks (final data)
-const CACHE_PATH_PREFIX = 'cache/weekly_leaderboard_2025_week_';
+const CACHE_PATH_PREFIX = `cache/weekly_leaderboard_${SEASON_CONFIG.year}_week_`;
 
 /**
  * Generate and cache weekly leaderboard data for a specific week
@@ -67,7 +68,7 @@ exports.generateWeeklyLeaderboardCache = onRequest(
                 generatedAt: Date.now(),
                 generatedAtTimestamp: Timestamp.now(),
                 weekNumber: weekNumber,
-                version: '2025-weekly-v1-nintendo'
+                version: `${SEASON_CONFIG.year}-weekly-v2`
             };
 
             await cacheRef.set(cacheDocument);
@@ -164,201 +165,72 @@ exports.getWeeklyLeaderboard = onRequest(
 );
 
 /**
- * Generate complete weekly leaderboard data using picks-viewer-auth.html pattern
+ * Generate weekly leaderboard data from pool members, picks and game results.
+ * Scoring rules live in confidenceScoring.js (shared byte-for-byte with the browser).
  */
 async function generateWeeklyLeaderboardData(weekNumber) {
     console.log(`📊 Starting Week ${weekNumber} leaderboard data generation...`);
 
-    // Get pool members
-    const poolMembersPath = SEASON_CONFIG.paths.poolMembers();
-    const membersDoc = await db.doc(poolMembersPath).get();
-
+    const membersDoc = await db.doc(SEASON_CONFIG.paths.poolMembers()).get();
     if (!membersDoc.exists) {
         throw new Error('Pool members not found');
     }
-
     const poolMembers = membersDoc.data();
     const memberIds = Object.keys(poolMembers);
 
-    // Load bible data for this week
-    const bibleData = await loadBibleDataForWeek(weekNumber);
-    const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata');
+    const [bibleData, picksDocs] = await Promise.all([
+        loadBibleDataForWeek(weekNumber),
+        Promise.all(memberIds.map((memberId) => db.doc(SEASON_CONFIG.paths.picks(weekNumber, memberId)).get()))
+    ]);
 
-    // Determine if games are live/completed
-    const gameStates = await analyzeGameStates(bibleData);
+    const picksByUser = {};
+    picksDocs.forEach((snap, i) => {
+        if (snap.exists) picksByUser[memberIds[i]] = snap.data();
+    });
+
+    const states = Scoring.gameStates(bibleData);
+    const ranked = Scoring.weekStandings(poolMembers, picksByUser, bibleData);
+    const players = ranked.filter((row) => row.hasPicks);
+    const generatedAt = new Date().toISOString();
+
+    const standings = ranked.map((row) => ({
+        rank: row.rank,
+        userId: row.userId,
+        name: row.name,
+        email: poolMembers[row.userId].email || null,
+        totalPoints: row.points,
+        correctPicks: row.correct,
+        totalPicks: row.decided,
+        picksMade: row.picksMade,
+        pickAccuracy: row.decided > 0 ? (row.correct / row.decided) * 100 : 0,
+        hasPicks: row.hasPicks,
+        pointsFromLeader: row.pointsFromLeader,
+        lastUpdated: generatedAt
+    }));
 
     const leaderboardData = {
         type: 'weekly',
         week: weekNumber,
-        generatedAt: new Date().toISOString(),
-        standings: [],
-        gameStates: gameStates,
+        season: SEASON_CONFIG.year,
+        generatedAt,
+        standings,
+        gameStates: { live: states.live, completed: states.completed, upcoming: states.upcoming },
         metadata: {
             totalUsers: memberIds.length,
-            totalGames: gameIds.length,
-            liveGames: gameStates.live,
-            completedGames: gameStates.completed,
-            version: '2025-weekly-nintendo-v1'
+            totalGames: states.total,
+            liveGames: states.live,
+            completedGames: states.completed,
+            usersWithPicks: players.length,
+            highScore: players.length > 0 ? players[0].points : 0,
+            averageScore: players.length > 0
+                ? players.reduce((sum, row) => sum + row.points, 0) / players.length
+                : 0,
+            version: `${SEASON_CONFIG.year}-weekly-v2`
         }
     };
 
-    // Process each user for this specific week
-    const userWeeklyResults = [];
-
-    for (const memberId of memberIds) {
-        try {
-            const memberInfo = poolMembers[memberId];
-
-            // Get user's picks for this week (same path as tricked-out-ricky)
-            const picksPath = `artifacts/nerdfootball/public/data/nerdfootball_picks/${weekNumber}/submissions/${memberId}`;
-            const userPicksDoc = await db.doc(picksPath).get();
-
-            let weeklyData = {
-                userId: memberId,
-                name: memberInfo.name || memberInfo.email || 'Unknown',
-                email: memberInfo.email,
-                totalPoints: 0,
-                correctPicks: 0,
-                totalPicks: 0,
-                pickAccuracy: 0,
-                hasPicks: false,
-                picks: {}
-            };
-
-            // BULLETPROOF: Calculate scores in real-time from picks + bible (like tricked-out-ricky)
-            if (userPicksDoc.exists) {
-                const userPicks = userPicksDoc.data();
-                const pickGameIds = Object.keys(userPicks).filter(key =>
-                    !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints',
-                      'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated',
-                      'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key)
-                );
-
-                let totalPoints = 0;
-                let correctPicks = 0;
-                let totalPicks = pickGameIds.length;
-
-                // Calculate score from each pick
-                for (const gameId of pickGameIds) {
-                    const pick = userPicks[gameId];
-                    const game = bibleData[gameId];
-
-                    // Check if game is completed (has winner OR has equal scores indicating tie)
-                    const gameIsCompleted = game && (
-                        (game.winner && game.winner !== 'TBD') ||
-                        (game.awayScore !== undefined && game.homeScore !== undefined &&
-                         parseInt(game.awayScore) === parseInt(game.homeScore) && parseInt(game.awayScore) > 0)
-                    );
-
-                    if (pick && pick.winner && gameIsCompleted) {
-                        const confidence = pick.confidence || 0;
-
-                        // 🔥 TIE GAME LOGIC: Check if game ended in a tie (EXACT Grid logic)
-                        // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
-                        const isTie = (game.winner && (
-                            game.winner.toUpperCase() === 'TIE' ||
-                            game.winner.toUpperCase() === 'TIE/OT' ||
-                            game.winner.toUpperCase() === 'DRAW' ||
-                            game.winner.toUpperCase().includes('TIE')
-                        )) || (game.awayScore !== undefined && game.homeScore !== undefined &&
-                               parseInt(game.awayScore) === parseInt(game.homeScore) &&
-                               parseInt(game.awayScore) > 0);
-
-                        // In a tie, EVERYONE who made a pick is correct
-                        const isCorrect = isTie ? true : (game.winner === pick.winner);
-
-                        if (isCorrect) {
-                            correctPicks++;
-                            totalPoints += confidence;
-                        }
-                    }
-                }
-
-                weeklyData = {
-                    ...weeklyData,
-                    totalPoints,
-                    correctPicks,
-                    totalPicks,
-                    pickAccuracy: totalPicks > 0 ? ((correctPicks / totalPicks) * 100) : 0,
-                    hasPicks: true,
-                    lastUpdated: new Date().toISOString()
-                };
-
-                console.log(`  ✅ User ${memberInfo.name}: ${totalPoints} points (${correctPicks}/${totalPicks} correct)`);
-            } else {
-                console.log(`  ⚠️ No picks found for ${memberInfo.name}`);
-            }
-
-            userWeeklyResults.push(weeklyData);
-
-        } catch (userError) {
-            console.error(`❌ Error processing Week ${weekNumber} for user ${memberId}:`, userError);
-            // Continue processing other users
-        }
-    }
-
-    // Sort by total points (descending)
-    userWeeklyResults.sort((a, b) => b.totalPoints - a.totalPoints);
-
-    // Add rankings and calculate metadata
-    let totalScore = 0;
-    leaderboardData.standings = userWeeklyResults.map((user, index) => {
-        totalScore += user.totalPoints;
-        return {
-            rank: index + 1,
-            ...user,
-            pointsFromLeader: index === 0 ? 0 : userWeeklyResults[0].totalPoints - user.totalPoints
-        };
-    });
-
-    // Update metadata
-    leaderboardData.metadata.averageScore = userWeeklyResults.length > 0 ? (totalScore / userWeeklyResults.length) : 0;
-    leaderboardData.metadata.highScore = userWeeklyResults.length > 0 ? userWeeklyResults[0].totalPoints : 0;
-    leaderboardData.metadata.usersWithPicks = userWeeklyResults.filter(u => u.hasPicks).length;
-
-    console.log(`✅ Generated Week ${weekNumber} leaderboard for ${userWeeklyResults.length} users`);
-    console.log(`🏆 Week ${weekNumber} Leader: ${userWeeklyResults[0]?.name} with ${userWeeklyResults[0]?.totalPoints} points`);
-
+    console.log(`✅ Generated Week ${weekNumber} leaderboard for ${standings.length} members (${players.length} with picks)`);
     return leaderboardData;
-}
-
-/**
- * Analyze game states to determine which are live, completed, upcoming
- * MATCHES THE GRID'S LOGIC EXACTLY - nerd-universe-grid.html lines 2052-2072
- */
-async function analyzeGameStates(bibleData) {
-    const gameIds = Object.keys(bibleData).filter(k => k !== '_metadata');
-
-    let live = 0;
-    let completed = 0;
-    let upcoming = 0;
-
-    for (const gameId of gameIds) {
-        const game = bibleData[gameId];
-
-        // Normalize status to lowercase for case-insensitive comparison
-        const status = (game.status || '').toLowerCase();
-
-        // Game is completed (EXACT Grid logic)
-        const isCompleted = status === 'final' ||
-                           status === 'final/ot' ||
-                           status === 'status_final' ||
-                           (game.winner && game.winner !== 'TBD');
-
-        // Game is in progress (EXACT Grid logic)
-        const isInProgress = status === 'in_progress' ||
-                            status === 'halftime';
-
-        if (isCompleted) {
-            completed++;
-        } else if (isInProgress) {
-            live++;
-        } else {
-            upcoming++;
-        }
-    }
-
-    return { live, completed, upcoming };
 }
 
 /**
@@ -369,81 +241,13 @@ function getCurrentWeekNumber() {
 }
 
 /**
- * Load bible data for a specific week from Firestore (matches diagnostic path)
+ * Load this season's game data for a week
  */
 async function loadBibleDataForWeek(weekNumber) {
-    try {
-        console.log(`📊 Loading Week ${weekNumber} game data from Firestore...`);
-
-        // Use the same path as diagnostic page
-        const gameResultsPath = `artifacts/nerdfootball/public/data/nerdfootball_games/${weekNumber}`;
-        const gameResultsRef = db.doc(gameResultsPath);
-        const gameResultsSnap = await gameResultsRef.get();
-
-        if (!gameResultsSnap.exists) {
-            throw new Error(`No game results found for Week ${weekNumber} at ${gameResultsPath}`);
-        }
-
-        const bibleData = gameResultsSnap.data();
-        const gameCount = Object.keys(bibleData).filter(k => k !== '_metadata').length;
-
-        console.log(`✅ Loaded Week ${weekNumber} bible data from Firestore: ${gameCount} games`);
-        console.log(`📊 Sample game data:`, JSON.stringify(Object.values(bibleData)[0], null, 2).substring(0, 200));
-
-        return bibleData;
-    } catch (error) {
-        console.error(`❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
-        throw error;
+    const gamesPath = SEASON_CONFIG.paths.games(weekNumber);
+    const gamesSnap = await db.doc(gamesPath).get();
+    if (!gamesSnap.exists) {
+        throw new Error(`No game results found for Week ${weekNumber} at ${gamesPath}`);
     }
-}
-
-/**
- * Analyze picks for scoring (same logic as season leaderboard)
- */
-function analyzePicksForScoring(picks, bibleData) {
-    const gameIds = Object.keys(picks).filter(key =>
-        !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints',
-          'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated',
-          'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key)
-    );
-
-    const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata') : [];
-
-    let correctPicks = 0;
-    let totalPointsEarned = 0;
-    const pickResults = {};
-
-    // Process each game pick
-    for (const gameId of gameIds) {
-        const pick = picks[gameId];
-        if (pick && pick.winner && bibleData && bibleData[gameId]) {
-            const actualWinner = bibleData[gameId].winner;
-            const userPick = pick.winner;
-            const isCorrect = actualWinner === userPick;
-
-            pickResults[gameId] = {
-                isValid: true,
-                isCorrect,
-                userPick,
-                actualWinner,
-                confidence: pick.confidence || 0,
-                pointsEarned: isCorrect ? (pick.confidence || 0) : 0
-            };
-
-            if (isCorrect) {
-                correctPicks++;
-                totalPointsEarned += pick.confidence || 0;
-            }
-        } else {
-            pickResults[gameId] = { isValid: false, isCorrect: false };
-        }
-    }
-
-    return {
-        correctPicks,
-        totalPicks: gameIds.length,
-        totalPointsEarned,
-        pickResults,
-        expectedGameCount: expectedGameIds.length
-    };
+    return gamesSnap.data();
 }

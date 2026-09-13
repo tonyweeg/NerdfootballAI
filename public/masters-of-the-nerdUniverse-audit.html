@@ -432,6 +432,7 @@
     <script src="./js/utils/logger-compat.js"></script>
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
+    <script src="./js/utils/confidence-scoring.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
@@ -448,8 +449,8 @@
 
         <!-- Auth Section (shows if not authenticated) -->
         <div id="authSection" class="auth-section" style="display: none;">
-            <div class="auth-title">🔒 ADMIN ACCESS REQUIRED</div>
-            <p>This audit dashboard is restricted to NerdUniverse administrators.</p>
+            <div class="auth-title">🔒 SIGN IN REQUIRED</div>
+            <p>Sign in to NerdUniverse to view the audit dashboard. <a href="./index.html">Go to sign in</a></p>
         </div>
 
         <!-- Main Content (shows if authenticated) -->
@@ -485,7 +486,7 @@
                     <div class="section-meta">
                         <div style="display: flex; align-items: center; gap: 1rem;">
                             <button id="week-down" class="nav-button">◄ PREV</button>
-                            <div class="nav-button" id="week-display">WEEK <span id="current-week-display">5</span></div>
+                            <div class="nav-button" id="week-display">WEEK <span id="current-week-display">-</span></div>
                             <button id="week-up" class="nav-button">NEXT ►</button>
                         </div>
                     </div>
@@ -499,7 +500,7 @@
             <div class="section">
                 <div class="section-header">
                     <div class="section-title">🏆 Complete Season Leaderboard</div>
-                    <div class="section-meta">All 53 users ranked by total points</div>
+                    <div class="section-meta" id="seasonMeta">Ranked by total points</div>
                 </div>
                 <div id="seasonLeaderboard">
                     <div class="loading">Loading season data...</div>
@@ -536,19 +537,25 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // Week configuration
-        const CURRENT_WEEK = getCurrentWeekNumber(); // Dynamic week calculation
-        let displayWeek = CURRENT_WEEK; // Track currently displayed week
+        const Scoring = window.ConfidenceScoring;
+        const CURRENT_WEEK = window.SEASON_CONFIG.utils.getCurrentWeek();
+        let displayWeek = CURRENT_WEEK;
+        let seasonDataPromise = null;
 
-        // Helper functions for real-time season calculation (from gold standard leaderboard.html)
         function getCurrentWeekNumber() {
-            return window.SEASON_CONFIG.utils.getCurrentWeek();
+            return CURRENT_WEEK;
         }
 
-        // Week navigation functions
-        function changeWeek(newWeek) {
-            if (newWeek < 1 || newWeek > 18 || newWeek === displayWeek) return;
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
 
+        function shortName(name) {
+            return escapeHtml(String(name).split('@')[0]);
+        }
+
+        function changeWeek(newWeek) {
+            if (newWeek < 1 || newWeek > CURRENT_WEEK || newWeek === displayWeek) return;
             displayWeek = newWeek;
             updateWeekDisplay();
             loadWeeklyData(displayWeek);
@@ -556,9 +563,7 @@
 
         function updateWeekDisplay() {
             document.getElementById('current-week-display').textContent = displayWeek;
-
-            // Update button states
-            document.getElementById('week-up').disabled = displayWeek >= 18;
+            document.getElementById('week-up').disabled = displayWeek >= CURRENT_WEEK;
             document.getElementById('week-down').disabled = displayWeek <= 1;
         }
 
@@ -568,9 +573,22 @@
             updateWeekDisplay();
         }
 
-        // Initialize dashboard (no authentication required - public data)
+        function waitForAuthUser() {
+            return new Promise((resolve) => {
+                const unsubscribe = auth.onAuthStateChanged((user) => {
+                    unsubscribe();
+                    resolve(user);
+                });
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
-            document.getElementById('authSection').style.display = 'none';
+            const user = await waitForAuthUser();
+            console.info('NERD_AUDIT auth', user ? user.uid : 'signed out');
+            if (!user) {
+                document.getElementById('authSection').style.display = 'block';
+                return;
+            }
             document.getElementById('mainContent').style.display = 'block';
             initializeWeekControls();
             await initializeAuditDashboard();
@@ -578,16 +596,13 @@
 
         async function initializeAuditDashboard() {
             logger.auth('🌌 Initializing Masters of the NerdUniverse Audit Dashboard...');
-
             try {
-                // Load all data in parallel for speed
                 await Promise.all([
                     loadUniverseStats(),
-                    loadWeeklyData(),
+                    loadWeeklyData(displayWeek),
                     loadSeasonData(),
                     loadSurvivorData()
                 ]);
-
                 logger.auth('✅ Masters Audit Dashboard loaded successfully');
             } catch (error) {
                 logger.error('AUTH', '❌ Error initializing audit dashboard:', error);
@@ -595,304 +610,93 @@
             }
         }
 
-        async function loadBibleData(weekNumber) {
-            logger.auth(`🔍 Loading Week ${weekNumber} bible data from Firestore...`);
-
-            try {
-                // Load from Firestore (single source of truth)
-                const gamesRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_games').doc(weekNumber.toString());
-                const gamesSnap = await gamesRef.get();
-
-                if (!gamesSnap.exists) {
-                    logger.warn('AUTH', `No games found for Week ${weekNumber} in Firestore`);
-                    return null;
-                }
-
-                const bibleData = gamesSnap.data();
-                logger.auth(`✅ Loaded Week ${weekNumber} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
-
-                return bibleData;
-            } catch (error) {
-                logger.error('AUTH', `❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
-                return null;
-            }
+        async function loadWeek(week) {
+            const paths = window.SEASON_CONFIG.paths;
+            const [gamesSnap, picksSnap] = await Promise.all([
+                db.doc(paths.games(week)).get(),
+                db.collection(paths.picksWeek(week)).get()
+            ]);
+            const picksByUser = {};
+            picksSnap.forEach((userDoc) => { picksByUser[userDoc.id] = userDoc.data(); });
+            return { week, games: gamesSnap.exists ? gamesSnap.data() : {}, picksByUser };
         }
 
-        function analyzePicks(picks, bibleData) {
-            const issues = [];
-            const gameIds = Object.keys(picks).filter(key => !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints', 'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated', 'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key));
-
-            // All weeks now use consistent Firestore structure
-            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata') : [];
-            const expectedGameCount = expectedGameIds.length;
-
-            // Check for expected game IDs
-            const missingGames = expectedGameIds.filter(id => !gameIds.includes(id));
-            const extraGames = gameIds.filter(id => !expectedGameIds.includes(id));
-
-            if (missingGames.length > 0) {
-                issues.push(`Missing games: ${missingGames.join(', ')}`);
+        function loadSeason() {
+            if (!seasonDataPromise) {
+                seasonDataPromise = (async () => {
+                    const startTime = Date.now();
+                    const weekNumbers = Array.from({ length: CURRENT_WEEK }, (_, i) => i + 1);
+                    const [membersSnap, weeks] = await Promise.all([
+                        db.doc(window.SEASON_CONFIG.paths.poolMembers()).get(),
+                        Promise.all(weekNumbers.map(loadWeek))
+                    ]);
+                    const members = membersSnap.exists ? membersSnap.data() : {};
+                    const standings = Scoring.seasonStandings(members, weeks);
+                    const summary = Scoring.seasonSummary(standings, weeks);
+                    console.info('NERD_AUDIT season', window.SEASON_CONFIG.year, 'weeks 1-' + CURRENT_WEEK,
+                        'members', summary.members, 'loaded in', (Date.now() - startTime) + 'ms');
+                    weeks.forEach(({ week, games, picksByUser }) => {
+                        console.info('NERD_AUDIT week', week, Scoring.gameStates(games), 'sheets', Object.keys(picksByUser).length);
+                    });
+                    console.info('NERD_AUDIT summary', summary);
+                    return { members, weeks, standings, summary };
+                })();
+                seasonDataPromise.catch(() => { seasonDataPromise = null; });
             }
-            if (extraGames.length > 0) {
-                issues.push(`Extra games: ${extraGames.join(', ')}`);
-            }
-
-            // Check confidence values and calculate accuracy
-            const confidenceValues = [];
-            let correctPicks = 0;
-            let totalValidPicks = 0;
-            let totalPointsEarned = 0;
-            const pickResults = {};
-            const winningPicks = []; // Track winning picks with team names and points
-
-            gameIds.forEach(gameId => {
-                const pick = picks[gameId];
-                if (pick && typeof pick === 'object') {
-                    if (pick.winner === '[object Object]' || typeof pick.winner === 'object') {
-                        issues.push(`Game ${gameId}: Winner corrupted`);
-                        pickResults[gameId] = { isValid: false, isCorrect: false };
-                    } else if (pick.winner && bibleData && bibleData[gameId]) {
-                        // Compare user pick with bible result
-                        const actualWinner = bibleData[gameId].winner;
-                        const userPick = pick.winner;
-                        const isCorrect = actualWinner === userPick;
-
-                        pickResults[gameId] = {
-                            isValid: true,
-                            isCorrect: isCorrect,
-                            userPick: userPick,
-                            actualWinner: actualWinner
-                        };
-
-                        totalValidPicks++;
-                        if (isCorrect) {
-                            correctPicks++;
-                            // Add confidence points for correct picks
-                            if (typeof pick.confidence === 'number' && pick.confidence >= 1 && pick.confidence <= expectedGameCount) {
-                                totalPointsEarned += pick.confidence;
-
-                                // Store winning pick with validation
-                                if (typeof userPick === 'string' && userPick.length > 0 && userPick !== '[object Object]') {
-                                    winningPicks.push({
-                                        team: userPick,
-                                        points: pick.confidence,
-                                        gameId: gameId
-                                    });
-                                }
-                            }
-                        }
-                    } else {
-                        pickResults[gameId] = { isValid: false, isCorrect: false };
-                    }
-
-                    if (pick.confidence !== undefined) {
-                        if (typeof pick.confidence !== 'number' || pick.confidence < 1 || pick.confidence > expectedGameCount) {
-                            issues.push(`Game ${gameId}: Invalid confidence ${pick.confidence} (should be 1-${expectedGameCount})`);
-                        } else {
-                            confidenceValues.push(pick.confidence);
-                        }
-                    } else {
-                        issues.push(`Game ${gameId}: Missing confidence`);
-                    }
-                }
-            });
-
-            // Check for duplicate confidence values
-            const uniqueConfidence = [...new Set(confidenceValues)];
-            if (confidenceValues.length !== uniqueConfidence.length) {
-                const duplicates = confidenceValues.filter((val, idx) => confidenceValues.indexOf(val) !== idx);
-                issues.push(`Duplicate confidence: ${[...new Set(duplicates)].join(', ')}`);
-            }
-
-            // Calculate losing points total and validate sum
-            let totalLosingPoints = 0;
-            Object.keys(pickResults).forEach(gameId => {
-                const result = pickResults[gameId];
-                const pick = picks[gameId];
-                if (result.isValid && !result.isCorrect && pick && typeof pick.confidence === 'number') {
-                    totalLosingPoints += pick.confidence;
-                }
-            });
-
-            // Expected total confidence points: 1+2+3+...+n = n×(n+1)/2
-            const expectedTotal = expectedGameCount * (expectedGameCount + 1) / 2;
-            const actualTotal = totalPointsEarned + totalLosingPoints;
-            const isSumValid = actualTotal === expectedTotal;
-
-            return {
-                totalGames: gameIds.length,
-                issues,
-                confidenceValues: confidenceValues.sort((a, b) => a - b),
-                gameIds,
-                correctPicks,
-                totalValidPicks,
-                totalPointsEarned,
-                totalLosingPoints,
-                expectedTotal,
-                actualTotal,
-                isSumValid,
-                pickResults,
-                winningPicks: winningPicks.sort((a, b) => b.points - a.points) // Sort by points descending
-            };
+            return seasonDataPromise;
         }
 
         async function loadUniverseStats() {
             try {
-                logger.auth('📊 Calculating universe stats from real-time data...');
-
-                const poolMembersRef = db.collection('artifacts').doc('nerdfootball').collection('pools').doc(window.SEASON_CONFIG.poolId).collection('metadata').doc('members');
-                const poolMembersSnap = await poolMembersRef.get();
-                const poolMembers = poolMembersSnap.exists ? poolMembersSnap.data() : {};
-                const totalUsers = Object.keys(poolMembers).length;
-
-                const actualCurrentWeek = getCurrentWeekNumber();
-                const completedWeeks = actualCurrentWeek - 1;
-
-                const userSeasonTotals = {};
-                let weeklyHighScore = 0;
-
-                // ⚡ PARALLEL FETCH: Load all weeks simultaneously
-                logger.auth(`⚡ Starting parallel fetch for weeks 1-${completedWeeks}...`);
-                const weekNumbers = Array.from({length: completedWeeks}, (_, i) => i + 1);
-
-                const allWeeksData = await Promise.all(
-                    weekNumbers.map(async (weekNumber) => {
-                        try {
-                            const bibleData = await loadBibleData(weekNumber);
-                            const picksRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_picks').doc(weekNumber.toString()).collection('submissions');
-                            const picksSnap = await picksRef.get();
-                            return { weekNumber, bibleData, picksSnap };
-                        } catch (error) {
-                            logger.warn('AUTH', `Error fetching Week ${weekNumber}:`, error);
-                            return { weekNumber, bibleData: null, picksSnap: null };
-                        }
-                    })
-                );
-
-                logger.auth(`✅ Parallel fetch complete, processing ${allWeeksData.length} weeks...`);
-
-                // Process all weeks (now that we have all data)
-                allWeeksData.forEach(({ weekNumber, bibleData, picksSnap }) => {
-                    if (!bibleData || !picksSnap) return;
-
-                    picksSnap.forEach(userDoc => {
-                        const userId = userDoc.id;
-                        const picks = userDoc.data();
-                        const analysis = analyzePicks(picks, bibleData);
-
-                        if (!userSeasonTotals[userId]) {
-                            userSeasonTotals[userId] = 0;
-                        }
-                        userSeasonTotals[userId] += analysis.totalPointsEarned;
-
-                        if (analysis.totalPointsEarned > weeklyHighScore) {
-                            weeklyHighScore = analysis.totalPointsEarned;
-                        }
-                    });
-                });
-
-                const seasonScores = Object.values(userSeasonTotals);
-                const seasonHighScore = seasonScores.length > 0 ? Math.max(...seasonScores) : 0;
-                const averageScore = seasonScores.length > 0 ? Math.round(seasonScores.reduce((a, b) => a + b, 0) / seasonScores.length) : 0;
-
-                document.getElementById('totalUsers').textContent = totalUsers;
-                document.getElementById('completedWeeks').textContent = completedWeeks;
-                document.getElementById('highScore').textContent = seasonHighScore;
-                document.getElementById('averageScore').textContent = averageScore;
-                document.getElementById('survivalRate').textContent = '-';
-
-                logger.auth(`✅ Universe stats calculated: ${totalUsers} users, ${completedWeeks} weeks, season high: ${seasonHighScore}, avg: ${averageScore}`);
-
+                const { summary } = await loadSeason();
+                document.getElementById('totalUsers').textContent = summary.members;
+                document.getElementById('completedWeeks').textContent = summary.weeksCompleted;
+                document.getElementById('highScore').textContent = summary.highScore;
+                document.getElementById('averageScore').textContent = summary.averageScore;
             } catch (error) {
                 logger.error('AUTH', 'Error loading universe stats:', error);
             }
         }
 
-        async function loadWeeklyData(specificWeek = null) {
+        async function loadWeeklyData(week = displayWeek) {
             const weeklyGrid = document.getElementById('weeklyGrid');
             weeklyGrid.innerHTML = '<div class="loading">Loading weekly data...</div>';
-
             try {
-                if (specificWeek) {
-                    // Load only the specified week
-                    logger.auth(`📊 Loading Week ${specificWeek} data...`);
-                    const weekData = await loadWeekData(specificWeek);
-
-                    weeklyGrid.innerHTML = '';
-                    if (weekData) {
-                        weeklyGrid.appendChild(createWeekCard(weekData));
-                    } else {
-                        weeklyGrid.innerHTML = '<div class="error">No data available for Week ' + specificWeek + '</div>';
-                    }
-                } else {
-                    // Load all weeks (original behavior)
-                    const weeklyPromises = [];
-                    for (let week = 1; week <= CURRENT_WEEK; week++) {
-                        weeklyPromises.push(loadWeekData(week));
-                    }
-
-                    const weeklyResults = await Promise.all(weeklyPromises);
-
-                    weeklyGrid.innerHTML = '';
-                    // Reverse to show most recent week first (descending order)
-                    weeklyResults.reverse().forEach(weekData => {
-                        if (weekData) {
-                            weeklyGrid.appendChild(createWeekCard(weekData));
-                        }
-                    });
+                const { members, weeks } = await loadSeason();
+                const weekData = weeks.find((w) => w.week === week);
+                if (!weekData || Scoring.gameStates(weekData.games).total === 0) {
+                    weeklyGrid.innerHTML = '<div class="error">No games found for Week ' + week + '</div>';
+                    return;
                 }
-
+                weeklyGrid.innerHTML = '';
+                weeklyGrid.appendChild(createWeekCard(weekData, members));
             } catch (error) {
                 logger.error('AUTH', 'Error loading weekly data:', error);
-                weeklyGrid.innerHTML = '<div class="error">Failed to load weekly data: ' + error.message + '</div>';
+                weeklyGrid.innerHTML = '<div class="error">Failed to load weekly data: ' + escapeHtml(error.message) + '</div>';
             }
         }
 
-        async function loadWeekData(weekNumber) {
-            try {
-                const cacheBuster = Date.now();
-                const response = await fetch(`https://getweeklyleaderboard-np7uealtnq-uc.a.run.app?week=${weekNumber}&t=${cacheBuster}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    return {
-                        week: weekNumber,
-                        data: data.data,
-                        gameStates: data.data.gameStates,
-                        metadata: data.data.metadata
-                    };
-                }
-                return null;
-            } catch (error) {
-                logger.error('AUTH', `Error loading Week ${weekNumber}:`, error);
-                return null;
-            }
-        }
-
-        function createWeekCard(weekData) {
+        function createWeekCard(weekData, members) {
             const card = document.createElement('div');
             card.className = 'week-card';
 
-            const gameStates = weekData.gameStates;
-            let status = 'upcoming';
+            const states = Scoring.gameStates(weekData.games);
+            const standings = Scoring.weekStandings(members, weekData.picksByUser, weekData.games);
+            const players = standings.filter((row) => row.hasPicks);
+            const highScore = players.length > 0 ? players[0].points : 0;
+            const averageScore = players.length > 0
+                ? Math.round(players.reduce((sum, row) => sum + row.points, 0) / players.length)
+                : 0;
+
+            let status = 'UPCOMING';
             let statusClass = 'status-upcoming';
-
-            logger.auth(`🔍 Week ${weekData.week} Status Check:`, {
-                completed: gameStates.completed,
-                totalGames: weekData.metadata.totalGames,
-                live: gameStates.live,
-                scheduled: gameStates.scheduled
-            });
-
-            if (gameStates.completed === weekData.metadata.totalGames) {
+            if (states.completed === states.total) {
                 status = 'COMPLETED';
                 statusClass = 'status-completed';
-            } else if (gameStates.live > 0 || gameStates.completed > 0) {
+            } else if (states.live > 0 || states.completed > 0) {
                 status = 'IN PROGRESS';
                 statusClass = 'status-in-progress';
             }
-
-            const allUsers = weekData.data.standings; // Show all users instead of top 10
 
             card.innerHTML = `
                 <div class="week-header">
@@ -900,9 +704,10 @@
                     <div class="week-status ${statusClass}">${status}</div>
                 </div>
                 <div class="week-meta">
-                    <small>Games: ${gameStates.completed}/${weekData.metadata.totalGames} •
-                    High: ${weekData.metadata.highScore} pts •
-                    Avg: ${Math.round(weekData.metadata.averageScore)} pts</small>
+                    <small>Games final: ${states.completed}/${states.total} •
+                    Sheets: ${players.length}/${standings.length} •
+                    High: ${highScore} pts •
+                    Avg: ${averageScore} pts</small>
                 </div>
                 <table class="leaderboard-table">
                     <thead>
@@ -914,166 +719,35 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${allUsers.map(user => `
+                        ${standings.map(row => `
                             <tr>
-                                <td class="rank-cell">${user.rank}</td>
-                                <td>${user.name.split('@')[0]}</td>
-                                <td class="points-cell">${user.totalPoints}</td>
-                                <td class="accuracy-cell">${user.correctPicks}/${user.totalPicks}</td>
+                                <td class="rank-cell">${row.rank}</td>
+                                <td>${shortName(row.name)}</td>
+                                <td class="points-cell">${row.points}</td>
+                                <td class="accuracy-cell">${row.hasPicks ? `${row.correct}/${row.decided}` : 'no picks'}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
             `;
-
             return card;
         }
 
         async function loadSeasonData() {
             const seasonContainer = document.getElementById('seasonLeaderboard');
-            seasonContainer.innerHTML = '<div class="loading">Loading season data with real-time calculation...</div>';
+            const seasonMeta = document.getElementById('seasonMeta');
+            seasonContainer.innerHTML = '<div class="loading">Loading season data...</div>';
 
             try {
-                logger.auth('⚡ Starting real-time season calculation for Masters Audit...');
-                const startTime = Date.now();
+                const { standings } = await loadSeason();
+                const players = standings.filter((row) => row.weeksPlayed > 0);
+                seasonMeta.textContent = `${players.length} of ${standings.length} members ranked by total points • Weeks 1-${CURRENT_WEEK}, ${window.SEASON_CONFIG.year}`;
 
-                // Load pool members for validation
-                let poolMembers = {};
-                try {
-                    const membersRef = db.collection('artifacts').doc('nerdfootball').collection('pools').doc(window.SEASON_CONFIG.poolId).collection('metadata').doc('members');
-                    const membersSnap = await membersRef.get();
-                    if (membersSnap.exists) {
-                        poolMembers = membersSnap.data();
-                    }
-                } catch (e) {
-                    logger.warn('AUTH', 'Could not load pool members:', e);
+                if (players.length === 0) {
+                    seasonContainer.innerHTML = '<div class="loading">No picks submitted yet this season</div>';
+                    return;
                 }
 
-                // Batch load all user names in one query (MUCH FASTER!)
-                const userNames = {};
-                const userEmails = {};
-
-                try {
-                    const usersRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_users');
-                    const usersSnap = await usersRef.get();
-
-                    usersSnap.forEach(userDoc => {
-                        const userData = userDoc.data();
-                        userNames[userDoc.id] = userData.userName || userData.displayName || userData.name || 'Unknown User';
-                        userEmails[userDoc.id] = userData.email || userData.emailAddress || 'No Email';
-                    });
-
-                    logger.auth(`✅ Loaded ${usersSnap.size} total users in batch`);
-                } catch (e) {
-                    logger.warn('AUTH', 'Could not batch load users:', e);
-                }
-
-                // Initialize season totals for all users
-                const seasonTotals = {};
-                const actualCurrentWeek = getCurrentWeekNumber();
-
-                // ⚡ PARALLEL FETCH: Load all 18 weeks simultaneously
-                logger.auth(`⚡ Starting parallel fetch for weeks 1-18...`);
-                const seasonWeekNumbers = Array.from({length: 18}, (_, i) => i + 1);
-
-                const allSeasonWeeksData = await Promise.all(
-                    seasonWeekNumbers.map(async (weekNumber) => {
-                        try {
-                            const bibleData = await loadBibleData(weekNumber);
-                            const picksRef = db.collection('artifacts').doc('nerdfootball').collection('public').doc('data').collection('nerdfootball_picks').doc(weekNumber.toString()).collection('submissions');
-                            const picksSnap = await picksRef.get();
-                            return { weekNumber, bibleData, picksSnap };
-                        } catch (error) {
-                            logger.warn('AUTH', `Error fetching Week ${weekNumber}:`, error);
-                            return { weekNumber, bibleData: null, picksSnap: null };
-                        }
-                    })
-                );
-
-                logger.auth(`✅ Parallel fetch complete, processing ${allSeasonWeeksData.length} weeks...`);
-
-                // Process all weeks (now that we have all data)
-                allSeasonWeeksData.forEach(({ weekNumber, bibleData, picksSnap }) => {
-                    if (!bibleData) {
-                        logger.warn('AUTH', `No bible data for Week ${weekNumber}, skipping...`);
-                        return;
-                    }
-
-                    if (!picksSnap || picksSnap.size === 0) {
-                        logger.warn('AUTH', `No picks for Week ${weekNumber}, skipping...`);
-                        return;
-                    }
-
-                    // Process each user's picks for this week
-                    picksSnap.forEach(userDoc => {
-                        const userId = userDoc.id;
-                        const picks = userDoc.data();
-
-                        // Initialize user if not exists
-                        if (!seasonTotals[userId]) {
-                            seasonTotals[userId] = {
-                                userId,
-                                userName: userNames[userId] || 'Unknown',
-                                userEmail: userEmails[userId] || 'No Email',
-                                isPoolMember: !!poolMembers[userId],
-                                totalPointsEarned: 0,
-                                totalCorrectPicks: 0,
-                                totalValidPicks: 0,
-                                weeklyBreakdown: {},
-                                winningPicks: [],
-                                weeksPlayed: 0
-                            };
-                        }
-
-                        // Analyze picks for this week
-                        const analysis = analyzePicks(picks, bibleData);
-
-                        // Add to season totals
-                        seasonTotals[userId].totalPointsEarned += analysis.totalPointsEarned;
-                        seasonTotals[userId].totalCorrectPicks += analysis.correctPicks;
-                        seasonTotals[userId].totalValidPicks += analysis.totalValidPicks;
-                        seasonTotals[userId].weeksPlayed += 1;
-
-                        // Store weekly breakdown
-                        seasonTotals[userId].weeklyBreakdown[weekNumber] = {
-                            pointsEarned: analysis.totalPointsEarned,
-                            correctPicks: analysis.correctPicks,
-                            totalPicks: analysis.totalValidPicks
-                        };
-
-                        // Add winning picks with week context
-                        if (analysis.winningPicks && analysis.winningPicks.length > 0) {
-                            analysis.winningPicks.forEach(pick => {
-                                seasonTotals[userId].winningPicks.push({
-                                    ...pick,
-                                    week: weekNumber
-                                });
-                            });
-                        }
-                    });
-                });
-
-                // Convert to array and sort by total points
-                const sortedUsers = Object.values(seasonTotals)
-                    .filter(user => user.totalValidPicks > 0) // Only users with picks
-                    .sort((a, b) => b.totalPointsEarned - a.totalPointsEarned);
-
-                const seasonData = sortedUsers.map((user, index) => ({
-                    rank: index + 1,
-                    name: user.userName,
-                    email: user.userEmail,
-                    totalPoints: user.totalPointsEarned,
-                    totalCorrectPicks: user.totalCorrectPicks,
-                    totalValidPicks: user.totalValidPicks,
-                    avgAccuracy: user.totalValidPicks > 0 ? ((user.totalCorrectPicks / user.totalValidPicks) * 100).toFixed(1) : '0.0',
-                    weeksPlayed: user.weeksPlayed,
-                    pointsFromLeader: index === 0 ? 0 : sortedUsers[0].totalPointsEarned - user.totalPointsEarned
-                }));
-
-                logger.auth(`✅ Real-time calculation completed in ${Date.now() - startTime}ms`);
-                logger.auth(`📊 Processed ${seasonData.length} users across ${actualCurrentWeek - 1} weeks`);
-
-                // Render the season leaderboard with correct data
                 seasonContainer.innerHTML = `
                     <table class="leaderboard-table">
                         <thead>
@@ -1082,30 +756,29 @@
                                 <th>User</th>
                                 <th>Total Points</th>
                                 <th>Correct Picks</th>
-                                <th>Avg Accuracy</th>
+                                <th>Accuracy</th>
                                 <th>Weeks Played</th>
                                 <th>Points Behind</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${seasonData.map(user => `
+                            ${players.map(row => `
                                 <tr>
-                                    <td class="rank-cell">${user.rank}</td>
-                                    <td>${user.name.split('@')[0]}</td>
-                                    <td class="points-cell">${user.totalPoints}</td>
-                                    <td>${user.totalCorrectPicks}/${user.totalValidPicks}</td>
-                                    <td class="accuracy-cell">${user.avgAccuracy}%</td>
-                                    <td>${user.weeksPlayed}</td>
-                                    <td>${user.pointsFromLeader}</td>
+                                    <td class="rank-cell">${row.rank}</td>
+                                    <td>${shortName(row.name)}</td>
+                                    <td class="points-cell">${row.points}</td>
+                                    <td>${row.correct}/${row.decided}</td>
+                                    <td class="accuracy-cell">${row.decided > 0 ? ((row.correct / row.decided) * 100).toFixed(1) + '%' : '—'}</td>
+                                    <td>${row.weeksPlayed}</td>
+                                    <td>${row.pointsFromLeader}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
                 `;
-
             } catch (error) {
                 logger.error('AUTH', 'Error loading season data:', error);
-                seasonContainer.innerHTML = '<div class="error">Failed to load season data: ' + error.message + '</div>';
+                seasonContainer.innerHTML = '<div class="error">Failed to load season data: ' + escapeHtml(error.message) + '</div>';
             }
         }
 
@@ -1138,11 +811,12 @@
                 logger.auth(`🏈 Loading current week (${currentWeek}) survivor picks for alive players...`);
 
                 // Check if current week has started using Eastern Time Parser (DYNAMIC DETECTION)
-                const bibleData = await loadBibleData(currentWeek);
+                const { weeks } = await loadSeason();
+                const bibleData = (weeks.find((w) => w.week === currentWeek) || {}).games;
                 let weekHasStarted = false;
 
                 if (bibleData && window.easternTimeParser) {
-                    const games = Object.values(bibleData).filter(g => g && typeof g === 'object');
+                    const games = Scoring.gameIds(bibleData).map((id) => bibleData[id]);
                     // Use Eastern Time Parser to check if ANY game has started
                     weekHasStarted = games.some(game => {
                         if (game.dt) {
@@ -1297,31 +971,7 @@
             container.insertBefore(errorDiv, container.firstChild);
         }
 
-        // Add refresh functionality
         window.loadWeeklyData = loadWeeklyData;
-
-        // Function to load specific week
-        window.loadSpecificWeek = async function(weekNumber) {
-            const weeklyGrid = document.getElementById('weeklyGrid');
-            weeklyGrid.innerHTML = '<div class="loading">Loading Week ' + weekNumber + ' data...</div>';
-
-            // Update button states
-            document.querySelectorAll('.week-nav-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-
-            try {
-                const weekData = await loadWeekData(weekNumber);
-                if (weekData) {
-                    weeklyGrid.innerHTML = '';
-                    weeklyGrid.appendChild(createWeekCard(weekData));
-                } else {
-                    weeklyGrid.innerHTML = '<div class="error">Failed to load Week ' + weekNumber + ' data</div>';
-                }
-            } catch (error) {
-                logger.error('AUTH', 'Error loading Week ' + weekNumber + ':', error);
-                weeklyGrid.innerHTML = '<div class="error">Error loading Week ' + weekNumber + ': ' + error.message + '</div>';
-            }
-        };
 
         logger.auth('🌌 Masters of the NerdUniverse Audit Tool initialized');
     </script>
