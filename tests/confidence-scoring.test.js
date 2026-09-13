@@ -126,6 +126,46 @@ describe('rankStandings', () => {
     });
 });
 
+describe('isConfidencePlayer', () => {
+    test('only members with confidence turned off are left out (the Grid rule)', () => {
+        const off = { participation: { confidence: { enabled: false, status: 'disabled' }, survivor: { enabled: true } } };
+        expect(scoring.isConfidencePlayer(off)).toBe(false);
+        expect(scoring.isConfidencePlayer({ participation: { confidence: { enabled: true } } })).toBe(true);
+        expect(scoring.isConfidencePlayer({ participation: { survivor: { enabled: true } } })).toBe(true);
+        expect(scoring.isConfidencePlayer({ name: 'No participation data' })).toBe(true);
+        expect(scoring.isConfidencePlayer({})).toBe(true);
+        expect(scoring.isConfidencePlayer(null)).toBe(true);
+    });
+});
+
+describe('survivor-only members stay off every confidence board', () => {
+    const games = { 101: game('Home'), 102: game(null, 'scheduled') };
+    const members = {
+        c1: { name: 'Confidence', participation: { confidence: { enabled: true } } },
+        c2: { name: 'Forgot To Pick', participation: { confidence: { enabled: true } } },
+        s1: { name: 'Survivor Only', participation: { confidence: { enabled: false } } },
+        s2: { name: 'Survivor With A Sheet', participation: { confidence: { enabled: false } } }
+    };
+    const picksByUser = {
+        c1: { 101: { winner: 'Home', confidence: 2 }, 102: { winner: 'Home', confidence: 1 } },
+        s2: { 101: { winner: 'Home', confidence: 2 }, 102: { winner: 'Home', confidence: 1 } }
+    };
+
+    test('weekStandings keeps confidence players, including one with no picks', () => {
+        expect(scoring.weekStandings(members, picksByUser, games).map(r => [r.userId, r.hasPicks])).toEqual([
+            ['c1', true], ['c2', false]
+        ]);
+    });
+
+    test('seasonStandings', () => {
+        expect(scoring.seasonStandings(members, [{ week: 1, games, picksByUser }]).map(r => r.userId)).toEqual(['c1', 'c2']);
+    });
+
+    test('upsideStandings', () => {
+        expect(scoring.upsideStandings(members, picksByUser, games).map(r => r.userId)).toEqual(['c1']);
+    });
+});
+
 describe('weekStandings', () => {
     const members = { u1: { name: 'Ann' }, u2: { email: 'bob@x.com' }, u3: {} };
     const picksByUser = {
