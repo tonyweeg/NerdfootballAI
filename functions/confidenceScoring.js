@@ -81,17 +81,48 @@
         return result;
     }
 
-    function rankStandings(rows) {
+    function rankStandings(rows, key = 'points') {
         const sorted = rows
             .map((row, index) => ({ row, index }))
-            .sort((a, b) => (b.row.points - a.row.points) || (a.index - b.index))
+            .sort((a, b) => (b.row[key] - a.row[key]) || (a.index - b.index))
             .map(({ row }) => ({ ...row }));
-        const leader = sorted.length > 0 ? sorted[0].points : 0;
+        const leader = sorted.length > 0 ? sorted[0][key] : 0;
         sorted.forEach((row, i) => {
-            row.rank = i > 0 && row.points === sorted[i - 1].points ? sorted[i - 1].rank : i + 1;
-            row.pointsFromLeader = leader - row.points;
+            row.rank = i > 0 && row[key] === sorted[i - 1][key] ? sorted[i - 1].rank : i + 1;
+            row.pointsFromLeader = leader - row[key];
         });
         return sorted;
+    }
+
+    // Upside = points already earned + confidence still riding on unfinished games.
+    function upsideWeek(picks, games) {
+        const result = { ...scoreWeek(picks, games), pointsLeft: 0, gamesLeft: 0, maxPossible: 0 };
+        if (picks && typeof picks === 'object') {
+            const ids = gameIds(games);
+            const maxConfidence = ids.length;
+            ids.forEach((id) => {
+                const pick = picks[id];
+                if (!isEntry(id, pick) || typeof pick.winner !== 'string' || pick.winner === '') return;
+                if (isGameFinal(games[id])) return;
+                result.gamesLeft++;
+                const confidence = pick.confidence;
+                if (Number.isInteger(confidence) && confidence >= 1 && confidence <= maxConfidence) {
+                    result.pointsLeft += confidence;
+                }
+            });
+        }
+        result.maxPossible = result.points + result.pointsLeft;
+        return result;
+    }
+
+    function upsideStandings(members, picksByUser, games) {
+        const rows = [];
+        Object.keys(members || {}).forEach((userId) => {
+            const upside = upsideWeek((picksByUser || {})[userId], games);
+            if (upside.picksMade === 0) return;
+            rows.push({ userId, name: memberName(members[userId]), ...upside });
+        });
+        return rankStandings(rows, 'maxPossible');
     }
 
     const memberName = (member) =>
@@ -174,7 +205,9 @@
         rankStandings,
         weekStandings,
         seasonStandings,
-        seasonSummary
+        seasonSummary,
+        upsideWeek,
+        upsideStandings
     });
 
     if (typeof window !== 'undefined') {
