@@ -20,7 +20,6 @@ const PAGES = [
   { path: '/nerdfootballConfidencePicks.html', marker: 'Killer Bees' },
   { path: '/NerdSurvivorPicks.html', marker: 'Survivor Pick Selection Room' },
   { path: '/nerdfootballTheGrid.html', marker: 'The Grid' },
-  // Deliberately year-less: the heading currently hardcodes 2025 (NERD-10).
   { path: '/leaderboard.html', marker: 'Season Leaderboard' },
   { path: '/NerdSurvivorAdmin.html', marker: 'Survivor Pool Admin' },
 ];
@@ -130,7 +129,7 @@ describe(`navigation labels: ${BASE}`, () => {
  * other check still passes.
  */
 describe(`shared header: ${BASE}`, () => {
-  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html', '/the-survival-chamber-36-degrees.html', '/weekly-leaderboard.html'];
+  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html', '/the-survival-chamber-36-degrees.html', '/weekly-leaderboard.html', '/leaderboard.html'];
 
   test.each(ADOPTERS)('%s mounts the shared header and theme', async (path) => {
     const { status, body } = await get(path);
@@ -234,6 +233,24 @@ describe(`shared header: ${BASE}`, () => {
     for (const gone of ['game-results-grid', 'showPlayerDetails', 'upset-picks', 'wu-tang', 'terminal-bg', 'JetBrains Mono']) {
       expect(body).not.toContain(gone);
     }
+  });
+
+  test('Season Leaderboard scores with the shared module, from pool members, without emails or a hardcoded year', async () => {
+    const { body } = await get('/leaderboard.html');
+    expect(body).toContain('Scoring.seasonStandings');
+    expect(body).toContain('id="sl-loading"');
+    expect(body).toContain('id="breakdown-body"');
+    for (const gone of ['nerdfootball_users', 'Leaderboard 2025', 'cdn.tailwindcss.com', 'userEmail', 'terminal-window']) {
+      expect(body).not.toContain(gone);
+    }
+  });
+
+  test.each(['/weekly-leaderboard.html', '/leaderboard.html'])('%s uses the shared leaderboard stylesheet', async (path) => {
+    const { body } = await get(path);
+    expect(body).toContain('./css/nerd-leaderboard.css');
+    const css = await get('/css/nerd-leaderboard.css');
+    expect(css.status).toBe(200);
+    expect(css.body).toContain('.podium-card');
   });
 
   test('the header stylesheet is served', async () => {
