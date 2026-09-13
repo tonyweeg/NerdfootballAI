@@ -123,3 +123,36 @@ describe(`navigation labels: ${BASE}`, () => {
     expect(unlabelled).toEqual([]);
   });
 });
+
+/**
+ * NERD-20: the shared header is client-rendered, so a page that forgets the
+ * slot, the script or the stylesheet ships with no navigation at all and every
+ * other check still passes.
+ */
+describe(`shared header: ${BASE}`, () => {
+  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html'];
+
+  test.each(ADOPTERS)('%s mounts the shared header and theme', async (path) => {
+    const { status, body } = await get(path);
+    expect(status).toBe(200);
+    expect(body).toContain('data-nerd-header');
+    expect(body).toContain('./js/components/nerd-header.js');
+    expect(body).toContain('./css/nerd-header.css');
+    expect(body).toContain('./css/nerd-theme.css');
+    expect(body).toContain('./js/utils/theme-toggle.js');
+  });
+
+  test('the component ships at least 8 labelled nav items', async () => {
+    const { status, body } = await get('/js/components/nerd-header.js');
+    expect(status).toBe(200);
+    const items = [...body.matchAll(/\{ href: '([^']+)', icon: '([a-z_]+)', label: '([^']*)'/g)];
+    expect(items.length).toBeGreaterThanOrEqual(8);
+    expect(items.filter(([, , , label]) => !label.trim())).toEqual([]);
+  });
+
+  test('the header stylesheet is served', async () => {
+    const { status, body } = await get('/css/nerd-header.css');
+    expect(status).toBe(200);
+    expect(body).toContain('.nh-menu-panel');
+  });
+});
