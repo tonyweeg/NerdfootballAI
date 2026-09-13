@@ -74,16 +74,24 @@ jobs:
         env:
           BASE_URL: ${{ steps.deploy.outputs.details_url }}
         run: |
-          for i in $(seq 1 30); do
+          # Firebase channel propagation is not instant and is not bounded. A
+          # 150s window produced a false failure on PR #14: the channel 404'd
+          # for every attempt, then served normally minutes later. A gate that
+          # cries wolf is a gate people merge past, so the window is now 10
+          # minutes with a slower poll.
+          deadline=$(( SECONDS + 600 ))
+          attempt=0
+          until [ $SECONDS -ge $deadline ]; do
+            attempt=$(( attempt + 1 ))
             code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/nerd-universe.html")
             if [ "$code" = "200" ]; then
-              echo "preview ready after $i attempt(s)"
+              echo "preview ready after ${attempt} attempt(s), $((SECONDS))s"
               exit 0
             fi
-            echo "attempt $i: HTTP $code"
-            sleep 5
+            echo "attempt ${attempt}: HTTP ${code} (${SECONDS}s elapsed)"
+            sleep 10
           done
-          echo "::error::preview never served 200 within 150s"
+          echo "::error::preview never served 200 within 600s — channel $BASE_URL"
           exit 1
 
       - name: Smoke the preview
