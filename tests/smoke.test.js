@@ -165,6 +165,19 @@ describe(`shared header: ${BASE}`, () => {
     expect(body).not.toContain('Life Force');
   });
 
+  test.each(["/NerdSurvivorPicks.html", "/the-survival-chamber-36-degrees.html"])("%s loads the shared team logo map", async (path) => {
+    const { body } = await get(path);
+    expect(body).toContain("./js/utils/team-logos.js");
+    const logos = await get("/js/utils/team-logos.js");
+    expect(logos.status).toBe(200);
+    expect(logos.body).toContain("logoUrl");
+  });
+
+  test("Survivor Pick Selection Room no longer says Survival Chamber", async () => {
+    const { body } = await get("/NerdSurvivorPicks.html");
+    expect(body).not.toContain("Survival Chamber");
+  });
+
   test("36 Chambers ships the pick piles and the board rules module", async () => {
     const { body } = await get("/the-survival-chamber-36-degrees.html");
     expect(body).toContain('id="pick-piles"');
