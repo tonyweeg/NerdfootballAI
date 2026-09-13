@@ -79,16 +79,25 @@ jobs:
           # for every attempt, then served normally minutes later. A gate that
           # cries wolf is a gate people merge past, so the window is now 10
           # minutes with a slower poll.
+          #
+          # NERD-22: PRs #19 and #25 still failed all 60 polls while the same URL
+          # served 200 from outside the runner. Suspected cause: the first poll
+          # lands before propagation, the CDN edge caches that 404, and every
+          # later identical URL gets the cached 404. Each poll now uses a unique
+          # query string, and every non-200 logs its cache headers so a future
+          # failure explains itself instead of repeating.
           deadline=$(( SECONDS + 600 ))
           attempt=0
           until [ $SECONDS -ge $deadline ]; do
             attempt=$(( attempt + 1 ))
-            code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL/nerd-universe.html")
+            url="$BASE_URL/nerd-universe.html?ready=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}"
+            code=$(curl -s -o /dev/null -D /tmp/preview-headers -w '%{http_code}' "$url")
             if [ "$code" = "200" ]; then
               echo "preview ready after ${attempt} attempt(s), $((SECONDS))s"
               exit 0
             fi
             echo "attempt ${attempt}: HTTP ${code} (${SECONDS}s elapsed)"
+            grep -iE '^(HTTP/[0-9.]+ |(x-cache|x-cache-hits|age|cache-control|x-served-by|date):)' /tmp/preview-headers | sed 's/^/    /' || true
             sleep 10
           done
           echo "::error::preview never served 200 within 600s — channel $BASE_URL"
