@@ -448,6 +448,26 @@
 
         .sv-block-big { font-size: 1.5rem; font-weight: 700; color: var(--md-error); }
 
+        /* ---- Helmets ---------------------------------------------------- */
+        .sv-helmet { flex-shrink: 0; object-fit: contain; }
+        .sv-helmet.is-xs { width: 24px; height: 24px; }
+        .sv-helmet.is-sm { width: 32px; height: 32px; }
+        .sv-helmet.is-md { width: 40px; height: 40px; }
+        .sv-helmet.is-lg { width: 64px; height: 64px; }
+        .sv-helmet.is-xl { width: 88px; height: 88px; margin: 0 auto 0.25rem; display: block; }
+
+        .sv-pick-id { display: flex; align-items: center; gap: 0.875rem; flex: 1; min-width: 0; }
+        .sv-pick-id .sv-panel-title { overflow-wrap: anywhere; }
+        .sv-state { flex-shrink: 0; }
+
+        @media (max-width: 640px) {
+            .sv-helmet.is-lg { width: 48px; height: 48px; }
+            .sv-pick-id { gap: 0.625rem; }
+        }
+        .sv-team-id { display: flex; align-items: center; gap: 0.625rem; min-width: 0; }
+        .sv-matchup { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .team-btn:disabled .sv-helmet { filter: grayscale(1); }
+
         /* ---- Toasts ----------------------------------------------------- */
         .sv-toast {
             position: fixed;
@@ -486,6 +506,7 @@
     <script src="./js/utils/logger-compat.js"></script>
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
+    <script src="./js/utils/team-logos.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
@@ -593,6 +614,11 @@
         const app = initializeApp(getFirebaseConfig());
         const auth = getAuth(app);
         const db = getFirestore(app);
+
+        function helmet(team, size) {
+            const url = window.TeamLogos && window.TeamLogos.logoUrl(team);
+            return url ? `<img class="sv-helmet is-${size}" src="${url}" alt="" loading="lazy">` : '';
+        }
 
         function escapeHtml(value) {
             return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1051,7 +1077,7 @@
             const winsHtml = winningPicks.map(pick => `
                 <div class="sv-row is-win">
                     <div class="sv-row-main">
-                        <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                        ${helmet(pick.team, 'sm') || '<span class="material-symbols-outlined" aria-hidden="true">check_circle</span>'}
                         <div>
                             <div class="sv-row-title">Week ${pick.week}</div>
                             <div class="sv-meta">${escapeHtml(pick.team)}</div>
@@ -1100,10 +1126,13 @@
                 currentWeekContent.innerHTML = `
                     <div class="sv-panel is-current">
                         <div class="sv-panel-row">
-                            <div>
-                                <h3 class="sv-panel-title">${escapeHtml(activePick.team)}</h3>
-                                <p class="sv-meta">Game ID: ${escapeHtml(activePick.gameId || 'Not set')}</p>
-                                <p class="sv-meta">Status: ${escapeHtml(activePick.result || 'Pending')}</p>
+                            <div class="sv-pick-id">
+                                ${helmet(activePick.team, 'lg')}
+                                <div>
+                                    <h3 class="sv-panel-title">${escapeHtml(activePick.team)}</h3>
+                                    <p class="sv-meta">Game ID: ${escapeHtml(activePick.gameId || 'Not set')}</p>
+                                    <p class="sv-meta">Status: ${escapeHtml(activePick.result || 'Pending')}</p>
+                                </div>
                             </div>
                             <div class="sv-state ${alive ? 'is-alive' : 'is-dead'}">
                                 <span class="material-symbols-outlined" aria-hidden="true">${alive ? 'check_circle' : 'skull'}</span>
@@ -1177,7 +1206,7 @@
                     html += `
                         <div class="sv-row ${hasStarted ? 'is-started' : ''}">
                             <div>
-                                <div class="sv-row-title">${escapeHtml(game.a)} @ ${escapeHtml(game.h)}</div>
+                                <div class="sv-row-title sv-matchup">${helmet(game.a, 'xs')}${escapeHtml(game.a)} @ ${helmet(game.h, 'xs')}${escapeHtml(game.h)}</div>
                                 <div class="sv-meta">${gameTime}</div>
                             </div>
                             <div class="sv-game-state ${hasStarted ? 'is-started' : 'is-upcoming'}">
@@ -1235,10 +1264,13 @@
                         type="button"
                         ${isDisabled ? 'disabled' : ''}
                     >
-                        <div>
-                            <div class="team-name">${team}</div>
-                            ${opponent !== team ? `<div class="team-vs">vs ${opponent}</div>` : ''}
-                            ${isUsed ? '<div class="team-used">Already Used</div>' : ''}
+                        <div class="sv-team-id">
+                            ${helmet(team, 'md')}
+                            <div>
+                                <div class="team-name">${team}</div>
+                                ${opponent !== team ? `<div class="team-vs">vs ${opponent}</div>` : ''}
+                                ${isUsed ? '<div class="team-used">Already Used</div>' : ''}
+                            </div>
                         </div>
                         ${currentUser && ADMIN_UIDS.includes(currentUser.uid) && opponent && opponent !== team ? `
                             <span onclick="showAIPrediction('survivor_week_${selectedWeek}_${team}', '${team}', '${opponent}', event); event.stopPropagation();"
@@ -1377,7 +1409,7 @@
                 winningPicksHtml = userSurvivorStatus.allWinningPicks.map(pick => `
                     <div class="sv-row is-win">
                         <div class="sv-row-main">
-                            <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                            ${helmet(pick.team, 'sm') || '<span class="material-symbols-outlined" aria-hidden="true">check_circle</span>'}
                             <div>
                                 <div class="sv-row-title">Week ${pick.week}</div>
                                 <div class="sv-meta">${escapeHtml(pick.team)}</div>
@@ -1393,10 +1425,11 @@
                 <div class="sv-death">
                     <span class="material-symbols-outlined sv-death-icon" aria-hidden="true">skull</span>
                     <h1 class="sv-death-title">SOUL REAPED - WEEK ${userSurvivorStatus.eliminatedWeek}</h1>
-                    <div class="sv-death-lede">Your journey in the Survival Chamber has ended.</div>
+                    <div class="sv-death-lede">Your journey in the Survivor Pick Selection Room has ended.</div>
 
                     <div class="sv-block is-death">
                         <div class="sv-block-label">Eliminated By:</div>
+                        ${helmet(userSurvivorStatus.eliminatedBy, 'xl')}
                         <div class="sv-block-big">${escapeHtml(userSurvivorStatus.eliminatedBy)}</div>
                     </div>
 
@@ -1406,7 +1439,7 @@
                             ${winningPicksHtml}
                             <div class="sv-row is-death">
                                 <div class="sv-row-main">
-                                    <span class="material-symbols-outlined" aria-hidden="true">cancel</span>
+                                    ${helmet(userSurvivorStatus.eliminatedBy, 'sm') || '<span class="material-symbols-outlined" aria-hidden="true">cancel</span>'}
                                     <div>
                                         <div class="sv-row-title">Week ${userSurvivorStatus.eliminatedWeek}</div>
                                         <div class="sv-meta">${escapeHtml(userSurvivorStatus.eliminatedBy)} [DEATH]</div>
@@ -1452,7 +1485,7 @@
 
                     <div class="sv-block" style="text-align: center;">
                         <div class="sv-meta">
-                            Contact the pool administrator to join the Survival Chamber.
+                            Contact the pool administrator to join the Survivor Pick Selection Room.
                         </div>
                     </div>
 

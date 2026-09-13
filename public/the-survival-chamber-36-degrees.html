@@ -327,6 +327,7 @@
     <script src="./js/config/season-config.js"></script>
     <script src="./js/utils/confidence-scoring.js"></script>
     <script src="./js/utils/survivor-board.js"></script>
+    <script src="./js/utils/team-logos.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
@@ -451,21 +452,6 @@
                 window.location.href = '/';
             }
         });
-
-        // Convert team names to ESPN abbreviations for helmet URLs
-        function getTeamAbbreviation(teamName) {
-            const teamAbbreviations = {
-                'Arizona Cardinals': 'ARI', 'Atlanta Falcons': 'ATL', 'Baltimore Ravens': 'BAL', 'Buffalo Bills': 'BUF',
-                'Carolina Panthers': 'CAR', 'Chicago Bears': 'CHI', 'Cincinnati Bengals': 'CIN', 'Cleveland Browns': 'CLE',
-                'Dallas Cowboys': 'DAL', 'Denver Broncos': 'DEN', 'Detroit Lions': 'DET', 'Green Bay Packers': 'GB',
-                'Houston Texans': 'HOU', 'Indianapolis Colts': 'IND', 'Jacksonville Jaguars': 'JAX', 'Kansas City Chiefs': 'KC',
-                'Las Vegas Raiders': 'LV', 'Los Angeles Chargers': 'LAC', 'Los Angeles Rams': 'LAR', 'Miami Dolphins': 'MIA',
-                'Minnesota Vikings': 'MIN', 'New England Patriots': 'NE', 'New Orleans Saints': 'NO', 'New York Giants': 'NYG',
-                'New York Jets': 'NYJ', 'Philadelphia Eagles': 'PHI', 'Pittsburgh Steelers': 'PIT', 'San Francisco 49ers': 'SF',
-                'Seattle Seahawks': 'SEA', 'Tampa Bay Buccaneers': 'TB', 'Tennessee Titans': 'TEN', 'Washington Commanders': 'WSH'
-            };
-            return teamAbbreviations[teamName] || null;
-        }
 
         function getCurrentWeekNumber() {
             return window.SEASON_CONFIG.utils.getCurrentWeek();
@@ -599,8 +585,8 @@
         }
 
         function teamPick(team, note) {
-            const abbr = getTeamAbbreviation(team);
-            const helmet = abbr ? `<img src="https://a.espncdn.com/i/teamlogos/nfl/500/${abbr}.png" alt="" loading="lazy">` : '';
+            const url = window.TeamLogos.logoUrl(team);
+            const helmet = url ? `<img src="${url}" alt="" loading="lazy">` : '';
             return `<span class="ch-pick">${helmet}<span><span class="ch-pick-team">${escapeHtml(team)}</span>${note ? `<br><span class="ch-pick-note">${escapeHtml(note)}</span>` : ''}</span></span>`;
         }
 
@@ -650,8 +636,9 @@
             }
             const piles = window.SurvivorBoard.pickPiles(survivorsData, currentWeek);
             container.innerHTML = piles.map((pile) => {
-                const abbr = getTeamAbbreviation(pile.team);
-                const helmet = abbr ? `<img src="https://a.espncdn.com/i/teamlogos/nfl/500/${abbr}.png" alt="">` : '';
+                const abbr = window.TeamLogos.abbreviation(pile.team);
+                const url = window.TeamLogos.logoUrl(pile.team);
+                const helmet = url ? `<img src="${url}" alt="">` : '';
                 const label = `${pile.team}: ${pile.count} pick${pile.count === 1 ? '' : 's'}${pile.fallen ? ', all eliminated' : ''}`;
                 return `
                     <div class="ch-pile${pile.fallen ? ' is-fallen' : ''}" role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
