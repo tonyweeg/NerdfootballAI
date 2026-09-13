@@ -319,6 +319,11 @@
 
         .nf-status-slot { display: inline-flex; align-items: center; }
 
+        /* An author display rule beats the browser's [hidden] { display: none },
+           so hiding a slot has to be stated explicitly or .hidden = true would
+           silently do nothing. */
+        .nf-status-slot[hidden] { display: none; }
+
         .nf-status-slot > span {
             display: inline-flex;
             align-items: center;
@@ -1354,6 +1359,13 @@
         function updateStatus(message, type) {
             const statusEl = document.getElementById('statusIndicator');
             statusEl.textContent = message;
+
+            // Idle, this said "Ready" — the same word the auto-save readout
+            // already shows, so the toolbar carried two identical pills. It now
+            // stands down when it has nothing to report. Visibility lives on the
+            // wrapper because the line below reassigns className outright.
+            const slot = statusEl.closest('.nf-status-slot');
+            if (slot) slot.hidden = !message || message === 'Ready';
 
             statusEl.className = 'px-3 py-1 rounded text-sm';
 
