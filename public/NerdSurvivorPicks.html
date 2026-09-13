@@ -460,6 +460,24 @@
         .sv-pick-id .sv-panel-title { overflow-wrap: anywhere; }
         .sv-state { flex-shrink: 0; }
 
+        .sv-result {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-top: 0.25rem;
+            font-family: var(--md-font-mono);
+            font-size: var(--md-label-size);
+            font-weight: 600;
+            letter-spacing: var(--md-label-tracking);
+            text-transform: uppercase;
+            color: var(--md-on-surface-muted);
+        }
+
+        .sv-result .material-symbols-outlined { font-size: 16px; }
+        .sv-result.is-won { color: var(--md-tertiary); }
+        .sv-result.is-lost { color: var(--md-error); }
+        .sv-result.is-live { color: var(--md-primary); }
+
         @media (max-width: 640px) {
             .sv-helmet.is-lg { width: 48px; height: 48px; }
             .sv-pick-id { gap: 0.625rem; }
@@ -507,6 +525,8 @@
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
     <script src="./js/utils/team-logos.js"></script>
+    <script src="./js/utils/confidence-scoring.js"></script>
+    <script src="./js/utils/survivor-board.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
@@ -1122,7 +1142,19 @@
             const currentWeekContent = document.getElementById('currentWeekContent');
 
             if (activePick) {
-                const alive = activePick.alive !== false;
+                const game = window.SurvivorBoard.pickGameStatus(activePick.team, gameData[activeWeek]);
+                const alive = activePick.alive !== false && game.state !== 'lost';
+                const code = (team) => (window.TeamLogos && window.TeamLogos.abbreviation(team)) || team;
+                const line = game.teamScore !== null && game.opponentScore !== null
+                    ? `${code(activePick.team)} ${game.teamScore}–${game.opponentScore} ${code(game.opponent)}` : '';
+                const RESULT = {
+                    won: ['check_circle', `Won · ${line}`],
+                    lost: ['cancel', `Lost · ${line}`],
+                    tie: ['drag_handle', `Tie · ${line}`],
+                    live: ['radio_button_checked', `In progress · ${line}`],
+                    scheduled: ['schedule', game.dt && window.easternTimeParser ? `Kickoff ${window.easternTimeParser.formatGameTime(game.dt)}` : 'Scheduled'],
+                    unknown: ['help', 'Result not available']
+                }[game.state];
                 currentWeekContent.innerHTML = `
                     <div class="sv-panel is-current">
                         <div class="sv-panel-row">
@@ -1130,8 +1162,8 @@
                                 ${helmet(activePick.team, 'lg')}
                                 <div>
                                     <h3 class="sv-panel-title">${escapeHtml(activePick.team)}</h3>
-                                    <p class="sv-meta">Game ID: ${escapeHtml(activePick.gameId || 'Not set')}</p>
-                                    <p class="sv-meta">Status: ${escapeHtml(activePick.result || 'Pending')}</p>
+                                    ${game.opponent ? `<p class="sv-meta">${game.isHome ? 'vs' : '@'} ${escapeHtml(game.opponent)}</p>` : ''}
+                                    <p class="sv-result is-${game.state}"><span class="material-symbols-outlined" aria-hidden="true">${RESULT[0]}</span>${escapeHtml(RESULT[1])}</p>
                                 </div>
                             </div>
                             <div class="sv-state ${alive ? 'is-alive' : 'is-dead'}">
