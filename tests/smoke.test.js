@@ -130,7 +130,7 @@ describe(`navigation labels: ${BASE}`, () => {
  * other check still passes.
  */
 describe(`shared header: ${BASE}`, () => {
-  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html', '/the-survival-chamber-36-degrees.html'];
+  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html', '/the-survival-chamber-36-degrees.html', '/weekly-leaderboard.html'];
 
   test.each(ADOPTERS)('%s mounts the shared header and theme', async (path) => {
     const { status, body } = await get(path);
@@ -224,6 +224,16 @@ describe(`shared header: ${BASE}`, () => {
     const script = await get('/js/components/load-steps.js');
     expect(script.status).toBe(200);
     expect(script.body).toContain('NerdLoadSteps');
+  });
+
+  test('Weekly Leaderboard scores with the shared module and ships none of the dead parts', async () => {
+    const { body } = await get('/weekly-leaderboard.html');
+    expect(body).toContain('./js/utils/confidence-scoring.js');
+    expect(body).toContain('Scoring.weekStandings');
+    expect(body).toContain('id="wl-loading"');
+    for (const gone of ['game-results-grid', 'showPlayerDetails', 'upset-picks', 'wu-tang', 'terminal-bg', 'JetBrains Mono']) {
+      expect(body).not.toContain(gone);
+    }
   });
 
   test('the header stylesheet is served', async () => {
