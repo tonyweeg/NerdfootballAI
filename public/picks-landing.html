@@ -4,204 +4,322 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Make Picks - NerdfootballAI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="./js/utils/suppress-tailwind-warning.js"></script>
-    <script>
-        tailwind.config = {
-            corePlugins: { preflight: true },
-            theme: {
-                extend: {
-                    colors: {
-                        'terminal': {
-                            'bg': '#0a0a0a',
-                            'surface': '#1a1a1a',
-                            'border': '#2a2a2a',
-                            'accent': '#00ff41',
-                            'secondary': '#00d4ff',
-                            'danger': '#ff4757',
-                            'warning': '#ffa502',
-                            'text': '#ffffff',
-                            'muted': '#888888'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/nerd-theme.css">
+    <link rel="stylesheet" href="./css/nerd-header.css">
+    <script src="./js/utils/theme-toggle.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+        /* Make Picks landing on the shared standard (NERD-24). Colour and shape
+           come from css/nerd-theme.css tokens; the Tailwind terminal palette,
+           neon buttons, glow text and hover lift were deleted, not re-pointed. */
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'JetBrains Mono', monospace;
-            background: #121212;
+            font-family: var(--md-font);
+            font-size: 15px;
+            line-height: 1.55;
+            background: var(--md-background);
+            color: var(--md-on-surface);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .terminal-window {
-            background: rgba(26, 26, 26, 0.95);
-            border: 1px solid #2a2a2a;
-            backdrop-filter: blur(10px);
-            box-shadow:
-                0 0 20px rgba(0, 255, 65, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        a { color: inherit; text-decoration: none; }
+
+        .landing-main {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 2rem 1rem 3rem;
         }
 
-        .neon-button {
-            background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
-            border: 1px solid #00ff41;
-            color: #00ff41;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+        /* ---- Hero ------------------------------------------------------- */
+        .landing-hero { margin-bottom: 1.5rem; }
+
+        .landing-kicker {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            margin-bottom: 0.5rem;
+            font-family: var(--md-font-mono);
+            font-size: var(--md-label-size);
+            font-weight: 600;
+            letter-spacing: var(--md-label-tracking);
+            text-transform: uppercase;
+            color: var(--md-primary);
         }
 
-        .neon-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.2), transparent);
-            transition: left 0.5s ease;
+        .landing-kicker-rule {
+            width: 28px;
+            height: 1px;
+            background: var(--md-outline);
         }
 
-        .neon-button:hover::before {
-            left: 100%;
+        .landing-title {
+            font-size: clamp(2rem, 4.5vw, 3.25rem);
+            font-weight: 700;
+            line-height: 1.08;
+            letter-spacing: -0.01em;
         }
 
-        .neon-button:hover {
-            background: linear-gradient(45deg, #2a2a2a, #3a3a3a);
-            box-shadow:
-                0 0 20px rgba(0, 255, 65, 0.3),
-                inset 0 0 20px rgba(0, 255, 65, 0.1);
-            transform: translateY(-2px);
+        .landing-subtitle {
+            margin-top: 0.5rem;
+            color: var(--md-on-surface-muted);
         }
 
-        .confidence-button {
-            background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
-            border: 1px solid #00d4ff;
-            color: #00d4ff;
-            text-shadow: 0 0 5px rgba(0, 212, 255, 0.5);
+        /* ---- Pool cards ------------------------------------------------- */
+        .pool-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
         }
 
-        .confidence-button:hover {
-            background: linear-gradient(45deg, #1a2a2a, #2a3a3a);
-            box-shadow:
-                0 0 20px rgba(0, 212, 255, 0.3),
-                inset 0 0 20px rgba(0, 212, 255, 0.1);
+        .pool-card {
+            display: flex;
+            flex-direction: column;
+            background: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: var(--md-shape-lg);
+            box-shadow: var(--md-elev-2);
+            padding: 1.25rem;
         }
 
-        .glow-text {
-            text-shadow: 0 0 20px currentColor;
+        .pool-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: var(--md-shape-md);
+            background: var(--md-surface-container-high);
+            color: var(--md-on-surface-variant);
         }
 
-        .terminal-text { color: #ffffff; }
-        .terminal-accent { color: #00ff41; }
-        .terminal-secondary { color: #00d4ff; }
+        .pool-icon .material-symbols-outlined { font-size: 28px; }
 
+        .pool-title {
+            margin-top: 0.875rem;
+            font-size: 1.375rem;
+            font-weight: 700;
+        }
+
+        .pool-copy {
+            margin-top: 0.25rem;
+            color: var(--md-on-surface-muted);
+            flex: 1;
+        }
+
+        .pool-actions {
+            display: grid;
+            gap: 0.5rem;
+            margin-top: 1.25rem;
+        }
+
+        .action {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            min-height: 44px;
+            padding: 0 0.875rem 0 1rem;
+            border: 1px solid transparent;
+            border-radius: var(--md-shape-sm);
+            font-weight: 700;
+            transition: background var(--md-dur-short) var(--md-ease),
+                        border-color var(--md-dur-short) var(--md-ease);
+        }
+
+        .action .material-symbols-outlined { font-size: 20px; }
+
+        .action:focus-visible,
+        .quick-link:focus-visible {
+            outline: 2px solid var(--md-primary);
+            outline-offset: 2px;
+        }
+
+        .action-primary {
+            background: var(--md-action-bg);
+            border-color: var(--md-action-border);
+            box-shadow: var(--md-elev-1), inset 0 1px 0 var(--md-button-highlight);
+            color: var(--md-action-text);
+            font-size: 1rem;
+        }
+
+        .action-primary:hover {
+            background: var(--md-action-bg-hover);
+            border-color: var(--md-action-border-hover);
+        }
+
+        .action-primary:active {
+            background: var(--md-action-bg-active);
+            box-shadow: inset 0 1px 3px rgb(0 0 0 / .28);
+        }
+
+        .action-secondary {
+            background: var(--md-button-bg);
+            border-color: var(--md-button-border);
+            box-shadow: var(--md-elev-1), inset 0 1px 0 var(--md-button-highlight);
+            color: var(--md-on-surface);
+            font-size: 0.875rem;
+        }
+
+        .action-secondary:hover {
+            background: var(--md-button-bg-hover);
+            border-color: var(--md-outline);
+        }
+
+        /* ---- Quick links ------------------------------------------------ */
+        .quick-card {
+            margin-top: 1rem;
+            background: var(--md-surface);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: var(--md-shape-lg);
+            box-shadow: var(--md-elev-2);
+            padding: 1.25rem;
+        }
+
+        .quick-title {
+            padding-bottom: 0.875rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--md-outline-variant);
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.625rem;
+        }
+
+        .quick-link {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            min-height: 48px;
+            padding: 0.5rem 0.75rem;
+            background: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: var(--md-shape-sm);
+            font-size: 0.875rem;
+            font-weight: 700;
+            transition: background var(--md-dur-short) var(--md-ease),
+                        border-color var(--md-dur-short) var(--md-ease);
+        }
+
+        .quick-link:hover {
+            background: var(--md-surface-container-high);
+            border-color: var(--md-outline);
+        }
+
+        .quick-link .material-symbols-outlined {
+            font-size: 20px;
+            color: var(--md-on-surface-muted);
+        }
+
+        @media (max-width: 760px) {
+            .pool-grid { grid-template-columns: 1fr; }
+            .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 480px) {
+            .landing-main { padding-top: 1.25rem; }
+        }
     </style>
+    <script src="./js/config/season-data.js"></script>
 </head>
-<body class="min-h-screen text-terminal-text">
-    <!-- Header -->
-    <header class="bg-terminal-bg border-b border-terminal-border">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <a href="./nerd-universe.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                    <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 w-auto">
-                    <h1 class="text-2xl font-bold terminal-accent glow-text">NerdfootballAI</h1>
+<body>
+    <div class="nerd-header-slot" data-nerd-header data-title="Make Picks" data-back="true"></div>
+    <script src="./js/components/nerd-header.js"></script>
+
+    <main class="landing-main">
+        <section class="landing-hero">
+            <p class="landing-kicker">Nerdfootball<span class="landing-kicker-rule" aria-hidden="true"></span><span id="landing-season">Season</span></p>
+            <h1 class="landing-title">Make Picks</h1>
+            <p class="landing-subtitle">Choose your pool type to start making picks</p>
+        </section>
+
+        <div class="pool-grid">
+            <section class="pool-card">
+                <span class="pool-icon" aria-hidden="true"><span class="material-symbols-outlined">sports_football</span></span>
+                <h2 class="pool-title">Survivor Picks</h2>
+                <p class="pool-copy">Pick one team per week. Elimination on loss. Last person standing wins!</p>
+                <div class="pool-actions">
+                    <a href="./NerdSurvivorPicks.html" class="action action-primary">
+                        <span>Make Survivor Pick</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                    </a>
+                    <a href="./the-survival-chamber-36-degrees.html" class="action action-secondary">
+                        <span>View Survivor Status</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">shield</span>
+                    </a>
+                </div>
+            </section>
+
+            <section class="pool-card">
+                <span class="pool-icon" aria-hidden="true"><span class="material-symbols-outlined">ads_click</span></span>
+                <h2 class="pool-title">Confidence Picks</h2>
+                <p class="pool-copy">Assign confidence values 1-N to each game. Higher values = more points!</p>
+                <div class="pool-actions">
+                    <a href="./nerdfootballConfidencePicks.html" class="action action-primary">
+                        <span>Make Confidence Picks</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+                    </a>
+                    <a href="./leaderboard.html" class="action action-secondary">
+                        <span>View Leaderboard</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">leaderboard</span>
+                    </a>
+                </div>
+            </section>
+        </div>
+
+        <section class="quick-card">
+            <h2 class="quick-title">Quick Links</h2>
+            <div class="quick-grid">
+                <a href="./nerd-universe-grid.html" class="quick-link">
+                    <span class="material-symbols-outlined" aria-hidden="true">grid_view</span><span>The Grid</span>
                 </a>
-                <button onclick="history.back()" class="neon-button px-4 py-2 rounded-lg text-sm">
-                    ← Back
-                </button>
+                <a href="./leaderboard.html" class="quick-link">
+                    <span class="material-symbols-outlined" aria-hidden="true">emoji_events</span><span>Season Board</span>
+                </a>
+                <a href="./weekly-leaderboard.html" class="quick-link">
+                    <span class="material-symbols-outlined" aria-hidden="true">calendar_view_week</span><span>Weekly Board</span>
+                </a>
+                <a href="./nerdfootballRules.html" class="quick-link">
+                    <span class="material-symbols-outlined" aria-hidden="true">menu_book</span><span>Rules</span>
+                </a>
             </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
-        <div class="max-w-4xl mx-auto">
-            <!-- Hero Section -->
-            <div class="terminal-window rounded-xl p-8 mb-8 text-center">
-                <h1 class="text-4xl md:text-5xl font-bold mb-4 terminal-accent glow-text">🎯 Make Picks</h1>
-                <p class="text-xl terminal-secondary mb-6">Choose your pool type to start making picks</p>
-            </div>
-
-            <!-- Pick Options -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <!-- Survivor Picks -->
-                <div class="terminal-window rounded-xl p-8 hover:border-terminal-accent transition-all duration-300">
-                    <div class="text-center mb-6">
-                        <div class="text-6xl mb-4">🏈</div>
-                        <h2 class="text-2xl font-bold terminal-accent glow-text mb-2">Survivor Picks</h2>
-                        <p class="terminal-text mb-6">Pick one team per week. Elimination on loss. Last person standing wins!</p>
-                    </div>
-                    <div class="space-y-4">
-                        <a href="./NerdSurvivorPicks.html" class="neon-button w-full block text-center py-4 px-6 rounded-lg transition-all duration-300">
-                            <span class="text-lg font-semibold">Make Survivor Pick</span>
-                        </a>
-                        <a href="./the-survival-chamber-36-degrees.html" class="neon-button w-full block text-center py-3 px-6 rounded-lg transition-all duration-300 opacity-75 hover:opacity-100">
-                            <span class="text-sm">View Survivor Status</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Confidence Picks -->
-                <div class="terminal-window rounded-xl p-8 hover:border-terminal-secondary transition-all duration-300">
-                    <div class="text-center mb-6">
-                        <div class="text-6xl mb-4">🎯</div>
-                        <h2 class="text-2xl font-bold terminal-secondary glow-text mb-2">Confidence Picks</h2>
-                        <p class="terminal-text mb-6">Assign confidence values 1-N to each game. Higher values = more points!</p>
-                    </div>
-                    <div class="space-y-4">
-                        <a href="./nerdfootballConfidencePicks.html" class="confidence-button w-full block text-center py-4 px-6 rounded-lg transition-all duration-300">
-                            <span class="text-lg font-semibold">Make Confidence Picks</span>
-                        </a>
-                        <a href="./leaderboard.html" class="confidence-button w-full block text-center py-3 px-6 rounded-lg transition-all duration-300 opacity-75 hover:opacity-100">
-                            <span class="text-sm">View Leaderboard</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Links -->
-            <div class="terminal-window rounded-xl p-6 mt-8">
-                <h3 class="text-xl font-bold terminal-text glow-text mb-4 text-center">Quick Links</h3>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <a href="./nerd-universe-grid.html" class="neon-button text-center py-3 px-4 rounded-lg transition-all duration-300 block">
-                        <div class="text-lg mb-1">📊</div>
-                        <div class="text-xs">The Grid</div>
-                    </a>
-                    <a href="./leaderboard.html" class="neon-button text-center py-3 px-4 rounded-lg transition-all duration-300 block">
-                        <div class="text-lg mb-1">🏆</div>
-                        <div class="text-xs">Season Board</div>
-                    </a>
-                    <a href="./weekly-leaderboard.html" class="neon-button text-center py-3 px-4 rounded-lg transition-all duration-300 block">
-                        <div class="text-lg mb-1">🎮</div>
-                        <div class="text-xs">Weekly Board</div>
-                    </a>
-                    <a href="./nerdfootballRules.html" class="neon-button text-center py-3 px-4 rounded-lg transition-all duration-300 block">
-                        <div class="text-lg mb-1">📋</div>
-                        <div class="text-xs">Rules</div>
-                    </a>
-                </div>
-            </div>
-        </div>
+        </section>
     </main>
 
-    <!-- Firebase Auth (Basic) -->
+    <script>
+        if (window.SEASON_DATA) {
+            document.getElementById('landing-season').textContent = window.SEASON_DATA.year + ' Season';
+        }
+    </script>
+
     <script type="module">
         import { getFirebaseConfig } from './js/config/firebase-config.js';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
         const app = initializeApp(getFirebaseConfig());
         const auth = getAuth(app);
 
-        // Basic auth check - redirect if not signed in
         onAuthStateChanged(auth, (user) => {
             if (!user) {
                 window.location.href = './login.html';
+                return;
+            }
+            const header = window.NerdHeader && window.NerdHeader.current;
+            if (header) {
+                header.setUser(user);
+                header.setLogoutHandler(async () => {
+                    await signOut(auth);
+                    window.location.href = './login.html';
+                });
             }
         });
     </script>
