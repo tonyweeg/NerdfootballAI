@@ -130,7 +130,7 @@ describe(`navigation labels: ${BASE}`, () => {
  * other check still passes.
  */
 describe(`shared header: ${BASE}`, () => {
-  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html'];
+  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html', '/the-survival-chamber-36-degrees.html'];
 
   test.each(ADOPTERS)('%s mounts the shared header and theme', async (path) => {
     const { status, body } = await get(path);
@@ -150,11 +150,17 @@ describe(`shared header: ${BASE}`, () => {
     expect(items.filter(([, , , label]) => !label.trim())).toEqual([]);
   });
 
-  test('survivor picks opts into the red survivor accent', async () => {
-    const { body } = await get('/NerdSurvivorPicks.html');
+  test.each(['/NerdSurvivorPicks.html', '/the-survival-chamber-36-degrees.html'])('%s opts into the red survivor accent', async (path) => {
+    const { body } = await get(path);
     expect(body).toMatch(/<html[^>]*data-accent="survivor"/);
     const css = await get('/css/nerd-theme.css');
     expect(css.body).toContain(':root[data-accent="survivor"]');
+  });
+
+  test('36 Chambers no longer ships the invisible game overlay that blocked header clicks', async () => {
+    const { body } = await get('/the-survival-chamber-36-degrees.html');
+    expect(body).not.toContain('id="game-zone"');
+    expect(body).not.toContain('<canvas');
   });
 
   test('the header stylesheet is served', async () => {
