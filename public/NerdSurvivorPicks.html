@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./css/nerd-theme.css">
     <link rel="stylesheet" href="./css/nerd-header.css">
+    <link rel="stylesheet" href="./css/nerd-loading.css">
     <script src="./js/utils/theme-toggle.js"></script>
     <!-- Tailwind stays only for the shared admin AI modal (nerdfootballai-modal.js).
          Page colour comes from css/nerd-theme.css; there is no custom palette. -->
@@ -463,6 +464,19 @@
         .sv-toast.is-success { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
         .sv-toast.is-error { background: var(--md-error-container); color: var(--md-on-error-container); }
 
+        /* ---- Loading ---------------------------------------------------- */
+        .sv-loading .sv-tiles { margin-bottom: 1rem; }
+        .sv-loading .sv-tile { min-height: 84px; }
+        .sv-loading .card { min-height: 150px; }
+        .sv-load-steps { padding: 0.25rem 0.25rem 0; }
+
+        /* Keep the steps on the first screen on phones: compact skeleton. */
+        @media (max-width: 640px) {
+            .sv-loading .sv-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+            .sv-loading .sv-tile { min-height: 64px; padding: 0.625rem; }
+            .sv-loading .card { min-height: 110px; }
+        }
+
         @media (max-width: 640px) {
             .sv-main { padding-top: 1.25rem; }
             .card { padding: 1rem; }
@@ -484,6 +498,22 @@
             <h1 class="sv-title">Survival Chamber</h1>
             <p class="sv-subtitle">Choose one team per week. One loss = Death. Only the strongest survive the 36 degrees.</p>
             <div id="authStatus" class="sv-auth">Authenticating...</div>
+        </section>
+
+        <!-- Loading: skeleton shaped like the status tiles and pick card, plus the real load steps -->
+        <section id="sv-loading" class="sv-loading" data-loader>
+            <div class="sv-tiles" aria-hidden="true">
+                <div class="sv-tile"><div class="sk sk-xl sk-w-30"></div><div class="sk sk-sm sk-w-70"></div></div>
+                <div class="sv-tile"><div class="sk sk-xl sk-w-30"></div><div class="sk sk-sm sk-w-70"></div></div>
+                <div class="sv-tile"><div class="sk sk-xl sk-w-30"></div><div class="sk sk-sm sk-w-70"></div></div>
+            </div>
+            <div class="card" aria-hidden="true">
+                <div class="sk sk-lg sk-w-40"></div>
+                <div class="sk sk-w-90"></div>
+                <div class="sk sk-w-70"></div>
+                <div class="sk sk-w-50"></div>
+            </div>
+            <div id="sv-load-steps" class="sv-load-steps"></div>
         </section>
 
         <!-- Current Status Card -->
@@ -548,6 +578,8 @@
         }
     </script>
 
+    <script src="./js/components/load-steps.js"></script>
+
     <!-- Load Eastern Time Parser -->
     <script src="./easternTimeParser-v2.js"></script>
 
@@ -597,6 +629,18 @@
         let gameData = {};
         let usedTeams = new Set();
 
+        const loader = window.NerdLoadSteps.mount(document.getElementById('sv-load-steps'), [
+            { key: 'auth', label: 'Signed in' },
+            { key: 'membership', label: 'Pool membership' },
+            { key: 'status', label: 'Survivor status' },
+            { key: 'picks', label: 'Your picks' },
+            { key: 'games', label: "This week's games" }
+        ], {
+            root: document.getElementById('sv-loading'),
+            onRetry: () => window.location.reload()
+        });
+        loader.start('auth');
+
         // Authentication
         onAuthStateChanged(auth, async (user) => {
             const authStatus = document.getElementById('authStatus');
@@ -613,24 +657,32 @@
                 isAuthenticated = true;
                 const godModeIndicator = GOD_MODE && ADMIN_UIDS.includes(user.uid) ? '<span class="sv-chip is-god">God Mode</span>' : '';
                 authStatus.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">check_circle</span>${escapeHtml(user.email?.split('@')[0] || 'User')}${godModeIndicator}`;
+                loader.done('auth');
                 await initializeUserInterface();
             } else {
                 authStatus.textContent = 'Please sign in';
                 isAuthenticated = false;
+                loader.fail('auth', 'Please sign in to make your survivor pick.');
             }
         });
 
         async function initializeUserInterface() {
+            let step = 'membership';
             try {
                 // Check if user is pool member
+                loader.start('membership');
                 if (!(await isPoolMember())) {
-                    showError('You are not a member of the survivor pool.');
+                    loader.fail('membership', 'You are not a member of the survivor pool.');
                     return;
                 }
+                loader.done('membership');
 
                 // PHASE 1: Load centralized survivor status FIRST
                 logger.survivor('💀 SURVIVOR_INIT: Step 1 - Loading survivor status...');
+                step = 'status';
+                loader.start('status');
                 userSurvivorStatus = await loadUserSurvivorStatus();
+                loader.done('status');
 
                 // 👑 GOD MODE: Admin bypass for eliminated status
                 if (GOD_MODE && ADMIN_UIDS.includes(currentUser.uid)) {
@@ -645,13 +697,21 @@
                 // PHASE 2: Route based on survivor status
                 if (userSurvivorStatus.isEliminated) {
                     logger.survivor('💀 SURVIVOR_INIT: User is ELIMINATED - showing death screen');
+                    step = 'picks';
+                    loader.start('picks');
                     await loadUserSurvivorData(); // Load picks for history display
+                    loader.done('picks');
+                    loader.skip('games');
+                    loader.finish();
                     showEliminationScreen();
                     return; // STOP - no more functionality for dead users
                 }
 
                 if (userSurvivorStatus.notParticipating) {
                     logger.survivor('⚠️ SURVIVOR_INIT: User NOT PARTICIPATING - showing not participating screen');
+                    loader.skip('picks');
+                    loader.skip('games');
+                    loader.finish();
                     showNotParticipatingScreen();
                     return; // STOP
                 }
@@ -659,15 +719,22 @@
                 // User is ALIVE - proceed with normal interface
                 logger.survivor('✅ SURVIVOR_INIT: User is ALIVE - loading full interface');
                 currentWeek = getCurrentWeek();
+                step = 'picks';
+                loader.start('picks');
                 await loadUserSurvivorData();
+                loader.done('picks');
+                step = 'games';
+                loader.start('games');
                 await loadGameData();
+                loader.done('games');
                 calculateUsedTeams();
 
                 displayUserInterface();
+                loader.finish();
 
             } catch (error) {
                 logger.error('SURVIVOR', 'Error initializing interface:', error);
-                showError(`Error loading data: ${error.message}`);
+                loader.fail(step, `Error loading data: ${error.message}`);
             }
         }
 
