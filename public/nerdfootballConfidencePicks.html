@@ -17,29 +17,16 @@
             corePlugins: { preflight: true },
             // Suppress production warning for confidence picks page
             suppressWarnings: true,
-            theme: {
-                extend: {
-                    colors: {
-                        // Mapped onto the shared theme tokens (NERD-16), so the
-                        // 58 existing bg-wutang-* / text-wutang-* classes in the
-                        // markup follow the theme without touching the markup.
-                        'wutang': {
-                            'void': 'var(--md-background)',
-                            'surface': 'var(--md-surface-container-low)',
-                            'border': 'var(--md-outline-variant)',
-                            'accent': 'var(--md-primary)',
-                            'secondary': 'var(--md-secondary)',
-                            'danger': 'var(--md-error)',
-                            'warning': 'var(--md-tertiary)',
-                            'text': 'var(--md-on-surface)',
-                            'muted': 'var(--md-on-surface-muted)'
-                        }
-                    }
-                }
-            }
+            // Tailwind is kept for layout utilities only. Colour comes from
+            // css/nerd-theme.css; there is no custom palette to drift.
         }
     </script>
     <style>
+        /* Confidence picks, on the shared standard (NERD-16/17).
+           Colour and shape come from css/nerd-theme.css tokens. No glows, no
+           animations, no leftovers from the terminal era — the old neon rules
+           were deleted rather than re-pointed at new values. */
+
         body {
             font-family: var(--md-font);
             font-size: 15px;
@@ -47,147 +34,157 @@
             color: var(--md-on-surface);
         }
 
-        .wutang-window {
-            background: var(--md-surface-container-low);
+        /* ---- Colour utilities, token-backed --------------------------- */
+        .nf-fg            { color: var(--md-on-surface); }
+        .nf-fg-muted      { color: var(--md-on-surface-muted); }
+        .nf-fg-accent     { color: var(--md-primary); }
+        .nf-fg-secondary  { color: var(--md-on-surface-variant); }
+        .nf-fg-warning    { color: var(--md-tertiary); }
+        .nf-fg-danger     { color: var(--md-error); }
+        .nf-bg            { background: var(--md-background); }
+        .nf-surface       { background: var(--md-surface-container-low); }
+        .nf-divider       { background: var(--md-outline-variant); }
+        .nf-border            { border-color: var(--md-outline-variant); }
+        .nf-border-accent     { border-color: var(--md-primary); }
+        .nf-border-secondary  { border-color: var(--md-outline); }
+
+        /* ---- Panels --------------------------------------------------- */
+        .nf-card {
+            background: var(--md-surface);
             border: 1px solid var(--md-outline-variant);
-            backdrop-filter: blur(10px);
-            box-shadow:
-                0 0 20px color-mix(in srgb, var(--md-primary) 10%, transparent),
-                inset 0 1px 0 var(--md-button-highlight);
+            border-radius: var(--md-shape-lg);
+            box-shadow: var(--md-elev-2);
         }
 
-        .neon-button {
-            background: linear-gradient(45deg, var(--md-surface-container-low), var(--md-outline-variant));
-            border: 1px solid var(--md-primary);
-            color: var(--md-primary);
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            text-shadow: 0 0 5px color-mix(in srgb, var(--md-primary) 50%, transparent);
+        /* ---- Buttons: the tactile control from the standard ------------ */
+        .nf-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background: var(--md-action-bg);
+            border: 1px solid var(--md-action-border);
+            border-radius: var(--md-shape-sm);
+            box-shadow: var(--md-elev-1), inset 0 1px 0 var(--md-button-highlight);
+            color: var(--md-action-text);
+            font-weight: 700;
+            transition: background var(--md-dur-short) var(--md-ease),
+                        border-color var(--md-dur-short) var(--md-ease),
+                        box-shadow var(--md-dur-short) var(--md-ease);
         }
 
-        .neon-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--md-primary) 20%, transparent), transparent);
-            transition: left 0.5s ease;
+        .nf-btn:hover:not(:disabled) {
+            background: var(--md-action-bg-hover);
+            border-color: var(--md-action-border-hover);
         }
 
-        .neon-button:hover::before {
-            left: 100%;
+        /* Pressed: the surface sinks. */
+        .nf-btn:active:not(:disabled) {
+            background: var(--md-action-bg-active);
+            box-shadow: inset 0 1px 3px rgb(0 0 0 / .28);
         }
 
-        .neon-button:hover {
-            background: linear-gradient(45deg, var(--md-outline-variant), var(--md-outline));
-            box-shadow:
-                0 0 20px color-mix(in srgb, var(--md-primary) 30%, transparent),
-                inset 0 0 20px color-mix(in srgb, var(--md-primary) 10%, transparent);
-            transform: translateY(-2px);
+        .nf-btn:focus-visible {
+            outline: 2px solid var(--md-primary);
+            outline-offset: 2px;
         }
 
-        .confidence-button {
-            background: linear-gradient(45deg, var(--md-surface-container-low), var(--md-outline-variant));
-            border: 1px solid var(--md-secondary);
-            color: var(--md-secondary);
-            text-shadow: 0 0 5px color-mix(in srgb, var(--md-secondary) 50%, transparent);
+        .nf-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* Secondary action: quiet surface rather than a second bright colour. */
+        .nf-btn-alt {
+            background: var(--md-button-bg);
+            border-color: var(--md-button-border);
+            color: var(--md-on-surface);
         }
 
-        .confidence-button:hover {
-            background: linear-gradient(45deg, var(--md-surface-container), var(--md-surface-container-high));
-            box-shadow:
-                0 0 20px color-mix(in srgb, var(--md-secondary) 30%, transparent),
-                inset 0 0 20px color-mix(in srgb, var(--md-secondary) 10%, transparent);
+        .nf-btn-alt:hover:not(:disabled) {
+            background: var(--md-button-bg-hover);
+            border-color: var(--md-outline);
         }
 
-        .glow-text {
-            text-shadow: 0 0 20px currentColor;
+        /* ---- Game rows ------------------------------------------------- */
+        .game-row {
+            background: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: var(--md-shape-sm);
+            transition: background var(--md-dur-short) var(--md-ease),
+                        border-color var(--md-dur-short) var(--md-ease);
         }
 
-        .wutang-text { color: var(--md-on-surface); }
-        .wutang-accent { color: var(--md-primary); }
-        .wutang-secondary { color: var(--md-secondary); }
-        .wutang-warning { color: var(--md-tertiary); }
-        .wutang-danger { color: var(--md-error); }
-        .wutang-muted { color: var(--md-on-surface-muted); }
-        .wutang-void { background: var(--md-background); }
-        .wutang-surface { background: var(--md-surface-container-low); }
-        .wutang-border { background: var(--md-outline-variant); color: var(--md-outline-variant); }
+        .game-row:hover:not(.locked-row) {
+            background: var(--md-surface-container-high);
+            border-color: var(--md-primary);
+        }
 
         .locked-row {
-            background: var(--md-surface-container);
-            opacity: 0.7;
-            pointer-events: none;
-            border: 1px solid var(--md-outline-variant);
-        }
-        .locked-row input, .locked-row select {
             background: var(--md-surface-container-low);
-            color: var(--md-on-surface-muted);
-            cursor: not-allowed;
             border: 1px solid var(--md-outline-variant);
+            opacity: 0.65;
+            pointer-events: none;
         }
-        .auto-save-indicator {
-            transition: all 0.3s ease;
+
+        .locked-row input,
+        .locked-row select {
+            background: var(--md-surface-container-low);
+            color: var(--md-on-surface-disabled);
+            border: 1px solid var(--md-outline-variant);
+            cursor: not-allowed;
         }
-        .saving {
-            background: linear-gradient(45deg, var(--md-tertiary), var(--md-error)) !important;
-            color: white !important;
-            box-shadow: 0 0 10px color-mix(in srgb, var(--md-tertiary) 50%, transparent);
-        }
-        .saved {
-            background: linear-gradient(45deg, var(--md-primary), var(--md-secondary)) !important;
-            color: var(--md-background) !important;
-            box-shadow: 0 0 10px color-mix(in srgb, var(--md-primary) 50%, transparent);
-        }
-        .game-row {
-            transition: all 0.3s ease;
-            background: var(--md-surface-container);
-            border: 1px solid transparent;
-        }
-        .game-row:hover:not(.locked-row) {
-            background: var(--md-surface-container);
-            border: 1px solid var(--md-primary);
-            box-shadow: 0 0 10px color-mix(in srgb, var(--md-primary) 20%, transparent);
-        }
-        .confidence-input, .confidence-select {
-            width: 80px;
-            text-align: center;
-            background: var(--md-surface-container-low) !important;
-            color: var(--md-primary) !important;
-            border: 1px solid var(--md-outline-variant) !important;
-        }
-        .confidence-input:focus, .confidence-select:focus {
-            box-shadow: 0 0 10px color-mix(in srgb, var(--md-primary) 50%, transparent) !important;
-            border-color: var(--md-primary) !important;
-        }
+
+        /* ---- Inputs ---------------------------------------------------- */
+        .confidence-input,
+        .confidence-select,
         .team-select {
-            min-width: 200px;
-            background: var(--md-surface-container-low) !important;
-            color: var(--md-primary) !important;
-            border: 1px solid var(--md-outline-variant) !important;
+            background: var(--md-surface-container-low);
+            color: var(--md-on-surface);
+            border: 1px solid var(--md-outline);
+            border-radius: var(--md-shape-sm);
+            font-family: var(--md-font);
+            font-weight: 700;
+            padding: 0.375rem 0.5rem;
         }
+
+        .confidence-input,
+        .confidence-select { width: 80px; text-align: center; }
+
+        .team-select { min-width: 200px; }
+
+        .confidence-input:focus,
+        .confidence-select:focus,
         .team-select:focus {
-            box-shadow: 0 0 10px color-mix(in srgb, var(--md-primary) 50%, transparent) !important;
-            border-color: var(--md-primary) !important;
+            outline: 2px solid var(--md-primary);
+            outline-offset: 1px;
+            border-color: var(--md-primary);
         }
+
+        /* ---- Save indicator: states read by colour, not by glow -------- */
+        .auto-save-indicator {
+            border-radius: var(--md-shape-full);
+            font-family: var(--md-font-mono);
+            font-size: var(--md-label-size);
+            letter-spacing: var(--md-label-tracking);
+            text-transform: uppercase;
+            transition: background var(--md-dur-short) var(--md-ease),
+                        color var(--md-dur-short) var(--md-ease);
+        }
+
+        .saving {
+            background: var(--md-tertiary-container) !important;
+            color: var(--md-on-tertiary-container) !important;
+        }
+
+        .saved {
+            background: var(--md-action-bg) !important;
+            color: var(--md-action-text) !important;
+        }
+
+        /* ---- Kickoff times --------------------------------------------- */
         .time-display {
+            font-family: var(--md-font-mono);
             font-size: 0.75rem;
-            color: var(--md-secondary);
-            text-shadow: 0 0 5px color-mix(in srgb, var(--md-secondary) 50%, transparent);
+            color: var(--md-on-surface-muted);
         }
-
-        .bee-buzz {
-            animation: beeBuzz 2s ease-in-out infinite;
-        }
-
-        @keyframes beeBuzz {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-3px); }
-        }
-
     </style>
 
     <!-- 🤖 ML PREDICTION SYSTEM - CONFIDENCE POOL -->
@@ -243,8 +240,8 @@
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 
             modal.innerHTML = `
-                <div class="bg-wutang-surface rounded-lg shadow-xl max-w-3xl w-full">
-                    <div class="bg-gradient-to-r from-wutang-border to-wutang-accent text-white p-6 rounded-t-lg">
+                <div class="nf-surface rounded-lg shadow-xl max-w-3xl w-full">
+                    <div class="bg-gradient-to-r from-nf-divider to-nf-fg-accent text-white p-6 rounded-t-lg">
                         <div class="flex justify-between items-center">
                             <div class="flex items-center gap-3">
                                 <span class="text-2xl">🧠</span>
@@ -253,7 +250,7 @@
                                     <p class="text-green-100 text-sm">Diamond-Level Game Analytics</p>
                                 </div>
                             </div>
-                            <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-wutang-muted">
+                            <button onclick="this.closest('.fixed').remove()" class="text-white hover:nf-fg-muted">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
@@ -263,10 +260,10 @@
 
                     <div class="p-6">
                         <div class="text-center mb-6">
-                            <h3 class="text-lg font-bold text-wutang-text mb-2">Game ${prediction.gameId}</h3>
+                            <h3 class="text-lg font-bold nf-fg mb-2">Game ${prediction.gameId}</h3>
                             <div class="flex items-center justify-center gap-4 mb-4">
                                 <span class="text-xl font-bold text-blue-700">${prediction.awayTeam}</span>
-                                <span class="text-wutang-muted">@</span>
+                                <span class="nf-fg-muted">@</span>
                                 <span class="text-xl font-bold text-green-700">${prediction.homeTeam}</span>
                             </div>
                             <div class="text-2xl font-bold text-green-700 mb-2">
@@ -287,10 +284,10 @@
                         </div>
 
                         <div class="space-y-3 text-sm">
-                            <div class="bg-wutang-surface p-3 rounded">⚡ <strong>Offensive Power:</strong> ${prediction.homeTeam} ${prediction.homeData.offense} vs ${prediction.awayTeam} ${prediction.awayData.offense}</div>
-                            <div class="bg-wutang-surface p-3 rounded">🛡️ <strong>Defensive Strength:</strong> ${prediction.homeTeam} ${prediction.homeData.defense} vs ${prediction.awayTeam} ${prediction.awayData.defense}</div>
-                            <div class="bg-wutang-surface p-3 rounded">📈 <strong>Recent Form:</strong> ${prediction.homeTeam} ${prediction.homeData.form}% vs ${prediction.awayTeam} ${prediction.awayData.form}%</div>
-                            <div class="bg-wutang-surface p-3 rounded">🧠 <strong>AI Analysis:</strong> ${prediction.winner} predicted with ${prediction.confidence}% confidence based on offensive/defensive matchups and recent form</div>
+                            <div class="nf-surface p-3 rounded">⚡ <strong>Offensive Power:</strong> ${prediction.homeTeam} ${prediction.homeData.offense} vs ${prediction.awayTeam} ${prediction.awayData.offense}</div>
+                            <div class="nf-surface p-3 rounded">🛡️ <strong>Defensive Strength:</strong> ${prediction.homeTeam} ${prediction.homeData.defense} vs ${prediction.awayTeam} ${prediction.awayData.defense}</div>
+                            <div class="nf-surface p-3 rounded">📈 <strong>Recent Form:</strong> ${prediction.homeTeam} ${prediction.homeData.form}% vs ${prediction.awayTeam} ${prediction.awayData.form}%</div>
+                            <div class="nf-surface p-3 rounded">🧠 <strong>AI Analysis:</strong> ${prediction.winner} predicted with ${prediction.confidence}% confidence based on offensive/defensive matchups and recent form</div>
                         </div>
                     </div>
                 </div>
@@ -306,14 +303,14 @@
     <script src="./js/config/season-config.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
-<body class="min-h-screen wutang-text">
+<body class="min-h-screen nf-fg">
     <!-- Header -->
-    <header class="bg-wutang-void border-b border-wutang-border">
+    <header class="nf-bg border-b nf-border">
         <div class="container mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
                 <a href="./nerd-universe.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
                     <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 w-auto">
-                    <h1 class="text-2xl font-bold wutang-accent glow-text">🐝 Wu-Tang Confidence - Killer Bees</h1>
+                    <h1 class="text-2xl font-bold nf-fg-accent">🐝 Wu-Tang Confidence - Killer Bees</h1>
                 </a>
                 <div class="flex items-center gap-3">
                     <button class="theme-toggle" type="button">
@@ -325,7 +322,7 @@
                             <path stroke-linecap="round" d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
                         </svg>
                     </button>
-                    <button onclick="history.back()" class="neon-button px-4 py-2 rounded-lg text-sm">
+                    <button onclick="history.back()" class="nf-btn px-4 py-2 rounded-lg text-sm">
                         ← Back
                     </button>
                 </div>
@@ -337,44 +334,44 @@
     <main class="container mx-auto px-4 py-8">
         <div class="max-w-6xl mx-auto">
             <!-- Hero Section -->
-            <div class="wutang-window rounded-xl p-8 mb-8 text-center">
-                <h1 class="text-4xl md:text-5xl font-bold mb-4 wutang-accent glow-text bee-buzz">🐝 Killer Bees Swarm</h1>
-                <p class="text-xl wutang-secondary mb-6">Assign confidence values 1-N to each game. Higher values = more deadly bee stings!</p>
+            <div class="nf-card rounded-xl p-8 mb-8 text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-4 nf-fg-accent">🐝 Killer Bees Swarm</h1>
+                <p class="text-xl nf-fg-secondary mb-6">Assign confidence values 1-N to each game. Higher values = more deadly bee stings!</p>
                 <!-- Auth Status -->
-                <div id="authStatus" class="mt-4 p-3 wutang-window rounded">
-                    <p class="wutang-accent">🐝 Connecting to the Wu-Tang hive...</p>
+                <div id="authStatus" class="mt-4 p-3 nf-card rounded">
+                    <p class="nf-fg-accent">🐝 Connecting to the Wu-Tang hive...</p>
                 </div>
             </div>
 
             <!-- Navigation & Controls -->
-            <div class="wutang-window rounded-xl p-6 mb-6">
+            <div class="nf-card rounded-xl p-6 mb-6">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <!-- Week Navigation -->
                 <div class="flex items-center gap-4">
-                    <button id="prevWeek" class="neon-button px-4 py-2 rounded disabled:opacity-50" disabled>
+                    <button id="prevWeek" class="nf-btn px-4 py-2 rounded disabled:opacity-50" disabled>
                         ← Previous Hive
                     </button>
-                    <select id="weekSelector" class="px-4 py-2 bg-wutang-surface border border-wutang-border rounded-md text-wutang-text focus:outline-none focus:ring-2 focus:ring-wutang-accent">
+                    <select id="weekSelector" class="px-4 py-2 nf-surface border nf-border rounded-md nf-fg focus:outline-none focus:ring-2 focus:ring-nf-fg-accent">
                         <!-- Populated by JavaScript -->
                     </select>
-                    <button id="nextWeek" class="neon-button px-4 py-2 rounded disabled:opacity-50">
+                    <button id="nextWeek" class="nf-btn px-4 py-2 rounded disabled:opacity-50">
                         Next Hive →
                     </button>
                 </div>
 
                 <!-- Status & Actions -->
                 <div class="flex items-center gap-4">
-                    <div id="autoSaveStatus" class="px-3 py-1 rounded text-sm wutang-window">
-                        <span class="wutang-secondary">Bees Ready</span>
+                    <div id="autoSaveStatus" class="px-3 py-1 rounded text-sm nf-card">
+                        <span class="nf-fg-secondary">Bees Ready</span>
                     </div>
-                    <div id="statusIndicator" class="px-3 py-1 rounded text-sm wutang-window">
-                        <span class="wutang-accent">Loading the hive...</span>
+                    <div id="statusIndicator" class="px-3 py-1 rounded text-sm nf-card">
+                        <span class="nf-fg-accent">Loading the hive...</span>
                     </div>
                 </div>
             </div>
 
             <!-- Week Info -->
-            <div id="weekInfo" class="mt-4 p-3 wutang-window rounded hidden">
+            <div id="weekInfo" class="mt-4 p-3 nf-card rounded hidden">
                 <!-- Populated when week loads -->
             </div>
             </div>
@@ -382,46 +379,46 @@
             <!-- Picks Editor -->
             <div id="picksEditor" class="hidden">
                 <!-- MNF Points -->
-                <div class="wutang-window rounded-xl p-4 mb-4">
+                <div class="nf-card rounded-xl p-4 mb-4">
                     <div class="flex justify-between items-center">
                         <div>
-                            <h3 class="text-lg font-semibold wutang-accent glow-text">🐝 Monday Night Killer Bees Tiebreaker</h3>
-                            <p class="text-sm wutang-secondary">Total points scored in the Monday Night hive</p>
+                            <h3 class="text-lg font-semibold nf-fg-accent">🐝 Monday Night Killer Bees Tiebreaker</h3>
+                            <p class="text-sm nf-fg-secondary">Total points scored in the Monday Night hive</p>
                         </div>
                         <div>
                             <input type="number" id="mnfPointsInput" class="confidence-input px-3 py-2 rounded-md text-center"
                                    placeholder="Bee Points" min="0" max="100" step="1">
-                            <label class="block text-xs wutang-muted mt-1 text-center">Total Bee Points</label>
+                            <label class="block text-xs nf-fg-muted mt-1 text-center">Total Bee Points</label>
                         </div>
                 </div>
             </div>
 
             <!-- Games List -->
-            <div class="wutang-window rounded-xl overflow-hidden">
-                <div class="bg-wutang-border px-6 py-4 border-b border-wutang-accent">
-                    <h2 class="text-xl font-bold wutang-accent glow-text">🐝 Hive <span id="weekTitle">1</span> Battles</h2>
-                    <p class="text-sm wutang-secondary mt-1">Choose champions and assign bee venom levels (1-16, each used once in the hive)</p>
+            <div class="nf-card rounded-xl overflow-hidden">
+                <div class="nf-divider px-6 py-4 border-b nf-border-accent">
+                    <h2 class="text-xl font-bold nf-fg-accent">🐝 Hive <span id="weekTitle">1</span> Battles</h2>
+                    <p class="text-sm nf-fg-secondary mt-1">Choose champions and assign bee venom levels (1-16, each used once in the hive)</p>
                 </div>
 
-                <div id="gamesList" class="divide-y divide-wutang-border">
+                <div id="gamesList" class="divide-y divide-nf-divider">
                     <!-- Games populated by JavaScript -->
                 </div>
             </div>
 
             <!-- Validation Summary -->
-            <div id="validationSummary" class="mt-6 wutang-window rounded-xl p-6">
-                <h3 class="text-lg font-semibold wutang-accent glow-text mb-3">🐝 Killer Bees Validation Hive</h3>
-                <div id="validationDetails" class="text-sm wutang-secondary">
+            <div id="validationSummary" class="mt-6 nf-card rounded-xl p-6">
+                <h3 class="text-lg font-semibold nf-fg-accent mb-3">🐝 Killer Bees Validation Hive</h3>
+                <div id="validationDetails" class="text-sm nf-fg-secondary">
                     <!-- Populated by validation logic -->
                 </div>
             </div>
             </div>
 
             <!-- No Picks Message -->
-            <div id="noPicksMessage" class="hidden wutang-window rounded-xl p-8 text-center">
-                <h3 class="text-xl font-semibold wutang-accent glow-text mb-2">🐝 No Bee Picks Yet</h3>
-                <p class="wutang-secondary mb-4">You haven't made picks for this hive week yet.</p>
-                <button id="createPicksBtn" class="neon-button px-6 py-3 rounded-lg">
+            <div id="noPicksMessage" class="hidden nf-card rounded-xl p-8 text-center">
+                <h3 class="text-xl font-semibold nf-fg-accent mb-2">🐝 No Bee Picks Yet</h3>
+                <p class="nf-fg-secondary mb-4">You haven't made picks for this hive week yet.</p>
+                <button id="createPicksBtn" class="nf-btn px-6 py-3 rounded-lg">
                     🐝 Create My Bee Picks
                 </button>
             </div>
@@ -430,18 +427,18 @@
 
     <!-- ML Prediction Modal -->
     <div id="ml-prediction-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden flex items-center justify-center p-4">
-        <div class="wutang-window rounded-xl shadow-xl max-w-4xl w-full max-h-90vh overflow-hidden">
+        <div class="nf-card rounded-xl shadow-xl max-w-4xl w-full max-h-90vh overflow-hidden">
             <!-- Modal Header -->
-            <div class="bg-gradient-to-r from-wutang-border to-wutang-accent text-white p-6">
+            <div class="bg-gradient-to-r from-nf-divider to-nf-fg-accent text-white p-6">
                 <div class="flex justify-between items-center">
                     <div class="flex items-center gap-3">
-                        <span class="text-2xl bee-buzz">🐝</span>
+                        <span class="text-2xl">🐝</span>
                         <div>
                             <h2 class="text-xl font-bold">Killer Bees AI Prediction</h2>
-                            <p class="wutang-muted text-sm">Powered by Wu-Tang Bee Analytics v∞</p>
+                            <p class="nf-fg-muted text-sm">Powered by Wu-Tang Bee Analytics v∞</p>
                         </div>
                     </div>
-                    <button id="close-ml-prediction-btn" class="text-white hover:text-wutang-muted transition-colors">
+                    <button id="close-ml-prediction-btn" class="text-white hover:nf-fg-muted transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -493,17 +490,17 @@
             const authStatus = document.getElementById('authStatus');
             if (user) {
                 currentUser = user;
-                authStatus.innerHTML = `<p class="wutang-accent">✅ Signed in as: ${user.email}</p>`;
+                authStatus.innerHTML = `<p class="nf-fg-accent">✅ Signed in as: ${user.email}</p>`;
 
                 // Check if user is a pool member
                 await checkPoolMembership();
                 if (poolMemberInfo) {
                     await initializeUserApp();
                 } else {
-                    authStatus.innerHTML = `<p class="wutang-danger">❌ You are not a pool member. Contact admin to join.</p>`;
+                    authStatus.innerHTML = `<p class="nf-fg-danger">❌ You are not a pool member. Contact admin to join.</p>`;
                 }
             } else {
-                authStatus.innerHTML = `<p class="wutang-danger">❌ Please sign in to view your picks.</p>`;
+                authStatus.innerHTML = `<p class="nf-fg-danger">❌ Please sign in to view your picks.</p>`;
             }
         });
 
@@ -734,7 +731,7 @@
 
             if (isPastWeek) {
                 statusText = `📊 Past Week - View Only (Current NFL Week: ${currentNFLWeek})`;
-                statusClass = 'bg-wutang-surface border-wutang-border text-wutang-muted';
+                statusClass = 'nf-surface nf-border nf-fg-muted';
             } else if (isCurrentWeek) {
                 statusText = `🔥 Current Week - Live Picks! (Games lock when they start)`;
                 statusClass = 'bg-green-50 border-green-200 text-green-700';
@@ -810,11 +807,11 @@
                 // Game status indicator
                 let statusIndicator = '';
                 if (game.status === 'final') {
-                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-wutang-surface text-wutang-accent">✅ FINAL</span>`;
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium nf-surface nf-fg-accent">✅ FINAL</span>`;
                 } else if (gameStarted) {
-                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-wutang-surface text-wutang-danger">🔒 LOCKED</span>`;
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium nf-surface nf-fg-danger">🔒 LOCKED</span>`;
                 } else {
-                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-wutang-surface text-wutang-secondary">📝 OPEN</span>`;
+                    statusIndicator = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium nf-surface nf-fg-secondary">📝 OPEN</span>`;
                 }
 
                 gameRow.innerHTML = `
@@ -823,19 +820,19 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
                                 <div class="flex items-center gap-2">
-                                    <h4 class="font-semibold text-wutang-text">Game ${gameId}</h4>
+                                    <h4 class="font-semibold nf-fg">Game ${gameId}</h4>
                                     ${currentUser && ADMIN_UIDS.includes(currentUser.uid) ? `
                                         <!-- 🧠 AI BRAIN ICON -->
                                         <span onclick="showAIPrediction('${gameId}', '${game.a}', '${game.h}', event)"
-                                              class="w-5 h-5 hover:bg-wutang-surface transform hover:scale-125 transition-all duration-150 flex items-center justify-center group cursor-pointer rounded"
+                                              class="w-5 h-5 hover:nf-surface transform hover:scale-125 transition-all duration-150 flex items-center justify-center group cursor-pointer rounded"
                                               title="AI Prediction for ${game.a} @ ${game.h}">
-                                            <span class="text-xs group-hover:animate-pulse">🧠</span>
+                                            <span class="text-xs">🧠</span>
                                         </span>
                                     ` : ''}
                                 </div>
                                 ${statusIndicator}
                             </div>
-                            <div class="text-sm text-wutang-muted mb-1">
+                            <div class="text-sm nf-fg-muted mb-1">
                                 <span class="font-medium">${game.a}</span> @ <span class="font-medium">${game.h}</span>
                             </div>
                             <div class="time-display">${gameTimeDisplay}</div>
@@ -846,7 +843,7 @@
                         <div class="flex items-center gap-4">
                             <!-- Team Selection -->
                             <div>
-                                <label class="block text-xs font-medium text-wutang-text mb-1">Pick</label>
+                                <label class="block text-xs font-medium nf-fg mb-1">Pick</label>
                                 <select class="team-select px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         data-game-id="${gameId}" data-field="winner" ${isLocked ? 'disabled' : ''}>
                                     <option value="">Select team...</option>
@@ -857,7 +854,7 @@
 
                             <!-- Confidence -->
                             <div>
-                                <label class="block text-xs font-medium text-wutang-text mb-1">Confidence</label>
+                                <label class="block text-xs font-medium nf-fg mb-1">Confidence</label>
                                 <select class="confidence-select px-3 py-2 border border-gray-300 rounded-md text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         data-game-id="${gameId}" data-field="confidence" ${isLocked ? 'disabled' : ''}>
                                     <option value="">Select...</option>
@@ -1102,18 +1099,18 @@
                     <span class="text-lg font-medium">Progress: ${completePicks}/${gameIds.length} picks (${progressPercent}%)</span>
                     <span class="text-sm">Confidence sum: ${actualTotal}/${expectedTotal}</span>
                 </div>
-                <div class="w-full bg-wutang-border rounded-full h-2 mb-4">
+                <div class="w-full nf-divider rounded-full h-2 mb-4">
                     <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: ${progressPercent}%"></div>
                 </div>
             `;
 
             if (issues.length === 0 && completePicks === gameIds.length) {
-                validationHTML += `<p class="wutang-accent font-medium">✅ All bee picks complete and valid!</p>`;
-                document.getElementById('validationSummary').className = 'mt-6 wutang-window rounded-xl p-6 border-l-4 border-wutang-accent';
+                validationHTML += `<p class="nf-fg-accent font-medium">✅ All bee picks complete and valid!</p>`;
+                document.getElementById('validationSummary').className = 'mt-6 nf-card rounded-xl p-6 border-l-4 nf-border-accent';
             } else {
                 if (issues.length > 0) {
                     validationHTML += `
-                        <div class="wutang-secondary">
+                        <div class="nf-fg-secondary">
                             <p class="font-medium mb-2">⚠️ Bee hive anomalies to fix:</p>
                             <ul class="list-disc list-inside space-y-1 text-sm">
                                 ${issues.slice(0, 5).map(issue => `<li>${issue}</li>`).join('')}
@@ -1122,7 +1119,7 @@
                         </div>
                     `;
                 }
-                document.getElementById('validationSummary').className = 'mt-6 wutang-window rounded-xl p-6 border-l-4 border-wutang-secondary';
+                document.getElementById('validationSummary').className = 'mt-6 nf-card rounded-xl p-6 border-l-4 nf-border-secondary';
             }
 
             validationDetails.innerHTML = validationHTML;
@@ -1147,7 +1144,7 @@
                     break;
                 default:
                     statusEl.textContent = '🔄 Ready';
-                    statusEl.className = 'px-3 py-1 rounded text-sm bg-wutang-surface';
+                    statusEl.className = 'px-3 py-1 rounded text-sm nf-surface';
             }
         }
 
@@ -1159,16 +1156,16 @@
 
             switch (type) {
                 case 'success':
-                    statusEl.classList.add('bg-wutang-surface', 'text-wutang-accent');
+                    statusEl.classList.add('nf-surface', 'nf-fg-accent');
                     break;
                 case 'error':
-                    statusEl.classList.add('bg-wutang-surface', 'text-wutang-danger');
+                    statusEl.classList.add('nf-surface', 'nf-fg-danger');
                     break;
                 case 'info':
-                    statusEl.classList.add('bg-wutang-surface', 'text-wutang-secondary');
+                    statusEl.classList.add('nf-surface', 'nf-fg-secondary');
                     break;
                 default:
-                    statusEl.classList.add('bg-wutang-surface', 'text-wutang-text');
+                    statusEl.classList.add('nf-surface', 'nf-fg');
             }
         }
 
@@ -1323,14 +1320,14 @@
 
                     <!-- Win Probability Display -->
                     <div class="grid grid-cols-2 gap-4 mb-6">
-                        <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-secondary text-center">
+                        <div class="nf-surface rounded-lg p-4 border nf-border-secondary text-center">
                             <div class="text-lg font-bold text-blue-700">${awayAbbr}</div>
                             <div class="text-3xl font-bold text-blue-600 mb-2">
                                 ${mlPrediction.awayWinProbability}%
                             </div>
                             <div class="text-sm text-blue-500">Win Probability</div>
                         </div>
-                        <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-accent text-center">
+                        <div class="nf-surface rounded-lg p-4 border nf-border-accent text-center">
                             <div class="text-lg font-bold text-green-700">${homeAbbr}</div>
                             <div class="text-3xl font-bold text-green-600 mb-2">
                                 ${mlPrediction.homeWinProbability}%
@@ -1350,7 +1347,7 @@
                     </div>
 
                     <!-- Key Factors -->
-                    <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-accent mb-4">
+                    <div class="nf-surface rounded-lg p-4 border nf-border-accent mb-4">
                         <div class="text-sm font-semibold text-green-800 mb-3">🎯 Key Factors Analyzed:</div>
                         <div class="grid grid-cols-1 gap-2">
                             ${mlPrediction.factors.map(factor => `
@@ -1525,14 +1522,14 @@
 
                     <!-- Win Probability Display -->
                     <div class="grid grid-cols-2 gap-4 mb-6">
-                        <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-secondary text-center">
+                        <div class="nf-surface rounded-lg p-4 border nf-border-secondary text-center">
                             <div class="text-lg font-bold text-blue-700">${awayAbbr}</div>
                             <div class="text-3xl font-bold text-blue-600 mb-2">
                                 ${mlPrediction.awayWinProbability}%
                             </div>
                             <div class="text-sm text-blue-500">Win Probability</div>
                         </div>
-                        <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-accent text-center">
+                        <div class="nf-surface rounded-lg p-4 border nf-border-accent text-center">
                             <div class="text-lg font-bold text-green-700">${homeAbbr}</div>
                             <div class="text-3xl font-bold text-green-600 mb-2">
                                 ${mlPrediction.homeWinProbability}%
@@ -1552,7 +1549,7 @@
                     </div>
 
                     <!-- Key Factors -->
-                    <div class="bg-wutang-surface rounded-lg p-4 border border-wutang-accent mb-4">
+                    <div class="nf-surface rounded-lg p-4 border nf-border-accent mb-4">
                         <div class="text-sm font-semibold text-green-800 mb-3">🎯 Key Factors Analyzed:</div>
                         <div class="grid grid-cols-1 gap-2">
                             ${mlPrediction.factors.map(factor => `
