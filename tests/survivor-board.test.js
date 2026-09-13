@@ -89,3 +89,54 @@ describe('pickPiles', () => {
         expect(Board.pickPiles(undefined, 1)).toEqual([]);
     });
 });
+
+describe('pickGameStatus', () => {
+    const week = {
+        _metadata: {},
+        103: { a: 'Tampa Bay Buccaneers', h: 'Cincinnati Bengals', status: 'STATUS_FINAL', winner: 'Cincinnati Bengals', awayScore: 27, homeScore: 33, dt: '2026-09-13T13:00:00Z' },
+        109: { a: 'Cleveland Browns', h: 'Jacksonville Jaguars', status: 'STATUS_FINAL', winner: 'Jacksonville Jaguars', awayScore: 10, homeScore: 34 },
+        110: { a: 'Buffalo Bills', h: 'Houston Texans', status: 'STATUS_FINAL', winner: null, awayScore: '20', homeScore: '20' },
+        111: { a: 'Miami Dolphins', h: 'Las Vegas Raiders', status: 'STATUS_FINAL', winner: null, awayScore: '17', homeScore: '24' },
+        114: { a: 'Arizona Cardinals', h: 'Los Angeles Chargers', status: 'IN_PROGRESS', winner: null, awayScore: 10, homeScore: 7 },
+        116: { a: 'Denver Broncos', h: 'Kansas City Chiefs', status: 'scheduled', winner: null, awayScore: 0, homeScore: 0, dt: '2026-09-14T20:15:00Z' },
+        117: { a: 'TBD', h: 'TBD', status: 'scheduled' }
+    };
+
+    test('real week 1 game 103: Bengals won at home', () => {
+        expect(Board.pickGameStatus('Cincinnati Bengals', week)).toEqual({
+            state: 'won', gameId: '103', opponent: 'Tampa Bay Buccaneers', isHome: true,
+            teamScore: 33, opponentScore: 27, dt: '2026-09-13T13:00:00Z'
+        });
+    });
+
+    test('away loser is lost, with scores from the picked team\'s side', () => {
+        expect(Board.pickGameStatus('Cleveland Browns', week)).toMatchObject({
+            state: 'lost', opponent: 'Jacksonville Jaguars', isHome: false, teamScore: 10, opponentScore: 34
+        });
+    });
+
+    test('final with equal scores is a tie for both teams', () => {
+        expect(Board.pickGameStatus('Buffalo Bills', week).state).toBe('tie');
+        expect(Board.pickGameStatus('Houston Texans', week).state).toBe('tie');
+    });
+
+    test('final without a winner field is decided by the score', () => {
+        expect(Board.pickGameStatus('Las Vegas Raiders', week).state).toBe('won');
+        expect(Board.pickGameStatus('Miami Dolphins', week).state).toBe('lost');
+    });
+
+    test('in-progress games are live whatever the status prefix', () => {
+        expect(Board.pickGameStatus('Los Angeles Chargers', week)).toMatchObject({ state: 'live', teamScore: 7, opponentScore: 10 });
+    });
+
+    test('not started is scheduled, and zero scores are not treated as a result', () => {
+        expect(Board.pickGameStatus('Kansas City Chiefs', week)).toMatchObject({ state: 'scheduled', opponent: 'Denver Broncos', dt: '2026-09-14T20:15:00Z' });
+    });
+
+    test('unknown team, placeholders or no games give unknown', () => {
+        expect(Board.pickGameStatus('Seattle Seahawks', week)).toEqual({ state: 'unknown' });
+        expect(Board.pickGameStatus('TBD', week)).toEqual({ state: 'unknown' });
+        expect(Board.pickGameStatus('Cincinnati Bengals', null)).toEqual({ state: 'unknown' });
+        expect(Board.pickGameStatus(undefined, week)).toEqual({ state: 'unknown' });
+    });
+});

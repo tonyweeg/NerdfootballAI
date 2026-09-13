@@ -7,6 +7,10 @@
 
     const NO_PICK = 'NO_PICK_SUBMITTED';
 
+    // Final / live / tie rules come from the shared scorer so every page agrees.
+    const Scoring = (typeof window !== 'undefined' && window.ConfidenceScoring)
+        || (typeof require === 'function' ? require('./confidence-scoring.js') : null);
+
     const byName = (a, b) => a.name.localeCompare(b.name);
 
     // Eliminated by a team, not for failing to pick.
@@ -47,7 +51,49 @@
             .sort((a, b) => (b.count - a.count) || a.team.localeCompare(b.team));
     }
 
-    const SurvivorBoard = Object.freeze({ boardRows, pickPiles });
+    const score = (value) => {
+        const n = parseInt(value, 10);
+        return Number.isFinite(n) ? n : null;
+    };
+
+    // Live status of a survivor pick, read from this week's game data rather than
+    // the result stored on the pick (which is written once, as "Pending", on save).
+    function pickGameStatus(team, weekGames) {
+        if (typeof team !== 'string' || team === '' || team === 'TBD' || !weekGames) return { state: 'unknown' };
+
+        const gameId = Scoring.gameIds(weekGames).find((id) => {
+            const g = weekGames[id];
+            return g.a === team || g.h === team;
+        });
+        if (!gameId) return { state: 'unknown' };
+
+        const game = weekGames[gameId];
+        const isHome = game.h === team;
+        const teamScore = score(isHome ? game.homeScore : game.awayScore);
+        const opponentScore = score(isHome ? game.awayScore : game.homeScore);
+
+        let state = 'scheduled';
+        if (Scoring.isGameFinal(game)) {
+            if (Scoring.isTieGame(game)) state = 'tie';
+            else if (typeof game.winner === 'string' && game.winner !== '' && game.winner !== 'TBD') state = game.winner === team ? 'won' : 'lost';
+            else if (teamScore !== null && opponentScore !== null) state = teamScore > opponentScore ? 'won' : teamScore < opponentScore ? 'lost' : 'tie';
+            else state = 'unknown';
+        } else if (Scoring.isGameLive(game)) {
+            state = 'live';
+        }
+
+        return {
+            state,
+            gameId,
+            opponent: isHome ? game.a : game.h,
+            isHome,
+            teamScore,
+            opponentScore,
+            dt: game.dt
+        };
+    }
+
+    const SurvivorBoard = Object.freeze({ boardRows, pickPiles, pickGameStatus });
 
     if (typeof window !== 'undefined') window.SurvivorBoard = SurvivorBoard;
     if (typeof module !== 'undefined' && module.exports) module.exports = SurvivorBoard;
