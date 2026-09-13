@@ -244,6 +244,47 @@
             .nf-header-status { width: 100%; justify-content: flex-start; }
         }
 
+        /* Validation readout: the whole state in one chip. State is carried by
+           colour and a leading mark, so it reads at a glance without a panel. */
+        .nf-validation-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: var(--md-shape-full);
+            border: 1px solid var(--md-outline-variant);
+            background: var(--md-surface-container);
+            color: var(--md-on-surface-muted);
+            font-family: var(--md-font-mono);
+            font-size: var(--md-label-size);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .nf-validation-chip.is-ok {
+            border-color: var(--md-primary);
+            color: var(--md-primary);
+        }
+
+        .nf-validation-chip.is-ok::before { content: '✓'; font-weight: 700; }
+
+        .nf-validation-chip.is-warn {
+            border-color: var(--md-tertiary);
+            color: var(--md-tertiary);
+        }
+
+        .nf-validation-chip.is-warn::before { content: '!'; font-weight: 700; }
+
+        .nf-panel-title {
+            font-family: var(--md-font-mono);
+            font-size: var(--md-label-size);
+            font-weight: 600;
+            letter-spacing: var(--md-label-tracking);
+            text-transform: uppercase;
+            color: var(--md-tertiary);
+            margin-bottom: 0.75rem;
+        }
+
         /* ---- Kickoff times --------------------------------------------- */
         .time-display {
             font-family: var(--md-font-mono);
@@ -396,6 +437,7 @@
                 <div class="nf-header-group nf-header-status">
                     <span class="nf-status-slot"><span id="autoSaveStatus" class="px-3 py-1 rounded text-sm nf-surface">Ready</span></span>
                     <span class="nf-status-slot"><span id="statusIndicator" class="px-3 py-1 rounded text-sm nf-surface">Loading…</span></span>
+                    <span class="nf-status-slot"><span id="validationChip" class="nf-validation-chip">—</span></span>
                     <span id="authStatus" class="nf-auth-slot">Connecting…</span>
                 </div>
                 <div class="flex items-center gap-3">
@@ -455,7 +497,7 @@
 
             <!-- Validation Summary -->
             <div id="validationSummary" class="mt-6 nf-card rounded-xl p-6">
-                <h3 class="text-lg font-semibold nf-fg-accent mb-3">🐝 Killer Bees Validation Hive</h3>
+                <h3 class="nf-panel-title">Issues to fix</h3>
                 <div id="validationDetails" class="text-sm nf-fg-secondary">
                     <!-- Populated by validation logic -->
                 </div>
@@ -1152,9 +1194,22 @@
                 </div>
             `;
 
-            if (issues.length === 0 && completePicks === gameIds.length) {
-                validationHTML += `<p class="nf-fg-accent font-medium">✅ All bee picks complete and valid!</p>`;
-                document.getElementById('validationSummary').className = 'mt-6 nf-card rounded-xl p-6 border-l-4 nf-border-accent';
+            // Compact readout in the header. Same numbers, a fraction of the space.
+            const chip = document.getElementById('validationChip');
+            const allValid = issues.length === 0 && completePicks === gameIds.length;
+            if (chip) {
+                chip.textContent = `${completePicks}/${gameIds.length} picks · ${actualTotal}/${expectedTotal}`;
+                chip.className = 'nf-validation-chip ' + (allValid ? 'is-ok' : 'is-warn');
+                chip.title = allValid
+                    ? 'All picks complete and valid'
+                    : `${issues.length} issue${issues.length === 1 ? '' : 's'} to fix`;
+            }
+
+            if (allValid) {
+                // Nothing to act on, so the panel does not take up the page.
+                // className is assigned outright here, so 'hidden' must be part
+                // of the same assignment or it would be wiped.
+                document.getElementById('validationSummary').className = 'hidden';
             } else {
                 if (issues.length > 0) {
                     validationHTML += `
