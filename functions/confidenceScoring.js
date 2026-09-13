@@ -117,7 +117,7 @@
 
     function upsideStandings(members, picksByUser, games) {
         const rows = [];
-        Object.keys(members || {}).forEach((userId) => {
+        confidencePlayerIds(members).forEach((userId) => {
             const upside = upsideWeek((picksByUser || {})[userId], games);
             if (upside.picksMade === 0) return;
             rows.push({ userId, name: memberName(members[userId]), ...upside });
@@ -125,11 +125,21 @@
         return rankStandings(rows, 'maxPossible');
     }
 
+    // The Grid's rule: survivor-only members (confidence turned off) are not on
+    // confidence boards. Members with no participation data count as players.
+    function isConfidencePlayer(member) {
+        return !(member && member.participation && member.participation.confidence &&
+            member.participation.confidence.enabled === false);
+    }
+
+    const confidencePlayerIds = (members) =>
+        Object.keys(members || {}).filter((userId) => isConfidencePlayer(members[userId]));
+
     const memberName = (member) =>
         (member && (member.name || member.displayName || member.email)) || 'Unknown';
 
     function weekStandings(members, picksByUser, games) {
-        const rows = Object.keys(members || {}).map((userId) => {
+        const rows = confidencePlayerIds(members).map((userId) => {
             const score = scoreWeek((picksByUser || {})[userId], games);
             return {
                 userId,
@@ -143,7 +153,7 @@
 
     function seasonStandings(members, weeks) {
         const totals = {};
-        Object.keys(members || {}).forEach((userId) => {
+        confidencePlayerIds(members).forEach((userId) => {
             totals[userId] = {
                 userId,
                 name: memberName(members[userId]),
@@ -200,6 +210,7 @@
         isGameFinal,
         isGameLive,
         isTieGame,
+        isConfidencePlayer,
         gameStates,
         scoreWeek,
         rankStandings,

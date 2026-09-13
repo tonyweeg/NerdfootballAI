@@ -216,7 +216,7 @@ async function generateWeeklyLeaderboardData(weekNumber) {
         standings,
         gameStates: { live: states.live, completed: states.completed, upcoming: states.upcoming },
         metadata: {
-            totalUsers: memberIds.length,
+            totalUsers: standings.length,
             totalGames: states.total,
             liveGames: states.live,
             completedGames: states.completed,
