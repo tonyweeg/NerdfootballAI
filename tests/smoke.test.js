@@ -130,7 +130,7 @@ describe(`navigation labels: ${BASE}`, () => {
  * other check still passes.
  */
 describe(`shared header: ${BASE}`, () => {
-  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html'];
+  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html'];
 
   test.each(ADOPTERS)('%s mounts the shared header and theme', async (path) => {
     const { status, body } = await get(path);
