@@ -96,3 +96,30 @@ describe(`smoke: ${BASE}`, () => {
     expect(body).not.toMatch(/nerdfootball_picks\/\d+\/submissions\/[A-Za-z0-9]{20,}/);
   });
 });
+
+/**
+ * Regression guard for a bug shipped in NERD-16: the emoji-to-Material-Symbols
+ * replacement matched "<span>📊</span> Picks Grid" and replaced the whole
+ * string, deleting five navigation labels. Every check at the time passed —
+ * icon names were valid and the href count was unchanged — because none of them
+ * looked at link text. This one does.
+ */
+describe(`navigation labels: ${BASE}`, () => {
+  test('every hamburger menu item has visible text, not just an icon', async () => {
+    const { body } = await get('/nerd-universe.html');
+    const panel = body.slice(body.indexOf('id="menu-panel"'));
+    const items = [...panel.matchAll(/href="([^"]+)"[^>]*class="menu-item[^"]*">([\s\S]*?)<\/a>/g)];
+
+    expect(items.length).toBeGreaterThanOrEqual(8);
+
+    const unlabelled = items
+      .map(([, href, inner]) => {
+        // The icon ligature is itself text, so drop the first token.
+        const words = inner.replace(/<[^>]+>/g, ' ').trim().split(/\s+/);
+        return { href, label: words.slice(1).join(' ') };
+      })
+      .filter((item) => !item.label);
+
+    expect(unlabelled).toEqual([]);
+  });
+});
