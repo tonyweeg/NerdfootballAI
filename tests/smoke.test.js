@@ -18,7 +18,7 @@ const GHOST_UID = 'okl4sw2aDhW3yKpOfOwe5lH7OQj1';
 const PAGES = [
   { path: '/nerd-universe.html', marker: 'Nerd Universe' },
   { path: '/nerdfootballConfidencePicks.html', marker: 'Killer Bees' },
-  { path: '/NerdSurvivorPicks.html', marker: 'Survival Chamber' },
+  { path: '/NerdSurvivorPicks.html', marker: 'Survivor Pick Selection Room' },
   { path: '/nerdfootballTheGrid.html', marker: 'The Grid' },
   // Deliberately year-less: the heading currently hardcodes 2025 (NERD-10).
   { path: '/leaderboard.html', marker: 'Season Leaderboard' },
