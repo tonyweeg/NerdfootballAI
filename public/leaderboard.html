@@ -3,702 +3,379 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Season Leaderboard - NerdfootballAI Terminal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="./js/utils/suppress-tailwind-warning.js"></script>
-    <script>
-        tailwind.config = {
-            corePlugins: { preflight: true },
-            theme: {
-                extend: {
-                    colors: {
-                        'terminal': {
-                            'bg': '#0a0a0a',
-                            'surface': '#1a1a1a',
-                            'border': '#2a2a2a',
-                            'accent': '#00ff41',
-                            'secondary': '#00d4ff',
-                            'danger': '#ff4757',
-                            'warning': '#ffa502',
-                            'text': '#ffffff',
-                            'muted': '#888888'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <title>Season Leaderboard - NerdFootball</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/nerd-theme.css">
+    <link rel="stylesheet" href="./css/nerd-header.css">
+    <link rel="stylesheet" href="./css/nerd-loading.css">
+    <link rel="stylesheet" href="./css/nerd-leaderboard.css">
+    <script src="./js/utils/theme-toggle.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+        .stats-row.four { grid-template-columns: repeat(4, 1fr); }
+        .stat-box .stat-sub { overflow-wrap: anywhere; }
 
-        body {
-            font-family: 'JetBrains Mono', monospace;
-            background: #121212;
+        .breakdown-wrap { overflow-x: auto; margin-top: 1rem; }
+        .breakdown { font-size: 0.875rem; }
+        .breakdown th, .breakdown td { padding: 0.5rem 0.625rem; text-align: center; white-space: nowrap; }
+        .breakdown th:first-child, .breakdown td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            text-align: left;
+            background: var(--md-surface);
+        }
+        .breakdown td { font-family: var(--md-font-mono); }
+        .breakdown td:first-child { font-family: var(--md-font); max-width: 12rem; overflow: hidden; text-overflow: ellipsis; }
+        .breakdown .week-top {
+            background: var(--md-primary-container);
+            color: var(--md-on-primary-container);
+            font-weight: 600;
+        }
+        .breakdown .total-cell { color: var(--md-on-surface); font-weight: 600; }
+        .breakdown-legend { margin-top: 0.75rem; }
+        .legend-swatch {
+            display: inline-block;
+            width: 0.75rem;
+            height: 0.75rem;
+            margin-right: 0.375rem;
+            vertical-align: -1px;
+            border-radius: var(--md-shape-xs);
+            background: var(--md-primary-container);
         }
 
-        .terminal-window {
-            background: rgba(26, 26, 26, 0.95);
-            border: 1px solid #2a2a2a;
-            backdrop-filter: blur(10px);
-            box-shadow:
-                0 0 20px rgba(0, 255, 65, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        @media (max-width: 768px) {
+            .stats-row.four { grid-template-columns: repeat(2, 1fr); }
         }
-
-        .neon-button {
-            background: linear-gradient(45deg, #1a1a1a, #2a2a2a);
-            border: 1px solid #00ff41;
-            color: #00ff41;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
-        }
-
-        .neon-button:hover {
-            background: linear-gradient(45deg, #2a2a2a, #3a3a3a);
-            box-shadow:
-                0 0 20px rgba(0, 255, 65, 0.3),
-                inset 0 0 20px rgba(0, 255, 65, 0.1);
-            transform: translateY(-2px);
-        }
-
-        .terminal-text { color: #ffffff; }
-        .terminal-accent { color: #00ff41; }
-        .terminal-secondary { color: #00d4ff; }
-        .terminal-danger { color: #ff4757; }
-        .terminal-warning { color: #ffa502; }
-        .terminal-muted { color: #888888; }
-
-        .glow-text {
-            text-shadow: 0 0 20px currentColor;
-        }
-
-        .command-line::before {
-            content: '$ ';
-            color: #00d4ff;
-            font-weight: bold;
-        }
-
-        .rank-gold { color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
-        .rank-silver { color: #c0c0c0; text-shadow: 0 0 10px rgba(192, 192, 192, 0.5); }
-        .rank-bronze { color: #cd7f32; text-shadow: 0 0 10px rgba(205, 127, 50, 0.5); }
-
-
-        .loading-dots::after {
-            content: '';
-            animation: dots 2s linear infinite;
-        }
-
-        @keyframes dots {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60% { content: '...'; }
-            80%, 100% { content: ''; }
+        @media (max-width: 480px) {
+            .lb-sk-row { grid-template-columns: 1fr 4fr 2fr; }
         }
     </style>
-    <script src="./js/utils/logger-compat.js"></script>
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
+    <script src="./js/utils/confidence-scoring.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
-<body class="min-h-screen text-terminal-text">
-    <!-- Header -->
-    <header class="bg-terminal-bg/95 border-b-2 border-terminal-accent backdrop-filter backdrop-blur-lg sticky top-0 z-40">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center space-x-4">
-                    <a href="./nerd-universe.html" class="neon-button px-4 py-2 rounded-md text-sm">
-                        ← Back to Command Center
-                    </a>
-                    <h1 class="text-3xl font-bold terminal-accent glow-text command-line">Season Leaderboard 2025</h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <span id="user-display" class="text-sm terminal-secondary">Loading...</span>
-                    <div id="auth-status" class="text-sm terminal-muted">Authenticating...</div>
-                </div>
-            </div>
-        </div>
-    </header>
+<body>
+    <div class="nerd-header-slot" data-nerd-header data-title="Season Leaderboard" data-back="true"></div>
+    <script src="./js/components/nerd-header.js"></script>
 
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
-        <!-- Loading Screen -->
-        <div id="loading-screen" class="terminal-window p-8 text-center">
-            <div class="text-2xl terminal-accent mb-4">🏆</div>
-            <h2 class="text-xl font-bold mb-4 terminal-text">Initializing Leaderboard System<span class="loading-dots"></span></h2>
-            <div class="terminal-muted">Calculating season statistics...</div>
+    <main class="lb-main">
+        <section class="lb-hero">
+            <p class="lb-kicker">Confidence Pool<span class="lb-kicker-rule" aria-hidden="true"></span><span id="sl-kicker">Season</span></p>
+            <h1 class="lb-title">Season Leaderboard</h1>
+            <p class="lb-subtitle" id="sl-subtitle">Every point, every week.</p>
+        </section>
+
+        <div id="auth-section" class="card message-card hidden">
+            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            <div class="message-title">Sign in required</div>
+            <p>Sign in to NerdUniverse to see the season leaderboard. <a href="./index.html">Go to sign in</a></p>
         </div>
 
-        <!-- Leaderboard Content (hidden initially) -->
-        <div id="leaderboard-content" class="hidden space-y-6">
-            <!-- Season Stats Header -->
-            <div class="terminal-window p-6">
-                <div class="text-center mb-6">
-                    <h2 class="text-3xl font-bold terminal-accent glow-text mb-2">🏆 Season Leaders</h2>
-                    <div id="season-stats" class="text-terminal-secondary">
-                        <span id="total-weeks-played">0</span> weeks completed •
-                        <span id="total-participants">0</span> participants •
-                        <span id="last-updated">Last updated: calculating...</span>
+        <div id="main-content" class="hidden">
+            <div class="card">
+                <div class="controls">
+                    <span class="week-display" id="sl-weeks">Weeks -</span>
+                    <button id="refresh" class="btn" type="button" aria-label="Refresh"><span class="material-symbols-outlined" aria-hidden="true">refresh</span><span class="btn-label">Refresh</span></button>
+                </div>
+
+                <div class="stats-row four">
+                    <div class="stat-box">
+                        <div class="stat-label"><span class="material-symbols-outlined" aria-hidden="true">groups</span>Players</div>
+                        <div class="stat-value" id="stat-players">-</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label"><span class="material-symbols-outlined" aria-hidden="true">trophy</span>Leader</div>
+                        <div class="stat-value highlight" id="stat-high">-</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label"><span class="material-symbols-outlined" aria-hidden="true">functions</span>Average</div>
+                        <div class="stat-value" id="stat-average">-</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label"><span class="material-symbols-outlined" aria-hidden="true">bolt</span>Best Week</div>
+                        <div class="stat-value" id="stat-best">-</div>
+                        <div class="stat-sub" id="stat-best-sub"></div>
                     </div>
                 </div>
-
-                <!-- Top 3 Podium -->
-                <div id="podium" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <!-- Will be populated by JavaScript -->
-                </div>
             </div>
 
-            <!-- Full Leaderboard Table -->
-            <div class="terminal-window p-6">
-                <h3 class="text-xl font-bold terminal-secondary mb-4 command-line">Complete Rankings</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="border-b border-terminal-border">
-                                <th class="text-left py-3 px-2 terminal-accent">Rank</th>
-                                <th class="text-left py-3 px-4 terminal-accent">Player</th>
-                                <th class="text-center py-3 px-2 terminal-accent">Total Points</th>
-                                <th class="text-center py-3 px-2 terminal-accent">Avg/Week</th>
-                                <th class="text-center py-3 px-2 terminal-accent">Correct Picks</th>
-                                <th class="text-center py-3 px-2 terminal-accent">Pick Rate</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leaderboard-table">
-                            <!-- Will be populated by JavaScript -->
-                        </tbody>
-                    </table>
+            <!-- Loading: skeleton shaped like the rankings table, plus the real load steps -->
+            <section id="sl-loading" class="lb-loading" data-loader hidden>
+                <div class="card" aria-hidden="true">
+                    <div class="sk sk-lg sk-w-40"></div>
+                    <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+                    <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+                    <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+                    <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
                 </div>
-            </div>
+                <div id="sl-load-steps" class="lb-load-steps"></div>
+            </section>
 
-            <!-- Week-by-Week Breakdown (Collapsible) -->
-            <div class="terminal-window p-6">
-                <button id="toggle-breakdown" class="neon-button px-4 py-2 rounded-md mb-4">
-                    📊 Show Weekly Breakdown
-                </button>
-                <div id="weekly-breakdown" class="hidden">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-            </div>
-        </div>
+            <div id="board" class="hidden">
+                <section class="card">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">social_leaderboard</span>Top 3</h2>
+                        <div class="section-meta">Season points</div>
+                    </div>
+                    <div id="podium" class="podium"></div>
+                </section>
 
-        <!-- Error State -->
-        <div id="error-screen" class="hidden terminal-window p-8 text-center border-terminal-danger">
-            <div class="text-3xl terminal-danger mb-4">⚠️</div>
-            <h2 class="text-xl font-bold mb-4 terminal-danger">System Error</h2>
-            <div id="error-message" class="terminal-muted mb-4">An error occurred loading the leaderboard.</div>
-            <button id="retry-btn" class="neon-button px-6 py-2 rounded-md">Retry</button>
+                <section id="you-card" class="card you-card hidden">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">person</span>Your Season</h2>
+                    </div>
+                    <div class="you-grid">
+                        <div class="stat-box">
+                            <div class="stat-label">Rank</div>
+                            <div class="stat-value" id="you-rank">-</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Points</div>
+                            <div class="stat-value highlight" id="you-points">-</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Avg / Week</div>
+                            <div class="stat-value" id="you-average">-</div>
+                            <div class="stat-sub" id="you-accuracy"></div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">Behind 1st</div>
+                            <div class="stat-value" id="you-behind">-</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">leaderboard</span>Full Rankings</h2>
+                        <div class="section-meta" id="last-updated"></div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="col-rank">Rank</th>
+                                    <th>Player</th>
+                                    <th class="num">Points</th>
+                                    <th class="num col-hide-sm">Avg/Wk</th>
+                                    <th class="num col-hide-sm">Correct</th>
+                                    <th class="num">Accuracy</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboard-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="controls">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">calendar_view_week</span>Weekly Breakdown</h2>
+                        <button id="toggle-breakdown" class="btn breakdown-toggle" type="button" aria-expanded="false" aria-controls="breakdown">
+                            <span class="btn-label" id="toggle-breakdown-label">Show</span><span class="material-symbols-outlined" id="toggle-breakdown-icon" aria-hidden="true">expand_more</span>
+                        </button>
+                    </div>
+                    <div id="breakdown" class="hidden">
+                        <div class="breakdown-wrap">
+                            <table class="breakdown">
+                                <thead id="breakdown-head"></thead>
+                                <tbody id="breakdown-body"></tbody>
+                            </table>
+                        </div>
+                        <p class="section-meta breakdown-legend"><span class="legend-swatch" aria-hidden="true"></span>Top score that week</p>
+                    </div>
+                </section>
+            </div>
         </div>
     </main>
 
-    <!-- Firebase SDK -->
+    <script src="./js/components/load-steps.js"></script>
+
     <script type="module">
         import { getFirebaseConfig } from './js/config/firebase-config.js';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-        import { getFirestore, collection, getDocs, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+        import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, doc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
         const app = initializeApp(getFirebaseConfig());
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const Scoring = window.ConfidenceScoring;
+        const LOG = 'NERD_SEASON';
+        const CURRENT_WEEK = window.SEASON_CONFIG.utils.getCurrentWeek();
+        const WEEKS = Array.from({ length: CURRENT_WEEK }, (_, i) => i + 1);
 
         let currentUser = null;
+        let loadToken = 0;
 
-        // Auth state handler
-        onAuthStateChanged(auth, async (user) => {
-            const userDisplay = document.getElementById('user-display');
-            const authStatus = document.getElementById('auth-status');
+        const $ = (id) => document.getElementById(id);
 
-            if (user) {
-                currentUser = user;
-                userDisplay.textContent = user.email;
-                userDisplay.classList.add('terminal-accent');
-                authStatus.textContent = 'Authenticated';
-                authStatus.classList.add('terminal-accent');
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
 
-                // Load leaderboard data
-                await loadSeasonLeaderboard();
-            } else {
-                userDisplay.textContent = 'Not signed in';
-                userDisplay.classList.add('terminal-danger');
-                authStatus.textContent = 'Access denied - please sign in';
-                authStatus.classList.add('terminal-danger');
+        const displayName = (name) => String(name).split('@')[0];
+        const accuracy = (row) => (row.decided > 0 ? `${Math.round((row.correct / row.decided) * 100)}%` : '—');
+        const average = (row) => (row.weeksPlayed > 0 ? (row.points / row.weeksPlayed).toFixed(1) : '—');
 
-                // Redirect after delay
-                setTimeout(() => {
-                    window.location.href = './index.html';
-                }, 2000);
-            }
-        });
+        $('sl-kicker').textContent = `${window.SEASON_CONFIG.year} Season`;
+        const weeksLabel = CURRENT_WEEK === 1 ? 'Week 1' : `Weeks 1–${CURRENT_WEEK}`;
+        $('sl-weeks').textContent = weeksLabel;
+        $('sl-subtitle').textContent = `Every point, ${weeksLabel.toLowerCase()}.`;
 
-        async function loadSeasonLeaderboard() {
+        async function loadSeason() {
+            if (!currentUser) return;
+            const token = ++loadToken;
+
+            $('board').classList.add('hidden');
+            $('sl-loading').hidden = false;
+            $('sl-loading').removeAttribute('data-state');
+            const loader = window.NerdLoadSteps.mount($('sl-load-steps'), [
+                { key: 'members', label: 'Pool members' },
+                { key: 'games', label: `${weeksLabel} games` },
+                { key: 'picks', label: `${weeksLabel} picks` }
+            ], { root: $('sl-loading'), onRetry: loadSeason });
+
+            const paths = window.SEASON_CONFIG.paths;
+            const track = (key, promise) => {
+                loader.start(key);
+                return promise.then((value) => {
+                    if (token === loadToken) loader.done(key);
+                    return value;
+                }, (error) => { throw Object.assign(error, { step: key }); });
+            };
+
             try {
-                showLoading();
-                logger.leaderboard('⚡ Loading season data with real-time calculation...');
                 const startTime = Date.now();
+                const [membersSnap, gameSnaps, pickSnaps] = await Promise.all([
+                    track('members', getDoc(doc(db, paths.poolMembers())).then((snap) => {
+                        if (!snap.exists()) throw new Error('Pool members not found');
+                        return snap;
+                    })),
+                    track('games', Promise.all(WEEKS.map((week) => getDoc(doc(db, paths.games(week)))))),
+                    track('picks', Promise.all(WEEKS.map((week) => getDocs(collection(db, paths.picksWeek(week))))))
+                ]);
+                if (token !== loadToken) return;
 
-                // Load pool members for validation
-                let poolMembers = {};
-                try {
-                    const membersPath = window.SEASON_CONFIG.paths.poolMembers();
-                    const membersSnap = await getDoc(doc(db, membersPath));
-                    if (membersSnap.exists()) {
-                        poolMembers = membersSnap.data();
-                    }
-                } catch (e) {
-                    logger.error('LEADERBOARD', 'Could not load pool members:', e);
-                }
-
-                // Batch load all user names in one query (MUCH FASTER!)
-                const userNames = {};
-                const userEmails = {};
-
-                try {
-                    const usersCollection = collection(db, 'artifacts/nerdfootball/public/data/nerdfootball_users');
-                    const usersSnap = await getDocs(usersCollection);
-
-                    usersSnap.forEach(userDoc => {
-                        const userData = userDoc.data();
-                        userNames[userDoc.id] = userData.userName || userData.displayName || userData.name || 'Unknown User';
-                        userEmails[userDoc.id] = userData.email || userData.emailAddress || 'No Email';
-                    });
-
-                    logger.leaderboard(`✅ Loaded ${usersSnap.size} total users in batch`);
-                } catch (e) {
-                    logger.warn('LEADERBOARD', 'Could not batch load users:', e);
-                }
-
-                // Initialize season totals for all users
-                const seasonTotals = {};
-                const actualCurrentWeek = getCurrentWeekNumber();
-
-                // ⚡ PARALLEL FETCH: Load all weeks simultaneously instead of sequentially
-                logger.leaderboard(`⚡ Starting parallel fetch for weeks 1-18...`);
-                const weekNumbers = Array.from({length: 18}, (_, i) => i + 1);
-
-                const allWeeksData = await Promise.all(
-                    weekNumbers.map(async (weekNumber) => {
-                        try {
-                            const bibleData = await loadBibleData(weekNumber);
-                            const picksPath = window.SEASON_CONFIG.paths.picksWeek(weekNumber);
-                            const picksSnap = await getDocs(collection(db, picksPath));
-                            return { weekNumber, bibleData, picksSnap };
-                        } catch (error) {
-                            logger.warn('LEADERBOARD', `Error fetching Week ${weekNumber}:`, error);
-                            return { weekNumber, bibleData: null, picksSnap: null };
-                        }
-                    })
-                );
-
-                logger.leaderboard(`✅ Parallel fetch complete, processing ${allWeeksData.length} weeks...`);
-
-                // Process all weeks (now that we have all data)
-                allWeeksData.forEach(({ weekNumber, bibleData, picksSnap }) => {
-                    if (!bibleData) {
-                        logger.warn('LEADERBOARD', `No bible data for Week ${weekNumber}, skipping...`);
-                        return;
-                    }
-
-                    if (!picksSnap || picksSnap.size === 0) {
-                        logger.warn('LEADERBOARD', `No picks for Week ${weekNumber}, skipping...`);
-                        return;
-                    }
-
-                    logger.leaderboard(`📊 Processing Week ${weekNumber} (${picksSnap.size} users)...`);
-
-                    // Process each user's picks for this week
-                    picksSnap.forEach(userDoc => {
-                        const userId = userDoc.id;
-                        const picks = userDoc.data();
-
-                        // Initialize user if not exists
-                        if (!seasonTotals[userId]) {
-                            seasonTotals[userId] = {
-                                userId,
-                                userName: userNames[userId] || 'Unknown',
-                                userEmail: userEmails[userId] || 'No Email',
-                                isPoolMember: !!poolMembers[userId],
-                                totalPointsEarned: 0,
-                                totalCorrectPicks: 0,
-                                totalValidPicks: 0,
-                                weeklyBreakdown: {},
-                                winningPicks: [],
-                                weeksPlayed: 0
-                            };
-                        }
-
-                        // Analyze picks for this week
-                        const analysis = analyzePicks(picks, bibleData);
-
-                        // Add to season totals
-                        seasonTotals[userId].totalPointsEarned += analysis.totalPointsEarned;
-                        seasonTotals[userId].totalCorrectPicks += analysis.correctPicks;
-                        seasonTotals[userId].totalValidPicks += analysis.totalValidPicks;
-                        seasonTotals[userId].weeksPlayed += 1;
-
-                        // Store weekly breakdown
-                        seasonTotals[userId].weeklyBreakdown[weekNumber] = {
-                            pointsEarned: analysis.totalPointsEarned,
-                            correctPicks: analysis.correctPicks,
-                            totalPicks: analysis.totalValidPicks
-                        };
-
-                        // Add winning picks with week context
-                        if (analysis.winningPicks && analysis.winningPicks.length > 0) {
-                            analysis.winningPicks.forEach(pick => {
-                                seasonTotals[userId].winningPicks.push({
-                                    ...pick,
-                                    week: weekNumber
-                                });
-                            });
-                        }
-                    });
+                const members = membersSnap.data();
+                const weeks = WEEKS.map((week, i) => {
+                    const picksByUser = {};
+                    pickSnaps[i].forEach((d) => { picksByUser[d.id] = d.data(); });
+                    return { week, games: gameSnaps[i].exists() ? gameSnaps[i].data() : {}, picksByUser };
                 });
 
-                // Convert to array and sort by total points (same format as before)
-                const sortedUsers = Object.values(seasonTotals)
-                    .filter(user => user.totalValidPicks > 0) // Only users with picks
-                    .sort((a, b) => b.totalPointsEarned - a.totalPointsEarned);
+                const rows = Scoring.seasonStandings(members, weeks);
+                const summary = Scoring.seasonSummary(rows, weeks);
+                console.info(LOG, window.SEASON_CONFIG.year, weeksLabel, 'ranked', rows.length, 'loaded in', `${Date.now() - startTime}ms`, summary);
 
-                const seasonData = sortedUsers.map((user, index) => ({
-                    id: user.userId,
-                    name: user.userName,
-                    email: user.userEmail,
-                    totalPoints: user.totalPointsEarned,
-                    totalCorrectPicks: user.totalCorrectPicks,
-                    totalValidPicks: user.totalValidPicks,
-                    averagePoints: user.weeksPlayed > 0 ? (user.totalPointsEarned / user.weeksPlayed).toFixed(1) : '0.0',
-                    pickRate: user.totalValidPicks > 0 ? ((user.totalCorrectPicks / user.totalValidPicks) * 100).toFixed(1) : '0.0',
-                    weeklyData: user.weeklyBreakdown,
-                    rank: index + 1,
-                    pointsFromLeader: index === 0 ? 0 : sortedUsers[0].totalPointsEarned - user.totalPointsEarned,
-                    weeksPlayed: user.weeksPlayed
-                }));
-
-                // Create metadata object
-                const metadata = {
-                    totalWeeks: actualCurrentWeek - 1, // Completed weeks only
-                    totalUsers: seasonData.length,
-                    lastUpdated: new Date().toISOString()
-                };
-
-                // Process with fake leaderboard data structure
-                const fakeLeaderboardData = {
-                    standings: seasonData,
-                    metadata: metadata
-                };
-
-                logger.leaderboard(`✅ Real-time calculation completed in ${Date.now() - startTime}ms`);
-                logger.leaderboard(`📊 Processed ${seasonData.length} users across ${metadata.totalWeeks} weeks`);
-
-                processLeaderboardData(fakeLeaderboardData);
-                showContent();
-
+                loader.finish();
+                render(rows, summary);
             } catch (error) {
-                logger.error('LEADERBOARD', '❌ Error loading leaderboard:', error);
-                showError(error.message);
+                if (token !== loadToken) return;
+                console.error(LOG, 'load failed at', error.step, error);
+                loader.fail(error.step || 'picks', error.message);
             }
         }
 
-        function processLeaderboardData(leaderboardData) {
-            // Data is already correctly calculated - just use it directly
-            const seasonData = leaderboardData.standings;
-
-            // Update season stats from metadata
-            updateSeasonStats(
-                leaderboardData.metadata.totalWeeks,
-                leaderboardData.metadata.totalUsers
-            );
-
-            // Render leaderboard
-            renderLeaderboard(seasonData);
-        }
-
-        // Helper functions for real-time calculation (copied from season-pick-viewer-auth.html)
-
-        function getCurrentWeekNumber() {
-            return window.SEASON_CONFIG.utils.getCurrentWeek();
-        }
-
-        async function loadBibleData(weekNumber) {
-            logger.leaderboard(`🔍 Loading Week ${weekNumber} bible data from Firestore...`);
-
-            try {
-                // Load from Firestore (single source of truth)
-                const gamesRef = doc(db, window.SEASON_CONFIG.paths.games(weekNumber));
-                const gamesSnap = await getDoc(gamesRef);
-
-                if (!gamesSnap.exists()) {
-                    logger.warn('LEADERBOARD', `No games found for Week ${weekNumber} in Firestore`);
-                    return null;
-                }
-
-                const bibleData = gamesSnap.data();
-                logger.leaderboard(`✅ Loaded Week ${weekNumber} bible data:`, Object.keys(bibleData).filter(k => k !== '_metadata').length, 'games');
-
-                return bibleData;
-            } catch (error) {
-                logger.error('LEADERBOARD', `❌ Error loading Week ${weekNumber} bible data from Firestore:`, error);
-                return null;
-            }
-        }
-
-        function analyzePicks(picks, bibleData) {
-            const issues = [];
-            const gameIds = Object.keys(picks).filter(key => !['userName', 'submittedAt', 'weekNumber', 'timestamp', 'mondayNightPoints', 'mnfTotalPoints', 'tiebreaker', 'totalPoints', 'userId', 'lastUpdated', 'poolId', 'survivorPick', 'createdAt', 'week', 'games'].includes(key));
-
-            // All weeks now use consistent Firestore structure
-            const expectedGameIds = bibleData ? Object.keys(bibleData).filter(k => k !== '_metadata') : [];
-            const expectedGameCount = expectedGameIds.length;
-
-            // Check for expected game IDs
-            const missingGames = expectedGameIds.filter(id => !gameIds.includes(id));
-            const extraGames = gameIds.filter(id => !expectedGameIds.includes(id));
-
-            if (missingGames.length > 0) {
-                issues.push(`Missing games: ${missingGames.join(', ')}`);
-            }
-            if (extraGames.length > 0) {
-                issues.push(`Extra games: ${extraGames.join(', ')}`);
-            }
-
-            // Check confidence values and calculate accuracy
-            const confidenceValues = [];
-            let correctPicks = 0;
-            let totalValidPicks = 0;
-            let totalPointsEarned = 0;
-            const pickResults = {};
-            const winningPicks = []; // Track winning picks with team names and points
-
-            gameIds.forEach(gameId => {
-                const pick = picks[gameId];
-                if (pick && typeof pick === 'object') {
-                    if (pick.winner === '[object Object]' || typeof pick.winner === 'object') {
-                        issues.push(`Game ${gameId}: Winner corrupted`);
-                        pickResults[gameId] = { isValid: false, isCorrect: false };
-                    } else if (pick.winner && bibleData && bibleData[gameId]) {
-                        // Compare user pick with bible result
-                        const game = bibleData[gameId];
-                        const userPick = pick.winner;
-
-                        // 🔥 TIE GAME LOGIC: Check if game ended in a tie (EXACT same logic as Cloud Function and Grid)
-                        // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
-                        const isTie = (game.winner && (
-                            game.winner.toUpperCase() === 'TIE' ||
-                            game.winner.toUpperCase() === 'TIE/OT' ||
-                            game.winner.toUpperCase() === 'DRAW' ||
-                            game.winner.toUpperCase().includes('TIE')
-                        )) || (game.awayScore !== undefined && game.homeScore !== undefined &&
-                               parseInt(game.awayScore) === parseInt(game.homeScore) &&
-                               parseInt(game.awayScore) > 0);
-
-                        // In a tie, EVERYONE who made a pick is correct
-                        const isCorrect = isTie ? true : (game.winner === userPick);
-
-                        pickResults[gameId] = {
-                            isValid: true,
-                            isCorrect: isCorrect,
-                            userPick: userPick,
-                            actualWinner: game.winner
-                        };
-
-                        totalValidPicks++;
-                        if (isCorrect) {
-                            correctPicks++;
-                            // Add confidence points for correct picks
-                            if (typeof pick.confidence === 'number' && pick.confidence >= 1 && pick.confidence <= expectedGameCount) {
-                                totalPointsEarned += pick.confidence;
-
-                                // Store winning pick with validation
-                                if (typeof userPick === 'string' && userPick.length > 0 && userPick !== '[object Object]') {
-                                    winningPicks.push({
-                                        team: userPick,
-                                        points: pick.confidence,
-                                        gameId: gameId
-                                    });
-                                }
-                            }
-                        }
-                    } else {
-                        pickResults[gameId] = { isValid: false, isCorrect: false };
-                    }
-
-                    if (pick.confidence !== undefined) {
-                        if (typeof pick.confidence !== 'number' || pick.confidence < 1 || pick.confidence > expectedGameCount) {
-                            issues.push(`Game ${gameId}: Invalid confidence ${pick.confidence} (should be 1-${expectedGameCount})`);
-                        } else {
-                            confidenceValues.push(pick.confidence);
-                        }
-                    } else {
-                        issues.push(`Game ${gameId}: Missing confidence`);
-                    }
-                }
-            });
-
-            // Check for duplicate confidence values
-            const uniqueConfidence = [...new Set(confidenceValues)];
-            if (confidenceValues.length !== uniqueConfidence.length) {
-                const duplicates = confidenceValues.filter((val, idx) => confidenceValues.indexOf(val) !== idx);
-                issues.push(`Duplicate confidence: ${[...new Set(duplicates)].join(', ')}`);
-            }
-
-            // Calculate losing points total and validate sum
-            let totalLosingPoints = 0;
-            Object.keys(pickResults).forEach(gameId => {
-                const result = pickResults[gameId];
-                const pick = picks[gameId];
-                if (result.isValid && !result.isCorrect && pick && typeof pick.confidence === 'number') {
-                    totalLosingPoints += pick.confidence;
-                }
-            });
-
-            // Expected total confidence points: 1+2+3+...+n = n×(n+1)/2
-            const expectedTotal = expectedGameCount * (expectedGameCount + 1) / 2;
-            const actualTotal = totalPointsEarned + totalLosingPoints;
-            const isSumValid = actualTotal === expectedTotal;
-
-            return {
-                totalGames: gameIds.length,
-                issues,
-                confidenceValues: confidenceValues.sort((a, b) => a - b),
-                gameIds,
-                correctPicks,
-                totalValidPicks,
-                totalPointsEarned,
-                totalLosingPoints,
-                expectedTotal,
-                actualTotal,
-                isSumValid,
-                pickResults,
-                winningPicks: winningPicks.sort((a, b) => b.points - a.points) // Sort by points descending
+        function render(rows, summary) {
+            const players = rows.filter((row) => row.weeksPlayed > 0);
+            const nameOf = (userId) => {
+                const row = rows.find((r) => r.userId === userId);
+                return row ? displayName(row.name) : '';
             };
-        }
 
-        function updateSeasonStats(weeksCompleted, totalParticipants) {
-            document.getElementById('total-weeks-played').textContent = weeksCompleted;
-            document.getElementById('total-participants').textContent = totalParticipants;
-            document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleString()}`;
-        }
+            $('stat-players').textContent = players.length;
+            $('stat-high').textContent = summary.highScore;
+            $('stat-average').textContent = summary.averageScore;
+            $('stat-best').textContent = summary.bestWeek ? summary.bestWeek.points : '—';
+            $('stat-best-sub').textContent = summary.bestWeek ? `${nameOf(summary.bestWeek.userId)} · Wk ${summary.bestWeek.week}` : '';
 
-        function renderLeaderboard(seasonData) {
-            // Render top 3 podium
-            renderPodium(seasonData.slice(0, 3));
+            $('podium').innerHTML = rows.slice(0, 3).map((row, i) => `
+                <div class="podium-card place-${i + 1}">
+                    <div class="podium-place"><span class="material-symbols-outlined" aria-hidden="true">${row.rank === 1 ? 'trophy' : 'workspace_premium'}</span>${['1st', '2nd', '3rd'][row.rank - 1]}</div>
+                    <div class="podium-name">${escapeHtml(displayName(row.name))}</div>
+                    <div class="podium-points">${row.points}</div>
+                    <div class="podium-detail">${average(row)}/wk · ${row.correct}/${row.decided} · ${accuracy(row)}</div>
+                </div>
+            `).join('');
 
-            // Render full table
-            renderLeaderboardTable(seasonData);
-        }
+            const me = rows.find((row) => row.userId === currentUser.uid);
+            if (me) {
+                $('you-rank').textContent = `${me.rank}/${rows.length}`;
+                $('you-points').textContent = me.points;
+                $('you-average').textContent = average(me);
+                $('you-accuracy').textContent = `${me.correct}/${me.decided} · ${accuracy(me)}`;
+                $('you-behind').textContent = me.pointsFromLeader === 0 ? 'Leader' : me.pointsFromLeader;
+            }
+            $('you-card').classList.toggle('hidden', !me);
 
-        function renderPodium(topThree) {
-            const podium = document.getElementById('podium');
-            podium.innerHTML = '';
-
-            topThree.forEach((player, index) => {
-                const position = index + 1;
-                let rankClass = '';
-                let icon = '';
-
-                switch (position) {
-                    case 1:
-                        rankClass = 'rank-gold';
-                        icon = '🥇';
-                        break;
-                    case 2:
-                        rankClass = 'rank-silver';
-                        icon = '🥈';
-                        break;
-                    case 3:
-                        rankClass = 'rank-bronze';
-                        icon = '🥉';
-                        break;
-                }
-
-                podium.innerHTML += `
-                    <div class="terminal-window p-6 text-center border-2 ${position === 1 ? 'border-yellow-500' : position === 2 ? 'border-gray-400' : 'border-yellow-600'} hover:scale-105 transition-transform duration-300">
-                        <div class="text-4xl mb-2">${icon}</div>
-                        <div class="text-2xl ${rankClass} font-bold mb-2">#${position}</div>
-                        <div class="text-lg terminal-text font-semibold mb-2">${player.name}</div>
-                        <div class="text-xl terminal-accent font-bold">${player.totalPoints} pts</div>
-                        <div class="text-sm terminal-muted">${player.totalCorrectPicks}/${player.totalValidPicks} picks</div>
-                        <div class="text-sm terminal-secondary">${player.pickRate}% accuracy</div>
-                    </div>
-                `;
-            });
-        }
-
-        function renderLeaderboardTable(seasonData) {
-            const tableBody = document.getElementById('leaderboard-table');
-            tableBody.innerHTML = '';
-
-            seasonData.forEach((player, index) => {
-                const rank = index + 1;
-                let rankClass = '';
-
-                if (rank <= 3) {
-                    rankClass = rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : 'rank-bronze';
-                }
-
-                tableBody.innerHTML += `
-                    <tr class="border-b border-terminal-border hover:bg-terminal-surface/30 transition-colors duration-200">
-                        <td class="py-3 px-2 font-bold ${rankClass}">#${rank}</td>
-                        <td class="py-3 px-4">
-                            <div class="terminal-text font-semibold">${player.name}</div>
-                            <div class="text-xs terminal-muted">${player.email}</div>
-                        </td>
-                        <td class="py-3 px-2 text-center">
-                            <div class="text-lg font-bold terminal-accent">${player.totalPoints}</div>
-                        </td>
-                        <td class="py-3 px-2 text-center terminal-secondary">${player.averagePoints}</td>
-                        <td class="py-3 px-2 text-center">
-                            <div class="terminal-text">${player.totalCorrectPicks}/${player.totalValidPicks}</div>
-                        </td>
-                        <td class="py-3 px-2 text-center">
-                            <div class="terminal-warning font-semibold">${player.pickRate}%</div>
-                        </td>
+            $('leaderboard-body').innerHTML = rows.map((row) => {
+                const isMe = row.userId === currentUser.uid;
+                return `
+                    <tr${isMe ? ' class="current-user-row"' : ''}>
+                        <td class="rank-cell ${row.rank <= 3 ? 'rank-top' : ''}">${row.rank}</td>
+                        <td class="player-cell">${escapeHtml(displayName(row.name))}${isMe ? '<span class="you-chip">You</span>' : ''}${row.weeksPlayed > 0 ? '' : '<span class="no-picks">No picks</span>'}</td>
+                        <td class="num points-cell">${row.points}</td>
+                        <td class="num col-hide-sm">${average(row)}</td>
+                        <td class="num col-hide-sm">${row.correct}/${row.decided}</td>
+                        <td class="num">${accuracy(row)}</td>
                     </tr>
                 `;
+            }).join('');
+
+            renderBreakdown(rows);
+            $('last-updated').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+            $('board').classList.remove('hidden');
+        }
+
+        function renderBreakdown(rows) {
+            const topByWeek = {};
+            WEEKS.forEach((week) => {
+                const scores = rows.map((row) => row.byWeek[week]).filter((points) => points !== undefined);
+                if (scores.length > 0) topByWeek[week] = Math.max(...scores);
             });
+
+            $('breakdown-head').innerHTML = `<tr><th>Player</th>${WEEKS.map((week) => `<th>Wk ${week}</th>`).join('')}<th>Total</th></tr>`;
+            $('breakdown-body').innerHTML = rows.map((row) => `
+                <tr${row.userId === currentUser.uid ? ' class="current-user-row"' : ''}>
+                    <td class="player-cell">${escapeHtml(displayName(row.name))}</td>
+                    ${WEEKS.map((week) => {
+                        const points = row.byWeek[week];
+                        if (points === undefined) return '<td>—</td>';
+                        return `<td${points === topByWeek[week] ? ' class="week-top"' : ''}>${points}</td>`;
+                    }).join('')}
+                    <td class="total-cell">${row.points}</td>
+                </tr>
+            `).join('');
         }
 
-        function showLoading() {
-            document.getElementById('loading-screen').classList.remove('hidden');
-            document.getElementById('leaderboard-content').classList.add('hidden');
-            document.getElementById('error-screen').classList.add('hidden');
-        }
-
-        function showContent() {
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('leaderboard-content').classList.remove('hidden');
-            document.getElementById('error-screen').classList.add('hidden');
-        }
-
-        function showError(message) {
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('leaderboard-content').classList.add('hidden');
-            document.getElementById('error-screen').classList.remove('hidden');
-            document.getElementById('error-message').textContent = message;
-        }
-
-        // Retry button
-        document.getElementById('retry-btn').addEventListener('click', () => {
-            if (currentUser) {
-                loadSeasonLeaderboard();
-            }
+        $('toggle-breakdown').addEventListener('click', () => {
+            const open = $('toggle-breakdown').getAttribute('aria-expanded') !== 'true';
+            $('toggle-breakdown').setAttribute('aria-expanded', String(open));
+            $('toggle-breakdown-label').textContent = open ? 'Hide' : 'Show';
+            $('toggle-breakdown-icon').textContent = open ? 'expand_less' : 'expand_more';
+            $('breakdown').classList.toggle('hidden', !open);
         });
 
-        // Weekly breakdown toggle
-        document.getElementById('toggle-breakdown').addEventListener('click', () => {
-            const breakdown = document.getElementById('weekly-breakdown');
-            const button = document.getElementById('toggle-breakdown');
+        $('refresh').addEventListener('click', () => loadSeason());
 
-            if (breakdown.classList.contains('hidden')) {
-                breakdown.classList.remove('hidden');
-                button.textContent = '📊 Hide Weekly Breakdown';
-            } else {
-                breakdown.classList.add('hidden');
-                button.textContent = '📊 Show Weekly Breakdown';
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            console.info(LOG, 'auth', user ? user.uid : 'signed out');
+            const header = window.NerdHeader && window.NerdHeader.current;
+            if (header) {
+                header.setUser(user);
+                header.setLogoutHandler(user ? async () => {
+                    await signOut(auth);
+                    window.location.href = './login.html';
+                } : null);
             }
+            $('auth-section').classList.toggle('hidden', !!user);
+            $('main-content').classList.toggle('hidden', !user);
+            if (user) loadSeason();
         });
     </script>
-
 </body>
 </html>
