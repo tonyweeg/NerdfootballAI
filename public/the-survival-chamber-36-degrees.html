@@ -159,6 +159,53 @@
         .ch-sk-row .sk + .sk { margin-top: 0; }
         .ch-load-steps { padding: 0.25rem 0.25rem 0; }
 
+        /* ---- Pick piles ------------------------------------------------- */
+        .ch-piles {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+            gap: 0.625rem;
+            padding: 1rem 0 0.5rem;
+        }
+
+        .ch-pile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0.875rem 0.5rem 0.75rem;
+            text-align: center;
+            background: var(--md-surface-container);
+            border: 1px solid var(--md-outline-variant);
+            border-top: 3px solid var(--md-tertiary);
+            border-radius: var(--md-shape-md);
+        }
+
+        .ch-pile img { width: 56px; height: 56px; }
+
+        .ch-pile-count {
+            margin-top: 0.25rem;
+            font-family: var(--md-font);
+            font-size: clamp(2rem, 4vw, 2.75rem);
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -0.01em;
+            font-variant-numeric: tabular-nums;
+            color: var(--md-on-surface);
+        }
+
+        .ch-pile-team {
+            margin-top: 0.375rem;
+            font-family: var(--md-font-mono);
+            font-size: 0.625rem;
+            font-weight: 500;
+            letter-spacing: var(--md-label-tracking);
+            text-transform: uppercase;
+            color: var(--md-on-surface-muted);
+        }
+
+        .ch-pile.is-fallen { border-top-color: var(--md-error); }
+        .ch-pile.is-fallen .ch-pile-count { color: var(--md-error); }
+        .ch-pile.is-fallen img { opacity: 0.6; }
+
         /* ---- Table ------------------------------------------------------ */
         .table-wrap { overflow-x: auto; }
 
@@ -269,6 +316,8 @@
             .ch-pick { white-space: normal; align-items: flex-start; }
             .ch-pick img { width: 24px; height: 24px; }
             .ch-pick-note { font-size: 0.75rem; }
+            .ch-piles { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 0.5rem; }
+            .ch-pile img { width: 44px; height: 44px; }
             .ch-status { padding: 0.125rem 0.5rem; font-size: 0.625rem; letter-spacing: 0.03em; }
             .ch-status .material-symbols-outlined { display: none; }
         }
@@ -277,6 +326,7 @@
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
     <script src="./js/utils/confidence-scoring.js"></script>
+    <script src="./js/utils/survivor-board.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
@@ -330,6 +380,7 @@
                 <h2 class="card-title"><span class="material-symbols-outlined" aria-hidden="true">sports_football</span>The Fallen &amp; The Survivors</h2>
                 <div class="card-meta">Week <span id="table-week-number">1</span> Battle Results - Only The Strong Survive</div>
             </div>
+            <div id="pick-piles" class="ch-piles hidden" aria-label="Picks by team this week"></div>
             <div class="table-wrap">
                 <table class="ch-table">
                     <thead>
@@ -591,11 +642,30 @@
             `;
         }
 
+        function renderPickPiles(currentWeek) {
+            const container = document.getElementById('pick-piles');
+            if (!weekHasStarted) {
+                container.classList.add('hidden');
+                return;
+            }
+            const piles = window.SurvivorBoard.pickPiles(survivorsData, currentWeek);
+            container.innerHTML = piles.map((pile) => {
+                const abbr = getTeamAbbreviation(pile.team);
+                const helmet = abbr ? `<img src="https://a.espncdn.com/i/teamlogos/nfl/500/${abbr}.png" alt="">` : '';
+                const label = `${pile.team}: ${pile.count} pick${pile.count === 1 ? '' : 's'}${pile.fallen ? ', all eliminated' : ''}`;
+                return `
+                    <div class="ch-pile${pile.fallen ? ' is-fallen' : ''}" role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">
+                        ${helmet}
+                        <div class="ch-pile-count">${pile.count}</div>
+                        <div class="ch-pile-team">${escapeHtml(abbr || pile.team)}</div>
+                    </div>
+                `;
+            }).join('');
+            container.classList.toggle('hidden', piles.length === 0);
+        }
+
         function displaySurvivorData() {
-            // No pick, not on the board: once the board opens, survivors without this
-            // week's pick are left off; the fallen list only players knocked out by a team.
-            const aliveSurvivors = survivorsData.filter((s) => s.status === 'ALIVE' && (!weekHasStarted || s.currentWeekPick));
-            const eliminatedSurvivors = survivorsData.filter((s) => s.isEliminated && s.eliminatedBy && s.eliminatedBy !== 'NO_PICK_SUBMITTED');
+            const { alive: aliveSurvivors, fallen: eliminatedSurvivors } = window.SurvivorBoard.boardRows(survivorsData, weekHasStarted);
 
             const currentWeek = getCurrentWeekNumber();
             document.getElementById('header-week-number').textContent = currentWeek;
@@ -606,11 +676,7 @@
             document.getElementById('eliminated-count').textContent = eliminatedSurvivors.length;
             document.getElementById('total-count').textContent = aliveSurvivors.length + eliminatedSurvivors.length;
 
-            // Alive first (alphabetical), then eliminated (by elimination week, then name)
-            aliveSurvivors.sort((a, b) => a.name.localeCompare(b.name));
-            eliminatedSurvivors.sort((a, b) => (a.eliminatedWeek !== b.eliminatedWeek)
-                ? a.eliminatedWeek - b.eliminatedWeek
-                : a.name.localeCompare(b.name));
+            renderPickPiles(currentWeek);
 
             let rows = '';
             if (aliveSurvivors.length) rows += groupRow('alive', 'shield', 'Survivors', aliveSurvivors.length) + aliveSurvivors.map(survivorRow).join('');

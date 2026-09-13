@@ -165,6 +165,15 @@ describe(`shared header: ${BASE}`, () => {
     expect(body).not.toContain('Life Force');
   });
 
+  test("36 Chambers ships the pick piles and the board rules module", async () => {
+    const { body } = await get("/the-survival-chamber-36-degrees.html");
+    expect(body).toContain('id="pick-piles"');
+    expect(body).toContain("./js/utils/survivor-board.js");
+    const board = await get("/js/utils/survivor-board.js");
+    expect(board.status).toBe(200);
+    expect(board.body).toContain("pickPiles");
+  });
+
   test('36 Chambers no longer ships the invisible game overlay that blocked header clicks', async () => {
     const { body } = await get('/the-survival-chamber-36-degrees.html');
     expect(body).not.toContain('id="game-zone"');
