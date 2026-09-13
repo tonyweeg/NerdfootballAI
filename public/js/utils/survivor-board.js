@@ -56,15 +56,37 @@
         return Number.isFinite(n) ? n : null;
     };
 
+    const isRealTeam = (team) => typeof team === 'string' && team !== '' && team !== 'TBD';
+
+    // Scheduled matchups only: TBD placeholders are not games.
+    const realGameIds = (weekGames) => (weekGames ? Scoring.gameIds(weekGames) : [])
+        .filter((id) => isRealTeam(weekGames[id].a) && isRealTeam(weekGames[id].h));
+
+    // The id of the game this team plays in this week, or null (bye, or no schedule).
+    function gameForTeam(team, weekGames) {
+        if (!isRealTeam(team)) return null;
+        return realGameIds(weekGames).find((id) => weekGames[id].a === team || weekGames[id].h === team) || null;
+    }
+
+    // playing | bye | unknown. Without a loaded schedule nobody is called a bye.
+    function teamWeekStatus(team, weekGames) {
+        if (realGameIds(weekGames).length === 0) return 'unknown';
+        return gameForTeam(team, weekGames) ? 'playing' : 'bye';
+    }
+
+    // What a survivor pick stores: the team, its real game and when. Result and
+    // alive are never stored — they are derived from game data (pickGameStatus).
+    function buildPickRecord({ team, weekGames, now = new Date(), submittedBy } = {}) {
+        if (!isRealTeam(team)) throw new Error('buildPickRecord: team is required');
+        const record = { team, gameId: gameForTeam(team, weekGames), submittedAt: now.toISOString() };
+        if (submittedBy) record.submittedBy = submittedBy;
+        return record;
+    }
+
     // Live status of a survivor pick, read from this week's game data rather than
     // the result stored on the pick (which is written once, as "Pending", on save).
     function pickGameStatus(team, weekGames) {
-        if (typeof team !== 'string' || team === '' || team === 'TBD' || !weekGames) return { state: 'unknown' };
-
-        const gameId = Scoring.gameIds(weekGames).find((id) => {
-            const g = weekGames[id];
-            return g.a === team || g.h === team;
-        });
+        const gameId = gameForTeam(team, weekGames);
         if (!gameId) return { state: 'unknown' };
 
         const game = weekGames[gameId];
@@ -93,7 +115,7 @@
         };
     }
 
-    const SurvivorBoard = Object.freeze({ boardRows, pickPiles, pickGameStatus });
+    const SurvivorBoard = Object.freeze({ boardRows, pickPiles, pickGameStatus, gameForTeam, teamWeekStatus, buildPickRecord });
 
     if (typeof window !== 'undefined') window.SurvivorBoard = SurvivorBoard;
     if (typeof module !== 'undefined' && module.exports) module.exports = SurvivorBoard;

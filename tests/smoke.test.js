@@ -187,6 +187,26 @@ describe(`shared header: ${BASE}`, () => {
     expect(board.body).toContain("pickPiles");
   });
 
+  test.each(['/NerdSurvivorPicks.html', '/NerdSurvivorAdmin.html'])(
+    '%s saves survivor picks through the shared record builder, never a stored result',
+    async (path) => {
+      const { body } = await get(path);
+      expect(body).toContain('./js/utils/survivor-board.js');
+      expect(body).toContain('SurvivorBoard.buildPickRecord');
+      expect(body).not.toContain("result: 'Pending'");
+      const board = await get('/js/utils/survivor-board.js');
+      expect(board.body).toContain('buildPickRecord');
+    }
+  );
+
+  test('Survivor Admin no longer ships the stale game id, result and alive inputs', async () => {
+    const { body } = await get('/NerdSurvivorAdmin.html');
+    expect(body).toContain('id="pickGameInfo"');
+    for (const id of ['gameIdInput', 'resultSelect', 'aliveSelect']) {
+      expect(body).not.toContain(`id="${id}"`);
+    }
+  });
+
   test('36 Chambers no longer ships the invisible game overlay that blocked header clicks', async () => {
     const { body } = await get('/the-survival-chamber-36-degrees.html');
     expect(body).not.toContain('id="game-zone"');
