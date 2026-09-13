@@ -187,3 +187,71 @@ describe('seasonStandings', () => {
         });
     });
 });
+
+describe('rankStandings by another key', () => {
+    test('ranks and measures distance from the leader on the given key', () => {
+        const ranked = scoring.rankStandings([
+            { userId: 'a', points: 9, maxPossible: 10 },
+            { userId: 'b', points: 1, maxPossible: 14 },
+            { userId: 'c', points: 5, maxPossible: 10 }
+        ], 'maxPossible');
+        expect(ranked.map(r => [r.userId, r.rank, r.pointsFromLeader])).toEqual([
+            ['b', 1, 0], ['a', 2, 4], ['c', 2, 4]
+        ]);
+    });
+});
+
+describe('upsideWeek', () => {
+    const games = {
+        1: game('Home', 'final', 10, 13),
+        2: game(null, 'STATUS_FINAL', 17, 17),
+        3: game(null, 'STATUS_IN_PROGRESS', 7, 7),
+        4: game(null, 'scheduled'),
+        5: game(null, 'scheduled')
+    };
+
+    test('points so far use the scoring rules; points left count only real picks on unfinished games', () => {
+        const picks = {
+            1: { winner: 'Home', confidence: 5 },
+            2: { winner: 'Away', confidence: 1 },
+            3: { winner: 'Home', confidence: 4 },
+            4: { winner: 'Away', confidence: 9 },
+            5: { winner: '', confidence: 3 }
+        };
+        expect(scoring.upsideWeek(picks, games)).toEqual({
+            points: 6, correct: 2, decided: 2, picksMade: 4,
+            pointsLeft: 4, gamesLeft: 2, maxPossible: 10
+        });
+    });
+
+    test('points so far always equal scoreWeek points', () => {
+        const picks = { 1: { winner: 'Away', confidence: 2 }, 2: { winner: 'Home', confidence: 3 }, 3: { winner: 'Away', confidence: 5 } };
+        expect(scoring.upsideWeek(picks, games).points).toBe(scoring.scoreWeek(picks, games).points);
+    });
+
+    test('no picks means no upside', () => {
+        expect(scoring.upsideWeek(null, games)).toEqual({
+            points: 0, correct: 0, decided: 0, picksMade: 0, pointsLeft: 0, gamesLeft: 0, maxPossible: 0
+        });
+    });
+});
+
+describe('upsideStandings', () => {
+    test('members with picks ranked by max possible, ties share a rank, members without picks left out', () => {
+        const members = { u1: { name: 'Ann' }, u2: { name: 'Bob' }, u3: { name: 'Cy' }, u4: { name: 'Dee' } };
+        const games = { 1: game('Home'), 2: game(null, 'scheduled') };
+        const picksByUser = {
+            u1: { 1: { winner: 'Home', confidence: 2 }, 2: { winner: 'Home', confidence: 1 } },
+            u2: { 1: { winner: 'Away', confidence: 1 }, 2: { winner: 'Home', confidence: 2 } },
+            u3: { 1: { winner: 'Home', confidence: 1 }, 2: { winner: 'Away', confidence: 2 } },
+            u4: { 1: { confidence: 2 } },
+            ghost: { 1: { winner: 'Home', confidence: 2 } }
+        };
+        const rows = scoring.upsideStandings(members, picksByUser, games);
+        expect(rows.map(r => [r.userId, r.name, r.rank, r.points, r.pointsLeft, r.maxPossible, r.gamesLeft, r.pointsFromLeader])).toEqual([
+            ['u1', 'Ann', 1, 2, 1, 3, 1, 0],
+            ['u3', 'Cy', 1, 1, 2, 3, 1, 0],
+            ['u2', 'Bob', 3, 0, 2, 2, 1, 1]
+        ]);
+    });
+});
