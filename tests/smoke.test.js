@@ -130,7 +130,7 @@ describe(`navigation labels: ${BASE}`, () => {
  * other check still passes.
  */
 describe(`shared header: ${BASE}`, () => {
-  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html'];
+  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html'];
 
   test.each(ADOPTERS)('%s mounts the shared header and theme', async (path) => {
     const { status, body } = await get(path);
@@ -148,6 +148,13 @@ describe(`shared header: ${BASE}`, () => {
     const items = [...body.matchAll(/\{ href: '([^']+)', icon: '([a-z_]+)', label: '([^']*)'/g)];
     expect(items.length).toBeGreaterThanOrEqual(8);
     expect(items.filter(([, , , label]) => !label.trim())).toEqual([]);
+  });
+
+  test('survivor picks opts into the red survivor accent', async () => {
+    const { body } = await get('/NerdSurvivorPicks.html');
+    expect(body).toMatch(/<html[^>]*data-accent="survivor"/);
+    const css = await get('/css/nerd-theme.css');
+    expect(css.body).toContain(':root[data-accent="survivor"]');
   });
 
   test('the header stylesheet is served', async () => {
