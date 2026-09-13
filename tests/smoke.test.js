@@ -163,6 +163,16 @@ describe(`shared header: ${BASE}`, () => {
     expect(body).not.toContain('<canvas');
   });
 
+  test('survivor picks ships its loading skeleton and live load steps', async () => {
+    const { body } = await get('/NerdSurvivorPicks.html');
+    expect(body).toContain('id="sv-loading"');
+    expect(body).toContain('./js/components/load-steps.js');
+    expect(body).toContain('./css/nerd-loading.css');
+    const script = await get('/js/components/load-steps.js');
+    expect(script.status).toBe(200);
+    expect(script.body).toContain('NerdLoadSteps');
+  });
+
   test('the header stylesheet is served', async () => {
     const { status, body } = await get('/css/nerd-header.css');
     expect(status).toBe(200);
