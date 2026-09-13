@@ -67,9 +67,15 @@
         setTheme(activeTheme() === 'light' ? 'dark' : 'light');
     }
 
-    function wireButtons() {
-        var buttons = document.querySelectorAll('.theme-toggle');
+    // Idempotent: components render toggles after this script runs and call
+    // wire() themselves, and DOMContentLoaded wiring may run afterwards. The
+    // marker lives on the element so a second pass never double-binds — two
+    // handlers on one button would flip the theme twice, i.e. not at all.
+    function wireButtons(root) {
+        var buttons = (root || document).querySelectorAll('.theme-toggle');
         for (var i = 0; i < buttons.length; i++) {
+            if (buttons[i].hasAttribute('data-theme-wired')) continue;
+            buttons[i].setAttribute('data-theme-wired', '');
             buttons[i].addEventListener('click', toggleTheme);
             buttons[i].setAttribute('aria-label', 'Switch between light and dark theme');
             buttons[i].setAttribute('title', 'Switch theme');
@@ -79,7 +85,7 @@
     applyStoredTheme();
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', wireButtons);
+        document.addEventListener('DOMContentLoaded', function () { wireButtons(); });
     } else {
         wireButtons();
     }
@@ -97,6 +103,7 @@
         get: activeTheme,
         set: setTheme,
         toggle: toggleTheme,
+        wire: wireButtons,
         clear: function () {
             try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
             document.documentElement.removeAttribute('data-theme');
