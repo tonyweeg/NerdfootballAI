@@ -179,31 +179,118 @@
             color: var(--md-action-text) !important;
         }
 
-        /* ---- Consolidated header ---------------------------------------
-           Identity, week navigation, status and actions all live in the bar,
-           so the page opens straight into the picks. */
+        /* ---- Header ------------------------------------------------------
+           Two rows with distinct jobs: identity and page actions on top, one
+           toolbar beneath. Cohesion comes from a single control height, one
+           type treatment for every readout, and rules instead of loose gaps —
+           the previous version mixed four heights, three radii and two type
+           systems in one wrapping row. */
+        :root { --nf-control-h: 32px; }
+
+        .nf-header {
+            background: var(--md-surface-container-low);
+            border-bottom: 1px solid var(--md-outline-variant);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .nf-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .nf-header-identity { padding: 0.625rem 0 0.5rem; }
+
+        .nf-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            min-width: 0;
+            transition: opacity var(--md-dur-short) var(--md-ease);
+        }
+
+        .nf-brand:hover { opacity: .8; }
+        .nf-brand-mark { height: 26px; width: auto; }
+
         .nf-wordmark {
-            font-size: 1.125rem;
+            font-size: 1.0625rem;
             font-weight: 700;
             color: var(--md-on-surface);
             white-space: nowrap;
         }
 
-        .nf-header-group {
+        .nf-header-actions {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            min-width: 0;
         }
 
-        .nf-icon-btn {
-            width: 34px;
-            height: 34px;
+        /* ---- Toolbar ---------------------------------------------------- */
+        .nf-toolbar {
+            display: flex;
+            align-items: stretch;
+            flex-wrap: wrap;
+            gap: 0;
+            margin-bottom: 0.625rem;
+            border: 1px solid var(--md-outline-variant);
+            border-radius: var(--md-shape-sm);
+            background: var(--md-surface-container);
+            overflow: hidden;
+        }
+
+        .nf-toolbar-seg {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.3125rem 0.625rem;
+            border-right: 1px solid var(--md-outline-variant);
+        }
+
+        .nf-toolbar-seg:last-child { border-right: none; }
+        .nf-toolbar-end { margin-left: auto; }
+
+        /* One height for every control in the bar. */
+        .nf-toolbar-icon,
+        .nf-toolbar-btn,
+        .nf-week-select,
+        .theme-toggle {
+            height: var(--nf-control-h);
+        }
+
+        .nf-toolbar-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: var(--nf-control-h);
             padding: 0;
-            flex: 0 0 auto;
+            background: var(--md-button-bg);
+            border: 1px solid var(--md-button-border);
+            border-radius: var(--md-shape-sm);
+            color: var(--md-on-surface-variant);
+            cursor: pointer;
+            transition: background var(--md-dur-short) var(--md-ease),
+                        border-color var(--md-dur-short) var(--md-ease),
+                        color var(--md-dur-short) var(--md-ease);
         }
 
-        .nf-icon-btn .material-symbols-outlined { font-size: 20px; }
+        .nf-toolbar-icon:hover:not(:disabled) {
+            background: var(--md-button-bg-hover);
+            border-color: var(--md-outline);
+            color: var(--md-on-surface);
+        }
+
+        .nf-toolbar-icon:disabled { opacity: .4; cursor: not-allowed; }
+        .nf-toolbar-icon:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+        .nf-toolbar-icon .material-symbols-outlined { font-size: 20px; }
+
+        .nf-toolbar-btn {
+            padding: 0 0.875rem;
+            font-size: 0.8125rem;
+            border-radius: var(--md-shape-sm);
+        }
 
         .nf-week-select {
             background: var(--md-surface-container-low);
@@ -212,9 +299,9 @@
             border-radius: var(--md-shape-sm);
             font-family: var(--md-font);
             font-weight: 700;
-            font-size: 0.9375rem;
-            padding: 0.375rem 0.625rem;
-            min-width: 9rem;
+            font-size: 0.875rem;
+            padding: 0 0.5rem;
+            min-width: 8.5rem;
         }
 
         .nf-week-select:focus {
@@ -223,37 +310,24 @@
             border-color: var(--md-primary);
         }
 
-        /* showAutoSaveStatus() replaces className outright, so the readouts are
-           positioned by these wrappers rather than by classes on the elements
-           themselves — otherwise the layout would vanish on the first save. */
+        /* ---- Readouts ---------------------------------------------------
+           Styled through the wrapper and a structural child selector, never by
+           the element's own class: showAutoSaveStatus() and the auth handler
+           both assign className outright, so class-based styling here would be
+           erased on the first save. */
+        .nf-toolbar-readouts { gap: 0.5rem; }
+
         .nf-status-slot { display: inline-flex; align-items: center; }
 
-        .nf-auth-slot {
-            font-family: var(--md-font-mono);
-            font-size: var(--md-label-size);
-            color: var(--md-on-surface-muted);
-            white-space: nowrap;
-            max-width: 24ch;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .nf-auth-slot p { display: inline; }
-
-        @media (max-width: 900px) {
-            .nf-header-status { width: 100%; justify-content: flex-start; }
-        }
-
-        /* Validation readout: the whole state in one chip. State is carried by
-           colour and a leading mark, so it reads at a glance without a panel. */
-        .nf-validation-chip {
+        .nf-status-slot > span {
             display: inline-flex;
             align-items: center;
             gap: 0.375rem;
-            padding: 0.25rem 0.625rem;
-            border-radius: var(--md-shape-full);
+            height: 24px;
+            padding: 0 0.5rem;
+            border-radius: var(--md-shape-xs);
             border: 1px solid var(--md-outline-variant);
-            background: var(--md-surface-container);
+            background: var(--md-surface-container-low);
             color: var(--md-on-surface-muted);
             font-family: var(--md-font-mono);
             font-size: var(--md-label-size);
@@ -261,12 +335,32 @@
             white-space: nowrap;
         }
 
+        .nf-auth-slot {
+            font-family: var(--md-font-mono);
+            font-size: var(--md-label-size);
+            color: var(--md-on-surface-muted);
+            white-space: nowrap;
+            max-width: 26ch;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .nf-auth-slot p { display: inline; margin: 0; }
+
+        @media (max-width: 760px) {
+            .nf-toolbar-seg { border-right: none; border-bottom: 1px solid var(--md-outline-variant); width: 100%; }
+            .nf-toolbar-seg:last-child { border-bottom: none; }
+            .nf-toolbar-end { margin-left: 0; }
+        }
+
+        /* Validation readout: the whole state in one chip. State is carried by
+           colour and a leading mark, so it reads at a glance without a panel. */
         .nf-validation-chip.is-ok {
             border-color: var(--md-primary);
             color: var(--md-primary);
         }
 
-        .nf-validation-chip.is-ok::before { content: '✓'; font-weight: 700; }
+        .nf-validation-chip.is-ok::before { content: '\2713'; font-weight: 700; }
 
         .nf-validation-chip.is-warn {
             border-color: var(--md-tertiary);
@@ -411,36 +505,16 @@
 </head>
 <body class="min-h-screen nf-fg">
     <!-- Header -->
-    <header class="nf-bg border-b nf-border">
-        <div class="container mx-auto px-4 py-3">
-            <div class="flex flex-wrap justify-between items-center gap-3">
-                <a href="./nerd-universe.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity shrink-0">
-                    <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="h-8 w-auto">
+    <header class="nf-header">
+        <div class="container mx-auto px-4">
+
+            <!-- Row 1 — identity and page-level actions. Quiet by design. -->
+            <div class="nf-header-row nf-header-identity">
+                <a href="./nerd-universe.html" class="nf-brand">
+                    <img src="https://firebasestorage.googleapis.com/v0/b/nerdfootball.firebasestorage.app/o/nerdfootball-nerd-2025.png?alt=media&token=de5cef91-c70e-49bc-ba71-6f993439b11e" alt="NerdfootballAI Logo" class="nf-brand-mark">
                     <span class="nf-wordmark">Confidence Picks</span>
                 </a>
-
-                <!-- Week navigation, consolidated out of the panel below. -->
-                <div class="nf-header-group">
-                    <button id="prevWeek" class="nf-btn nf-btn-alt nf-icon-btn" disabled aria-label="Previous week">
-                        <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
-                    </button>
-                    <select id="weekSelector" class="nf-week-select" aria-label="Week">
-                        <!-- Populated by JavaScript -->
-                    </select>
-                    <button id="nextWeek" class="nf-btn nf-btn-alt nf-icon-btn" aria-label="Next week">
-                        <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
-                    </button>
-                </div>
-
-                <!-- Status readouts. Each sits in a wrapper because
-                     showAutoSaveStatus() overwrites className outright. -->
-                <div class="nf-header-group nf-header-status">
-                    <span class="nf-status-slot"><span id="autoSaveStatus" class="px-3 py-1 rounded text-sm nf-surface">Ready</span></span>
-                    <span class="nf-status-slot"><span id="statusIndicator" class="px-3 py-1 rounded text-sm nf-surface">Loading…</span></span>
-                    <span class="nf-status-slot"><span id="validationChip" class="nf-validation-chip">—</span></span>
-                    <span id="authStatus" class="nf-auth-slot">Connecting…</span>
-                </div>
-                <div class="flex items-center gap-3">
+                <div class="nf-header-actions">
                     <button class="theme-toggle" type="button">
                         <svg class="icon-moon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
@@ -450,9 +524,35 @@
                             <path stroke-linecap="round" d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
                         </svg>
                     </button>
-                    <button onclick="history.back()" class="nf-btn px-4 py-2 rounded-lg text-sm">
-                        ← Back
+                    <button onclick="history.back()" class="nf-btn nf-btn-alt nf-toolbar-btn">Back</button>
+                </div>
+            </div>
+
+            <!-- Row 2 — one toolbar. Every control is the same height, the same
+                 type, and separated by rules rather than by loose gaps. -->
+            <div class="nf-toolbar">
+                <div class="nf-toolbar-seg">
+                    <button id="prevWeek" class="nf-toolbar-icon" disabled aria-label="Previous week">
+                        <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
                     </button>
+                    <select id="weekSelector" class="nf-week-select" aria-label="Week">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                    <button id="nextWeek" class="nf-toolbar-icon" aria-label="Next week">
+                        <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                    </button>
+                </div>
+
+                <!-- Readouts are styled through their wrapper, because
+                     showAutoSaveStatus() assigns className outright. -->
+                <div class="nf-toolbar-seg nf-toolbar-readouts">
+                    <span class="nf-status-slot"><span id="validationChip" class="nf-validation-chip">—</span></span>
+                    <span class="nf-status-slot"><span id="autoSaveStatus">Ready</span></span>
+                    <span class="nf-status-slot"><span id="statusIndicator">Loading…</span></span>
+                </div>
+
+                <div class="nf-toolbar-seg nf-toolbar-end">
+                    <span id="authStatus" class="nf-auth-slot">Connecting…</span>
                 </div>
             </div>
         </div>
