@@ -16,60 +16,11 @@
     <link rel="stylesheet" href="./css/nerd-leaderboard.css">
     <script src="./js/utils/theme-toggle.js"></script>
 
-    <script>
-        window.getCurrentNFLWeek = function() {
-            return window.SEASON_CONFIG.utils.getCurrentWeek();
-        };
-
-        // Each week's games start at the season's kickoff wall-clock time (e.g. 8:20 PM ET
-        // Thursday), which is a DISTINCT, LATER instant than the week's canonical boundary
-        // (midnight UTC Thursday) used by getCurrentNFLWeek(). Built from that week's own
-        // Eastern UTC offset (EDT/EST), not a constant delta: a fixed delta captured from
-        // week 1 (EDT, -04:00) fires 1h early from the November DST rollback onward, when
-        // Eastern is -05:00 but the constant delta still assumes -04:00.
-        function nthSundayOfMonth(year, month /* 0-indexed */, n) {
-            const first = new Date(Date.UTC(year, month, 1));
-            const firstSunday = 1 + ((7 - first.getUTCDay()) % 7);
-            return new Date(Date.UTC(year, month, firstSunday + (n - 1) * 7));
-        }
-        function isEasternDST(dateUTC) {
-            // US rule since 2007: DST runs from the 2nd Sunday in March to the 1st Sunday
-            // in November. Date-level comparison is exact for our purposes — weeks always
-            // land on Thursdays, never on the Sunday transition day itself.
-            const year = dateUTC.getUTCFullYear();
-            const dstStart = nthSundayOfMonth(year, 2, 2);
-            const dstEnd = nthSundayOfMonth(year, 10, 1);
-            return dateUTC >= dstStart && dateUTC < dstEnd;
-        }
-        window.gamesStartFor = function(week) {
-            const anchor = new Date(window.SEASON_CONFIG.weekAnchor);
-            const thursday = new Date(anchor.getTime() + (week - 1) * 7 * 86400000);
-            const kick = window.SEASON_CONFIG.kickoffDateTime.match(/T(\d{2}):(\d{2})/);
-            const offset = isEasternDST(thursday) ? '-04:00' : '-05:00';
-            const pad = (n) => String(n).padStart(2, '0');
-            const iso = `${thursday.getUTCFullYear()}-${pad(thursday.getUTCMonth() + 1)}-${pad(thursday.getUTCDate())}T${kick[1]}:${kick[2]}:00${offset}`;
-            return new Date(iso);
-        };
-
-        // Get the most recent week with actual game data for leaderboard display
-        window.getMostRecentWeekWithData = function() {
-            const currentWeek = window.getCurrentNFLWeek();
-            const today = new Date();
-
-            // Check if current week's games have started
-            const gamesDate = window.gamesStartFor(currentWeek);
-            if (today >= gamesDate) {
-                return currentWeek;
-            }
-
-            // Otherwise, show the most recent completed week
-            return Math.max(1, currentWeek - 1);
-        };
-    </script>
 
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
     <script src="./js/utils/confidence-scoring.js"></script>
+    <script src="./js/utils/week-kickoff.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
@@ -215,7 +166,9 @@
         const TOTAL_WEEKS = window.SEASON_CONFIG.totalWeeks;
         const LOG = 'NERD_WEEKLY';
 
-        let currentWeek = window.getMostRecentWeekWithData();
+        const Kickoff = window.WeekKickoff;
+        let currentWeek = window.SEASON_CONFIG.utils.getCurrentWeek();
+        let pickingDefaultWeek = true;
         let currentUser = null;
         let loadToken = 0;
 
@@ -248,6 +201,7 @@
         function changeWeek(week) {
             const next = Math.min(Math.max(week, 1), TOTAL_WEEKS);
             if (next === currentWeek) return;
+            pickingDefaultWeek = false;
             currentWeek = next;
             showWeek();
             loadWeek();
@@ -295,10 +249,24 @@
                 const rows = Scoring.weekStandings(members, picksByUser, games);
                 console.info(LOG, 'week', week, states, 'sheets', picksSnap.size, 'members', rows.length);
 
+                // A week starts at its first game; without game times, at its first result.
+                const kickoff = Kickoff.firstKickoff(games);
+                const started = kickoff ? Kickoff.hasKickedOff(games) : states.completed + states.live > 0;
+
+                if (pickingDefaultWeek) {
+                    pickingDefaultWeek = false;
+                    if (!started && week > 1) {
+                        console.info(LOG, 'week', week, 'kicks off', kickoff && kickoff.at.toISOString(), '- showing week', week - 1);
+                        currentWeek = week - 1;
+                        showWeek();
+                        return loadWeek();
+                    }
+                }
+
                 loader.finish();
                 renderStats(rows, states);
-                if (states.total > 0 && states.completed === 0 && states.live === 0) {
-                    renderSealed(week, rows);
+                if (!started) {
+                    renderSealed(week, rows, kickoff);
                 } else {
                     renderBoard(rows);
                 }
@@ -315,10 +283,9 @@
             $('stat-games').textContent = `${states.completed}/${states.total}`;
         }
 
-        function renderSealed(week, rows) {
-            const kickoff = window.gamesStartFor(week).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        function renderSealed(week, rows, kickoff) {
             $('sealed-title').textContent = `Week ${week} has not kicked off`;
-            $('sealed-date').textContent = `Games start ${kickoff}`;
+            $('sealed-date').textContent = kickoff ? `First game ${Kickoff.formatKickoff(kickoff)}` : 'Schedule not posted yet';
             $('sealed-count').textContent = `${rows.filter((row) => row.hasPicks).length}/${rows.length}`;
             $('sealed-prev').classList.toggle('hidden', week <= 1);
             $('sealed-prev-label').textContent = `Week ${week - 1} results`;
