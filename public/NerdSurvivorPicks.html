@@ -1286,7 +1286,8 @@
             let html = '';
             NFL_TEAMS.forEach(team => {
                 const isUsed = usedTeams.has(team);
-                const isDisabled = isUsed;
+                const isBye = window.SurvivorBoard.teamWeekStatus(team, gameData[selectedWeek]) === 'bye';
+                const isDisabled = isUsed || isBye;
                 const opponent = getOpponentForTeam(team, selectedWeek) || team;
 
                 html += `
@@ -1302,6 +1303,7 @@
                                 <div class="team-name">${team}</div>
                                 ${opponent !== team ? `<div class="team-vs">vs ${opponent}</div>` : ''}
                                 ${isUsed ? '<div class="team-used">Already Used</div>' : ''}
+                                ${isBye && !isUsed ? '<div class="team-vs">Bye week</div>' : ''}
                             </div>
                         </div>
                         ${currentUser && ADMIN_UIDS.includes(currentUser.uid) && opponent && opponent !== team ? `
@@ -1331,6 +1333,16 @@
             }
             if (usedTeams.has(team)) return;
 
+            const weekStatus = window.SurvivorBoard.teamWeekStatus(team, gameData[selectedWeek]);
+            if (weekStatus === 'bye') {
+                showError(`${team} has no game in Week ${selectedWeek}`);
+                return;
+            }
+            if (weekStatus === 'unknown') {
+                showError(`Week ${selectedWeek} schedule is not available yet - refresh and try again`);
+                return;
+            }
+
             // Clear previous selections
             document.querySelectorAll('.team-btn').forEach(btn => {
                 btn.classList.remove('is-selected');
@@ -1342,17 +1354,21 @@
 
             document.getElementById('selectedTeam').value = team;
 
-            // Auto-generate game ID (week * 100 + estimated game number)
-            const gameId = selectedWeek * 100 + 1; // Simplified for now
-            document.getElementById('selectedGameId').value = gameId;
+            document.getElementById('selectedGameId').value = window.SurvivorBoard.gameForTeam(team, gameData[selectedWeek]);
         };
 
         async function savePick() {
             const team = document.getElementById('selectedTeam').value;
-            const gameId = document.getElementById('selectedGameId').value;
 
             if (!team) {
                 alert('Please select a team first!');
+                return;
+            }
+
+            // Team, its real game and when. Result and alive are derived from game data, never stored.
+            const record = window.SurvivorBoard.buildPickRecord({ team, weekGames: gameData[selectedWeek] });
+            if (!record.gameId) {
+                showError(`Could not find ${team}'s Week ${selectedWeek} game - pick not saved`);
                 return;
             }
 
@@ -1360,13 +1376,7 @@
                 // Update local data
                 if (!userSurvivorData.picks) userSurvivorData.picks = {};
 
-                userSurvivorData.picks[selectedWeek.toString()] = {
-                    team: team,
-                    gameId: gameId || null,
-                    result: 'Pending',
-                    alive: true,
-                    submittedAt: new Date().toISOString()
-                };
+                userSurvivorData.picks[selectedWeek.toString()] = record;
 
                 // Save to Firebase
                 const survivorPath = window.SEASON_CONFIG.paths.survivorPicks(currentUser.uid);

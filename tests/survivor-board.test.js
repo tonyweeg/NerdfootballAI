@@ -140,3 +140,58 @@ describe('pickGameStatus', () => {
         expect(Board.pickGameStatus(undefined, week)).toEqual({ state: 'unknown' });
     });
 });
+
+describe('gameForTeam / teamWeekStatus', () => {
+    const week = {
+        _metadata: {},
+        103: { a: 'Tampa Bay Buccaneers', h: 'Cincinnati Bengals', status: 'STATUS_FINAL' },
+        117: { a: 'TBD', h: 'TBD', status: 'scheduled' }
+    };
+
+    test('home and away teams resolve to the real game id', () => {
+        expect(Board.gameForTeam('Cincinnati Bengals', week)).toBe('103');
+        expect(Board.gameForTeam('Tampa Bay Buccaneers', week)).toBe('103');
+    });
+
+    test('a team without a game that week is a bye', () => {
+        expect(Board.gameForTeam('Seattle Seahawks', week)).toBeNull();
+        expect(Board.teamWeekStatus('Seattle Seahawks', week)).toBe('bye');
+        expect(Board.teamWeekStatus('Cincinnati Bengals', week)).toBe('playing');
+    });
+
+    test('with no schedule loaded the status is unknown, never a false bye', () => {
+        expect(Board.teamWeekStatus('Cincinnati Bengals', null)).toBe('unknown');
+        expect(Board.teamWeekStatus('Cincinnati Bengals', {})).toBe('unknown');
+        expect(Board.teamWeekStatus('Cincinnati Bengals', { _metadata: {} })).toBe('unknown');
+        expect(Board.gameForTeam('Cincinnati Bengals', null)).toBeNull();
+    });
+
+    test('placeholder TBD entries are not games', () => {
+        expect(Board.gameForTeam('TBD', week)).toBeNull();
+    });
+});
+
+describe('buildPickRecord', () => {
+    const week = { 103: { a: 'Tampa Bay Buccaneers', h: 'Cincinnati Bengals', status: 'scheduled' } };
+    const now = new Date('2026-09-13T12:00:00Z');
+
+    test('stores team, the real game id and when — never result or alive', () => {
+        const record = Board.buildPickRecord({ team: 'Cincinnati Bengals', weekGames: week, now });
+        expect(record).toEqual({ team: 'Cincinnati Bengals', gameId: '103', submittedAt: '2026-09-13T12:00:00.000Z' });
+        expect(record).not.toHaveProperty('result');
+        expect(record).not.toHaveProperty('alive');
+    });
+
+    test('records who submitted it when given (admin saves)', () => {
+        expect(Board.buildPickRecord({ team: 'Cincinnati Bengals', weekGames: week, now, submittedBy: 'admin@x.com' }))
+            .toEqual({ team: 'Cincinnati Bengals', gameId: '103', submittedAt: '2026-09-13T12:00:00.000Z', submittedBy: 'admin@x.com' });
+    });
+
+    test('a team with no game gets a null game id (admins may save it)', () => {
+        expect(Board.buildPickRecord({ team: 'Seattle Seahawks', weekGames: week, now }).gameId).toBeNull();
+    });
+
+    test('requires a team', () => {
+        expect(() => Board.buildPickRecord({ team: '', weekGames: week, now })).toThrow('buildPickRecord: team is required');
+    });
+});

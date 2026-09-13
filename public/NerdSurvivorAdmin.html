@@ -14,6 +14,9 @@
     <script src="./js/utils/logger-compat.js"></script>
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
+    <script src="./js/utils/confidence-scoring.js"></script>
+    <script src="./js/utils/survivor-board.js"></script>
+    <script src="./easternTimeParser-v2.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -69,28 +72,11 @@
                         </select>
                     </div>
                     <div>
-                        <label for="gameIdInput" class="block text-sm font-medium text-gray-700 mb-2">Game ID:</label>
-                        <input type="text" id="gameIdInput" placeholder="e.g., 111" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <span class="block text-sm font-medium text-gray-700 mb-2">Game (from the week's schedule):</span>
+                        <div id="pickGameInfo" class="p-3 border border-gray-200 rounded-md bg-gray-50 text-gray-700">Select a team</div>
                     </div>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label for="resultSelect" class="block text-sm font-medium text-gray-700 mb-2">Result:</label>
-                        <select id="resultSelect" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <option value="Pending">Pending</option>
-                            <option value="Win">Win</option>
-                            <option value="Loss">Loss</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="aliveSelect" class="block text-sm font-medium text-gray-700 mb-2">Alive Status:</label>
-                        <select id="aliveSelect" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <option value="true">✅ Alive</option>
-                            <option value="false">💀 Eliminated</option>
-                        </select>
-                    </div>
-                </div>
+                <p class="text-sm text-gray-500 mb-4">Game, result and alive status come from game data. Admins can save any team, including one with no game that week.</p>
 
                 <div class="flex gap-4">
                     <button id="savePickBtn" class="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition-colors">
@@ -154,6 +140,47 @@
         let currentUserData = null;
         let selectedUserId = null;
         let selectedWeek = null;
+        const gamesByWeek = {};
+
+        async function loadWeekGames(week) {
+            if (!week) return null;
+            if (!(week in gamesByWeek)) {
+                try {
+                    const snap = await getDoc(doc(db, window.SEASON_CONFIG.paths.games(week)));
+                    gamesByWeek[week] = snap.exists() ? snap.data() : null;
+                } catch (error) {
+                    logger.error('SURVIVOR', `Error loading Week ${week} games:`, error);
+                    gamesByWeek[week] = null;
+                }
+            }
+            return gamesByWeek[week];
+        }
+
+        function matchupText(team, weekGames) {
+            const status = window.SurvivorBoard.teamWeekStatus(team, weekGames);
+            if (status === 'unknown') return 'Schedule not loaded for this week';
+            if (status === 'bye') return '⚠️ No game this week (bye)';
+            const game = window.SurvivorBoard.pickGameStatus(team, weekGames);
+            return `Game ${game.gameId}: ${game.isHome ? 'vs' : '@'} ${game.opponent}`;
+        }
+
+        function resultText(team, weekGames) {
+            const game = window.SurvivorBoard.pickGameStatus(team, weekGames);
+            const score = game.teamScore !== null && game.opponentScore !== null ? ` ${game.teamScore}–${game.opponentScore}` : '';
+            switch (game.state) {
+                case 'won': return `✅ Won${score}`;
+                case 'lost': return `💀 Lost${score}`;
+                case 'tie': return `🤝 Tie${score}`;
+                case 'live': return `🟠 In progress${score}`;
+                case 'scheduled': return game.dt && window.easternTimeParser ? `⏳ Kickoff ${window.easternTimeParser.formatGameTime(game.dt)}` : '⏳ Scheduled';
+                default: return '— No game data';
+            }
+        }
+
+        function updateGameInfo() {
+            const team = document.getElementById('teamSelect').value;
+            document.getElementById('pickGameInfo').textContent = team ? matchupText(team, gamesByWeek[selectedWeek]) : 'Select a team';
+        }
 
         // URL state management - keeps user/week selection across refresh
         function getUrlParams() {
@@ -299,11 +326,9 @@
             document.getElementById('deletePickBtn').addEventListener('click', deletePick);
             document.getElementById('clearFormBtn').addEventListener('click', clearForm);
 
-            // Auto-save on field changes
+            // Auto-save when the team changes
+            document.getElementById('teamSelect').addEventListener('change', updateGameInfo);
             document.getElementById('teamSelect').addEventListener('change', autoSave);
-            document.getElementById('gameIdInput').addEventListener('blur', autoSave);
-            document.getElementById('resultSelect').addEventListener('change', autoSave);
-            document.getElementById('aliveSelect').addEventListener('change', autoSave);
         }
 
         async function handleUserChange() {
@@ -312,6 +337,7 @@
                 await loadUserSurvivorData();
                 await displayFullSurvivorHistory();
                 if (selectedWeek) {
+                    await loadWeekGames(selectedWeek);
                     displayCurrentPick();
                 }
             } else {
@@ -323,6 +349,7 @@
         async function handleWeekChange() {
             selectedWeek = document.getElementById('weekSelect').value;
             if (selectedUserId && selectedWeek) {
+                await loadWeekGames(selectedWeek);
                 displayCurrentPick();
                 showPickEditor();
             }
@@ -361,18 +388,15 @@
                     <div class="p-4 bg-blue-50 border border-blue-200 rounded-md">
                         <h3 class="font-bold mb-2">Week ${selectedWeek} Current Pick:</h3>
                         <p><strong>Team:</strong> ${weekPick.team || 'Not set'}</p>
-                        <p><strong>Game ID:</strong> ${weekPick.gameId || 'Not set'}</p>
-                        <p><strong>Result:</strong> ${weekPick.result || 'Pending'}</p>
-                        <p><strong>Alive:</strong> ${weekPick.alive !== false ? '✅ Yes' : '💀 No'}</p>
-                        ${weekPick.submittedAt ? `<p><strong>Submitted:</strong> ${new Date(weekPick.submittedAt).toLocaleString()}</p>` : ''}
+                        <p><strong>Game:</strong> ${weekPick.team ? matchupText(weekPick.team, gamesByWeek[selectedWeek]) : '—'}</p>
+                        <p><strong>Result:</strong> ${weekPick.team ? resultText(weekPick.team, gamesByWeek[selectedWeek]) : '—'}</p>
+                        ${weekPick.submittedAt ? `<p><strong>Submitted:</strong> ${new Date(weekPick.submittedAt).toLocaleString()}${weekPick.submittedBy ? ` by ${weekPick.submittedBy}` : ''}</p>` : ''}
                     </div>
                 `;
 
                 // Populate form with current data
                 document.getElementById('teamSelect').value = weekPick.team || '';
-                document.getElementById('gameIdInput').value = weekPick.gameId || '';
-                document.getElementById('resultSelect').value = weekPick.result || 'Pending';
-                document.getElementById('aliveSelect').value = weekPick.alive !== false ? 'true' : 'false';
+                updateGameInfo();
             } else {
                 currentPickDisplay.innerHTML = `
                     <div class="p-4 bg-gray-50 border border-gray-200 rounded-md">
@@ -402,6 +426,7 @@
 
             const picks = currentUserData.picks || {};
             const historyContent = document.getElementById('survivorHistoryContent');
+            await Promise.all(Object.keys(picks).filter((w) => Number(w) >= 1 && Number(w) <= 18).map((w) => loadWeekGames(w)));
             let historyHTML = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
 
             for (let week = 1; week <= 18; week++) {
@@ -409,7 +434,8 @@
                 const weekPick = picks[weekKey];
 
                 if (weekPick) {
-                    const alive = weekPick.alive !== false;
+                    const game = window.SurvivorBoard.pickGameStatus(weekPick.team, gamesByWeek[weekKey]);
+                    const alive = game.state !== 'lost';
                     historyHTML += `
                         <div class="p-3 border rounded-md ${alive ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}">
                             <div class="flex justify-between items-center mb-2">
@@ -417,8 +443,8 @@
                                 <span class="${alive ? 'text-green-600' : 'text-red-600'}">${alive ? '✅' : '💀'}</span>
                             </div>
                             <p class="text-sm"><strong>Team:</strong> ${weekPick.team}</p>
-                            <p class="text-sm"><strong>Game:</strong> ${weekPick.gameId}</p>
-                            <p class="text-sm"><strong>Result:</strong> ${weekPick.result || 'Pending'}</p>
+                            <p class="text-sm"><strong>Game:</strong> ${matchupText(weekPick.team, gamesByWeek[weekKey])}</p>
+                            <p class="text-sm"><strong>Result:</strong> ${resultText(weekPick.team, gamesByWeek[weekKey])}</p>
                         </div>
                     `;
                 } else {
@@ -447,9 +473,6 @@
 
             try {
                 const team = document.getElementById('teamSelect').value;
-                const gameId = document.getElementById('gameIdInput').value;
-                const result = document.getElementById('resultSelect').value;
-                const alive = document.getElementById('aliveSelect').value === 'true';
 
                 if (!team) {
                     addStatusMessage('❌ Please select a team', 'error');
@@ -459,14 +482,14 @@
                 // Update the picks data
                 if (!currentUserData.picks) currentUserData.picks = {};
 
-                currentUserData.picks[selectedWeek] = {
-                    team: team,
-                    gameId: gameId || null,
-                    result: result,
-                    alive: alive,
-                    submittedAt: new Date().toISOString(),
-                    submittedBy: currentUser.email
-                };
+                // Admins can always adjust a pick: a team with no game that week is saved
+                // with gameId null and a warning. Result and alive are never stored.
+                const weekGames = await loadWeekGames(selectedWeek);
+                const record = window.SurvivorBoard.buildPickRecord({ team, weekGames, submittedBy: currentUser.email });
+                if (!record.gameId) {
+                    addStatusMessage(`⚠️ ${team} has no game in Week ${selectedWeek} - saved without a game (admin override)`, 'info');
+                }
+                currentUserData.picks[selectedWeek] = record;
 
                 // Save to Firebase
                 const survivorPath = window.SEASON_CONFIG.paths.survivorPicks(selectedUserId);
@@ -520,9 +543,7 @@
 
         function clearForm() {
             document.getElementById('teamSelect').value = '';
-            document.getElementById('gameIdInput').value = '';
-            document.getElementById('resultSelect').value = 'Pending';
-            document.getElementById('aliveSelect').value = 'true';
+            updateGameInfo();
         }
 
         async function autoSave() {
