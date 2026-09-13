@@ -157,15 +157,26 @@ describe(`shared header: ${BASE}`, () => {
     expect(css.body).toContain(':root[data-accent="survivor"]');
   });
 
+  test("36 Chambers table has exactly three columns: player, this week's pick, status", async () => {
+    const { body } = await get('/the-survival-chamber-36-degrees.html');
+    const head = body.slice(body.indexOf('<thead>'), body.indexOf('</thead>'));
+    const columns = [...head.matchAll(/<th>([\s\S]*?)<\/th>/g)].map(([, inner]) => inner.replace(/<[^>]+>/g, '').trim());
+    expect(columns).toEqual(['Player', 'Week 1 Pick', 'Status']);
+    expect(body).not.toContain('Life Force');
+  });
+
   test('36 Chambers no longer ships the invisible game overlay that blocked header clicks', async () => {
     const { body } = await get('/the-survival-chamber-36-degrees.html');
     expect(body).not.toContain('id="game-zone"');
     expect(body).not.toContain('<canvas');
   });
 
-  test('survivor picks ships its loading skeleton and live load steps', async () => {
-    const { body } = await get('/NerdSurvivorPicks.html');
-    expect(body).toContain('id="sv-loading"');
+  test.each([
+    ['/NerdSurvivorPicks.html', 'sv-loading'],
+    ['/the-survival-chamber-36-degrees.html', 'ch-loading']
+  ])('%s ships its loading skeleton and live load steps', async (path, loaderId) => {
+    const { body } = await get(path);
+    expect(body).toContain(`id="${loaderId}"`);
     expect(body).toContain('./js/components/load-steps.js');
     expect(body).toContain('./css/nerd-loading.css');
     const script = await get('/js/components/load-steps.js');
