@@ -129,7 +129,7 @@ describe(`navigation labels: ${BASE}`, () => {
  * other check still passes.
  */
 describe(`shared header: ${BASE}`, () => {
-  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html', '/the-survival-chamber-36-degrees.html', '/weekly-leaderboard.html', '/leaderboard.html'];
+  const ADOPTERS = ['/masters-of-the-nerdUniverse-audit.html', '/nerds-battlestar-galactica.html', '/picks-landing.html', '/NerdSurvivorPicks.html', '/the-survival-chamber-36-degrees.html', '/weekly-leaderboard.html', '/leaderboard.html', '/tricked-out-ricky.html'];
 
   test.each(ADOPTERS)('%s mounts the shared header and theme', async (path) => {
     const { status, body } = await get(path);
@@ -260,6 +260,20 @@ describe(`shared header: ${BASE}`, () => {
     const css = await get('/css/nerd-leaderboard.css');
     expect(css.status).toBe(200);
     expect(css.body).toContain('.podium-card');
+  });
+
+  test('Tricked Out Ricky uses the shared scorer and keeps the space battle behind its launch button', async () => {
+    const { body } = await get('/tricked-out-ricky.html');
+    expect(body).toContain('./js/utils/confidence-insights.js');
+    expect(body).toContain('id="launch-battle"');
+    expect(body).toMatch(/id="rsb-overlay"[^>]*hidden/);
+    expect(body).not.toContain('<script src="./js/components/ricky-space-battle.js"');
+    for (const gone of ['tricked-out-ricky-week-', 'firebasestorage.googleapis.com', 'alert(', 'id="starfield"']) {
+      expect(body).not.toContain(gone);
+    }
+    const battle = await get('/js/components/ricky-space-battle.js');
+    expect(battle.status).toBe(200);
+    expect(battle.body).toContain('RickySpaceBattle');
   });
 
   test('the header stylesheet is served', async () => {
