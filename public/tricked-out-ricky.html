@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tricked Out Ricky - NerdFootball</title>
+    <title>Space Nerd Stats - NerdFootball</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -13,42 +13,128 @@
     <link rel="stylesheet" href="./css/nerd-leaderboard.css">
     <script src="./js/utils/theme-toggle.js"></script>
     <style>
-        .stats-row.six { grid-template-columns: repeat(3, 1fr); }
+        .lb-main.wide { max-width: 1320px; }
 
+        .stats-row.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
         .toolbar-actions { display: flex; align-items: center; gap: 0.5rem; }
 
-        .chart-grid {
+        /* ---- Bento grid ---------------------------------------------------- */
+        .bento {
             display: grid;
-            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            grid-auto-flow: row dense;
             gap: 1.25rem;
         }
+        .bento > .card { margin-bottom: 0; min-width: 0; display: flex; flex-direction: column; }
+        .span-3 { grid-column: span 3; }
+        .span-4 { grid-column: span 4; }
+        .span-5 { grid-column: span 5; }
+        .span-6 { grid-column: span 6; }
+        .span-7 { grid-column: span 7; }
+        .span-8 { grid-column: span 8; }
+        .span-12 { grid-column: span 12; }
+        .row-2 { grid-row: span 2; }
 
-        .chart-grid > .card { margin-bottom: 0; min-width: 0; }
-        .chart-block { margin-bottom: 1.25rem; }
+        .section-header { margin-bottom: 0.875rem; }
+        .card-foot { margin-top: auto; padding-top: 0.75rem; }
 
-        .chart-box { position: relative; height: 280px; }
-        .chart-box.short { height: 220px; }
+        .chart-box { position: relative; height: 260px; }
+        .chart-box.tall { height: 380px; }
+        .chart-box.short { height: 200px; }
 
         .chart-empty {
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 0.375rem;
             height: 100%;
+            min-height: 6rem;
             font-family: var(--md-font-mono);
             font-size: var(--md-label-size);
             letter-spacing: var(--md-label-tracking);
             text-transform: uppercase;
             color: var(--md-on-surface-muted);
+            text-align: center;
         }
+        .chart-empty .material-symbols-outlined { font-size: 16px; }
 
-        .band-callout {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
+        /* ---- Nerd facts ---------------------------------------------------- */
+        .fact { justify-content: space-between; gap: 0.5rem; }
+        .fact-label { display: flex; align-items: center; gap: 0.375rem; font-family: var(--md-font-mono); font-size: var(--md-label-size); font-weight: 600; letter-spacing: var(--md-label-tracking); text-transform: uppercase; color: var(--md-on-surface-muted); }
+        .fact-label .material-symbols-outlined { font-size: 16px; }
+        .fact-value { font-family: var(--md-font-mono); font-size: clamp(2rem, 3.2vw, 2.75rem); font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+        .fact-value small { font-size: 0.45em; font-weight: 500; color: var(--md-on-surface-muted); margin-left: 0.25rem; }
+        .fact-detail { display: flex; align-items: center; gap: 0.375rem; min-height: 28px; font-weight: 700; overflow-wrap: anywhere; }
+        .fact-detail img { width: 28px; height: 28px; object-fit: contain; flex: none; }
+        .fact-sub { font-family: var(--md-font-mono); font-size: var(--md-label-size); color: var(--md-on-surface-muted); }
+        .fact.upset .fact-label { color: var(--md-error); }
+        .fact.cost .fact-label { color: var(--md-tertiary); }
+        .fact.miss .fact-label { color: var(--md-error); }
+        .fact.contrarian .fact-label { color: var(--md-primary); }
+
+        /* ---- Mini standings ------------------------------------------------ */
+        .mini-standings { width: 100%; font-size: 0.875rem; }
+        .mini-standings td, .mini-standings th { padding: 0.375rem 0.5rem; }
+        .mini-standings .gap td { text-align: center; color: var(--md-on-surface-muted); border-bottom: none; }
+
+        /* ---- Band callout -------------------------------------------------- */
+        .band-callout { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.875rem; }
+
+        /* ---- Heatmap strip ------------------------------------------------- */
+        .heatmap { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
+        .heat-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.125rem;
+            min-height: 72px;
+            border-radius: var(--md-shape-xs);
+            font-family: var(--md-font-mono);
+            color: var(--md-on-surface);
         }
+        .heat-cell .lvl { font-size: 0.7rem; opacity: 0.8; }
+        .heat-cell .pct { font-size: 0.8rem; font-weight: 600; }
+        .heat-cell.empty { background: var(--md-surface-container); color: var(--md-on-surface-disabled); }
+        .heat-legend { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.625rem; font-family: var(--md-font-mono); font-size: var(--md-label-size); color: var(--md-on-surface-muted); }
+        .heat-legend .bar { flex: 0 0 120px; height: 8px; border-radius: var(--md-shape-full); background: linear-gradient(90deg, var(--md-error), color-mix(in srgb, var(--md-error) 50%, var(--md-primary)), var(--md-primary)); }
 
-        /* ---- Game analysis ------------------------------------------------ */
+        /* ---- Pick matrix --------------------------------------------------- */
+        .matrix-wrap { overflow-x: auto; }
+        .matrix { border-collapse: separate; border-spacing: 2px; font-family: var(--md-font-mono); font-size: 0.72rem; }
+        .matrix th, .matrix td { padding: 0; border: none; text-align: center; }
+        .matrix thead th { position: sticky; top: 0; background: var(--md-surface); font-weight: 600; color: var(--md-on-surface-muted); padding-bottom: 0.25rem; }
+        .matrix thead img { display: block; width: 20px; height: 20px; margin: 0 auto; object-fit: contain; }
+        .matrix .name {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            background: var(--md-surface);
+            text-align: left;
+            padding-right: 0.5rem;
+            max-width: 9rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: var(--md-font);
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--md-on-surface);
+        }
+        .matrix .pts { padding-left: 0.5rem; font-weight: 600; color: var(--md-on-surface); }
+        .matrix .cell { width: 30px; height: 26px; border-radius: 4px; }
+        .matrix .cell.correct { color: var(--md-on-surface); }
+        .matrix .cell.wrong { color: var(--md-on-surface); }
+        .matrix .cell.pending { background: var(--md-surface-container-high); color: var(--md-on-surface-muted); }
+        .matrix .cell.none { background: transparent; color: var(--md-on-surface-disabled); }
+        .matrix tr.me .name { color: var(--md-primary); }
+        .matrix-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.625rem; font-family: var(--md-font-mono); font-size: var(--md-label-size); color: var(--md-on-surface-muted); }
+        .matrix-legend span[class]::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 0.375rem; border-radius: 2px; vertical-align: -1px; }
+        .matrix-legend .l-correct::before { background: var(--md-primary); }
+        .matrix-legend .l-wrong::before { background: var(--md-error); }
+        .matrix-legend .l-pending::before { background: var(--md-surface-container-high); }
+
+        /* ---- Game analysis ------------------------------------------------- */
         .matchup { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
         .matchup img { width: 28px; height: 28px; object-fit: contain; flex: none; }
         .matchup .team { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--md-on-surface); font-weight: 700; }
@@ -81,72 +167,22 @@
         .chip.upset { background: var(--md-error-container); color: var(--md-on-error-container); }
         .chip.tie { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
 
-        .link-card {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            color: var(--md-on-surface);
-            text-decoration: none;
-        }
+        .link-card { flex-direction: row !important; align-items: center; justify-content: space-between; gap: 1rem; color: var(--md-on-surface); text-decoration: none; }
         .link-card:hover { border-color: var(--md-outline); }
         .link-card .material-symbols-outlined { font-size: 20px; color: var(--md-on-surface-muted); }
 
-        /* ---- Space battle overlay ---------------------------------------- */
-        .rsb-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 1000;
-            background: #0a0a1f;
-            color: #f1f5ec;
-        }
+        /* ---- Tricked Out Ricky (space battle overlay) ---------------------- */
+        .rsb-overlay { position: fixed; inset: 0; z-index: 1000; background: #0a0a1f; color: #f1f5ec; }
         .rsb-overlay canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
         .rsb-glow { position: absolute; inset: 0; pointer-events: none; background: rgb(255 230 80 / 0); transition: background 0.5s ease; }
         .rsb-glow.active { background: rgb(255 230 80 / 0.3); }
-
-        .rsb-top {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding: 3rem 1rem 0;
-            pointer-events: none;
-        }
+        .rsb-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 3rem 1rem 0; pointer-events: none; }
         .rsb-top > * { pointer-events: auto; }
         .rsb-title { font-family: var(--md-font-mono); font-size: var(--md-label-size); letter-spacing: var(--md-label-tracking); text-transform: uppercase; opacity: 0.8; }
-
-        .rsb-exit, .rsb-team {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.375rem;
-            height: 40px;
-            padding: 0 1rem;
-            border-radius: var(--md-shape-sm);
-            border: 1px solid rgb(255 255 255 / 0.25);
-            background: rgb(0 0 0 / 0.45);
-            color: inherit;
-            font: inherit;
-            font-weight: 700;
-            cursor: pointer;
-        }
+        .rsb-exit, .rsb-team { display: inline-flex; align-items: center; gap: 0.375rem; height: 40px; padding: 0 1rem; border-radius: var(--md-shape-sm); border: 1px solid rgb(255 255 255 / 0.25); background: rgb(0 0 0 / 0.45); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
         .rsb-exit:focus-visible, .rsb-team:focus-visible { outline: 2px solid #b5ff45; outline-offset: 2px; }
         .rsb-exit .material-symbols-outlined { font-size: 18px; }
-
-        .rsb-bottom {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            display: grid;
-            grid-template-columns: auto 1fr auto;
-            align-items: center;
-            gap: 1rem;
-            padding: 0 1.5rem 1.5rem;
-        }
+        .rsb-bottom { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1rem; padding: 0 1.5rem 1.5rem; }
         .rsb-status { text-align: center; font-weight: 700; text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
         .rsb-team.red { border-color: #ff4444; color: #ff7a7a; }
         .rsb-team.blue { border-color: #5b7cff; color: #8fa6ff; }
@@ -154,16 +190,23 @@
         .rsb-team.blue.selected { background: rgb(91 124 255 / 0.35); }
         .rsb-team:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        @media (max-width: 900px) {
-            .chart-grid { grid-template-columns: minmax(0, 1fr); }
-            .chart-grid { gap: 1.25rem; }
+        @media (max-width: 1100px) {
+            .stats-row.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .span-3 { grid-column: span 6; }
+            .span-4, .span-5, .span-7, .span-8 { grid-column: span 12; }
+            .span-6 { grid-column: span 6; }
+            .row-2 { grid-row: auto; }
         }
-        @media (max-width: 768px) {
-            .stats-row.six { grid-template-columns: repeat(2, 1fr); }
+        @media (max-width: 760px) {
+            .bento > .card { grid-column: span 12; }
+            .stats-row.six { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .chart-box.tall { height: 420px; }
         }
         @media (max-width: 480px) {
             .matchup img { width: 22px; height: 22px; }
             .matchup .team-name-away, .matchup .team-name-home { display: none; }
+            .heat-cell { min-height: 56px; }
+            .heat-cell .pct { font-size: 0.62rem; }
             .rsb-bottom { grid-template-columns: 1fr 1fr; padding: 0 1rem 1rem; }
             .rsb-status { grid-column: 1 / -1; grid-row: 1; }
         }
@@ -172,25 +215,26 @@
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
     <script src="./js/utils/confidence-scoring.js"></script>
+    <script src="./js/utils/week-kickoff.js"></script>
     <script src="./js/utils/confidence-insights.js"></script>
     <script src="./js/utils/team-logos.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 <body>
-    <div class="nerd-header-slot" data-nerd-header data-title="Tricked Out Ricky" data-back="true"></div>
+    <div class="nerd-header-slot" data-nerd-header data-title="Space Nerd Stats" data-back="true"></div>
     <script src="./js/components/nerd-header.js"></script>
 
-    <main class="lb-main">
+    <main class="lb-main wide">
         <section class="lb-hero">
-            <p class="lb-kicker">Confidence Pool<span class="lb-kicker-rule" aria-hidden="true"></span><span id="tr-kicker">Week -</span></p>
-            <h1 class="lb-title">Tricked Out Ricky</h1>
-            <p class="lb-subtitle">What the pool's picks say about the week.</p>
+            <p class="lb-kicker">Confidence Pool<span class="lb-kicker-rule" aria-hidden="true"></span><span id="sn-kicker">Week -</span></p>
+            <h1 class="lb-title">Space Nerd Stats</h1>
+            <p class="lb-subtitle">Every number the pool's picks can give up. Picks unlock game by game at kickoff.</p>
         </section>
 
         <div id="auth-section" class="card message-card hidden">
             <span class="material-symbols-outlined" aria-hidden="true">lock</span>
             <div class="message-title">Sign in required</div>
-            <p>Sign in to NerdUniverse to see Tricked Out Ricky. <a href="./index.html">Go to sign in</a></p>
+            <p>Sign in to NerdUniverse to see Space Nerd Stats. <a href="./index.html">Go to sign in</a></p>
         </div>
 
         <div id="main-content" class="hidden">
@@ -202,7 +246,7 @@
                         <button id="week-next" class="btn btn-next" type="button" aria-label="Next week"><span class="btn-label">Next</span><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>
                     </div>
                     <div class="toolbar-actions">
-                        <button id="launch-battle" class="btn" type="button" aria-label="Launch the space battle" title="Space battle"><span class="material-symbols-outlined" aria-hidden="true">rocket_launch</span></button>
+                        <button id="launch-battle" class="btn" type="button" aria-label="Launch Tricked Out Ricky" title="Tricked Out Ricky"><span class="material-symbols-outlined" aria-hidden="true">rocket_launch</span></button>
                         <button id="refresh" class="btn" type="button" aria-label="Refresh"><span class="material-symbols-outlined" aria-hidden="true">refresh</span><span class="btn-label">Refresh</span></button>
                     </div>
                 </div>
@@ -235,57 +279,160 @@
                 </div>
             </div>
 
-            <!-- Loading: skeleton shaped like the charts, plus the real load steps -->
-            <section id="tr-loading" class="lb-loading" data-loader hidden>
+            <!-- Loading: skeleton shaped like the dashboard, plus the real load steps -->
+            <section id="sn-loading" class="lb-loading" data-loader hidden>
                 <div class="card" aria-hidden="true">
                     <div class="sk sk-lg sk-w-40"></div>
                     <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
                     <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
                     <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
                 </div>
-                <div id="tr-load-steps" class="lb-load-steps"></div>
+                <div id="sn-load-steps" class="lb-load-steps"></div>
             </section>
 
-            <div id="board" class="hidden">
-                <div class="chart-grid chart-block">
-                    <section class="card">
-                        <div class="section-header">
-                            <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>Win Rate by Confidence</h2>
-                            <div class="section-meta">Decided picks at each level</div>
-                        </div>
-                        <div class="chart-box"><canvas id="levels-chart" aria-label="Win rate at each confidence level"></canvas></div>
-                    </section>
-
-                    <section class="card">
-                        <div class="section-header">
-                            <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">compare_arrows</span>High vs Low</h2>
-                            <div class="section-meta">Does confidence pay off?</div>
-                        </div>
-                        <div class="band-callout">
-                            <div class="stat-box">
-                                <div class="stat-label" id="band-low-label">Low</div>
-                                <div class="stat-value" id="band-low">-</div>
-                                <div class="stat-sub" id="band-low-sub"></div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-label" id="band-high-label">High</div>
-                                <div class="stat-value highlight" id="band-high">-</div>
-                                <div class="stat-sub" id="band-high-sub"></div>
-                            </div>
-                        </div>
-                        <div class="chart-box short"><canvas id="bands-chart" aria-label="Win rate of low and high confidence picks"></canvas></div>
-                    </section>
-                </div>
-
-                <section class="card">
-                    <div class="section-header">
-                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">stacked_bar_chart</span>Accuracy Spread</h2>
-                        <div class="section-meta">Players by share of decided picks correct</div>
-                    </div>
-                    <div class="chart-box short"><canvas id="spread-chart" aria-label="Players in each accuracy range"></canvas></div>
+            <div id="board" class="bento hidden">
+                <!-- Nerd facts -->
+                <section class="card span-3 fact upset">
+                    <div class="fact-label"><span class="material-symbols-outlined" aria-hidden="true">bolt</span>Biggest Upset</div>
+                    <div class="fact-value" id="fact-upset-value">—</div>
+                    <div class="fact-detail" id="fact-upset-detail"></div>
+                    <div class="fact-sub" id="fact-upset-sub">No upsets yet</div>
+                </section>
+                <section class="card span-3 fact cost">
+                    <div class="fact-label"><span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span>Costliest Game</div>
+                    <div class="fact-value" id="fact-cost-value">—</div>
+                    <div class="fact-detail" id="fact-cost-detail"></div>
+                    <div class="fact-sub" id="fact-cost-sub">Nothing lost yet</div>
+                </section>
+                <section class="card span-3 fact miss">
+                    <div class="fact-label"><span class="material-symbols-outlined" aria-hidden="true">heart_broken</span>Boldest Miss</div>
+                    <div class="fact-value" id="fact-miss-value">—</div>
+                    <div class="fact-detail" id="fact-miss-detail"></div>
+                    <div class="fact-sub" id="fact-miss-sub">No misses yet</div>
+                </section>
+                <section class="card span-3 fact contrarian">
+                    <div class="fact-label"><span class="material-symbols-outlined" aria-hidden="true">psychology_alt</span>Contrarian</div>
+                    <div class="fact-value" id="fact-contrarian-value">—</div>
+                    <div class="fact-detail" id="fact-contrarian-detail"></div>
+                    <div class="fact-sub" id="fact-contrarian-sub">Unlocks at kickoff</div>
                 </section>
 
-                <section class="card">
+                <!-- Players -->
+                <section class="card span-8">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">social_leaderboard</span>Player Points</h2>
+                        <div class="section-meta">Top 15 this week</div>
+                    </div>
+                    <div class="chart-box tall"><canvas id="players-chart" aria-label="Points for the top 15 players"></canvas></div>
+                </section>
+                <section class="card span-4 row-2">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">leaderboard</span>Standings</h2>
+                        <div class="section-meta">Top 20</div>
+                    </div>
+                    <div class="table-container">
+                        <table class="mini-standings">
+                            <thead><tr><th class="col-rank">#</th><th>Player</th><th class="num">Pts</th><th class="num">Acc</th></tr></thead>
+                            <tbody id="standings-body"></tbody>
+                        </table>
+                    </div>
+                    <a class="card-foot section-meta" href="./weekly-leaderboard.html">Full Weekly Leaderboard →</a>
+                </section>
+                <section class="card span-8">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">show_chart</span>Scoring Race</h2>
+                        <div class="section-meta">Top 5, cumulative points game by game</div>
+                    </div>
+                    <div class="chart-box"><canvas id="race-chart" aria-label="Cumulative points of the top five players through finished games"></canvas></div>
+                </section>
+
+                <!-- Confidence -->
+                <section class="card span-7">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">monitoring</span>Confidence Accuracy Curve</h2>
+                        <div class="section-meta">Do high-confidence picks win more?</div>
+                    </div>
+                    <div class="chart-box"><canvas id="curve-chart" aria-label="Win rate at each confidence level"></canvas></div>
+                </section>
+                <section class="card span-5">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">compare_arrows</span>High vs Low</h2>
+                        <div class="section-meta">Does confidence pay off?</div>
+                    </div>
+                    <div class="band-callout">
+                        <div class="stat-box">
+                            <div class="stat-label" id="band-low-label">Low</div>
+                            <div class="stat-value" id="band-low">-</div>
+                            <div class="stat-sub" id="band-low-sub"></div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label" id="band-high-label">High</div>
+                            <div class="stat-value highlight" id="band-high">-</div>
+                            <div class="stat-sub" id="band-high-sub"></div>
+                        </div>
+                    </div>
+                    <div class="chart-box short"><canvas id="bands-chart" aria-label="Win rate of low and high confidence picks"></canvas></div>
+                </section>
+                <section class="card span-12">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">grid_on</span>Confidence Heatmap</h2>
+                        <div class="section-meta">Win rate at every level, 1 to <span id="heat-max">16</span></div>
+                    </div>
+                    <div id="heatmap" class="heatmap"></div>
+                    <div class="heat-legend"><span>0%</span><span class="bar" aria-hidden="true"></span><span>100%</span></div>
+                </section>
+
+                <!-- Distribution -->
+                <section class="card span-4">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">stacked_bar_chart</span>Accuracy Spread</h2>
+                        <div class="section-meta">Players by % correct</div>
+                    </div>
+                    <div class="chart-box"><canvas id="spread-chart" aria-label="Players in each accuracy range"></canvas></div>
+                </section>
+                <section class="card span-4">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">ssid_chart</span>Points Distribution</h2>
+                        <div class="section-meta">Every score, 1st to last</div>
+                    </div>
+                    <div class="chart-box"><canvas id="distribution-chart" aria-label="Every player's points in rank order"></canvas></div>
+                </section>
+                <section class="card span-4">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">scatter_plot</span>Consensus vs Points</h2>
+                        <div class="section-meta">Sided with the pool, and did it pay?</div>
+                    </div>
+                    <div class="chart-box"><canvas id="consensus-chart" aria-label="Agreement with the pool favourite against points"></canvas></div>
+                </section>
+
+                <!-- Money on the table -->
+                <section class="card span-6">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">hourglass_top</span>Points Still Riding</h2>
+                        <div class="section-meta">Top 10 by max possible</div>
+                    </div>
+                    <div class="chart-box tall"><canvas id="riding-chart" aria-label="Points earned and points still riding for the top ten"></canvas></div>
+                </section>
+                <section class="card span-6">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">trending_down</span>Upset Damage</h2>
+                        <div class="section-meta">Confidence points the pool lost per game</div>
+                    </div>
+                    <div class="chart-box tall"><canvas id="damage-chart" aria-label="Confidence points lost on each final game"></canvas></div>
+                </section>
+
+                <!-- Pick matrix -->
+                <section class="card span-12">
+                    <div class="section-header">
+                        <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">apps</span>Pick Matrix</h2>
+                        <div class="section-meta">Every pick on every started game · number = confidence</div>
+                    </div>
+                    <div id="matrix" class="matrix-wrap"></div>
+                    <div class="matrix-legend"><span class="l-correct">Correct (brighter = more confidence)</span><span class="l-wrong">Wrong</span><span class="l-pending">Not final</span><span>Games appear as they kick off</span></div>
+                </section>
+
+                <!-- Games -->
+                <section class="card span-12">
                     <div class="section-header">
                         <h2 class="section-title"><span class="material-symbols-outlined" aria-hidden="true">sports_football</span>Game Analysis</h2>
                         <div class="section-meta">Highest average confidence first</div>
@@ -304,20 +451,15 @@
                         </table>
                     </div>
                 </section>
-
-                <a class="card link-card" href="./weekly-leaderboard.html">
-                    <span class="section-title"><span class="material-symbols-outlined" aria-hidden="true">leaderboard</span>Standings for this week</span>
-                    <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
-                </a>
             </div>
         </div>
     </main>
 
-    <div id="rsb-overlay" class="rsb-overlay" role="dialog" aria-modal="true" aria-label="Space battle" hidden>
+    <div id="rsb-overlay" class="rsb-overlay" role="dialog" aria-modal="true" aria-label="Tricked Out Ricky space battle" hidden>
         <canvas id="rsb-canvas"></canvas>
         <div id="rsb-glow" class="rsb-glow"></div>
         <div class="rsb-top">
-            <span class="rsb-title">Space Battle · First to 10 kills</span>
+            <span class="rsb-title">Tricked Out Ricky · First to 10 kills</span>
             <button id="rsb-exit" class="rsb-exit" type="button"><span class="material-symbols-outlined" aria-hidden="true">close</span>Exit</button>
         </div>
         <div class="rsb-bottom">
@@ -340,7 +482,7 @@
         const db = getFirestore(app);
         const Insights = window.ConfidenceInsights;
         const TOTAL_WEEKS = window.SEASON_CONFIG.totalWeeks;
-        const LOG = 'NERD_RICKY';
+        const LOG = 'NERD_SPACE_STATS';
 
         let currentWeek = window.SEASON_CONFIG.utils.getCurrentWeek();
         let currentUser = null;
@@ -349,14 +491,19 @@
         const charts = {};
 
         const $ = (id) => document.getElementById(id);
-
-        function escapeHtml(value) {
-            return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        }
+        const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const shortName = (name) => String(name).split('@')[0];
+        const abbr = (team) => window.TeamLogos.abbreviation(team) || String(team).slice(0, 3).toUpperCase();
+        const matchupLabel = (g) => `${abbr(g.away)}@${abbr(g.home)}`;
+        const helmet = (team, size) => {
+            const url = window.TeamLogos.logoUrl(team);
+            return url ? `<img src="${url}" alt="${escapeHtml(team)}"${size ? ` width="${size}" height="${size}"` : ''}>` : '';
+        };
+        const accuracyOf = (row) => (row.decided > 0 ? Math.round((row.correct / row.decided) * 100) : null);
 
         function showWeek() {
             $('week-display').textContent = `Week ${currentWeek}`;
-            $('tr-kicker').textContent = `Week ${currentWeek}, ${window.SEASON_CONFIG.year}`;
+            $('sn-kicker').textContent = `Week ${currentWeek}, ${window.SEASON_CONFIG.year}`;
             $('week-prev').disabled = currentWeek <= 1;
             $('week-next').disabled = currentWeek >= TOTAL_WEEKS;
         }
@@ -375,13 +522,13 @@
             const week = currentWeek;
 
             $('board').classList.add('hidden');
-            $('tr-loading').hidden = false;
-            $('tr-loading').removeAttribute('data-state');
-            const loader = window.NerdLoadSteps.mount($('tr-load-steps'), [
+            $('sn-loading').hidden = false;
+            $('sn-loading').removeAttribute('data-state');
+            const loader = window.NerdLoadSteps.mount($('sn-load-steps'), [
                 { key: 'members', label: 'Pool members' },
                 { key: 'games', label: `Week ${week} games` },
                 { key: 'picks', label: `Week ${week} picks` }
-            ], { root: $('tr-loading'), onRetry: loadWeek });
+            ], { root: $('sn-loading'), onRetry: loadWeek });
 
             const paths = window.SEASON_CONFIG.paths;
             const track = (key, promise, check) => {
@@ -407,6 +554,7 @@
                 const picksByUser = {};
                 picksSnap.forEach((d) => { picksByUser[d.id] = d.data(); });
 
+                const now = new Date();
                 const summary = Insights.weekSummary(members, picksByUser, games);
                 const levels = Insights.confidenceLevels(members, picksByUser, games);
                 lastData = {
@@ -414,9 +562,15 @@
                     levels,
                     bands: Insights.confidenceBands(levels, summary.gamesTotal),
                     spread: Insights.accuracySpread(members, picksByUser, games),
-                    games: Insights.gameAnalysis(members, picksByUser, games)
+                    standings: Insights.standings(members, picksByUser, games),
+                    games: Insights.gameAnalysis(members, picksByUser, games, now),
+                    damage: Insights.upsetCost(members, picksByUser, games),
+                    race: Insights.scoringRace(members, picksByUser, games, { top: 5, now }),
+                    consensus: Insights.consensus(members, picksByUser, games, now),
+                    matrix: Insights.pickMatrix(members, picksByUser, games, now),
+                    facts: Insights.nerdFacts(members, picksByUser, games, now)
                 };
-                console.info(LOG, 'week', week, summary, 'sheets', picksSnap.size);
+                console.info(LOG, 'week', week, summary, 'started games', Insights.startedGameIds(games, now).length, 'sheets', picksSnap.size);
 
                 loader.finish();
                 render(lastData);
@@ -442,9 +596,99 @@
                 $(`band-${key}-sub`).textContent = `${band.wins}/${band.total} correct`;
             });
 
+            renderFacts(data.facts);
+            renderStandings(data.standings);
+            renderHeatmap(data.levels, summary.gamesTotal);
+            renderMatrix(data.matrix, summary.gamesTotal);
             renderGames(data.games);
             $('board').classList.remove('hidden');
             renderCharts(data);
+        }
+
+        function setFact(key, value, detail, sub) {
+            $(`fact-${key}-value`).innerHTML = value;
+            $(`fact-${key}-detail`).innerHTML = detail;
+            $(`fact-${key}-sub`).textContent = sub;
+        }
+
+        function renderFacts({ biggestUpset, costliestGame, boldestMiss, contrarian }) {
+            if (biggestUpset) {
+                setFact('upset', `${biggestUpset.winnerShare}<small>% picked it</small>`,
+                    `${helmet(biggestUpset.winner)}${escapeHtml(biggestUpset.winner)}`,
+                    `beat ${biggestUpset.loser}`);
+            } else setFact('upset', '—', '', 'No upsets yet');
+
+            if (costliestGame) {
+                setFact('cost', `${costliestGame.lost}<small>pts lost</small>`,
+                    `${helmet(costliestGame.away)}${helmet(costliestGame.home)}${escapeHtml(matchupLabel(costliestGame))}`,
+                    `${costliestGame.missed} player${costliestGame.missed === 1 ? '' : 's'} on the wrong side`);
+            } else setFact('cost', '—', '', 'Nothing lost yet');
+
+            if (boldestMiss) {
+                setFact('miss', `${boldestMiss.confidence}<small>confidence</small>`,
+                    `${helmet(boldestMiss.team)}${escapeHtml(boldestMiss.team)}`,
+                    `${boldestMiss.players} player${boldestMiss.players === 1 ? '' : 's'} missed at ${boldestMiss.confidence}`);
+            } else setFact('miss', '—', '', 'No misses yet');
+
+            if (contrarian) {
+                setFact('contrarian', `${contrarian.agreement}<small>% with the pool</small>`,
+                    escapeHtml(shortName(contrarian.name)),
+                    `${contrarian.points} pts from the top half`);
+            } else setFact('contrarian', '—', '', 'Unlocks at kickoff');
+        }
+
+        function renderStandings(rows) {
+            const me = rows.findIndex((row) => row.userId === currentUser.uid);
+            const line = (row) => `
+                <tr${row.userId === currentUser.uid ? ' class="current-user-row"' : ''}>
+                    <td class="rank-cell ${row.rank <= 3 ? 'rank-top' : ''}">${row.rank}</td>
+                    <td class="player-cell">${escapeHtml(shortName(row.name))}${row.userId === currentUser.uid ? '<span class="you-chip">You</span>' : ''}</td>
+                    <td class="num points-cell">${row.points}</td>
+                    <td class="num">${accuracyOf(row) === null ? '—' : `${accuracyOf(row)}%`}</td>
+                </tr>`;
+            let html = rows.slice(0, 20).map(line).join('');
+            if (me >= 20) html += `<tr class="gap"><td colspan="4">⋯</td></tr>${line(rows[me])}`;
+            $('standings-body').innerHTML = html || '<tr><td colspan="4">No picks yet</td></tr>';
+        }
+
+        function heatColour(winRate) {
+            return `color-mix(in srgb, var(--md-primary) ${Math.round(winRate)}%, var(--md-error))`;
+        }
+
+        function renderHeatmap(levels, gameCount) {
+            $('heat-max').textContent = gameCount;
+            const byLevel = Object.fromEntries(levels.map((l) => [l.level, l]));
+            $('heatmap').innerHTML = Array.from({ length: gameCount }, (_, i) => {
+                const l = byLevel[i + 1];
+                if (!l) return `<div class="heat-cell empty" title="Confidence ${i + 1}: no decided picks"><span class="lvl">${i + 1}</span><span class="pct">—</span></div>`;
+                return `<div class="heat-cell" style="background:${heatColour(l.winRate)}" title="Confidence ${l.level}: ${l.wins}/${l.total} correct"><span class="lvl">${l.level}</span><span class="pct">${Math.round(l.winRate)}%</span></div>`;
+            }).join('');
+        }
+
+        function renderMatrix(matrix, gameCount) {
+            if (matrix.games.length === 0 || matrix.rows.length === 0) {
+                $('matrix').innerHTML = '<div class="chart-empty"><span class="material-symbols-outlined" aria-hidden="true">lock</span>Locked until the first kickoff</div>';
+                return;
+            }
+            const shade = (cell) => {
+                const strength = cell.confidence ? 30 + Math.round((cell.confidence / gameCount) * 70) : 30;
+                const token = cell.state === 'correct' ? '--md-primary' : '--md-error';
+                return `background:color-mix(in srgb, var(${token}) ${strength}%, var(--md-surface))`;
+            };
+            const head = matrix.games.map((g) => `<th title="${escapeHtml(`${g.away} @ ${g.home}`)}">${helmet(g.home, 20)}${abbr(g.home)}</th>`).join('');
+            const body = matrix.rows.map((row) => `
+                <tr${row.userId === currentUser.uid ? ' class="me"' : ''}>
+                    <th class="name" scope="row">${escapeHtml(shortName(row.name))}</th>
+                    ${row.cells.map((cell, i) => {
+                        if (cell.state === 'none') return '<td class="cell none">·</td>';
+                        const game = matrix.games[i];
+                        const title = `${shortName(row.name)}: ${cell.team} (${cell.confidence ?? '?'}) · ${game.away} @ ${game.home}`;
+                        const style = cell.state === 'pending' ? '' : ` style="${shade(cell)}"`;
+                        return `<td class="cell ${cell.state}"${style} title="${escapeHtml(title)}">${cell.confidence ?? '?'}</td>`;
+                    }).join('')}
+                    <td class="pts">${row.points}</td>
+                </tr>`).join('');
+            $('matrix').innerHTML = `<table class="matrix"><thead><tr><th class="name">Player</th>${head}<th class="pts">Pts</th></tr></thead><tbody>${body}</tbody></table>`;
         }
 
         function renderGames(rows) {
@@ -453,17 +697,14 @@
                 upset: ['upset', 'bolt', 'Upset'],
                 split: ['', 'balance', 'Split'],
                 tie: ['tie', 'drag_handle', 'Tie'],
-                pending: ['', 'schedule', 'Pending']
-            };
-            const helmet = (team) => {
-                const url = window.TeamLogos.logoUrl(team);
-                return url ? `<img src="${url}" alt="${escapeHtml(team)}">` : '';
+                pending: ['', 'schedule', 'Pending'],
+                locked: ['', 'lock', 'Locked']
             };
             $('games-body').innerHTML = rows.map((g) => {
                 const [cls, icon, label] = RESULT[g.result];
-                const split = g.picks > 0
-                    ? `<div class="split"><div class="split-bar"><span class="away" style="width:${g.awayShare}%"></span><span class="home" style="width:${g.homeShare}%"></span></div><span class="split-label">${g.awayShare}% · ${g.homeShare}%</span></div>`
-                    : '<span class="split-label">No picks</span>';
+                let split = '<span class="split-label">No picks</span>';
+                if (g.locked) split = '<span class="split-label">Until kickoff</span>';
+                else if (g.picks > 0) split = `<div class="split"><div class="split-bar"><span class="away" style="width:${g.awayShare}%"></span><span class="home" style="width:${g.homeShare}%"></span></div><span class="split-label">${g.awayShare}% · ${g.homeShare}%</span></div>`;
                 return `
                     <tr>
                         <td>
@@ -476,115 +717,226 @@
                         <td>${split}</td>
                         <td><span class="chip ${cls}"><span class="material-symbols-outlined" aria-hidden="true">${icon}</span>${label}</span></td>
                         <td class="num col-hide-sm">${g.averageConfidence === null ? '—' : g.averageConfidence}</td>
-                    </tr>
-                `;
+                    </tr>`;
             }).join('');
         }
 
-        // Chart colours come from the theme tokens, so charts follow light/dark.
+        // ---- Charts: colours from theme tokens, redrawn when the theme flips -------
+        // Canvas needs plain colours: tokens are hex, so alpha is applied here.
+        function alpha(hex, amount) {
+            const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+            if (!m) return hex;
+            const n = parseInt(m[1], 16);
+            return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${amount})`;
+        }
+
         function palette() {
             const css = getComputedStyle(document.documentElement);
             const token = (name) => css.getPropertyValue(name).trim();
             return {
                 primary: token('--md-primary'),
+                tertiary: token('--md-tertiary'),
                 error: token('--md-error'),
                 text: token('--md-on-surface'),
                 muted: token('--md-on-surface-muted'),
+                disabled: token('--md-on-surface-disabled'),
                 grid: token('--md-outline-variant'),
                 surface: token('--md-surface-container-high'),
                 mono: token('--md-font-mono')
             };
         }
 
-        function baseOptions(p, { percent = false, max } = {}) {
+        function baseOptions(p, { percent = false, max, horizontal = false, stacked = false, legend = false } = {}) {
+            const valueAxis = {
+                beginAtZero: true,
+                max,
+                stacked,
+                ticks: { color: p.muted, font: { family: p.mono, size: 11 }, precision: 0, callback: (v) => (percent ? `${v}%` : v) },
+                grid: { color: p.grid },
+                border: { display: false }
+            };
+            const labelAxis = { stacked, ticks: { color: p.muted, font: { family: p.mono, size: 11 }, autoSkip: false, maxRotation: 0 }, grid: { display: false }, border: { color: p.grid } };
             return {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
+                indexAxis: horizontal ? 'y' : 'x',
                 plugins: {
-                    legend: { display: false },
-                    tooltip: { backgroundColor: p.surface, titleColor: p.text, bodyColor: p.text, borderColor: p.grid, borderWidth: 1, displayColors: false }
+                    legend: { display: legend, labels: { color: p.muted, font: { family: p.mono, size: 11 }, boxWidth: 10, boxHeight: 10 } },
+                    tooltip: { backgroundColor: p.surface, titleColor: p.text, bodyColor: p.text, borderColor: p.grid, borderWidth: 1 }
                 },
-                scales: {
-                    x: { ticks: { color: p.muted, font: { family: p.mono, size: 11 } }, grid: { display: false }, border: { color: p.grid } },
-                    y: {
-                        beginAtZero: true,
-                        max,
-                        ticks: { color: p.muted, font: { family: p.mono, size: 11 }, precision: 0, callback: (v) => (percent ? `${v}%` : v) },
-                        grid: { color: p.grid },
-                        border: { display: false }
-                    }
-                }
+                scales: horizontal ? { x: valueAxis, y: labelAxis } : { x: labelAxis, y: valueAxis }
             };
         }
 
-        function setChart(id, config, empty) {
+        function setChart(id, build, empty) {
             if (charts[id]) charts[id].destroy();
             charts[id] = null;
             const canvas = $(id);
             const box = canvas.parentElement;
             box.querySelector('.chart-empty')?.remove();
-            canvas.hidden = !!empty;
-            if (empty) {
-                box.insertAdjacentHTML('beforeend', `<div class="chart-empty">${empty}</div>`);
+            const message = empty || (typeof window.Chart !== 'function' ? 'Charts unavailable' : null);
+            canvas.hidden = !!message;
+            if (message) {
+                box.insertAdjacentHTML('beforeend', `<div class="chart-empty">${message}</div>`);
                 return;
             }
-            if (typeof window.Chart !== 'function') {
-                box.insertAdjacentHTML('beforeend', '<div class="chart-empty">Charts unavailable</div>');
-                canvas.hidden = true;
-                return;
-            }
-            charts[id] = new window.Chart(canvas, config);
+            charts[id] = new window.Chart(canvas, build());
         }
 
-        function renderCharts({ levels, bands, spread }) {
+        function renderCharts(data) {
             const p = palette();
-            const noDecided = levels.length === 0 ? 'No decided picks yet' : null;
+            const me = currentUser.uid;
+            const noDecided = data.levels.length === 0 ? 'No decided picks yet' : null;
+            const top15 = data.standings.slice(0, 15);
 
-            setChart('levels-chart', {
+            setChart('players-chart', () => ({
                 type: 'bar',
                 data: {
-                    labels: levels.map((l) => l.level),
-                    datasets: [{ data: levels.map((l) => l.winRate), backgroundColor: levels.map((l) => (l.winRate >= 50 ? p.primary : p.error)), borderRadius: 4, maxBarThickness: 28 }]
+                    labels: top15.map((r) => shortName(r.name)),
+                    datasets: [{ data: top15.map((r) => r.points), backgroundColor: top15.map((r) => (r.userId === me ? p.tertiary : p.primary)), borderRadius: 4, maxBarThickness: 20 }]
+                },
+                options: baseOptions(p, { horizontal: true })
+            }), top15.length === 0 ? 'No picks yet' : null);
+
+            const raceColours = [p.primary, p.tertiary, p.error, p.text, p.muted];
+            setChart('race-chart', () => ({
+                type: 'line',
+                data: {
+                    labels: data.race.games.map(matchupLabel),
+                    datasets: data.race.series.map((s, i) => ({
+                        label: shortName(s.name),
+                        data: s.points,
+                        borderColor: raceColours[i],
+                        backgroundColor: raceColours[i],
+                        borderWidth: s.userId === me ? 3 : 2,
+                        pointRadius: 2,
+                        tension: 0.25
+                    }))
+                },
+                options: { ...baseOptions(p, { legend: true }), scales: { ...baseOptions(p).scales, x: { ...baseOptions(p).scales.x, ticks: { ...baseOptions(p).scales.x.ticks, autoSkip: true, maxRotation: 45 } } } }
+            }), data.race.games.length === 0 ? 'No finished games yet' : null);
+
+            setChart('curve-chart', () => ({
+                type: 'line',
+                data: {
+                    labels: data.levels.map((l) => l.level),
+                    datasets: [{
+                        data: data.levels.map((l) => l.winRate),
+                        borderColor: p.primary,
+                        backgroundColor: alpha(p.primary, 0.18),
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 4,
+                        pointBackgroundColor: data.levels.map((l) => (l.winRate >= 50 ? p.primary : p.error))
+                    }]
                 },
                 options: {
                     ...baseOptions(p, { percent: true, max: 100 }),
-                    plugins: {
-                        ...baseOptions(p).plugins,
-                        tooltip: { ...baseOptions(p).plugins.tooltip, callbacks: {
-                            title: (items) => `Confidence ${items[0].label}`,
-                            label: (item) => `${item.parsed.y}% · ${levels[item.dataIndex].wins}/${levels[item.dataIndex].total} correct`
-                        } }
-                    }
+                    plugins: { ...baseOptions(p).plugins, tooltip: { ...baseOptions(p).plugins.tooltip, callbacks: {
+                        title: (items) => `Confidence ${items[0].label}`,
+                        label: (item) => `${item.parsed.y}% · ${data.levels[item.dataIndex].wins}/${data.levels[item.dataIndex].total} correct`
+                    } } }
                 }
-            }, noDecided);
+            }), noDecided);
 
-            setChart('bands-chart', {
+            setChart('bands-chart', () => ({
                 type: 'bar',
                 data: {
-                    labels: [`${bands.low.from}–${bands.low.to}`, `${bands.high.from}–${bands.high.to}`],
-                    datasets: [{ data: [bands.low.winRate || 0, bands.high.winRate || 0], backgroundColor: [p.muted, p.primary], borderRadius: 4, maxBarThickness: 56 }]
+                    labels: [`${data.bands.low.from}–${data.bands.low.to}`, `${data.bands.high.from}–${data.bands.high.to}`],
+                    datasets: [{ data: [data.bands.low.winRate || 0, data.bands.high.winRate || 0], backgroundColor: [p.muted, p.primary], borderRadius: 4, maxBarThickness: 56 }]
                 },
                 options: baseOptions(p, { percent: true, max: 100 })
-            }, noDecided);
+            }), noDecided);
 
-            const anyPlayers = spread.some((b) => b.players > 0);
-            setChart('spread-chart', {
+            setChart('spread-chart', () => ({
                 type: 'bar',
                 data: {
-                    labels: spread.map((b) => b.label),
-                    datasets: [{ data: spread.map((b) => b.players), backgroundColor: p.primary, borderRadius: 4, maxBarThickness: 56 }]
+                    labels: data.spread.map((b) => b.label),
+                    datasets: [{ data: data.spread.map((b) => b.players), backgroundColor: p.primary, borderRadius: 4, maxBarThickness: 48 }]
                 },
                 options: baseOptions(p)
-            }, anyPlayers ? null : 'No decided picks yet');
+            }), data.spread.some((b) => b.players > 0) ? null : 'No decided picks yet');
+
+            setChart('distribution-chart', () => ({
+                type: 'line',
+                data: {
+                    labels: data.standings.map((r) => r.rank),
+                    datasets: [{
+                        data: data.standings.map((r) => r.points),
+                        borderColor: p.primary,
+                        backgroundColor: alpha(p.primary, 0.14),
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: data.standings.map((r) => (r.userId === me ? 6 : 2)),
+                        pointBackgroundColor: data.standings.map((r) => (r.userId === me ? p.tertiary : p.primary))
+                    }]
+                },
+                options: {
+                    ...baseOptions(p),
+                    plugins: { ...baseOptions(p).plugins, tooltip: { ...baseOptions(p).plugins.tooltip, callbacks: {
+                        title: (items) => `#${data.standings[items[0].dataIndex].rank} ${shortName(data.standings[items[0].dataIndex].name)}`,
+                        label: (item) => `${item.parsed.y} pts`
+                    } } },
+                    scales: { ...baseOptions(p).scales, x: { ...baseOptions(p).scales.x, ticks: { ...baseOptions(p).scales.x.ticks, autoSkip: true } } }
+                }
+            }), data.standings.length === 0 ? 'No picks yet' : null);
+
+            setChart('consensus-chart', () => ({
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        data: data.consensus.map((r) => ({ x: r.agreement, y: r.points })),
+                        backgroundColor: data.consensus.map((r) => (r.userId === me ? p.tertiary : alpha(p.primary, 0.7))),
+                        pointRadius: data.consensus.map((r) => (r.userId === me ? 7 : 5))
+                    }]
+                },
+                options: {
+                    ...baseOptions(p),
+                    plugins: { ...baseOptions(p).plugins, tooltip: { ...baseOptions(p).plugins.tooltip, callbacks: {
+                        label: (item) => `${shortName(data.consensus[item.dataIndex].name)}: ${item.parsed.x}% with the pool, ${item.parsed.y} pts`
+                    } } },
+                    scales: {
+                        x: { ...baseOptions(p, { percent: true, max: 100 }).scales.y, title: { display: true, text: '% with pool favourite', color: p.muted, font: { family: p.mono, size: 11 } } },
+                        y: { ...baseOptions(p).scales.y, title: { display: true, text: 'Points', color: p.muted, font: { family: p.mono, size: 11 } } }
+                    }
+                }
+            }), data.consensus.length === 0 ? 'Unlocks at kickoff' : null);
+
+            const riding = [...data.standings].sort((a, b) => (b.maxPossible - a.maxPossible) || (b.points - a.points)).slice(0, 10);
+            setChart('riding-chart', () => ({
+                type: 'bar',
+                data: {
+                    labels: riding.map((r) => shortName(r.name)),
+                    datasets: [
+                        { label: 'Earned', data: riding.map((r) => r.points), backgroundColor: p.primary, borderRadius: 4, maxBarThickness: 22 },
+                        { label: 'Still riding', data: riding.map((r) => r.pointsLeft), backgroundColor: alpha(p.muted, 0.45), borderRadius: 4, maxBarThickness: 22 }
+                    ]
+                },
+                options: baseOptions(p, { horizontal: true, stacked: true, legend: true })
+            }), riding.length === 0 ? 'No picks yet' : null);
+
+            const damage = data.damage.filter((g) => g.picks > 0);
+            setChart('damage-chart', () => ({
+                type: 'bar',
+                data: {
+                    labels: damage.map(matchupLabel),
+                    datasets: [{ data: damage.map((g) => g.lost), backgroundColor: damage.map((g) => (g.lost > 0 ? p.error : p.disabled)), borderRadius: 4, maxBarThickness: 22 }]
+                },
+                options: {
+                    ...baseOptions(p, { horizontal: true }),
+                    plugins: { ...baseOptions(p).plugins, tooltip: { ...baseOptions(p).plugins.tooltip, callbacks: {
+                        label: (item) => `${item.parsed.x} pts lost · ${damage[item.dataIndex].missed}/${damage[item.dataIndex].picks} picked ${damage[item.dataIndex].winner === damage[item.dataIndex].away ? damage[item.dataIndex].home : damage[item.dataIndex].away}`
+                    } } }
+                }
+            }), damage.length === 0 ? 'No finished games yet' : null);
         }
 
-        // Redraw charts when the theme flips (toggle or OS setting).
         new MutationObserver(() => { if (lastData) renderCharts(lastData); })
             .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
         window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (lastData) renderCharts(lastData); });
 
-        // ---- Space battle: loaded on first launch, stopped on exit ---------------
+        // ---- Tricked Out Ricky: loaded on first launch, stopped on exit ------------
         let battleScript = null;
         let battleOpener = null;
 
@@ -594,7 +946,7 @@
                     const script = document.createElement('script');
                     script.src = './js/components/ricky-space-battle.js';
                     script.onload = resolve;
-                    script.onerror = () => { battleScript = null; reject(new Error('Space battle failed to load')); };
+                    script.onerror = () => { battleScript = null; reject(new Error('Tricked Out Ricky failed to load')); };
                     document.body.appendChild(script);
                 });
             }

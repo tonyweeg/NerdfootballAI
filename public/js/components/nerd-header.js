@@ -19,7 +19,7 @@
     var NAV_ITEMS = Object.freeze([
         { href: './nerd-universe-grid.html', icon: 'grid_view', label: 'Picks Grid', featured: true },
         { href: './nerds-battlestar-galactica.html', icon: 'trending_up', label: 'Upside View' },
-        { href: './tricked-out-ricky.html', icon: 'insights', label: 'Tricked Out Ricky' },
+        { href: './tricked-out-ricky.html', icon: 'insights', label: 'Space Nerd Stats' },
         { href: './index.html', icon: 'ads_click', label: 'Make Picks' },
         { href: './nerdSurvivor.html', icon: 'sports_football', label: 'Survivor Pool' },
         { href: './the-survival-chamber-36-degrees.html', icon: 'shield', label: 'The 36 Chambers' },

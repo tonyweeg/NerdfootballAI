@@ -45,6 +45,18 @@ describe('firstKickoff', () => {
     });
 });
 
+describe('gameKickoff', () => {
+    test('one game: Eastern wall clock to the real instant', () => {
+        expect(Kickoff.gameKickoff(game('2026-09-13T13:00:00Z')).at.toISOString()).toBe('2026-09-13T17:00:00.000Z');
+    });
+
+    test('placeholders and games without a time give null', () => {
+        expect(Kickoff.gameKickoff({ a: 'TBD', h: 'TBD', dt: '2026-09-13T13:00:00Z' })).toBeNull();
+        expect(Kickoff.gameKickoff(game(null))).toBeNull();
+        expect(Kickoff.gameKickoff(null)).toBeNull();
+    });
+});
+
 describe('hasKickedOff', () => {
     const week = { 101: game('2026-09-09T20:20:00Z'), 116: game('2026-09-14T20:15:00Z') };
 
