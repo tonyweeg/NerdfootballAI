@@ -36,14 +36,19 @@
         return Number.isNaN(at.getTime()) ? null : { eastern, at };
     }
 
+    // One game's kickoff, or null for placeholders and games without a usable time.
+    function gameKickoff(game) {
+        if (!game || typeof game !== 'object' || !isRealTeam(game.a) || !isRealTeam(game.h)) return null;
+        return parseEastern(game.dt);
+    }
+
     function firstKickoff(weekGames) {
         if (!weekGames || typeof weekGames !== 'object') return null;
         let first = null;
         Object.keys(weekGames).forEach((gameId) => {
             const game = weekGames[gameId];
-            if (gameId.startsWith('_') || !game || typeof game !== 'object') return;
-            if (!isRealTeam(game.a) || !isRealTeam(game.h)) return;
-            const kickoff = parseEastern(game.dt);
+            if (gameId.startsWith('_')) return;
+            const kickoff = gameKickoff(game);
             if (kickoff && (!first || kickoff.at < first.at)) first = { gameId, ...kickoff };
         });
         return first;
@@ -63,7 +68,7 @@
         return `${weekday}, ${MONTHS[month - 1]} ${day} at ${time} ET`;
     }
 
-    const WeekKickoff = Object.freeze({ firstKickoff, hasKickedOff, formatKickoff });
+    const WeekKickoff = Object.freeze({ gameKickoff, firstKickoff, hasKickedOff, formatKickoff });
 
     if (typeof window !== 'undefined') window.WeekKickoff = WeekKickoff;
     if (typeof module !== 'undefined' && module.exports) module.exports = WeekKickoff;

@@ -262,9 +262,11 @@ describe(`shared header: ${BASE}`, () => {
     expect(css.body).toContain('.podium-card');
   });
 
-  test('Tricked Out Ricky uses the shared scorer and keeps the space battle behind its launch button', async () => {
+  test('Space Nerd Stats uses the shared scorer, locks picks until kickoff, and keeps Tricked Out Ricky behind its launch button', async () => {
     const { body } = await get('/tricked-out-ricky.html');
     expect(body).toContain('./js/utils/confidence-insights.js');
+    expect(body).toContain('./js/utils/week-kickoff.js');
+    expect(body).toContain('<h1 class="lb-title">Space Nerd Stats</h1>');
     expect(body).toContain('id="launch-battle"');
     expect(body).toMatch(/id="rsb-overlay"[^>]*hidden/);
     expect(body).not.toContain('<script src="./js/components/ricky-space-battle.js"');
