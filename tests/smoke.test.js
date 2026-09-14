@@ -235,6 +235,15 @@ describe(`shared header: ${BASE}`, () => {
     }
   });
 
+  test('Weekly Leaderboard starts a week at its first game, not a fixed weekday', async () => {
+    const { body } = await get('/weekly-leaderboard.html');
+    expect(body).toContain('./js/utils/week-kickoff.js');
+    expect(body).not.toContain('gamesStartFor');
+    const helper = await get('/js/utils/week-kickoff.js');
+    expect(helper.status).toBe(200);
+    expect(helper.body).toContain('firstKickoff');
+  });
+
   test('Season Leaderboard scores with the shared module, from pool members, without emails or a hardcoded year', async () => {
     const { body } = await get('/leaderboard.html');
     expect(body).toContain('Scoring.seasonStandings');
