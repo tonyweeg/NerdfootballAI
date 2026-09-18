@@ -624,6 +624,7 @@
 <body>
     <div class="nerd-header-slot" data-nerd-header data-title="Picks Grid" data-back="true"></div>
     <script src="./js/components/nerd-header.js"></script>
+    <script src="./js/components/load-steps.js"></script>
 
     <main class="lb-main wide">
         <section class="lb-hero">
@@ -637,14 +638,6 @@
             <div class="message-title">Sign in required</div>
             <p>Sign in to NerdUniverse to see The Grid. <a href="./index.html">Go to sign in</a></p>
         </div>
-
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="flex items-center justify-center min-h-screen">
-        <div class="text-center">
-            <div class="loading w-32 h-2 mb-4"></div>
-            <p class="text-nerd-green">LOADING GRID DATA...</p>
-        </div>
-    </div>
 
     <!-- Main Grid -->
     <div id="main-content" class="hidden px-2">
@@ -661,6 +654,16 @@
                 </div>
             </div>
         </div>
+
+        <section id="grid-loading" class="lb-loading" data-loader hidden>
+            <div class="card" aria-hidden="true">
+                <div class="sk sk-lg sk-w-40"></div>
+                <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+                <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+                <div class="lb-sk-row"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+            </div>
+            <div id="grid-load-steps" class="lb-load-steps"></div>
+        </section>
 
         <!-- Grid Container -->
         <div class="grid-container">
@@ -732,7 +735,22 @@
 
         // Initialize the application
         async function initialize() {
+            let loader = null;
             try {
+                const loaderEl = document.getElementById('grid-loading');
+                if (loaderEl) {
+                    loaderEl.hidden = false;
+                    loaderEl.removeAttribute('data-state');
+                }
+                loader = window.NerdLoadSteps
+                    ? window.NerdLoadSteps.mount(document.getElementById('grid-load-steps'), [
+                        { key: 'members', label: 'Pool members' },
+                        { key: 'games', label: `Week ${currentWeek} games` },
+                        { key: 'picks', label: `Week ${currentWeek} picks` },
+                        { key: 'render', label: 'Building the matrix' }
+                      ], { root: loaderEl, onRetry: () => location.reload() })
+                    : null;
+
                 const currentUserId = auth.currentUser?.uid;
                 const currentWeekNum = getCurrentWeekNumber();
                 logger.grid('⚔️ GRID SECURITY INIT:', {
@@ -742,14 +760,23 @@
                     securityActive: currentWeek === currentWeekNum
                 });
 
+                if (loader) loader.start('members');
                 await loadPoolMembers();
+                if (loader) loader.done('members');
 
                 // ALWAYS LOAD FRESH DATA - NO CACHE
                 logger.grid('🔥 Loading fresh grid data from Firestore (cache disabled)');
+                if (loader) loader.start('games');
                 await loadBibleData();
-                await loadAllPicks();
+                if (loader) loader.done('games');
 
+                if (loader) loader.start('picks');
+                await loadAllPicks();
+                if (loader) loader.done('picks');
+
+                if (loader) loader.start('render');
                 renderGrid();
+                if (loader) loader.done('render');
                 updateStats();
                 startCountdownTimer();
 
@@ -758,7 +785,8 @@
                 hideLoading();
             } catch (error) {
                 logger.error('GRID', '❌ Error initializing grid:', error);
-                showError('GRID LOAD FAILED. REFRESH PAGE.');
+                if (loader) loader.fail(error.step || 'members', 'Grid failed to load');
+                showError('Grid load failed. Refresh the page.');
             }
         }
 
@@ -2062,19 +2090,23 @@
 
         // Show/hide loading
         function hideLoading() {
-            const old = document.getElementById('loading-screen');
-            if (old) old.classList.add('hidden');
             const loader = document.getElementById('grid-loading');
             if (loader) loader.hidden = true;
         }
 
         function showError(message) {
-            document.getElementById('loading-screen').innerHTML = `
-                <div class="text-center">
-                    <div class="text-red-600 mb-4 text-lg">⚠️ ERROR</div>
-                    <p class="text-nerd-green">${message}</p>
-                </div>
-            `;
+            // The loader stays visible here (unlike hideLoading's success path):
+            // loader.fail() just put a Retry button in it, and hiding the
+            // loader would hide that Retry along with it. #board doesn't
+            // exist yet (Task 5 adds it), so this is a no-op until then.
+            const board = document.getElementById('board');
+            if (!board) return;
+            board.innerHTML = `
+                <div class="card message-card span-12">
+                    <span class="material-symbols-outlined" aria-hidden="true">error</span>
+                    <div class="message-title">Grid failed to load</div>
+                    <p>${message}</p>
+                </div>`;
         }
 
         // The page renders nothing until Firebase has told us who is signed in.
