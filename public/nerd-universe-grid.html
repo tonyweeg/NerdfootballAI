@@ -15,9 +15,6 @@
     <link rel="stylesheet" href="./css/nerd-loading.css">
     <link rel="stylesheet" href="./css/nerd-leaderboard.css">
     <script src="./js/utils/theme-toggle.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@300;400;500;600;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
         .lb-main.wide { max-width: 1320px; }
@@ -471,28 +468,6 @@
         .md-helmet { width: 16px; height: 16px; flex: none; }
         .md-helmet.sm { width: 12px; height: 12px; }
 
-        /* Loading Terminal Style */
-        .loading {
-            background: linear-gradient(90deg, #111111 0%, #1a1a1a 50%, #111111 100%);
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-
-        @keyframes subtle-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.85; }
-        }
-
         /* Team-specific colors - Cache refresh 2025-09-28 */
         .team-arizona { background: linear-gradient(135deg, #97233f 0%, #000000 100%) !important; }
         .team-atlanta { background: linear-gradient(135deg, #a71930 0%, #000000 100%) !important; }
@@ -526,32 +501,6 @@
         .team-tampa-bay { background: linear-gradient(135deg, #d50a0a 0%, #ff7900 100%) !important; }
         .team-tennessee { background: linear-gradient(135deg, #0c2340 0%, #4b92db 100%) !important; }
         .team-washington { background: linear-gradient(135deg, #773141 0%, #ffb612 100%) !important; }
-
-        /* Column Group Hiding */
-        .column-group-completed.hidden {
-            display: none;
-        }
-
-        .column-group-active.hidden {
-            display: none;
-        }
-
-        .column-group-notstarted.hidden {
-            display: none;
-        }
-
-        /* Column Group Headers */
-        .group-header {
-            background: rgba(26, 26, 40, 0.4);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border-bottom: 1px solid rgba(51, 51, 51, 0.5);
-            font-size: 8px;
-            text-align: center;
-            color: #888888;
-            text-transform: uppercase;
-            padding: 2px;
-        }
 
         /* Mobile Responsive */
         @media (max-width: 767px) {
@@ -1543,6 +1492,10 @@
             logger.grid(`🎲 MATRIX stats: ${memberIds.length} players, ${finalCount}/${gameIds.length} final`);
         }
 
+        // Retained for future fact cards: these five helpers (through
+        // getContrarianPicks below) compute pool statistics — rankings, the
+        // leader, pick consensus, upsets and contrarian picks — from data
+        // already in memory. None are currently called; kept intentionally.
         // Calculate user rankings based on points earned
         function calculateUserRankings(memberIds) {
             const rankings = memberIds.map(memberId => {
@@ -1753,123 +1706,6 @@
             document.getElementById('modal-user-content').innerHTML = modalContent;
             document.getElementById('user-modal').classList.remove('hidden');
         };
-
-        // Analyze user picks for detailed view
-        function analyzeUserPicks(userPicks) {
-            let correctPicks = 0;
-            let totalPointsEarned = 0;
-            let confidenceSum = 0;
-            let winningPicks = [];
-            let losingPicks = [];
-            let winningPoints = 0;
-            let losingPoints = 0;
-
-            gameIds.forEach(gameId => {
-                const pick = userPicks[gameId];
-                const game = bibleData[gameId];
-
-                if (pick && pick.winner && pick.confidence) {
-                    confidenceSum += pick.confidence;
-
-                    if (game.winner && game.winner !== 'TBD') {
-                        // 🔥 TIE GAME LOGIC: Check if game ended in a tie
-                        // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
-                        const isTie = (game.winner && (
-                                          game.winner.toUpperCase() === 'TIE' ||
-                                          game.winner.toUpperCase() === 'TIE/OT' ||
-                                          game.winner.toUpperCase() === 'DRAW' ||
-                                          game.winner.toUpperCase().includes('TIE')
-                                      )) ||
-                                      (game.awayScore !== undefined && game.homeScore !== undefined &&
-                                       parseInt(game.awayScore) === parseInt(game.homeScore) &&
-                                       parseInt(game.awayScore) > 0);
-
-                        // In a tie, EVERYONE who made a pick is correct
-                        const isCorrect = isTie ? true : (game.winner === pick.winner);
-
-                        if (isCorrect) {
-                            correctPicks++;
-                            totalPointsEarned += pick.confidence;
-                            winningPicks.push(`${getTeamShort(pick.winner)} (${pick.confidence})`);
-                            winningPoints += pick.confidence;
-                        } else {
-                            losingPicks.push(`${getTeamShort(pick.winner)} (${pick.confidence}) → ${getTeamShort(game.winner)}`);
-                            losingPoints += pick.confidence;
-                        }
-                    }
-                }
-            });
-
-            return {
-                correctPicks,
-                totalPointsEarned,
-                confidenceSum,
-                winningPicks,
-                losingPicks,
-                winningPoints,
-                losingPoints,
-                isClean: confidenceSum === getMaxConfidenceSum()
-            };
-        }
-
-        // Generate picks grid for detailed view
-        function generatePicksGrid(userPicks) {
-            return gameIds.map(gameId => {
-                const pick = userPicks[gameId];
-                const game = bibleData[gameId];
-
-                if (!pick || !pick.winner) {
-                    return `<div class="md-pick pending">
-                        <div class="md-value">${gameId}</div>
-                        <div>NO PICK</div>
-                    </div>`;
-                }
-
-                const isGameComplete = game.winner && game.winner !== 'TBD';
-
-                // 🔥 TIE GAME LOGIC: Check if game ended in a tie
-                // A tie means EVERYONE who made a pick gets credit regardless of which team they picked
-                let isCorrect = false;
-                if (isGameComplete) {
-                    const isTie = (game.winner && (
-                                      game.winner.toUpperCase() === 'TIE' ||
-                                      game.winner.toUpperCase() === 'TIE/OT' ||
-                                      game.winner.toUpperCase() === 'DRAW' ||
-                                      game.winner.toUpperCase().includes('TIE')
-                                  )) ||
-                                  (game.awayScore !== undefined && game.homeScore !== undefined &&
-                                   parseInt(game.awayScore) === parseInt(game.homeScore) &&
-                                   parseInt(game.awayScore) > 0);
-
-                    // In a tie, EVERYONE who made a pick is correct
-                    isCorrect = isTie ? true : (game.winner === pick.winner);
-                }
-
-                const pickState = isGameComplete ? (isCorrect ? 'hit' : 'miss') : 'pending';
-
-                const teamShort = getTeamShort(pick.winner);
-                const helmetUrl = getTeamHelmetUrl(pick.winner);
-
-                return `<div class="md-pick ${pickState}">
-                    <div class="md-value">${gameId}</div>
-                    <div>C${pick.confidence}</div>
-                    <div class="md-row">
-                        <img src="${helmetUrl}" alt="${teamShort}" class="md-helmet" onerror="this.style.display='none'">
-                        <span class="md-value" title="${pick.winner}">${teamShort}</span>
-                    </div>
-                    ${!isCorrect && isGameComplete ? `<div class="md-row">
-                        <img src="${getTeamHelmetUrl(game.winner)}" alt="${getTeamShort(game.winner)}" class="md-helmet sm" onerror="this.style.display='none'">
-                        →${getTeamShort(game.winner)}
-                    </div>` : ''}
-                </div>`;
-            }).join('');
-        }
-
-        // Get maximum confidence sum for the week
-        function getMaxConfidenceSum() {
-            const n = gameIds.length;
-            return (n * (n + 1)) / 2;
-        }
 
         // Calculate total points for a user
         function calculateUserTotal(userPicks) {
