@@ -651,6 +651,8 @@
     <script src="./js/utils/logger-compat.js"></script>
     <script src="./js/config/season-data.js"></script>
     <script src="./js/config/season-config.js"></script>
+    <script src="./js/utils/team-logos.js"></script>
+    <script src="./js/utils/mnf-tiebreak.js"></script>
     <script>if (!window.SEASON_CONFIG) { console.error('SEASON_CONFIG missing — page cannot operate'); document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.style.cssText = 'background:#b91c1c;color:#fff;padding:8px;text-align:center;font-family:monospace'; b.textContent = 'CONFIG LOAD FAILURE — refresh or contact admin'; document.body.prepend(b); }); }</script>
 </head>
 
@@ -1311,47 +1313,21 @@
                 member: poolMembers[memberId],
                 userPicks: allPicks[memberId],
                 isCurrentUser: memberId === currentUserId,
-                score: calculateUserTotal(allPicks[memberId])
+                score: calculateUserTotal(allPicks[memberId]),
+                name: poolMembers[memberId].name || poolMembers[memberId].email || 'Unknown',
+                mnfGuess: allPicks[memberId] ? allPicks[memberId].mnfTotalPoints : null
             }));
 
-            // Calculate place/rank with ties
-            let currentPlace = 1;
-            let previousScore = null;
-            let tiedCount = 0;
-
-            playerRankings.forEach((player, index) => {
-                if (previousScore !== null && player.score !== previousScore) {
-                    currentPlace = index + 1;
-                    tiedCount = 0;
-                } else if (previousScore !== null && player.score === previousScore) {
-                    tiedCount++;
-                }
-
-                // Assign medals for top 3, then regular places
-                if (tiedCount > 0) {
-                    if (currentPlace === 1) {
-                        player.place = '🥇'; // Gold medal for tied first
-                    } else if (currentPlace === 2) {
-                        player.place = '🥈'; // Silver medal for tied second
-                    } else if (currentPlace === 3) {
-                        player.place = '🥉'; // Bronze medal for tied third
-                    } else {
-                        player.place = `T${currentPlace}`;
-                    }
-                } else {
-                    if (currentPlace === 1) {
-                        player.place = '🥇'; // Gold medal
-                    } else if (currentPlace === 2) {
-                        player.place = '🥈'; // Silver medal
-                    } else if (currentPlace === 3) {
-                        player.place = '🥉'; // Bronze medal
-                    } else {
-                        player.place = currentPlace.toString();
-                    }
-                }
-
-                previousScore = player.score;
+            // Places always come from score order, never from the table's current
+            // sort — otherwise alphabetical mode hands out places alphabetically.
+            const mnfActual = window.MnfTiebreak.mnfActualTotal(bibleData, gameIds, isGameCompleted);
+            const byScore = playerRankings.slice().sort((a, b) => {
+                if (a.score !== b.score) return b.score - a.score;
+                return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
             });
+            window.MnfTiebreak.assignPlaces(byScore, mnfActual);
+
+            logger.grid(`🎲 MATRIX places assigned — MNF actual: ${mnfActual === null ? 'not final' : mnfActual}`);
 
             // Extract current user row to pin at top
             const currentUserIndex = playerRankings.findIndex(p => p.isCurrentUser);
