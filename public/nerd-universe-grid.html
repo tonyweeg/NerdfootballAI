@@ -179,6 +179,18 @@
             box-shadow: 2px 0 10px rgba(0, 0, 0, 0.4) !important;
         }
 
+        .mnf-column {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%) !important;
+            font-weight: 700;
+            text-align: center !important;
+            padding: 6px 4px !important;
+            min-width: 44px;
+            max-width: 44px;
+            color: #89CFF0;
+            font-size: 14px !important;
+            border-left: 2px solid rgba(137, 207, 240, 0.4);
+        }
+
         .total-column {
             background: linear-gradient(135deg, #8e44ad 0%, #3498db 100%);
             font-weight: 700;
@@ -1261,6 +1273,7 @@
                 }
             });
 
+            headerHTML += '<th class="mnf-column">MNF</th>';
             headerHTML += '<th class="total-column">TOTAL</th>';
             headerHTML += '</tr>';
             header.innerHTML = headerHTML;
@@ -1361,6 +1374,7 @@
                     rowsHTML += createPickCellHTML(gameId, currentUserRow.userPicks, currentUserRow.memberId);
                 });
 
+                rowsHTML += `<td class="mnf-column">${formatMnfGuess(currentUserRow.mnfGuess)}</td>`;
                 rowsHTML += `<td class="total-column">${currentUserRow.score}</td>`;
                 rowsHTML += `</tr>`;
             }
@@ -1381,6 +1395,7 @@
                     rowsHTML += createPickCellHTML(gameId, player.userPicks, player.memberId);
                 });
 
+                rowsHTML += `<td class="mnf-column">${formatMnfGuess(player.mnfGuess)}</td>`;
                 rowsHTML += `<td class="total-column">${player.score}</td>`;
                 rowsHTML += `</tr>`;
             });
@@ -1456,6 +1471,19 @@
                 <div class="team-short">${teamShort}</div>
                 <div class="confidence-num">${pick.confidence || 0}</div>
             </td>`;
+        }
+
+        // MNF tiebreaker guesses are visible to everyone at all times — an
+        // explicit product decision, unlike game picks which stay hidden until
+        // kickoff. See docs/superpowers/specs/2026-09-18-grid-pick-matrix-design.md
+        //
+        // A guess of 0 is a real guess; null, undefined and '' are not, and
+        // Number() turns all three into 0, so they must be screened out before
+        // coercion (matches guessOf() in public/js/utils/mnf-tiebreak.js).
+        function formatMnfGuess(value) {
+            if (value === null || value === undefined || value === '') return '—';
+            const n = Number(value);
+            return Number.isFinite(n) ? String(n) : '—';
         }
 
         // Get shortened team name
