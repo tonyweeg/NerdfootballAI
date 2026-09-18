@@ -79,9 +79,14 @@
         }
 
         .picks-table {
+            --tile-w: 48px;
+            --tile-h: 20px;
+            --tile-font: 10px;
+            --matrix-scale: 1;
             width: max-content;
             min-width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 2px;
             font-size: 12px;
             background: rgba(15, 15, 30, 0.5);
             backdrop-filter: blur(12px);
@@ -240,21 +245,44 @@
         }
 
         .pick-cell {
-            min-width: 45px;
-            max-width: 45px;
-            font-size: 10px;
+            width: calc(var(--tile-w) * var(--matrix-scale));
+            min-width: calc(var(--tile-w) * var(--matrix-scale));
+            max-width: calc(var(--tile-w) * var(--matrix-scale));
+            height: calc(var(--tile-h) * var(--matrix-scale));
+            font-size: calc(var(--tile-font) * var(--matrix-scale));
             line-height: 1.2;
-            padding: 3px !important;
+            padding: 0 !important;
+            border: none !important;
+            border-radius: 4px;
             background: rgba(15, 25, 40, 0.8);
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        /* Tier A — phones: the tile colour is the team, the number is the confidence */
+        @media (max-width: 767px) {
+            .picks-table { --tile-w: 26px; --tile-h: 24px; --tile-font: 11px; }
+            .pick-cell .team-short { display: none; }
+        }
+
+        /* Tier B — tablets: abbreviation stacked over confidence */
+        @media (min-width: 768px) and (max-width: 1199px) {
+            .picks-table { --tile-w: 40px; --tile-h: 30px; --tile-font: 9px; }
+            .pick-cell .team-short { display: block; font-size: 1.1em; }
+            .pick-cell .confidence-num { display: block; font-size: 1.2em; }
+        }
+
+        /* Tier C — desktop: abbreviation and confidence on one line */
+        @media (min-width: 1200px) {
+            .picks-table { --tile-w: 48px; --tile-h: 20px; --tile-font: 10px; }
+            .pick-cell .team-short { display: inline; margin-right: 3px; }
+            .pick-cell .confidence-num { display: inline; opacity: 0.85; }
         }
 
         .pick-correct {
-            background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%) !important;
-            color: #000000 !important;
-            border-color: rgba(255, 255, 255, 0.8) !important;
-            box-shadow: 0 2px 8px rgba(255, 255, 255, 0.4);
-            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
-            filter: grayscale(0);
+            color: #ffffff !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+            font-weight: 700;
         }
 
         .gold-text {
@@ -269,24 +297,16 @@
 
 
         .pick-incorrect {
+            filter: saturate(0.25) brightness(0.5) !important;
             color: #888888 !important;
-            border-color: rgba(74, 74, 74, 0.8) !important;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             text-shadow: none !important;
-            filter: saturate(0.5) brightness(0.85) !important;
-            opacity: 0.8 !important;
-        }
-
-        .pick-incorrect .team-short {
-            color: #888888 !important;
             font-weight: 400 !important;
-            opacity: 1 !important;
         }
 
+        .pick-incorrect .team-short,
         .pick-incorrect .confidence-num {
             color: #888888 !important;
             font-weight: 400 !important;
-            opacity: 1 !important;
         }
 
         .pick-pending {
@@ -296,19 +316,25 @@
         }
 
         .pick-live {
-            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%) !important;
+            box-shadow: inset 0 0 0 2px rgba(243, 156, 18, 0.9);
             color: #ffffff !important;
-            border-color: rgba(243, 156, 18, 0.8) !important;
-            box-shadow: 0 2px 8px rgba(243, 156, 18, 0.4);
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-            transition: all 0.3s ease;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+            font-weight: 700;
         }
 
-        .pick-live:hover {
-            animation: subtle-pulse 4s infinite;
-            background: linear-gradient(135deg, #b19cd9 0%, #c8b2db 100%) !important;
-            border-color: rgba(177, 156, 217, 0.6) !important;
-            box-shadow: 0 2px 12px rgba(177, 156, 217, 0.3);
+        .pick-cell.big-bet {
+            box-shadow: inset 0 0 0 2px rgba(255, 215, 0, 0.85);
+        }
+
+        /* A big bet that lost keeps its rim, dimmed, so the cell still reads greyed out */
+        .pick-cell.pick-incorrect.big-bet {
+            box-shadow: inset 0 0 0 2px rgba(255, 215, 0, 0.34);
+        }
+
+        /* Live is the more time-sensitive signal, so it outranks the gold rim */
+        .pick-cell.pick-live,
+        .pick-cell.pick-live.big-bet {
+            box-shadow: inset 0 0 0 2px rgba(243, 156, 18, 0.9);
         }
 
         .team-short {
@@ -587,12 +613,6 @@
             .user-name {
                 min-width: 150px;
                 font-size: 18px !important;
-            }
-
-            .pick-cell {
-                min-width: 32px;
-                max-width: 32px;
-                font-size: 7px;
             }
 
             .team-short {
