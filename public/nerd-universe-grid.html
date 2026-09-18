@@ -82,7 +82,6 @@
             --tile-w: 48px;
             --tile-h: 20px;
             --tile-font: 10px;
-            --matrix-scale: 1;
             width: max-content;
             min-width: 100%;
             border-collapse: separate;
@@ -248,11 +247,11 @@
            is more specific (0,1,1 vs 0,1,0) and would otherwise pin every tile
            back to its old 28px/11px, leaving the tier variables inert. */
         .pick-cell {
-            width: calc(var(--tile-w) * var(--matrix-scale)) !important;
-            min-width: calc(var(--tile-w) * var(--matrix-scale)) !important;
-            max-width: calc(var(--tile-w) * var(--matrix-scale)) !important;
-            height: calc(var(--tile-h) * var(--matrix-scale)) !important;
-            font-size: calc(var(--tile-font) * var(--matrix-scale)) !important;
+            width: var(--tile-w) !important;
+            min-width: var(--tile-w) !important;
+            max-width: var(--tile-w) !important;
+            height: var(--tile-h) !important;
+            font-size: var(--tile-font) !important;
             line-height: 1.2 !important;
             padding: 0 !important;
             border: none !important;
@@ -601,16 +600,6 @@
             text-shadow: none !important;
         }
 
-        .toggle-button.inactive {
-            background: rgba(26, 26, 40, 0.3);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border-color: rgba(85, 85, 85, 0.5);
-            color: #666;
-            opacity: 0.6;
-            text-shadow: none;
-        }
-
         /* Scroll indicator gradient at bottom of grid */
         .grid-container::after {
             content: '';
@@ -869,13 +858,6 @@
         let gameIds = [];
         let isLoadingWeek = false;
         let sortByScore = true;
-
-        // Column grouping state
-        let columnGroups = {
-            completed: { visible: true, games: [] },
-            active: { visible: true, games: [] },
-            notstarted: { visible: true, games: [] }
-        };
 
         // Initialize the application
         async function initialize() {
@@ -1279,10 +1261,6 @@
             logger.grid(`🎯 Rendering grid for Week ${currentWeek} with gameIds:`, gameIds);
             renderTableHeader();
             renderTableBody();
-
-            // Categorize games by status and update UI
-            categorizeGamesByStatus();
-            updateColumnVisibility();
 
             logger.grid(`✅ Grid render complete for Week ${currentWeek}`);
         }
@@ -2180,47 +2158,6 @@
             document.getElementById('user-modal').classList.add('hidden');
         };
 
-        // Column grouping functions
-        function categorizeGamesByStatus() {
-            columnGroups.completed.games = [];
-            columnGroups.active.games = [];
-            columnGroups.notstarted.games = [];
-
-            logger.grid('🔍 CATEGORIZING GAMES BY STATUS:');
-
-            gameIds.forEach(gameId => {
-                const game = bibleData[gameId];
-                if (!game) return;
-
-                const status = getGameStatus(game);
-                logger.grid(`Game ${gameId}:`, {
-                    winner: game.winner,
-                    gameTime: game.gameTime,
-                    date: game.date,
-                    status: status
-                });
-
-                if (status === 'completed') {
-                    columnGroups.completed.games.push(gameId);
-                } else if (status === 'active') {
-                    columnGroups.active.games.push(gameId);
-                } else {
-                    columnGroups.notstarted.games.push(gameId);
-                }
-            });
-
-            logger.grid('📊 GAME STATUS SUMMARY:', {
-                completed: columnGroups.completed.games.length,
-                active: columnGroups.active.games.length,
-                notstarted: columnGroups.notstarted.games.length
-            });
-
-            // Update counts in UI (buttons removed in v4.0)
-            // document.getElementById('completed-count').textContent = columnGroups.completed.games.length;
-            // document.getElementById('active-count').textContent = columnGroups.active.games.length;
-            // document.getElementById('notstarted-count').textContent = columnGroups.notstarted.games.length;
-        }
-
         // Dynamic game status helpers - case-insensitive checks
         function isGameCompleted(game) {
             if (!game) return false;
@@ -2283,42 +2220,6 @@
             // Game has started but not finished (active)
             return 'active';
         }
-
-        // Toggle column group visibility
-        window.toggleColumnGroup = function(groupName) {
-            columnGroups[groupName].visible = !columnGroups[groupName].visible;
-
-            const button = document.getElementById(`toggle-${groupName}`);
-            if (columnGroups[groupName].visible) {
-                button.classList.add('active');
-                button.classList.remove('inactive');
-            } else {
-                button.classList.remove('active');
-                button.classList.add('inactive');
-            }
-
-            updateColumnVisibility();
-        };
-
-        // Toggle all columns
-        window.toggleAllColumns = function() {
-            const allVisible = Object.values(columnGroups).every(group => group.visible);
-            const newState = !allVisible;
-
-            Object.keys(columnGroups).forEach(groupName => {
-                columnGroups[groupName].visible = newState;
-                const button = document.getElementById(`toggle-${groupName}`);
-                if (newState) {
-                    button.classList.add('active');
-                    button.classList.remove('inactive');
-                } else {
-                    button.classList.remove('active');
-                    button.classList.add('inactive');
-                }
-            });
-
-            updateColumnVisibility();
-        };
 
         // Toggle sort by score
         window.toggleSort = function() {
@@ -2384,65 +2285,6 @@ ${cacheAge > 15 * 60 * 1000 ? '⚠️ Cache expired (>15min) - will regenerate o
                 alert('❌ Error clearing cache');
             }
         };
-
-        // Update column visibility in the table
-        function updateColumnVisibility() {
-            const table = document.getElementById('picks-table');
-            if (!table) return;
-
-            gameIds.forEach((gameId, index) => {
-                const columnIndex = index + 2; // +2 because first column is player names, and we're targeting game columns
-                const game = bibleData[gameId];
-                const status = getGameStatus(game);
-
-                let group = 'notstarted';
-                if (status === 'completed') group = 'completed';
-                else if (status === 'active') group = 'active';
-
-                const shouldHide = !columnGroups[group].visible;
-
-                // Hide/show header cells (skip player name and total columns)
-                const headerCell = table.querySelector(`thead tr th:nth-child(${columnIndex})`);
-                if (headerCell && !headerCell.classList.contains('total-column')) {
-                    headerCell.style.display = shouldHide ? 'none' : '';
-                }
-
-                // Hide/show body cells (skip player name and total columns)
-                const bodyCells = table.querySelectorAll(`tbody tr td:nth-child(${columnIndex})`);
-                bodyCells.forEach(cell => {
-                    if (!cell.classList.contains('total-column')) {
-                        cell.style.display = shouldHide ? 'none' : '';
-                    }
-                });
-            });
-
-            // Apply dynamic scaling based on visible groups
-            updateDynamicScaling();
-        }
-
-        // Update font sizes and cell sizes based on visible column groups
-        function updateDynamicScaling() {
-            const visibleGroups = Object.values(columnGroups).filter(group => group.visible).length;
-
-            let fontScale = 1;
-            if (visibleGroups === 2) {
-                fontScale = 1.25;
-            } else if (visibleGroups === 1) {
-                fontScale = 1.5;
-            }
-
-            const table = document.getElementById('picks-table');
-            if (!table) return;
-
-            // One variable, multiplied into the tier sizes by the stylesheet.
-            // Writing pixel values onto each cell here would override whichever
-            // responsive tier is active.
-            // Only the variable — an inline font-size here would beat the phone
-            // tier's rule and pin the table to one size at every width.
-            table.style.setProperty('--matrix-scale', fontScale);
-
-            logger.grid(`🎲 MATRIX scaling: ${visibleGroups} groups visible, scale ${fontScale}`);
-        }
 
         // Show/hide loading
         function hideLoading() {
