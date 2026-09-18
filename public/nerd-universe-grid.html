@@ -763,9 +763,14 @@
         }
 
         // Start countdown timer to next game
+        let countdownTimer = null;
+
         function startCountdownTimer() {
-            updateCountdown(); // Initial update
-            setInterval(updateCountdown, 1000); // Update every second
+            // Clear first: initialize() can run more than once per page load if
+            // the signed-in user changes, and a stray interval would tick forever.
+            if (countdownTimer) clearInterval(countdownTimer);
+            updateCountdown();
+            countdownTimer = setInterval(updateCountdown, 1000);
         }
 
         // Update countdown to next game
@@ -2074,7 +2079,7 @@
 
         // The page renders nothing until Firebase has told us who is signed in.
         // Signed out gets the auth card, not an indefinite loader.
-        let gridInitialized = false;
+        let initializedFor = null;
         onAuthStateChanged(auth, (user) => {
             logger.grid(`🎲 MATRIX auth: ${user ? user.uid : 'signed out'}`);
 
@@ -2090,13 +2095,17 @@
             document.getElementById('auth-section').classList.toggle('hidden', !!user);
             document.getElementById('main-content').classList.toggle('hidden', !user);
 
+            // Keyed on uid, not a boolean: onAuthStateChanged also fires on token
+            // refresh (we must not refetch the board), but it can hand us a
+            // different user without a null in between — and the board is
+            // rendered from the viewer's perspective, so that must re-render.
             if (user) {
-                if (!gridInitialized) {
-                    gridInitialized = true;
+                if (initializedFor !== user.uid) {
+                    initializedFor = user.uid;
                     initialize();
                 }
             } else {
-                gridInitialized = false;
+                initializedFor = null;
                 hideLoading();
             }
         });
