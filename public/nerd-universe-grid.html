@@ -2424,64 +2424,23 @@ ${cacheAge > 15 * 60 * 1000 ? '⚠️ Cache expired (>15min) - will regenerate o
         function updateDynamicScaling() {
             const visibleGroups = Object.values(columnGroups).filter(group => group.visible).length;
 
-            // Calculate scale factors
             let fontScale = 1;
-            let cellScale = 1;
-
             if (visibleGroups === 2) {
-                // One group hidden - 25% larger
                 fontScale = 1.25;
-                cellScale = 1.25;
             } else if (visibleGroups === 1) {
-                // Two groups hidden - 50% larger
                 fontScale = 1.5;
-                cellScale = 1.5;
             }
 
-            // Apply scaling to table
             const table = document.getElementById('picks-table');
-            if (table) {
-                // Base sizes
-                const baseFontSize = 12; // base table font
-                const basePickCellSize = 45; // base pick cell width
-                const basePickFontSize = 10; // base pick cell font
-                const baseHeaderFontSize = 12; // base header font
-                const baseCellFontSize = 11; // base td font
+            if (!table) return;
 
-                // Apply scaling
-                table.style.fontSize = `${baseFontSize * fontScale}px`;
+            // One variable, multiplied into the tier sizes by the stylesheet.
+            // Writing pixel values onto each cell here would override whichever
+            // responsive tier is active.
+            table.style.setProperty('--matrix-scale', fontScale);
+            table.style.fontSize = `${12 * fontScale}px`;
 
-                // Scale pick cells
-                const pickCells = table.querySelectorAll('.pick-cell');
-                pickCells.forEach(cell => {
-                    const newSize = Math.round(basePickCellSize * cellScale);
-                    cell.style.minWidth = `${newSize}px`;
-                    cell.style.maxWidth = `${newSize}px`;
-                    cell.style.fontSize = `${basePickFontSize * fontScale}px`;
-                });
-
-                // Scale headers
-                const headers = table.querySelectorAll('th');
-                headers.forEach(header => {
-                    header.style.fontSize = `${baseHeaderFontSize * fontScale}px`;
-                });
-
-                // Scale table cells
-                const cells = table.querySelectorAll('td');
-                cells.forEach(cell => {
-                    if (!cell.classList.contains('pick-cell') && !cell.classList.contains('user-name') && !cell.classList.contains('total-column')) {
-                        cell.style.fontSize = `${baseCellFontSize * fontScale}px`;
-                    }
-                });
-
-                // Scale team short text (helmet icons area)
-                const teamShorts = table.querySelectorAll('.team-short');
-                teamShorts.forEach(teamShort => {
-                    teamShort.style.fontSize = `${16 * fontScale}px`;
-                });
-
-                logger.grid(`🎯 Applied scaling: ${visibleGroups} groups visible, ${Math.round((fontScale - 1) * 100)}% size increase`);
-            }
+            logger.grid(`🎲 MATRIX scaling: ${visibleGroups} groups visible, scale ${fontScale}`);
         }
 
         // Show/hide loading
