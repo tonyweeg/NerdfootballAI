@@ -133,3 +133,38 @@ describe('assignPlaces', () => {
             .toEqual([['Bob', '🥇'], ['Ann', '🥈']]);
     });
 });
+
+describe('assignPlaces — a tie that runs past third', () => {
+    const P = (name, score, mnfGuess) => ({ name, score, mnfGuess });
+    const places = (players, actual) =>
+        MnfTiebreak.assignPlaces(players, actual).map((p) => [p.name, p.place]);
+
+    // Owner ruling: the tiebreak applies to as many players as are tied for a
+    // 1st/2nd/3rd place — the whole group resolves, not just the medal slot.
+    test('a six-way tie at third resolves every member, 3rd through 8th', () => {
+        const out = places([
+            P('Ann', 99, 40), P('Bob', 95, 40),
+            P('Cal', 88, 58), P('Dee', 88, 46), P('Eve', 88, 30),
+            P('Fay', 88, 47), P('Gus', 88, 52), P('Hal', 88, null)
+        ], 47);
+        expect(out).toEqual([
+            ['Ann', '🥇'], ['Bob', '🥈'],
+            ['Fay', '🥉'],   // exact 47
+            ['Dee', '4'],    // under by 1
+            ['Eve', '5'],    // under by 17
+            ['Gus', '6'],    // over by 5
+            ['Cal', '7'],    // over by 11
+            ['Hal', '8']     // no guess
+        ]);
+    });
+
+    test('a tie that starts below third is still left shared', () => {
+        expect(places([
+            P('Ann', 99, 40), P('Bob', 95, 40), P('Cal', 92, 40),
+            P('Dee', 80, 58), P('Eve', 80, 46), P('Fay', 80, 47)
+        ], 47)).toEqual([
+            ['Ann', '🥇'], ['Bob', '🥈'], ['Cal', '🥉'],
+            ['Dee', 'T4'], ['Eve', 'T4'], ['Fay', 'T4']
+        ]);
+    });
+});
