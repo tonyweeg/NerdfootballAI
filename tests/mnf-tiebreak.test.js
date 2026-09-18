@@ -63,3 +63,73 @@ describe('mnfActualTotal', () => {
         expect(MnfTiebreak.mnfActualTotal(strings, ['116'], isFinal)).toBe(38);
     });
 });
+
+describe('assignPlaces', () => {
+    // helper: build players already sorted by score descending
+    const P = (name, score, mnfGuess) => ({ name, score, mnfGuess });
+    const places = (players, actual) =>
+        MnfTiebreak.assignPlaces(players, actual).map((p) => [p.name, p.place]);
+
+    test('leaves an untied field exactly as it is', () => {
+        expect(places([P('Ann', 90, 40), P('Bob', 80, 40), P('Cal', 70, 40)], 47))
+            .toEqual([['Ann', '🥇'], ['Bob', '🥈'], ['Cal', '🥉']]);
+    });
+
+    test('under beats over — 46 wins over 51 when the actual is 47', () => {
+        expect(places([P('Tony', 88, 51), P('Dave', 88, 46), P('Ric', 85, 40)], 47))
+            .toEqual([['Dave', '🥇'], ['Tony', '🥈'], ['Ric', '🥉']]);
+    });
+
+    test('nearer under beats further under', () => {
+        expect(places([P('Ann', 88, 30), P('Bob', 88, 46)], 47))
+            .toEqual([['Bob', '🥇'], ['Ann', '🥈']]);
+    });
+
+    test('an exact guess wins outright', () => {
+        expect(places([P('Ann', 88, 40), P('Bob', 88, 47)], 47))
+            .toEqual([['Bob', '🥇'], ['Ann', '🥈']]);
+    });
+
+    test('when everyone went over, the smallest overshoot wins', () => {
+        expect(places([P('Ann', 88, 58), P('Bob', 88, 52)], 47))
+            .toEqual([['Bob', '🥇'], ['Ann', '🥈']]);
+    });
+
+    test('a player with no guess ranks last in the group', () => {
+        expect(places([P('Ann', 88, null), P('Bob', 88, 58)], 47))
+            .toEqual([['Bob', '🥇'], ['Ann', '🥈']]);
+    });
+
+    test('identical guesses fall back to alphabetical', () => {
+        expect(places([P('Zed', 88, 44), P('Abe', 88, 44)], 47))
+            .toEqual([['Abe', '🥇'], ['Zed', '🥈']]);
+    });
+
+    test('a three-way tie at first consumes all three medals', () => {
+        expect(places([P('Ann', 88, 30), P('Bob', 88, 46), P('Cal', 88, 52)], 47))
+            .toEqual([['Bob', '🥇'], ['Ann', '🥈'], ['Cal', '🥉']]);
+    });
+
+    test('a tie for second resolves into second and third', () => {
+        expect(places([P('Ann', 99, 40), P('Bob', 88, 52), P('Cal', 88, 46)], 47))
+            .toEqual([['Ann', '🥇'], ['Cal', '🥈'], ['Bob', '🥉']]);
+    });
+
+    test('a tie outside the top three stays shared', () => {
+        const out = places(
+            [P('Ann', 99, 40), P('Bob', 95, 40), P('Cal', 92, 40), P('Dee', 80, 46), P('Eve', 80, 52)],
+            47
+        );
+        expect(out).toEqual([['Ann', '🥇'], ['Bob', '🥈'], ['Cal', '🥉'], ['Dee', 'T4'], ['Eve', 'T4']]);
+    });
+
+    test('with no actual total yet, tied players share a medal as before', () => {
+        expect(places([P('Tony', 88, 51), P('Dave', 88, 46)], null))
+            .toEqual([['Tony', '🥇'], ['Dave', '🥇']]);
+    });
+
+    test('a 0-0 actual total still resolves — 0 is not "unknown"', () => {
+        expect(places([P('Ann', 88, 10), P('Bob', 88, 3)], 0))
+            .toEqual([['Bob', '🥇'], ['Ann', '🥈']]);
+    });
+});
