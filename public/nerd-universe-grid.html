@@ -1398,8 +1398,9 @@
                     👤 ${currentUserRow.member.name || currentUserRow.member.email || 'Unknown'}${pickPill}
                 </td>`;
 
+                const currentUserTop = topConfidenceValues(currentUserRow.userPicks);
                 gameIds.forEach(gameId => {
-                    rowsHTML += createPickCellHTML(gameId, currentUserRow.userPicks, currentUserRow.memberId);
+                    rowsHTML += createPickCellHTML(gameId, currentUserRow.userPicks, currentUserRow.memberId, currentUserTop);
                 });
 
                 rowsHTML += `<td class="mnf-column">${formatMnfGuess(currentUserRow.mnfGuess)}</td>`;
@@ -1419,8 +1420,9 @@
                     ${player.member.name || player.member.email || 'Unknown'}${pickPill}
                 </td>`;
 
+                const playerTop = topConfidenceValues(player.userPicks);
                 gameIds.forEach(gameId => {
-                    rowsHTML += createPickCellHTML(gameId, player.userPicks, player.memberId);
+                    rowsHTML += createPickCellHTML(gameId, player.userPicks, player.memberId, playerTop);
                 });
 
                 rowsHTML += `<td class="mnf-column">${formatMnfGuess(player.mnfGuess)}</td>`;
@@ -1432,7 +1434,7 @@
         }
 
         // Create individual pick cell HTML
-        function createPickCellHTML(gameId, userPicks, memberId) {
+        function createPickCellHTML(gameId, userPicks, memberId, topConfidence) {
             const currentWeekNum = getCurrentWeekNumber();
             const isCurrentWeek = currentWeek === currentWeekNum;
             const currentUserId = auth.currentUser?.uid;
@@ -1482,7 +1484,6 @@
             }
 
             let cellClass = 'pick-cell ';
-            let statusIcon = '';
 
             if (isGameComplete) {
                 cellClass += isCorrect ? 'pick-correct' : 'pick-incorrect';
@@ -1492,13 +1493,34 @@
                 cellClass += 'pick-pending';
             }
 
-            const teamShort = getTeamShort(pick.winner);
-            const teamColorClass = isGameComplete && !isCorrect ? '' : getTeamColorClass(pick.winner);
+            const confidence = pick.confidence || 0;
+            if (topConfidence && topConfidence.has(Number(confidence))) {
+                cellClass += ' big-bet';
+            }
 
-            return `<td class="${cellClass} ${teamColorClass}">
+            const teamShort = getTeamShort(pick.winner);
+            // The team gradient now stays on wrong picks too — the greyed-out
+            // look comes from the .pick-incorrect filter, not from dropping it.
+            const teamColorClass = getTeamColorClass(pick.winner);
+            const title = `${teamShort} · confidence ${confidence}`;
+
+            return `<td class="${cellClass} ${teamColorClass}" title="${title}">
                 <div class="team-short">${teamShort}</div>
-                <div class="confidence-num">${pick.confidence || 0}</div>
+                <div class="confidence-num">${confidence}</div>
             </td>`;
+        }
+
+        // The three highest confidence values this player assigned. Ranking by
+        // value rather than a fixed number keeps it right in 14-, 15- and
+        // 16-game weeks.
+        function topConfidenceValues(userPicks) {
+            if (!userPicks) return new Set();
+            const values = Object.keys(userPicks)
+                .filter(k => k.match(/^\d+$/))
+                .map(k => Number(userPicks[k] && userPicks[k].confidence))
+                .filter(n => Number.isFinite(n) && n > 0);
+            values.sort((a, b) => b - a);
+            return new Set(values.slice(0, 3));
         }
 
         // MNF tiebreaker guesses are visible to everyone at all times — an
