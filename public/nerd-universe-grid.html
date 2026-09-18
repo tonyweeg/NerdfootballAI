@@ -282,6 +282,40 @@
             .pick-cell .confidence-num { display: inline; opacity: 0.85; }
         }
 
+        .picks-table thead th.pick-cell {
+            height: auto !important;
+            padding: 4px 2px !important;
+            vertical-align: bottom;
+        }
+
+        .pick-cell .helmet {
+            display: block;
+            margin: 0 auto;
+            width: 15px;
+            height: 15px;
+            object-fit: contain;
+        }
+
+        .pick-cell .helmet.lost {
+            opacity: 0.25;
+            filter: grayscale(1);
+        }
+
+        .pick-cell .matchup-abbr {
+            font-size: 8px;
+            letter-spacing: 0;
+            line-height: 1.2;
+        }
+
+        /* Phones show helmets only — the matchup stays in the tooltip */
+        @media (max-width: 767px) {
+            .pick-cell .matchup-abbr { display: none; }
+        }
+
+        @media (min-width: 768px) {
+            .pick-cell .helmet { width: 18px; height: 18px; }
+        }
+
         .pick-correct {
             color: #ffffff !important;
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
@@ -1228,69 +1262,40 @@
                     const homeShort = getTeamShort(game.h);
                     const awayShort = getTeamShort(game.a);
                     const winner = game.winner;
-
-                    // Check if current user picked this game correctly
-                    const currentUserId = auth.currentUser?.uid;
-                    const currentUserPicks = allPicks[currentUserId];
-                    let isCurrentUserCorrect = false;
-
-                    if (currentUserPicks && currentUserPicks[gameId]) {
-                        const pick = currentUserPicks[gameId];
-                        const isGameComplete = isGameCompleted(game);
-
-                        // Check for tie (same logic as createPickCellHTML)
-                        const isTie = isGameComplete && (
-                            (game.winner && (
-                                game.winner.toUpperCase() === 'TIE' ||
-                                game.winner.toUpperCase() === 'TIE/OT' ||
-                                game.winner.toUpperCase() === 'DRAW' ||
-                                game.winner.toUpperCase().includes('TIE')
-                            )) ||
-                            (game.awayScore !== undefined && game.homeScore !== undefined &&
-                             parseInt(game.awayScore) === parseInt(game.homeScore) &&
-                             parseInt(game.awayScore) > 0)
-                        );
-
-                        if (isTie) {
-                            isCurrentUserCorrect = true;
-                        } else {
-                            isCurrentUserCorrect = isGameComplete && game.winner === pick.winner;
-                        }
-                    }
-
-                    // Bold the winning team and make it gold if user picked correctly
-                    // Make the losing team red if user picked it
-                    let awayDisplay = awayShort;
-                    let homeDisplay = homeShort;
-
-                    if (winner && winner !== 'TBD' &&
+                    const decided = winner &&
+                        winner !== 'TBD' &&
                         !winner.toUpperCase().includes('TIE') &&
-                        winner !== 'DRAW') {
+                        winner !== 'DRAW';
 
-                        // Determine which team the user picked
-                        const userPickedAway = currentUserPicks && currentUserPicks[gameId] && currentUserPicks[gameId].winner === game.a;
-                        const userPickedHome = currentUserPicks && currentUserPicks[gameId] && currentUserPicks[gameId].winner === game.h;
+                    const currentUserPicks = allPicks[auth.currentUser?.uid];
+                    const myPick = currentUserPicks && currentUserPicks[gameId]
+                        ? currentUserPicks[gameId].winner
+                        : null;
 
-                        if (winner === game.a) {
-                            // Away team won - make it bold (gold if user picked it)
-                            const goldClass = userPickedAway ? 'gold-text' : '';
-                            awayDisplay = `<span class="${goldClass}" style="font-weight: 700;">${awayShort}</span>`;
+                    // Gold for the team you picked and won with, red for the one
+                    // you picked and lost with — the Grid's existing signal.
+                    const abbrClass = (team) => {
+                        if (!decided || myPick !== team) return '';
+                        return winner === team ? 'gold-text' : 'red-text';
+                    };
 
-                            // Home team lost - make it red if user picked it
-                            const redClass = userPickedHome ? 'red-text' : '';
-                            homeDisplay = redClass ? `<span class="${redClass}" style="font-weight: 700;">${homeShort}</span>` : homeShort;
-                        } else if (winner === game.h) {
-                            // Home team won - make it bold (gold if user picked it)
-                            const goldClass = userPickedHome ? 'gold-text' : '';
-                            homeDisplay = `<span class="${goldClass}" style="font-weight: 700;">${homeShort}</span>`;
+                    const helmetFor = (team, short) => {
+                        const url = window.TeamLogos.logoUrl(team);
+                        const lost = decided && winner !== team ? ' lost' : '';
+                        return url
+                            ? `<img class="helmet${lost}" src="${url}" alt="${short}" loading="lazy">`
+                            : `<span class="matchup-abbr">${short}</span>`;
+                    };
 
-                            // Away team lost - make it red if user picked it
-                            const redClass = userPickedAway ? 'red-text' : '';
-                            awayDisplay = redClass ? `<span class="${redClass}" style="font-weight: 700;">${awayShort}</span>` : awayShort;
-                        }
-                    }
-
-                    headerHTML += `<th class="pick-cell">${awayDisplay}<br>@<br>${homeDisplay}</th>`;
+                    const title = `${awayShort} @ ${homeShort}`;
+                    headerHTML += `<th class="pick-cell" title="${title}">` +
+                        helmetFor(game.a, awayShort) +
+                        helmetFor(game.h, homeShort) +
+                        `<div class="matchup-abbr">` +
+                            `<span class="${abbrClass(game.a)}">${awayShort}</span>/` +
+                            `<span class="${abbrClass(game.h)}">${homeShort}</span>` +
+                        `</div>` +
+                    `</th>`;
                 } else {
                     headerHTML += `<th class="pick-cell">G${gameId}</th>`;
                 }
