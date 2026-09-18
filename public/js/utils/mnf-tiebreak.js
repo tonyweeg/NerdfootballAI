@@ -19,7 +19,21 @@
         return best;
     }
 
-    const MnfTiebreak = Object.freeze({ mnfGameId });
+    // Total points in the MNF game, or null while it is unplayed or unscored.
+    // `isFinal` is injected by the caller — the page passes its own
+    // isGameCompleted so this module cannot drift from the page's definition.
+    function mnfActualTotal(bibleData, gameIds, isFinal) {
+        const id = mnfGameId(gameIds);
+        if (!id || !bibleData) return null;
+        const game = bibleData[id];
+        if (typeof isFinal !== 'function' || !isFinal(game)) return null;
+        const away = Number(game.awayScore);
+        const home = Number(game.homeScore);
+        if (!Number.isFinite(away) || !Number.isFinite(home)) return null;
+        return away + home;
+    }
+
+    const MnfTiebreak = Object.freeze({ mnfGameId, mnfActualTotal });
 
     if (typeof window !== 'undefined') window.MnfTiebreak = MnfTiebreak;
     if (typeof module !== 'undefined' && module.exports) module.exports = MnfTiebreak;
