@@ -632,6 +632,12 @@
             <p class="lb-subtitle">Every pick from every player. Picks unlock game by game at kickoff.</p>
         </section>
 
+        <div id="auth-section" class="card message-card hidden">
+            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            <div class="message-title">Sign in required</div>
+            <p>Sign in to NerdUniverse to see The Grid. <a href="./index.html">Go to sign in</a></p>
+        </div>
+
     <!-- Loading Screen -->
     <div id="loading-screen" class="flex items-center justify-center min-h-screen">
         <div class="text-center">
@@ -696,7 +702,7 @@
     <script type="module">
         import { getFirebaseConfig } from './js/config/firebase-config.js';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
         import { getFirestore, doc, getDoc, setDoc, deleteDoc, getDocs, collection, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
         import { initializeAppCheck, ReCaptchaV3Provider } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js';
 
@@ -727,8 +733,6 @@
         // Initialize the application
         async function initialize() {
             try {
-                await waitForFirebaseAuth();
-
                 const currentUserId = auth.currentUser?.uid;
                 const currentWeekNum = getCurrentWeekNumber();
                 logger.grid('⚔️ GRID SECURITY INIT:', {
@@ -944,17 +948,6 @@
         // Get current NFL week number
         function getCurrentWeekNumber() {
             return window.SEASON_CONFIG.utils.getCurrentWeek();
-        }
-
-        // Wait for Firebase Auth
-        async function waitForFirebaseAuth() {
-            return new Promise((resolve) => {
-                const unsubscribe = auth.onAuthStateChanged((user) => {
-                    unsubscribe();
-                    resolve();
-                });
-                setTimeout(() => { unsubscribe(); resolve(); }, 5000);
-            });
         }
 
         // Load pool members
@@ -2064,8 +2057,10 @@
 
         // Show/hide loading
         function hideLoading() {
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('main-content').classList.remove('hidden');
+            const old = document.getElementById('loading-screen');
+            if (old) old.classList.add('hidden');
+            const loader = document.getElementById('grid-loading');
+            if (loader) loader.hidden = true;
         }
 
         function showError(message) {
@@ -2077,8 +2072,34 @@
             `;
         }
 
-        // Initialize when page loads
-        initialize();
+        // The page renders nothing until Firebase has told us who is signed in.
+        // Signed out gets the auth card, not an indefinite loader.
+        let gridInitialized = false;
+        onAuthStateChanged(auth, (user) => {
+            logger.grid(`🎲 MATRIX auth: ${user ? user.uid : 'signed out'}`);
+
+            const header = window.NerdHeader && window.NerdHeader.current;
+            if (header) {
+                header.setUser(user);
+                header.setLogoutHandler(user ? async () => {
+                    await signOut(auth);
+                    window.location.href = './index.html';
+                } : null);
+            }
+
+            document.getElementById('auth-section').classList.toggle('hidden', !!user);
+            document.getElementById('main-content').classList.toggle('hidden', !user);
+
+            if (user) {
+                if (!gridInitialized) {
+                    gridInitialized = true;
+                    initialize();
+                }
+            } else {
+                gridInitialized = false;
+                hideLoading();
+            }
+        });
     </script>
 </body>
 </html>
