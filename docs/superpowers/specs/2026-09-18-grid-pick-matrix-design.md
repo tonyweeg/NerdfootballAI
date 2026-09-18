@@ -170,8 +170,13 @@ The tiebreak lives in `public/js/utils/mnf-tiebreak.js`, following the
 `module.exports` for jest. Three pure functions:
 
 - `mnfGameId(gameIds)` → the highest ID
-- `mnfActualTotal(bibleData, gameIds)` → number, or `null` when that game is not final
+- `mnfActualTotal(bibleData, gameIds, isFinal)` → number, or `null` when that game is
+  not final. The `isFinal` predicate is injected — the page passes its own
+  `isGameCompleted`, so the module cannot drift from the page's definition of final.
 - `assignPlaces(players, actual)` → the same array with `place` set
+
+A fourth export, `compareByMnf(a, b, actual)`, is exposed for direct unit testing of
+the comparator.
 
 Keeping it out of the HTML file is what makes it testable, and follows the
 centralized-utility rule in CLAUDE.md.
