@@ -1475,19 +1475,40 @@
             document.getElementById('fact-final-sub').textContent =
                 finalCount === gameIds.length ? 'week complete' : `${gameIds.length - finalCount} still to play`;
 
+            // The card reads the same ranking the table does — same helper, same
+            // MNF tiebreak — so the two can never disagree about who leads.
+            // Property must be `mnfGuess`: that is what assignPlaces reads.
             const ranked = memberIds
                 .map(id => ({
                     name: poolMembers[id].name || poolMembers[id].email || 'Unknown',
                     score: calculateUserTotal(allPicks[id]),
-                    mnf: allPicks[id] ? allPicks[id].mnfTotalPoints : null
+                    mnfGuess: allPicks[id] ? allPicks[id].mnfTotalPoints : null
                 }))
                 .sort((a, b) => b.score - a.score || a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 
-            const leader = ranked[0];
-            document.getElementById('fact-leader').textContent = leader ? leader.name : '—';
-            document.getElementById('fact-leader-sub').textContent = leader
-                ? `${leader.score} pts · MNF ${formatMnfGuess(leader.mnf)}`
-                : '';
+            const mnfActual = window.MnfTiebreak.mnfActualTotal(bibleData, gameIds, isGameCompleted);
+            window.MnfTiebreak.assignPlaces(ranked, mnfActual);
+
+            // Whoever holds first place. More than one means the tiebreak could
+            // not separate them — the Monday game has not finished yet — so the
+            // card says so rather than picking one of them arbitrarily.
+            const first = ranked.filter(p => p.place === '🥇');
+            const leaderEl = document.getElementById('fact-leader');
+            const leaderSubEl = document.getElementById('fact-leader-sub');
+
+            if (first.length === 0) {
+                leaderEl.textContent = '—';
+                leaderSubEl.textContent = '';
+            } else if (first.length === 1) {
+                leaderEl.textContent = first[0].name;
+                leaderSubEl.textContent = `${first[0].score} pts · MNF ${formatMnfGuess(first[0].mnfGuess)}`;
+            } else {
+                const names = first.map(p => p.name);
+                const shown = names.slice(0, 2).join(', ');
+                leaderEl.textContent = `${first.length}-way tie`;
+                leaderSubEl.textContent = `${first[0].score} pts · ` +
+                    (names.length > 2 ? `${shown} +${names.length - 2} more` : shown);
+            }
 
             logger.grid(`🎲 MATRIX stats: ${memberIds.length} players, ${finalCount}/${gameIds.length} final`);
         }
